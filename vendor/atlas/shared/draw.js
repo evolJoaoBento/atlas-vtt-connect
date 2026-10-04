@@ -269,6 +269,116 @@ class LaserTrail {
     this.points = [];
   }
 }
+const LASER_STALE_MS = 1e3;
+const LASER_PLAYBACK_DELAY_MS = 90;
+const REMOTE_LASER_LIMITS = { points: 64, maxGapMs: 2e3, maxAheadMs: 3e3, senders: 32 };
+const MAX_PENDING = 256;
+const DEFAULT_SPAN_MS = 1e3 / 30;
+const MAX_GLIDE_MS = 100;
+function limited(points, timing) {
+  var _a;
+  const skip = Math.max(0, points.length - REMOTE_LASER_LIMITS.points);
+  const matching = ((_a = timing.dt) == null ? void 0 : _a.length) === points.length;
+  const dt = matching ? timing.dt.slice(skip).map((gap) => gap > 0 ? Math.min(REMOTE_LASER_LIMITS.maxGapMs, gap) : 0) : void 0;
+  return { points: skip > 0 ? points.slice(skip) : points, timing: { ...timing, ...dt ? { dt } : {} } };
+}
+class RemoteLasers {
+  constructor() {
+    __publicField(this, "entries", /* @__PURE__ */ new Map());
+  }
+  get isActive() {
+    return this.entries.size > 0;
+  }
+  receive(from, color, sent, lifted, now, sentTiming = {}) {
+    const { points, timing } = limited(sent, sentTiming);
+    let entry = this.entries.get(from);
+    if (!entry) {
+      if (points.length === 0 || this.entries.size >= REMOTE_LASER_LIMITS.senders) return;
+      entry = { color, trail: new LaserTrail(), lifted, lastAt: now, head: null, pending: [], offset: null, sentAt: 0 };
+      this.entries.set(from, entry);
+    }
+    if (entry.lifted && points.length > 0) {
+      entry.offset = null;
+      if (entry.pending.length === 0) {
+        entry.trail.clear();
+        entry.head = null;
+      }
+    }
+    this.enqueue(entry, points, now, timing);
+    entry.color = color;
+    entry.lifted = lifted;
+    entry.lastAt = now;
+  }
+  /** What to draw now; lasers that faded out are forgotten. */
+  frame(now) {
+    const frames = [];
+    for (const [from, entry] of this.entries) {
+      if (!entry.lifted && now - entry.lastAt > LASER_STALE_MS) entry.lifted = true;
+      this.play(entry, now);
+      entry.trail.prune(now);
+      const done = entry.pending.length === 0;
+      if (entry.lifted && done && entry.trail.length === 0) {
+        this.entries.delete(from);
+        continue;
+      }
+      const head = entry.lifted && done ? null : this.headAt(entry, now);
+      const trail = entry.trail.beamPoints(now);
+      if (head) trail.push({ x: head.x, y: head.y, life: 1 });
+      if (trail.length === 0) continue;
+      frames.push({ from, color: entry.color, trail, head });
+    }
+    return frames;
+  }
+  clear() {
+    this.entries.clear();
+  }
+  /** Puts the points on the entry's timeline. */
+  enqueue(entry, points, now, timing) {
+    var _a, _b;
+    if (points.length === 0) return;
+    if (timing.immediate) {
+      for (const point of points) entry.pending.push({ x: point.x, y: point.y, at: now });
+      entry.offset = null;
+      return;
+    }
+    const fresh = entry.offset === null;
+    const gaps = timing.dt && timing.dt.length === points.length ? timing.dt : points.map(() => DEFAULT_SPAN_MS / points.length);
+    let sent = fresh ? 0 : entry.sentAt;
+    const times = gaps.map((gap, index) => sent += index === 0 && fresh ? 0 : Math.max(0, gap));
+    const first = times[0] ?? 0;
+    const last = times[times.length - 1] ?? 0;
+    if (entry.offset === null || last + entry.offset < now) entry.offset = now + LASER_PLAYBACK_DELAY_MS - first;
+    const offset = entry.offset;
+    entry.sentAt = last;
+    let previous = ((_a = entry.pending[entry.pending.length - 1]) == null ? void 0 : _a.at) ?? ((_b = entry.head) == null ? void 0 : _b.at) ?? -Infinity;
+    points.forEach((point, index) => {
+      previous = Math.max(previous, (times[index] ?? 0) + offset);
+      entry.pending.push({ x: point.x, y: point.y, at: previous });
+    });
+    const horizon = now + LASER_PLAYBACK_DELAY_MS + REMOTE_LASER_LIMITS.maxAheadMs;
+    while (entry.pending.length > 0 && entry.pending[entry.pending.length - 1].at > horizon) entry.pending.pop();
+    if (entry.pending.length > MAX_PENDING) entry.pending.splice(0, entry.pending.length - MAX_PENDING);
+  }
+  /** Points whose time has come join the trail, which fades each from its own time. */
+  play(entry, now) {
+    while (entry.pending[0] && entry.pending[0].at <= now) {
+      const point = entry.pending.shift();
+      entry.trail.add(point.x, point.y, point.at);
+      entry.head = point;
+    }
+  }
+  /** The head between the point it left and the one it is heading for. */
+  headAt(entry, now) {
+    const from = entry.head;
+    const to = entry.pending[0];
+    if (!from) return null;
+    if (!to) return { x: from.x, y: from.y };
+    const start = Math.max(from.at, to.at - MAX_GLIDE_MS);
+    const span = to.at - start;
+    const share = span > 0 ? Math.min(1, Math.max(0, (now - start) / span)) : 1;
+    return { x: from.x + (to.x - from.x) * share, y: from.y + (to.y - from.y) * share };
+  }
+}
 const spacing = {
   xs: 4,
   s: 8,
@@ -685,6 +795,23 @@ function calculateOperationBounds(op) {
     }
   }
 }
+function insideSpans(points, y) {
+  const crossings = [];
+  for (let index = 0; index < points.length; index++) {
+    const a2 = points[index];
+    const b2 = points[(index + 1) % points.length];
+    if (a2.y <= y === b2.y <= y) continue;
+    crossings.push({ x: a2.x + (y - a2.y) / (b2.y - a2.y) * (b2.x - a2.x), winding: b2.y > a2.y ? 1 : -1 });
+  }
+  crossings.sort((p, q) => p.x - q.x);
+  const spans = [];
+  let winding = 0;
+  for (let index = 0; index < crossings.length - 1; index++) {
+    winding += crossings[index].winding;
+    if (winding !== 0) spans.push([crossings[index].x, crossings[index + 1].x]);
+  }
+  return spans;
+}
 export {
   BAR_BORDER,
   BAR_FILL_INSET,
@@ -700,6 +827,8 @@ export {
   FILAMENT_SHARE,
   FIRST_BAR_GAP,
   FOG_COLOR,
+  LASER_PLAYBACK_DELAY_MS,
+  LASER_STALE_MS,
   LaserTrail,
   MAP_ICON_LABELS,
   MAP_ICON_SIZE,
@@ -714,7 +843,9 @@ export {
   NAMEPLATE,
   NAMEPLATE_HEIGHT,
   NAMEPLATE_STYLE,
+  REMOTE_LASER_LIMITS,
   R as RESIZE_HANDLE_SIZE,
+  RemoteLasers,
   SCENE_LAYER_ORDER,
   SCENE_LAYER_Z,
   TEXT_LINE_SPACING,
@@ -749,6 +880,7 @@ export {
   hexToNumber,
   iconSize,
   inputHeight,
+  insideSpans,
   i as isHexColor,
   laserPointSpacing,
   lightenColor,

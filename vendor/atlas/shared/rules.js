@@ -142,6 +142,21 @@ function withoutHiddenToken(result, isTokenHidden) {
   const { type, abilityName } = source;
   return { ...result, source: abilityName ? { type, abilityName } : { type } };
 }
+function persistableDiceLog(log) {
+  return log.filter((entry) => !entry.rolledBy);
+}
+function rollerName(result) {
+  if (result.rolledBy) return result.rolledBy;
+  const source = result.source;
+  return (source == null ? void 0 : source.type) === "statblock" && source.tokenName ? source.tokenName : null;
+}
+function withDefaultRoll(modifier, defaultRoll) {
+  const bonus = modifier.replace(/\s+/g, "");
+  return bonus === "" || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
+}
+function rollByRules(formula, rules, random = Math.random, now = Date.now()) {
+  return rollFormula(hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll), random, now, rules);
+}
 const DEFAULT_INITIATIVE_RULES = { mode: "turn-order", roll: "1d20", firstSide: "players" };
 const INITIATIVE_MODES = ["turn-order", "sides"];
 const INITIATIVE_SIDES = ["players", "opponents"];
@@ -332,6 +347,7 @@ function clampModifier(modifier) {
 function trayPoolByDie(pool) {
   return Object.fromEntries(TRAY_DICE.filter((sides) => (pool[sides] ?? 0) > 0).map((sides) => [`d${sides}`, pool[sides] ?? 0]));
 }
+const PLAYER_VIEW_RULE_KEYS = ["showGrid", "showTokenNameplates", "showWidgets", "showInitiative"];
 export {
   BAR_SLOTS,
   CRIT_RULES,
@@ -355,6 +371,7 @@ export {
   MAX_MODIFIER,
   MAX_PER_DIE,
   MAX_RESOURCES,
+  PLAYER_VIEW_RULE_KEYS,
   RESOURCE_COLORS,
   SIDE_LABELS,
   TRAY_DICE,
@@ -385,6 +402,7 @@ export {
   parseDefaultRoll,
   parseExplodeRule,
   parseInitiativeRules,
+  persistableDiceLog,
   remainingShare,
   removeDie,
   resetLabel,
@@ -392,9 +410,11 @@ export {
   resourceColor,
   resourceUpdate,
   restedResources,
+  rollByRules,
   rollExplosions,
   rollFace,
   rollFormula,
+  rollerName,
   sameDiceRules,
   sameInitiativeRules,
   savedInitiativeRules,

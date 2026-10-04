@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.1.0";
+export declare const API_VERSION = "1.5.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -37,6 +37,10 @@ export declare interface AtlasExtension {
     /** The calling plugin's manifest id. */
     readonly id: string;
     readonly views: ViewsApi;
+    readonly presentation: PresentationApi;
+    readonly dice: DiceApi;
+    readonly lasers: LasersApi;
+    readonly lighting: LightingApi;
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
@@ -215,7 +219,25 @@ declare type DiagonalRule = 'equidistant' | 'alternating' | 'euclidean';
 /** The dice of Atlas's dice tray, in tray order. */
 declare const DICE_TYPES: readonly ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
 
+export declare interface DiceApi {
+    /** Rolls and logs the roll; returns a frozen copy of the result. */
+    roll(request: DiceRollRequest): DiceRollResult;
+    /** Every roll Atlas logs: the dice tray, statblocks, `roll`, `publish`. Listeners receive frozen copies and run guarded. */
+    onRolled(listener: (result: DiceRollResult) => void): Disposer;
+    /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
+    publish(result: DiceRollResult): void;
+}
+
 declare type DiceCrit = 'high' | 'low' | null;
+
+export declare interface DiceRollRequest {
+    /** e.g. "2d6+1d20-1"; the tray's selection is turned into this with `diceFormula` from @atlas-vtt/shared/rules. A formula without dice, such as "+3", is added to the rules' default roll. */
+    formula: string;
+    /** Rolls by the rules of this map's collection (exploding dice, critical rule); Atlas's defaults otherwise. Rules only: the roll shows in every open map's log. */
+    mapPath?: string | null;
+    /** Someone other than the GM: shown in the log and toasts, shown as a result card rather than thrown on the GM's map, never saved in the map file. */
+    rolledBy?: string;
+}
 
 export declare interface DiceRollResult {
     id: string;
@@ -226,7 +248,11 @@ export declare interface DiceRollResult {
     total: number;
     /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
     crit?: DiceCrit;
+    /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
+    unlistedDice?: number;
     player?: string;
+    /** Who rolled it when it was someone other than the GM: their name. */
+    rolledBy?: string;
     source?: {
         type: 'toolbar' | 'statblock';
         /** Let the roll follow its token's or statblock's current artwork. */
@@ -450,6 +476,22 @@ export declare type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
 };
 
+export declare interface LasersApi {
+    /**
+     * Hears the GM's own laser in a view: each point of it as it is drawn (world units), and when it is let go.
+     * Listeners receive frozen events and run guarded; they end when the view closes. An unknown view, or one
+     * without a laser, gives a disposer that does nothing.
+     */
+    onLocal(viewId: ViewId, listener: (event: LocalLaserEvent) => void): Disposer;
+    /**
+     * Draws someone else's laser in a view, fading like Atlas's own. Send the newest points as they come:
+     * a laser that is not heard from for a second is let go, and lasers are never saved. A message counts
+     * its newest 64 points, a gap in time at most 2 seconds, and 32 lasers show at once; the rest is ignored.
+     * Does nothing for an unknown view; throws when `laser` is malformed.
+     */
+    show(viewId: ViewId, laser: RemoteLaser): void;
+}
+
 declare type LightAnimation = 'none' | 'torch' | 'candle' | 'pulse' | 'magic';
 
 /** What a light gives off. Distances are game units (feet, metres…), converted at render time. */
@@ -491,6 +533,20 @@ declare interface LightEmission {
     preset?: string;
 }
 
+export declare interface LightingApi {
+    /**
+     * What the GM's player window shows of the view's lit scene, and nothing more. Never throws: an unknown view,
+     * or anything Atlas cannot tell yet, is `pending`. Never includes walls, lights, polygons or sight.
+     */
+    playerVisibility(viewId: ViewId, options?: PlayerVisibilityOptions): PlayerVisibility;
+    /**
+     * Called when what `playerVisibility` returns may have changed outside the store (sight recomputed, lighting switched,
+     * a deferred darkness due, explored memory decoded) and when the scene's lighting or explored memory changes. Runs
+     * guarded; ends when the view closes. An unknown view gives a disposer that does nothing.
+     */
+    watch(viewId: ViewId, listener: () => void): Disposer;
+}
+
 /** What a placed light is: it picks the light's marker. `custom` is any other light. */
 declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness' | 'custom';
 
@@ -503,6 +559,20 @@ declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness'
  * there outranks (`lightLevelAt`): no ambient light and no such light counts in it.
  */
 export declare type LightLevel = 'bright' | 'dim' | 'dark' | 'magical-dark';
+
+/**
+ * One Atlas view's lasers for online play: the GM's own as it is drawn (`LaserPointerRenderer`
+ * emits, `LaserRelay` listens), and other people's to show (`LaserRelay` shows,
+ * `RemoteLaserRenderer` draws). PIXI-free.
+ */
+/** The GM's laser reached a point (world units), or was let go. */
+export declare type LocalLaserEvent = {
+    kind: 'point';
+    x: number;
+    y: number;
+} | {
+    kind: 'lift';
+};
 
 export declare interface MapRules {
     /** The collection holding the map; null outside a collection. */
@@ -532,15 +602,111 @@ export declare interface MeasurementSettings {
     coneAngle: number;
 }
 
+/** How the player window shows a token: seen, outlined only (sensed), or not at all. */
+export declare type Perception = 'seen' | 'sensed' | 'unseen';
+
+export declare type PlayerVisibility = 
+/** Lighting hides nothing: dynamic lighting off, or the scene unlit. */
+    {
+    readonly status: 'unlit';
+}
+/**
+* Sight is not worked out for the scene the store holds (loading, a tab switch, no bounds yet, graphics context lost),
+* the explored memory the window shows is still being decoded, or the window forgot explored areas its saved mask
+* still holds. Fail closed: show players nothing. `watch` fires when it is ready.
+*/
+| {
+    readonly status: 'pending';
+} | {
+    readonly status: 'ready';
+    /**
+     * How the window's lighting perceives each token; a token absent here is 'unseen'. By lighting only: a token the
+     * GM hid can read 'seen' here, so apply `hidden` and fog yourself, as you do when the answer is `unlit`.
+     */
+    readonly tokens: Readonly<Record<string, Perception>>;
+    /**
+     * Where the player window shows the map, cell by cell (1 = shown), explored memory included. Cells are
+     * `cellSize` world pixels square from the map's top-left corner, row by row; `shown` is a fresh copy on every call.
+     * Conservative: a cell is shown only when the whole cell is, as sampled every 8 px (16 px on maps over 4096 px,
+     * doubling past 8192 px), so coarse cells hide more of the edge, never show more.
+     */
+    readonly darkness: {
+        readonly cellSize: number;
+        readonly cols: number;
+        readonly rows: number;
+        readonly shown: Uint8Array;
+    };
+    /** The window shows explored memory where no token sees. */
+    readonly showsExplored: boolean;
+};
+
+export declare interface PlayerVisibilityOptions {
+    /**
+     * The map's long side holds at most this many cells (16–1024, default 384); cells double in size from 8 px until it
+     * does. A cell is shown only when all of it is, so fewer, larger cells show less near every edge of sight.
+     */
+    maxCellsPerSide?: number;
+}
+
 export declare interface Point {
     x: number;
     y: number;
+}
+
+export declare interface PresentationApi {
+    current(): PresentedSceneInfo | null;
+    /**
+     * Switches `viewId` to `tabId` (default: its active tab), waits for the load, presents. Never throws.
+     * False for a closed view or when nothing new is on screen. After a failed load the scene stays registered
+     * as presented but held (`current().held === true`), and `presented(scene, true)` follows if its map later loads.
+     */
+    present(viewId: ViewId, tabId?: string): Promise<boolean>;
+    stop(): void;
+    subscribe(listener: PresentationListener): Disposer;
+    addTarget(target: PresentationTarget): Disposer;
+}
+
+export declare interface PresentationListener {
+    /** `resumed`: a held scene is shown again after its tab came back and loaded. */
+    presented?(scene: PresentedSceneInfo, resumed: boolean): void;
+    /** The GM switched the presented view to another tab; players keep the last scene they saw. */
+    held?(scene: PresentedSceneInfo): void;
+    /** Nothing is presented: stopped, the view closed, or its tab was closed. `previous.held` is true when the scene was held as it was cleared. */
+    cleared?(previous: PresentedSceneInfo): void;
+}
+
+export declare interface PresentationTarget {
+    id: string;
+    /** e.g. "online players" */
+    label: string;
+    /** While any target is active, the scene tab's eye presents without opening the player window, its tooltip names the target, a presented scene's eye stops presenting, and right-click offers "Open player window". */
+    isActive(): boolean;
+}
+
+export declare interface PresentedSceneInfo {
+    viewId: ViewId;
+    tabId: string;
+    mapPath: string;
+    held: boolean;
 }
 
 /** A user-defined abstract distance band for the measurement tool */
 declare interface RangeBand {
     name: string;
     maxSquares: number;
+}
+
+/** New points of someone else's laser, in their colour. */
+export declare interface RemoteLaser {
+    from: string;
+    color: string;
+    points: ReadonlyArray<{
+        x: number;
+        y: number;
+    }>;
+    lifted: boolean;
+    /** Milliseconds from each point to the one before it in the stroke, when the sender timed them. */
+    dt?: ReadonlyArray<number>;
 }
 
 export declare interface ResourceDefinition {

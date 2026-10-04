@@ -22,7 +22,11 @@ export interface DiceRollResult {
     total: number;
     /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
     crit?: DiceCrit;
+    /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
+    unlistedDice?: number;
     player?: string;
+    /** Who rolled it when it was someone other than the GM: their name. */
+    rolledBy?: string;
     source?: {
         type: 'toolbar' | 'statblock';
         /** Let the roll follow its token's or statblock's current artwork. */
@@ -46,3 +50,9 @@ export declare function diceFormula(selection: Readonly<Partial<Record<string, n
 export declare function rollFormula(formula: string, random?: () => number, now?: number, rules?: DiceRules): DiceRollResult;
 /** A roll for a token hidden from players keeps its ability and result, not the token's name or portrait. */
 export declare function withoutHiddenToken(result: DiceRollResult, isTokenHidden: (tokenId: string) => boolean): DiceRollResult;
+/** The dice log as a map file keeps it: rolls by someone other than the GM stay in the live log only. */
+export declare function persistableDiceLog(log: readonly DiceRollResult[]): DiceRollResult[];
+/** The name a roll shows: the person who rolled it, or a statblock roll's token; null for the GM's own. */
+export declare function rollerName(result: DiceRollResult): string | null;
+/** Rolls `formula` by a collection's `rules`; one without dice (`+3`) is added to the rules' default roll. */
+export declare function rollByRules(formula: string, rules: DiceRules, random?: () => number, now?: number): DiceRollResult;
