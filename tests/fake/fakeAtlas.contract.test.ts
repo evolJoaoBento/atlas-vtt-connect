@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { connectingPlugin, FakeAtlas } from './FakeAtlas';
 
@@ -10,22 +10,9 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-storage-3': 'Atlas-internal: a failed folder creation needs the vault adapter; the fake has no vault',
   'C-storage-4': 'Atlas-internal: a folder deleted after the first call needs the vault adapter; the fake has no vault',
   'C-pres-2': 'Atlas-internal: the eye of a target is Atlas UI',
+  'C-rules-6': "Atlas-internal: needs Atlas's settings service and its user system presets",
+  'C-rules-7': "Atlas-internal: the asset index's own loading and its failure log",
   // The fake does not simulate these namespaces yet; the task named in each reason adds its cases and removes the entry.
-  'C-views-1': 'tested in B6',
-  'C-views-2': 'tested in B6',
-  'C-views-3': 'tested in B6',
-  'C-views-4': 'tested in B6',
-  'C-views-5': 'tested in B6',
-  'C-views-6': 'tested in B6',
-  'C-views-7': 'tested in B6',
-  'C-rules-1': 'tested in B6',
-  'C-rules-2': 'tested in B6',
-  'C-rules-3': 'tested in B6',
-  'C-rules-4': 'tested in B6',
-  'C-rules-5': 'tested in B6',
-  'C-rules-6': 'tested in B6',
-  'C-rules-7': 'tested in B6',
-  'C-pres-1': 'tested in B6',
   'C-dice-1': 'tested in B7',
   'C-dice-2': 'tested in B7',
   'C-laser-1': 'tested in B7',
@@ -120,7 +107,8 @@ describe('FakeAtlas follows the contract cases', () => {
   });
 
   it('every case Atlas pins is tested here or listed as Atlas-only', () => {
-    const text = readFileSync('tests/fake/fakeAtlas.contract.test.ts', 'utf8');
+    const text = readdirSync('tests/fake').filter((name) => name.endsWith('.contract.test.ts'))
+      .map((name) => readFileSync(`tests/fake/${name}`, 'utf8')).join('\n');
     const tested = new Set([...text.matchAll(/^\s*it\('(C-[a-z]+-[0-9]+):/gm)].map((match) => match[1]));
     const missing = source.contractCases.filter((id) => !ATLAS_ONLY[id] && !tested.has(id));
     expect(missing).toEqual([]);

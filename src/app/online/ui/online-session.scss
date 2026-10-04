@@ -1,0 +1,50 @@
+// The online session modal and the join request notice. Spacing and type follow Atlas's tokens
+// (4, 8, 12 px; Obsidian's small UI fonts).
+
+.atlas-connect-session-modal__status { margin: 0 0 12px; font-size: var(--font-ui-small); color: var(--text-muted); line-height: var(--line-height-normal); }
+.atlas-connect-session-modal__error { margin: 0 0 12px; color: var(--text-error); font-size: var(--font-ui-small); }
+
+.atlas-connect-session-modal__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+
+  input {
+    flex: 1;
+    height: var(--input-height);
+    padding: 0 8px;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+  }
+}
+
+.atlas-connect-session-modal__players {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.atlas-connect-session-modal__player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.atlas-connect-session-modal__dot { display: flex; color: var(--text-faint); svg { width: 12px; height: 12px; } }
+.atlas-connect-session-modal__player--admitted .atlas-connect-session-modal__dot { color: var(--color-green); }
+.atlas-connect-session-modal__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-medium); }
+.atlas-connect-session-modal__state { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.atlas-connect-session-modal__footer { display: flex; justify-content: flex-end; }
+
+// The join request notice lives in Obsidian's notice container, outside any Atlas view.
+.atlas-connect-request { display: flex; flex-direction: column; gap: 8px; }
+.atlas-connect-request__actions { display: flex; align-items: center; gap: 8px; }
+.atlas-connect-request__mark { color: var(--text-muted); }
+.atlas-connect-request__warning { color: var(--text-warning); }

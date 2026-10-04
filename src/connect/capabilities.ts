@@ -3,6 +3,7 @@ import type { AtlasApi, AtlasCapability, AtlasExtension } from '@atlas-vtt/api-t
 /** The namespace each capability brings; gains one entry per synced namespace (decision D2). */
 export interface NeedMap {
   views: AtlasExtension['views'];
+  presentation: AtlasExtension['presentation'];
   rules: AtlasExtension['rules'];
   settings: AtlasExtension['settings'];
   storage: AtlasExtension['storage'];

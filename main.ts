@@ -12,7 +12,7 @@ export default class AtlasVttConnectPlugin extends Plugin {
   async onload(): Promise<void> {
     this.settings = await ConnectSettingsStore.load(this);
     this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings));
-    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api)).start();
+    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, { settings: this.settings })).start();
     // Further services are added task by task (plan B4 onwards).
   }
 

@@ -2,3 +2,5 @@
 @use 'atlas-mixins' as *;
 @use 'primitives';
 @use 'settings-rows';
+@use 'native-modal';
+@use '../src/app/online/ui/online-session';

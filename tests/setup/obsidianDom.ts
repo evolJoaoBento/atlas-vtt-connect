@@ -1,4 +1,4 @@
-// Modified from Atlas VTT tests/setup/obsidianDom.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc.
+// Modified from Atlas VTT tests/setup/obsidianDom.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc; `toggle(show)` (Obsidian's, for the status bar item).
 /**
  * Obsidian extends the DOM prototypes with element helpers (`createEl`,
  * `createDiv`, `empty`, ...). jsdom has none of them, so this setup file
@@ -101,6 +101,10 @@ const helpers: Record<string, (this: HTMLElement, ...args: never[]) => unknown> 
   },
   show(this: HTMLElement) {
     this.style.removeProperty('display');
+  },
+  toggle(this: HTMLElement, show: boolean) {
+    if (show) this.style.removeProperty('display');
+    else this.style.display = 'none';
   },
 };
 

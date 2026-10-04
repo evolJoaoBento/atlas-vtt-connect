@@ -1,0 +1,49 @@
+// Copied from Atlas VTT styles/_mixins.scss (atlas-native-modal-close-control, atlas-close-button,
+// atlas-close-corner) and src/app/packages/components/primitives/close-button.scss at cd9ef86
+// (AGPL-3.0-only), with Atlas's tokens written as the values and Obsidian variables they stand for.
+// Obsidian's own modals opened by Connect (ATLAS_NATIVE_MODAL_CLASSES): the close control sits in the
+// corner like Atlas's CloseButton, and the title centres on it.
+@use 'atlas-mixins' as *;
+
+.atlas-vtt-plugin.atlas-native-modal {
+  --atlas-panel-inner-radius: calc(var(--modal-radius) - var(--modal-border-width, 1px));
+
+  > :is(.modal-close-button, .modal-header-button) {
+    position: absolute;
+    top: $close-button-gap;
+    right: $close-button-gap;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    flex-shrink: 0;
+    width: $close-button-size;
+    height: $close-button-size;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-m);
+    @include atlas-corner-shape;
+    border-top-right-radius: atlas-panel-inset-radius-value($close-button-gap);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; stroke-width: 2; }
+    &:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+    &:active { background: var(--background-modifier-active-hover); transform: scale(0.95); }
+    &:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--background-modifier-border-focus); }
+  }
+
+  > .modal-header {
+    display: flex;
+    align-items: center;
+    min-height: $close-button-size;
+    margin-top: calc(#{$close-button-gap} - #{$spacing-l});
+    // Keeps long titles clear of the close button.
+    padding-inline-end: calc(#{$close-button-size} + #{$close-button-gap} + #{$spacing-s} - #{$spacing-l});
+
+    > .modal-title { flex: 1 1 auto; min-width: 0; }
+  }
+}

@@ -3,10 +3,9 @@ import type { FogOperation } from '@atlas-vtt/api-types';
 import type { Darkness } from '../../../src/app/online/scene/darknessFog';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
+import { FogCoverageCache } from '../../../src/app/online/scene/sceneSources';
 
-// The fork's second case counted the draws of Atlas's own fog renderer, and its first went through the
-// session's coverage cache; both belong with the code they measure (Atlas's renderer, the broadcaster's
-// sources). This pins the cost the projection depends on: a darkness is painted over the fog's cells.
+// The fork's second case counted the draws of Atlas's own fog renderer: it belongs with Atlas's renderer.
 
 /** `count` GM brush strokes and as many erases, a heavily fogged scene. */
 function heavyFog(count: number): Record<string, FogOperation> {
@@ -21,17 +20,17 @@ function heavyFog(count: number): Record<string, FogOperation> {
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('a darkness change costs the same however much fog the GM painted', () => {
-  it('the fog is rasterised once, then each darkness is painted over its cells', () => {
+  it('on the GM: the fog is rasterised once, then each darkness is painted over its cells', () => {
     const fog = heavyFog(300);
     const replays = vi.spyOn(FogCoverage, 'fromPlayerFog');
-    const playerFog = projectFog(fog, createProjectionMemo());
-    const coverage = FogCoverage.fromPlayerFog(playerFog);
+    const cache = new FogCoverageCache();
+    const memo = createProjectionMemo();
     const darkness = (x: number): Darkness => ({ fog: {}, covered: [{ x, y: 0, width: 100, height: 800 }] });
-    for (const x of [500, 600, 700]) coverage.covering(darkness(x).covered);
+    for (const x of [500, 600, 700]) cache.get(fog, memo, darkness(x));
     expect(replays).toHaveBeenCalledTimes(1);
     // The darkness painted over the cells covers what painting it after the operations covers.
-    const covered = coverage.covering(darkness(700).covered);
-    const replayed = FogCoverage.fromPlayerFog(playerFog, darkness(700).covered);
+    const covered = cache.get(fog, memo, darkness(700)).darkCoverage;
+    const replayed = FogCoverage.fromPlayerFog(projectFog(fog, memo), darkness(700).covered);
     for (let x = 0; x < 3200; x += 8) {
       for (let y = 0; y < 800; y += 8) {
         const cell = { x, y, width: 8, height: 8 };

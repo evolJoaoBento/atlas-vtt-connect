@@ -1,9 +1,12 @@
 import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer, SettingsApi, StorageApi } from '@atlas-vtt/api-types';
+import { FakePresentation } from './fakePresentation';
+import { FakeRules } from './fakeRules';
+import { FakeViews, type Own } from './fakeViews';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
 
-/** Namespaces the extension carries once their capability has landed (the real extension has them from API 1.1). */
-const NAMESPACES = ['views', 'rules'] as const;
+/** Namespaces the fake does not simulate yet; the extension carries a throwing stand-in once their capability is on. */
+const NAMESPACES = ['dice', 'lasers', 'lighting', 'tokens'] as const;
 
 /** Atlas's settings as the fake starts with them; `setSetting` changes them. */
 const DEFAULT_SETTINGS: AtlasSettingsView = {
@@ -19,7 +22,7 @@ const deepFreeze = <T>(value: T): T => {
   return Object.freeze(value);
 };
 
-/** A namespace whose simulation lands with the feature that first uses it (B6 views and rules). */
+/** A namespace whose simulation lands with the feature that first uses it (B7 dice and lasers, B9 lighting, B10 tokens). */
 function notSimulated(name: string): unknown {
   return new Proxy({}, { get: (_target, member) => { throw new Error(`FakeAtlas does not simulate ${name}.${String(member)} yet.`); } });
 }
@@ -52,6 +55,8 @@ function storageApi(extensionId: string): StorageApi {
 interface Connection {
   plugin: ConnectingPlugin;
   listeners: Listeners;
+  /** Teardowns of the namespaces' registrations (view subscriptions, presentation listeners, targets). */
+  owned: Set<() => void>;
   count(): number;
   dispose(): void;
 }
@@ -66,11 +71,26 @@ export class FakeAtlas implements AtlasApi {
   private unloaded = false;
   private settings: AtlasSettingsView = structuredClone(DEFAULT_SETTINGS);
   connectedIds: string[] = [];
+  /** Atlas's map views, as the test drives them. */
+  readonly views: FakeViews;
+  /** The presented scene and the presentation targets. */
+  readonly presentation: FakePresentation;
+  /** The collections' rules. */
+  readonly rules: FakeRules;
 
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
     this.version = options.version ?? '1.0.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
+    this.views = new FakeViews({
+      emitMapLoaded: (info) => this.emit('map-loaded', info),
+      emitMapClosed: (viewId) => this.emit('map-closed', viewId),
+      storeChanged: (viewId) => this.presentation.storeChanged(viewId),
+      tabsChanged: (viewId) => this.presentation.tabsChanged(viewId),
+      viewClosed: (viewId) => this.presentation.viewClosed(viewId),
+    });
+    this.presentation = new FakePresentation(this.views);
+    this.rules = new FakeRules((collectionId) => this.emit('rules-changed', collectionId));
   }
 
   has(capability: AtlasCapability): boolean {
@@ -88,12 +108,15 @@ export class FakeAtlas implements AtlasApi {
     this.connections.get(id)?.dispose(); // C-life-1: the first connection is disposed, without 'unload'
     this.connectedIds.push(id);
     const listeners: Listeners = {};
+    const owned = new Set<() => void>();
     const connection: Connection = {
       plugin,
       listeners,
-      count: () => Object.values(listeners).reduce((sum, set) => sum + (set?.size ?? 0), 0),
+      owned,
+      count: () => Object.values(listeners).reduce((sum, set) => sum + (set?.size ?? 0), 0) + owned.size,
       dispose: () => {
         for (const key of Object.keys(listeners) as Array<keyof AtlasEvents>) listeners[key]?.clear();
+        for (const teardown of [...owned]) teardown();
         if (this.connections.get(id) === connection) this.connections.delete(id);
       },
     };
@@ -108,8 +131,22 @@ export class FakeAtlas implements AtlasApi {
       set.add(listener);
       return () => { set.delete(listener); };
     };
+    const own: Own = (teardown) => {
+      let live = true;
+      const dispose = (): void => {
+        if (!live) return;
+        live = false;
+        owned.delete(dispose);
+        teardown();
+      };
+      owned.add(dispose);
+      return dispose;
+    };
     const extension: Record<string, unknown> = { id, on };
     for (const name of NAMESPACES) if (this.capabilities.has(name)) extension[name] = notSimulated(name);
+    if (this.capabilities.has('views')) extension.views = this.views.api(own);
+    if (this.capabilities.has('presentation')) extension.presentation = this.presentation.api(own);
+    if (this.capabilities.has('rules')) extension.rules = this.rules.api();
     if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
     if (this.capabilities.has('storage')) extension.storage = storageApi(id);
     return extension as unknown as AtlasExtension;

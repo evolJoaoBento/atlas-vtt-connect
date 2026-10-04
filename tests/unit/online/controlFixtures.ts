@@ -1,18 +1,50 @@
 /**
  * A GM with the real session and `ControlLists` over an in-memory network, and a small stand-in for the
- * move handler (which needs the scene store): it accepts a move of a token the player controls and refuses
- * every other. Players are real `PlayerSession`s. The full world (broadcaster, `TokenControlHost`) comes with
- * the session service.
+ * move handler (which needs `tokens.move`, plan B10): it accepts a move of a token the player controls and
+ * refuses every other. Players are real `PlayerSession`s. With a presented scene the world also runs the
+ * scene broadcaster, registered before the lists as the session service does, and drops the assignments of
+ * tokens deleted from the presented scene (`watchDeletedTokens`), as the token control host will.
  */
 import { vi } from 'vitest';
+import type { TokenEntity } from '@atlas-vtt/api-types';
 import { ControlLists } from '../../../src/app/online/control/ControlLists';
+import { watchDeletedTokens } from '../../../src/app/online/control/deletedTokens';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession, type PlayerSessionOptions } from '../../../src/app/online/PlayerSession';
 import { decodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
+import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
+import { SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { memoryImageFiles, nodeHash } from './assetFixtures';
+import { emptySceneState, presenter, sceneView, type ViewState } from './presentedFixtures';
 import { playerScene, sceneBody } from './sceneFixtures';
+
+/** hero and ally in the open, orc hidden. */
+export function partyTokens(): Record<string, TokenEntity> {
+  return {
+    hero: { id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'art/hero.png', name: 'Hero' },
+    ally: { id: 'ally', kind: 'character', x: 280, y: 140, imagePath: 'art/ally.png', name: 'Ally' },
+    orc: { id: 'orc', kind: 'character', x: 420, y: 140, imagePath: 'art/orc.png', name: 'Orc', isHidden: true },
+  };
+}
+
+/** The party on the Tavern map, loaded. */
+export function partyState(tokens: Record<string, TokenEntity> = partyTokens()): ViewState {
+  const state = emptySceneState();
+  return { ...state, objects: { ...state.objects, tokens } };
+}
+
+/** The presented scene of a control world: the broadcaster, the presenter and the view. */
+function presentedScene(gm: GmSession) {
+  const presented = presenter();
+  const settings = { getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }), onChange: () => () => {} };
+  const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
+  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: () => {} });
+  broadcaster.start();
+  return { presented, broadcaster, ...sceneView(presented, partyState(), { mapSize: { width: 2000, height: 1500 } }) };
+}
 
 export interface ControlPlayer {
   key: string;
@@ -24,7 +56,7 @@ export interface ControlPlayer {
   controlLists(): string[][];
 }
 
-export function controlWorld() {
+export function controlWorld(options: { scene?: boolean } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   const control = new TokenControl();
@@ -35,8 +67,10 @@ export function controlWorld() {
     onPlayersChanged: (players) => control.retainPlayers(new Set(players.map((player) => player.playerId))),
   });
   gm.start();
+  const scene = options.scene ? presentedScene(gm) : null;
   const lists = new ControlLists({ session: gm, control });
   lists.start();
+  const stopDeleted = scene ? watchDeletedTokens(scene.presented, control) : () => undefined;
   gm.use({
     onMessage: (player, message) => {
       if (message.type !== 'token-move') return;
@@ -78,6 +112,12 @@ export function controlWorld() {
 
   return {
     network, gm, control, moves, join,
+    /** The presented scene; only with `scene: true`. */
+    scene,
+    /** Presents the Tavern tab; only with `scene: true`. */
+    present(): void {
+      scene?.presented.present(scene.view, scene.tavern);
+    },
     /** Gives the player the standard test scene (scene id `scene-1`). */
     showScene(player: ControlPlayer): void {
       const scene = playerScene();
@@ -85,7 +125,9 @@ export function controlWorld() {
     },
     finish(): void {
       players.forEach((player) => player.session.stop());
+      stopDeleted();
       lists.stop();
+      scene?.broadcaster.stop();
       gm.stop();
     },
   };
