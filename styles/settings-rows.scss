@@ -1,0 +1,46 @@
+// Modified from Atlas VTT src/app/settings/settings-rows.scss at 6c939e6 (AGPL-3.0-only); changes: Connect's mixins file for the tokens, textareas fill their row too.
+@use 'atlas-mixins' as *;
+
+// Settings rows with a wide control or several controls. Obsidian lets the name and
+// description shrink beside the controls until they wrap one word per line; these keep the
+// text at a readable width and move the controls onto their own line below it when the row
+// is too narrow for both. Settings live outside any view, so this sits at the root.
+.setting-item.atlas-setting-wrap {
+  flex-wrap: wrap;
+  row-gap: $spacing-s;
+
+  .setting-item-info {
+    flex: 1 1 16em;
+  }
+
+  .setting-item-control {
+    flex: 0 1 auto;
+    margin-inline-start: auto;
+  }
+}
+
+// Controls that never fit beside the text (the own server's host, port and path, the relay
+// list, the player page) always take the full width under it; the host gets the room an
+// address needs.
+.setting-item.atlas-setting-wrap--below {
+  .setting-item-info {
+    flex-basis: 100%;
+    margin-inline-end: 0;
+  }
+
+  .setting-item-control {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-inline-start: 0;
+
+    input,
+    textarea {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .atlas-setting-wrap__wide {
+      flex-grow: 2;
+    }
+  }
+}

@@ -1,1 +1,7 @@
-{}
+{
+  "src/app/online/protocol.ts": {
+    "no-control-regex": {
+      "count": 1
+    }
+  }
+}

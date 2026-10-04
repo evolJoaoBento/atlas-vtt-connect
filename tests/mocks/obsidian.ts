@@ -28,7 +28,18 @@ export class App {
   constructor() {}
 }
 
-export class Plugin {}
+export class Plugin {
+  constructor(public app?: App) {}
+  addSettingTab(_tab: unknown): void {}
+}
+
+/** Obsidian's settings tab base: the container the tab renders into. */
+export class PluginSettingTab {
+  containerEl: HTMLElement = document.createElement('div');
+  constructor(public app: App, public plugin: Plugin) {}
+  display(): void {}
+  hide(): void {}
+}
 
 export class WorkspaceLeaf {
   view: any;
