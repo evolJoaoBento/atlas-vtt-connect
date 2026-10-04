@@ -1,6 +1,14 @@
 import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, ConnectingPlugin, Disposer } from '@atlas-vtt/api-types';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
+
+/** Namespaces the extension carries once their capability has landed (the real extension has them from API 1.1). */
+const NAMESPACES = ['views', 'rules', 'settings', 'storage'] as const;
+
+/** A namespace whose simulation lands with the feature that first uses it (B5 storage and settings, B6 views and rules). */
+function notSimulated(name: string): unknown {
+  return new Proxy({}, { get: (_target, member) => { throw new Error(`FakeAtlas does not simulate ${name}.${String(member)} yet.`); } });
+}
 type Trigger = (name: string, ...args: unknown[]) => void;
 
 /** A plugin as `connect` sees it, plus `unload()` to run what it registered (what Obsidian does on unload). */
@@ -70,11 +78,13 @@ export class FakeAtlas implements AtlasApi {
       plugin.register(() => { if (this.connections.get(id)?.plugin === plugin) this.connections.get(id)?.dispose(); });
     }
     const on = <E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer => {
-      const set = (listeners[event] ??= new Set()) as Set<AtlasEvents[E]>;
+      const set = ((listeners as Record<string, Set<unknown>>)[event] ??= new Set()) as Set<AtlasEvents[E]>;
       set.add(listener);
       return () => { set.delete(listener); };
     };
-    return { id, on };
+    const extension: Record<string, unknown> = { id, on };
+    for (const name of NAMESPACES) if (this.capabilities.has(name)) extension[name] = notSimulated(name);
+    return extension as unknown as AtlasExtension;
   }
 
   /** Atlas unloads (C-life-3): 'unload' to every extension in connection order, dispose all, then `atlas-vtt:api-unload`. */

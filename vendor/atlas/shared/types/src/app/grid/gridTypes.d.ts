@@ -17,7 +17,7 @@ export interface GridOptions {
     offsetY?: number;
     /** Color of grid lines in hex format. Unset picks black or white from the map's brightness. */
     color?: number | undefined;
-    /** Alpha transparency of grid lines (0�1) */
+    /** Alpha transparency of grid lines (0–1) */
     alpha?: number;
     /** Line width for grid lines */
     lineWidth?: number;

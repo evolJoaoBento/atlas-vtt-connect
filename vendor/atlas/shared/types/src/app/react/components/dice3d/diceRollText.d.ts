@@ -1,5 +1,5 @@
 import type { DiceScene } from '../../../dice3d/diceScene';
-import type { DiceRollResult } from '../../../tools/DiceTool';
+import type { DiceRollResult } from '../../../tools/diceRolling';
 /**
  * What was rolled, e.g. "Scimitar"; a roll without an action is just a roll.
  * Never who rolled it: the creature's portrait beside the label says that.

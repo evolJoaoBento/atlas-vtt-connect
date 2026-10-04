@@ -1,4 +1,4 @@
-import type { DiceRollResult } from '../tools/DiceTool';
+import type { DiceRollResult } from '../tools/diceRolling';
 import type { DiceDisplay } from './diceDisplay';
 import { type DiceScene } from './diceScene';
 /**
