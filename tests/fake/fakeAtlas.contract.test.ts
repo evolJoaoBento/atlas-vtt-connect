@@ -6,12 +6,11 @@ const source = JSON.parse(readFileSync('vendor/atlas/SOURCE.json', 'utf8')) as {
 /** Cases only Atlas can show (rendering, Atlas's own UI); each with why the fake leaves it out. */
 export const ATLAS_ONLY: Record<string, string> = {
   'C-life-4': 'Atlas-internal DisposerSet; the fake disposers are trivially idempotent',
-  // The fake does not simulate views, rules, settings or storage yet; the task that first uses each adds its cases and removes its entries.
-  'C-settings-1': 'tested in B5',
-  'C-settings-2': 'tested in B5',
-  'C-storage-1': 'tested in B5',
-  'C-storage-2': 'tested in B5',
-  'C-storage-3': 'tested in B5',
+  'C-settings-2': 'Atlas-internal: needs the player view switch and the dice look screens, which the fake does not have',
+  'C-storage-3': 'Atlas-internal: a failed folder creation needs the vault adapter; the fake has no vault',
+  'C-storage-4': 'Atlas-internal: a folder deleted after the first call needs the vault adapter; the fake has no vault',
+  'C-pres-2': 'Atlas-internal: the eye of a target is Atlas UI',
+  // The fake does not simulate these namespaces yet; the task named in each reason adds its cases and removes the entry.
   'C-views-1': 'tested in B6',
   'C-views-2': 'tested in B6',
   'C-views-3': 'tested in B6',
@@ -22,9 +21,50 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-rules-1': 'tested in B6',
   'C-rules-2': 'tested in B6',
   'C-rules-3': 'tested in B6',
+  'C-rules-4': 'tested in B6',
+  'C-rules-5': 'tested in B6',
+  'C-rules-6': 'tested in B6',
+  'C-rules-7': 'tested in B6',
+  'C-pres-1': 'tested in B6',
+  'C-dice-1': 'tested in B7',
+  'C-dice-2': 'tested in B7',
+  'C-laser-1': 'tested in B7',
+  'C-light-1': 'tested in B9',
+  'C-light-2': 'tested in B9',
+  'C-light-3': 'tested in B9',
 };
 
 describe('FakeAtlas follows the contract cases', () => {
+  it('C-storage-1: folder() is the extension folder and is stable', async () => {
+    const atlas = new FakeAtlas({ capabilities: ['storage'] });
+    const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+    expect(await extension.storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect');
+    expect(await extension.storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect');
+  });
+  it('C-storage-2: an id outside kebab-case rejects in folder(), not at connect', async () => {
+    const atlas = new FakeAtlas({ capabilities: ['storage'] });
+    const extension = atlas.connect(connectingPlugin('Not Kebab'));
+    await expect(extension.storage.folder()).rejects.toThrow(/kebab-case/);
+  });
+  it('C-settings-1: playerView has the four rules and settings-changed names the key', () => {
+    const atlas = new FakeAtlas({ capabilities: ['settings'] });
+    const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+    expect(Object.keys(extension.settings.get('playerView')).sort()).toEqual(['showGrid', 'showInitiative', 'showTokenNameplates', 'showWidgets']);
+    const keys: string[] = [];
+    extension.on('settings-changed', (key) => keys.push(key));
+    atlas.setSetting('laserPointer', { color: '#f00', size: 2 });
+    atlas.setSetting('laserPointer', { color: '#f00', size: 2 });
+    expect(keys).toEqual(['laserPointer']);
+  });
+  it('C-settings-3: get returns a frozen copy, and refuses a key that is not a setting', () => {
+    const atlas = new FakeAtlas({ capabilities: ['settings'] });
+    const { settings } = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+    const laser = settings.get('laserPointer');
+    expect(Object.isFrozen(laser)).toBe(true);
+    atlas.setSetting('laserPointer', { color: '#00f', size: 5 });
+    expect(laser).toEqual({ color: '#ff0000', size: 3 });
+    expect(() => settings.get('nope' as never)).toThrow(/Unknown setting/);
+  });
   it('C-life-1: connecting again with the same id disposes the first connection', () => {
     const atlas = new FakeAtlas();
     const plugin = connectingPlugin('x');

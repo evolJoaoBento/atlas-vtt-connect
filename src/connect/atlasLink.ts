@@ -16,6 +16,8 @@ export class AtlasLink {
   private warnedMissing = false;
   private warnedVersion = false;
   private atlasSeen = false;
+  /** Disposes what Atlas registered for the current connection (it would otherwise wait for Connect to unload). */
+  private release: (() => void) | null = null;
 
   constructor(
     private readonly plugin: Plugin,
@@ -50,27 +52,51 @@ export class AtlasLink {
       this.warnedVersion = true;
       return;
     }
+    const release = this.connectionReleaser();
     try {
-      const extension = value.connect(this.plugin);
+      const extension = value.connect({ manifest: this.plugin.manifest, register: release.collect });
       const stop = this.startWith(extension, value);
       this.extension = extension;
       this.stop = stop;
+      this.release = release.run;
     } catch (error) {
       this.extension = null;
       this.stop = null;
+      // `connect` may have succeeded before `startWith` threw: take its registrations off Atlas again.
+      release.run();
       console.error('Atlas VTT Connect could not start on this Atlas:', error);
       this.notify(`Atlas VTT Connect could not start: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  /** Collects the teardowns Atlas hands to `plugin.register` during `connect`, so the connection can be disposed on its own. */
+  private connectionReleaser(): { collect: (cleanup: () => void) => void; run: () => void } {
+    const cleanups: Array<() => void> = [];
+    return {
+      collect: (cleanup) => { cleanups.push(cleanup); },
+      run: () => {
+        for (const cleanup of cleanups.splice(0)) {
+          try {
+            cleanup();
+          } catch (error) {
+            console.error('Atlas VTT Connect could not release a connection to Atlas:', error);
+          }
+        }
+      },
+    };
+  }
+
   private detach(): void {
     const stop = this.stop;
+    const release = this.release;
     this.stop = null;
+    this.release = null;
     this.extension = null;
     try {
       stop?.();
     } catch (error) {
       console.error('Atlas VTT Connect failed to stop cleanly:', error);
     }
+    release?.();
   }
 }

@@ -1,11 +1,25 @@
-import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, ConnectingPlugin, Disposer } from '@atlas-vtt/api-types';
+import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer, SettingsApi, StorageApi } from '@atlas-vtt/api-types';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
 
 /** Namespaces the extension carries once their capability has landed (the real extension has them from API 1.1). */
-const NAMESPACES = ['views', 'rules', 'settings', 'storage'] as const;
+const NAMESPACES = ['views', 'rules'] as const;
 
-/** A namespace whose simulation lands with the feature that first uses it (B5 storage and settings, B6 views and rules). */
+/** Atlas's settings as the fake starts with them; `setSetting` changes them. */
+const DEFAULT_SETTINGS: AtlasSettingsView = {
+  laserPointer: { color: '#ff0000', size: 3 },
+  diceLook: { colour: '#7f1d1d', font: 'default' },
+  diceDisplay: 'card',
+  playerView: { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
+};
+const SETTING_KEYS = Object.keys(DEFAULT_SETTINGS) as AtlasSettingKey[];
+
+const deepFreeze = <T>(value: T): T => {
+  if (typeof value === 'object' && value !== null) for (const member of Object.values(value)) deepFreeze(member);
+  return Object.freeze(value);
+};
+
+/** A namespace whose simulation lands with the feature that first uses it (B6 views and rules). */
 function notSimulated(name: string): unknown {
   return new Proxy({}, { get: (_target, member) => { throw new Error(`FakeAtlas does not simulate ${name}.${String(member)} yet.`); } });
 }
@@ -24,6 +38,17 @@ export function connectingPlugin(id: string): FakeConnectingPlugin {
   } as unknown as FakeConnectingPlugin;
 }
 
+const EXTENSION_ID = /^[a-z0-9-]+$/;
+
+/** `atlas-vtt/.atlas-data/extensions/<id>`; an id that is not kebab-case rejects in `folder()`, not at connect. */
+function storageApi(extensionId: string): StorageApi {
+  return Object.freeze({
+    folder: (): Promise<string> => EXTENSION_ID.test(extensionId)
+      ? Promise.resolve(`atlas-vtt/.atlas-data/extensions/${extensionId}`)
+      : Promise.reject(new Error(`[Atlas API] "${extensionId}" cannot have a storage folder: the extension id must be kebab-case (a-z, 0-9, -).`)),
+  });
+}
+
 interface Connection {
   plugin: ConnectingPlugin;
   listeners: Listeners;
@@ -39,6 +64,7 @@ export class FakeAtlas implements AtlasApi {
   private readonly registered = new WeakSet<object>();
   private readonly trigger: Trigger;
   private unloaded = false;
+  private settings: AtlasSettingsView = structuredClone(DEFAULT_SETTINGS);
   connectedIds: string[] = [];
 
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
@@ -84,6 +110,8 @@ export class FakeAtlas implements AtlasApi {
     };
     const extension: Record<string, unknown> = { id, on };
     for (const name of NAMESPACES) if (this.capabilities.has(name)) extension[name] = notSimulated(name);
+    if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
+    if (this.capabilities.has('storage')) extension.storage = storageApi(id);
     return extension as unknown as AtlasExtension;
   }
 
@@ -95,6 +123,35 @@ export class FakeAtlas implements AtlasApi {
     for (const connection of all) for (const listener of [...(connection.listeners.unload ?? [])]) listener();
     for (const connection of all) connection.dispose();
     this.trigger('atlas-vtt:api-unload');
+  }
+
+  /** Changes one of Atlas's settings, as its settings screen does; 'settings-changed' names the key, and only when the value differs. */
+  setSetting<K extends AtlasSettingKey>(key: K, value: AtlasSettingsView[K]): void {
+    const changed = JSON.stringify(this.settings[key]) !== JSON.stringify(value);
+    this.settings = { ...this.settings, [key]: structuredClone(value) };
+    if (changed) this.emit('settings-changed', key);
+  }
+
+  private settingsApi(): SettingsApi {
+    return Object.freeze({
+      get: <K extends AtlasSettingKey>(key: K): AtlasSettingsView[K] => {
+        if (!SETTING_KEYS.includes(key)) throw new Error(`[Atlas API] Unknown setting "${String(key)}".`);
+        return deepFreeze(structuredClone(this.settings[key]));
+      },
+    });
+  }
+
+  /** Every extension's listeners for `event` run, guarded: one that throws does not stop the others. */
+  private emit<E extends keyof AtlasEvents>(event: E, ...args: Parameters<AtlasEvents[E]>): void {
+    for (const connection of [...this.connections.values()]) {
+      for (const listener of [...(connection.listeners[event] ?? [])]) {
+        try {
+          (listener as (...rest: unknown[]) => void)(...args);
+        } catch (error) {
+          console.error(`[Atlas API] A '${event}' listener threw:`, error);
+        }
+      }
+    }
   }
 
   listenerCount(): number {

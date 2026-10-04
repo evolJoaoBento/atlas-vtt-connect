@@ -119,6 +119,21 @@ describe('AtlasLink', () => {
     error.mockRestore();
   });
 
+  it('a throw from the start callback disposes the connection that connect made, so nothing stays registered on Atlas', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { app, plugins } = fakeWorkspaceApp();
+    const atlas = new FakeAtlas();
+    plugins['atlas-vtt'] = { api: atlas };
+    const link = new AtlasLink(fakeConnectPlugin(app), (extension) => {
+      extension.on('unload', () => undefined);
+      throw new Error('bad start');
+    }, () => undefined);
+    link.start();
+    expect(link.connected).toBeNull();
+    expect(atlas.listenerCount()).toBe(0);
+    error.mockRestore();
+  });
+
   it('a wrong-major api-ready after a compatible connection detaches the old one', () => {
     const { app, fire } = fakeWorkspaceApp();
     const stops: string[] = [];
