@@ -46,7 +46,10 @@ Both are under `C:\Users\joaoo\2075\.obsidian\plugins\atlas-vtt\`. A summary is 
 - Don't create or remove git worktrees, and don't push.
   - Track A runs a single `git switch` in the existing worktree (Task A1, step 1).
   - Local lightweight tags `api-pr-<N>-end` are allowed and stay local.
-- Commits always stage explicit paths (`git add <path> …`). Never use `git add -A` or `git add .`. Every commit message ends with this paragraph:
+- Commits always stage explicit paths (`git add <path> …`). Never use `git add -A` or `git add .`.
+  - A folder may be named only when the task created it in full.
+  - Where a task's `git add` line names a folder that earlier tasks also wrote (for example B2's `src/app/online`, `tests/unit`), stage instead the files that `git status --porcelain -- <folder>` lists, one by one by name.
+- Every commit message ends with this paragraph:
   ```
   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
   Claude-Session: https://claude.ai/code/session_01Q6CPZpZ7Wn79w7u8cBLtRr
@@ -55,6 +58,7 @@ Both are under `C:\Users\joaoo\2075\.obsidian\plugins\atlas-vtt\`. A summary is 
   ```bash
   npx tsc --noEmit && npm run lint && npm run lint:scan && npx vitest run --project unit \
     && npm run build:ci && npm run changelog:check && npm run preflight
+  npm run api:report && git add api-report/atlas-vtt-api.d.ts   # api:check diffs the tree against the index
   API_BASE_REF=api-pr-<previous>-end npm run api:check
   git grep -nE "src/app/online|/online/|OnlineScene|onlineSessionStore|peerjs|atlas-online" -- src main.ts package.json styles
   ```
@@ -67,6 +71,9 @@ Both are under `C:\Users\joaoo\2075\.obsidian\plugins\atlas-vtt\`. A summary is 
   - API lines go under `## New`, each starting with `Extension API:`. This satisfies the spec's "Extension API section" without changing the checker.
   - Bug fixes go under `## Fixed`.
   - Pure extractions (PR 1) get no line.
+  - `changelog:check` fails on a stale `src/app/changelog/releases.json` ("Stale generated changelog").
+    - Every task that edits `changelog/Unreleased.md` therefore runs `npm run changelog:generate` before its verify block.
+    - It stages `src/app/changelog/releases.json`, plus `CHANGELOG.md` if that changed, together with `changelog/Unreleased.md` in its commit. This applies even where the task's `git add` line below does not list them.
 - **Plugin ids:**
   - Connect's manifest id is `atlas-vtt-connect`, with the display name `Atlas VTT Connect`.
   - Its storage folder is `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/`.
@@ -302,6 +309,8 @@ B15 needs A31 (api-pr-12-end)  remote view tab                      B16 needs B1
 ```
 
 When a B task is ready but its A task has not landed, the controller runs the next A task. The two tracks never edit the same repository.
+
+**Sync rule.** `sync-atlas.mjs` runs `build:packages` inside the shared Atlas worktree, may need it detached, and rewrites Connect's `vendor/`. The controller therefore runs it only when no implementer is working in either repository. It runs it between tasks, right after tagging a PR's last A task, and commits the refreshed vendor as the first step of the next B task that needs it.
 
 Every B task that needs new API begins with this step: "re-sync the vendor at `api-pr-<N>-end`":
 
@@ -1137,6 +1146,7 @@ npm install --save-dev --save-exact @microsoft/api-extractor@7
   "apiReport": { "enabled": false },
   "docModel": { "enabled": false },
   "tsdocMetadata": { "enabled": false },
+  "newlineKind": "lf",
   "dtsRollup": { "enabled": true, "untrimmedFilePath": "<projectFolder>/api-report/atlas-vtt-api.d.ts" },
   "messages": {
     "extractorMessageReporting": { "default": { "logLevel": "warning" }, "ae-missing-release-tag": { "logLevel": "none" } },
@@ -1845,9 +1855,18 @@ Wiring:
 - `AtlasEvents` gains `'map-loaded': (view: ViewInfo) => void` and `'map-closed': (viewId: ViewId) => void`.
 - `atlas-view.ts` gets the fork's `get isClosed(): boolean { return this.isViewClosing; }`.
 
-- [ ] **Step 3: Run the tests**
+- [ ] **Step 3: Run the tests, and check the declaration program**
 
 `npx vitest run --project unit tests/api tests/unit/presentedCamera.test.ts`. Expected: PASS.
+
+Then run `npx tsc -p tsconfig.api.json --listFiles | grep -cE "main\.ts|storeFactory\.ts|PixiRendererOrchestrator"`. Expected: `0`.
+
+If the count is not 0, a record type pulls the app into the API's declaration program. The usual cause is `GridState` from `MapPersistence.ts`, which imports `main.ts`. Do decision D3's type-only move now:
+- move `GridState` and its parts to `src/app/types/gridStateTypes.ts`;
+- re-export them from `MapPersistence.ts`;
+- import them from the new file in `records.ts`.
+
+Repeat for any other type until the count is 0. This keeps `api:report` fast and free of unrelated emit errors.
 
 - [ ] **Step 4: Regenerate the report, verify, commit**
 
