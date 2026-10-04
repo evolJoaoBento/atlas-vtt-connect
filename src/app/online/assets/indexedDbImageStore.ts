@@ -7,7 +7,7 @@
  */
 import type { ImageStore, StoredEntry, StoredImage } from './AssetCache';
 
-const DB_NAME = 'atlas-online-images';
+const DB_NAME = 'atlas-vtt-connect-images';
 const DB_VERSION = 1;
 const IMAGES = 'images';
 const ENTRIES = 'entries';

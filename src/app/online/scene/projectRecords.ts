@@ -6,6 +6,9 @@
 import type { DrawingStroke, FogOperation, TextElement } from '@atlas-vtt/api-types';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, positiveOrNull, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
+
+/** What a text or drawing is checked against: whether an area is hidden from players. */
+export type Covers = Pick<FogCoverage, 'isCovered'>;
 import { DEFAULT_FONT_SIZE, drawingBounds, textBounds } from './objectBounds';
 import {
   PLAYER_DRAWING_TYPES, PLAYER_TEXT_ALIGNS, type PlayerDrawing, type PlayerFogOp, type PlayerText,
@@ -98,7 +101,7 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
 }
 
 /** A text players may see; null when it is completely under fog or has no position. */
-export function projectText(text: TextElement, coverage: FogCoverage): PlayerText | null {
+export function projectText(text: TextElement, coverage: Covers): PlayerText | null {
   const x = finiteOrNull(text.x, SCENE_RANGES.coordinate);
   const y = finiteOrNull(text.y, SCENE_RANGES.coordinate);
   if (x === null || y === null || coverage.isCovered(textBounds(text))) return null;
@@ -123,7 +126,7 @@ export function projectText(text: TextElement, coverage: FogCoverage): PlayerTex
   };
 }
 
-export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: FogCoverage): Record<string, PlayerText> {
+export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: Covers): Record<string, PlayerText> {
   return projectRecord(texts, (text) => projectText(text, coverage));
 }
 
@@ -145,7 +148,7 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
 
 export function projectDrawings(
   drawings: Readonly<Record<string, DrawingStroke>> | undefined,
-  coverage: FogCoverage,
+  coverage: Covers,
   memo: ProjectionMemo,
 ): Record<string, PlayerDrawing> {
   return projectRecord(drawings, (stroke) => {

@@ -205,7 +205,8 @@ describe('coverage of grid and scene fields', () => {
       initiative: (state) => ({ ...state, initiative: { ...state.initiative, round: 3 } }),
       initiativeTrackerOpen: (state) => ({ ...state, initiativeTrackerOpen: false }),
       mapSize: (state) => ({ ...state, mapSize: { width: 1200, height: 900 } }),
-      lighting: (state) => ({ ...state, lighting: { ...state.lighting, enabled: true, ambient: 0 } }),
+      // A scene saved lit fails closed on its own (`projectLitClosed.test.ts`); with lighting off its look changes nothing.
+      lighting: (state) => ({ ...state, lighting: { ...state.lighting, ambient: 0.1 } }),
       viewId: (state) => ({ ...state, viewId: 'view-2' }),
       loaded: (state) => ({ ...state, loaded: false }),
       mapPath: (state) => ({ ...state, mapPath: 'maps/other.atlasmap' }),

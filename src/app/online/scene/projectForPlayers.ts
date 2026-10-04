@@ -11,11 +11,12 @@ import type { Character, CollectionGridDefaults, GridState, InitiativeRules, Res
 import type { AssetIds } from './sceneContracts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
-import type { LightingFrame } from './lightingFrame';
+import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
+import type { WorldBounds } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
-import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
+import { projectDrawings, projectFog, projectRecord, projectTexts, type Covers, type ProjectionMemo } from './projectRecords';
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES,
@@ -24,7 +25,7 @@ import {
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 
 /** The part of a `SceneSnapshot` the projection reads; `mapPath` is the GM's own path and is never sent. */
-export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath'>;
+export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'>;
 
 export interface ProjectionContext {
   sceneId: string;
@@ -33,12 +34,13 @@ export interface ProjectionContext {
   coverage: FogCoverage;
   /**
    * With dynamic lighting on and the scene lit: which tokens the player window shows and the
-   * darkness over the map. Unset or null, nothing is lit.
+   * darkness over the map. Unset or null on a scene saved lit, or a closed frame: nothing is sent
+   * but the dark map (no token, text or drawing), whatever the caller does.
    */
   lighting?: LightingFrame | null;
   /**
    * The fog with the darkness of `lighting` over it, which texts and drawings are checked
-   * against; unset, `coverage`. Tokens are not: the window shows a token by its perception
+   * against; unset, `coverage` with the darkness of `lighting` painted over it. Tokens are not: the window shows a token by its perception
    * alone, and one it sees is never wholly dark (a darkness that lags would drop it).
    */
   darkCoverage?: FogCoverage;
@@ -68,7 +70,11 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const objects = state.objects;
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
   const cellSize = positiveOr(state.grid?.size, DEFAULT_GRID_SIZE);
-  const lighting = context.lighting ?? null;
+  // A scene saved lit whose lighting is missing, or whose frame is closed, shows players nothing but the dark map.
+  const lit = state.lighting?.enabled === true;
+  const closed = context.lighting?.closed === true || (lit && !context.lighting);
+  const lighting = closed ? closedFrame(context.mapSize) : context.lighting ?? null;
+  const hidden: Covers = lighting ? darkCovers(context, lighting) : context.coverage;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
   const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
@@ -82,12 +88,24 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
-    texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
-    drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, memo),
+    texts: closed ? {} : projectTexts(objects?.texts, hidden),
+    drawings: closed ? {} : projectDrawings(objects?.drawings, hidden, memo),
     widgets: projectWidgets(state, context.rules),
     initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
   };
+}
+
+/**
+ * What texts and drawings of a lit scene are checked against: the fog with the darkness over it, and
+ * whatever reaches beyond the map, where the darkness does not (a lit scene shows nothing out there).
+ */
+function darkCovers(context: ProjectionContext, lighting: LightingFrame): Covers {
+  const dark = context.darkCoverage ?? context.coverage.covering(lighting.darkness.covered);
+  const { width, height } = context.mapSize;
+  const inside = (bounds: WorldBounds): boolean => width > 0 && height > 0
+    && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width && bounds.y + bounds.height <= height;
+  return { isCovered: (bounds) => !inside(bounds) || dark.isCovered(bounds) };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {

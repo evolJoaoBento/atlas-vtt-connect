@@ -6,7 +6,7 @@
 import type { App } from 'obsidian';
 import type { IdentityCrypto, KeyPairJwk } from './identityCrypto';
 
-export const DEVICE_KEYS_STORAGE = 'atlas-online-device-keys';
+export const DEVICE_KEYS_STORAGE = 'atlas-vtt-connect-device-keys';
 
 export interface KeyValueStore {
   get(key: string): unknown;

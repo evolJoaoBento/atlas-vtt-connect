@@ -1,4 +1,4 @@
-import type { Darkness } from './darknessFog';
+import { darknessOf, NO_DARKNESS, type Darkness } from './darknessFog';
 import type { MapSize } from './sceneTypes';
 
 /**
@@ -18,4 +18,14 @@ export interface LightingFrame {
   /** Whether players see the token, by the player window's own rule; a token they only sense is not seen. */
   seen(tokenId: string): boolean;
   darkness: Darkness;
+  /** Set when the view's lighting could not be read: nothing but the dark map is sent (`closedFrame`). */
+  closed?: boolean;
+}
+
+/** Every token left out and the whole map dark: what players get while the view's lighting cannot be read. */
+export function closedFrame(map: MapSize): LightingFrame {
+  const darkness = map.width > 0 && map.height > 0
+    ? darknessOf({ cols: 1, rows: 1, cellSize: Math.max(map.width, map.height), map, dark: Uint8Array.of(1) })
+    : NO_DARKNESS;
+  return { seen: () => false, darkness, closed: true };
 }
