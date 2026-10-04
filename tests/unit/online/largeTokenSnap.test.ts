@@ -3,6 +3,7 @@ import type { GridState } from '@atlas-vtt/api-types';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { snapGridOfState } from '../../../src/app/online/scene/projectForPlayers';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
+import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import { fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 /**
@@ -44,6 +45,13 @@ describe("online token moves snap as the GM's drag", () => {
     expect(snapGridOfState(gridState('square', { size: 0 }))).toBeNull();
     expect(snapGridOfState(gridState('square', { size: Number.NaN }))).toBeNull();
     expect(snapGridOfState(null)).toBeNull();
+  });
+
+  it('sends a grid type players accept, whatever the map holds', () => {
+    const scene = project(gridState('square', { type: 'triangle' as unknown as NonNullable<GridState['type']> }));
+    expect(scene.measurement.snapGrid?.type).toBe('square');
+    const { fog: _fog, drawings: _drawings, ...body } = scene;
+    expect(isPlayerSceneBody(body)).toBe(true);
   });
 
   it('defaults a missing type to square and missing offsets to zero', () => {

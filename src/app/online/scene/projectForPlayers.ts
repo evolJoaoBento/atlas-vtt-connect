@@ -152,7 +152,7 @@ function projectSnapGrid(grid: GridState | null): PlayerSnapGrid | null {
   const snapped = snapGridOfState(grid);
   if (!snapped) return null;
   return {
-    type: snapped.type,
+    type: oneOf(PLAYER_GRID_TYPES, snapped.type, 'square'),
     size: positiveOr(snapped.size, DEFAULT_GRID_SIZE, SCENE_RANGES.gridSize),
     offsetX: finiteOr(snapped.offsetX, 0, SCENE_RANGES.coordinate),
     offsetY: finiteOr(snapped.offsetY, 0, SCENE_RANGES.coordinate),
