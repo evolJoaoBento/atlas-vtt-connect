@@ -1,4 +1,4 @@
-// Copied from Atlas VTT tests/unit/imageDimensions.test.ts at c1d4d15 (AGPL-3.0-only).
+// Modified from Atlas VTT tests/unit/imageDimensions.test.ts at c1d4d15 (AGPL-3.0-only); changes: import paths for tests/unit/copied.
 import { describe, expect, it } from 'vitest';
 import { imageDimensions } from '../../../src/app/imageProcessing/imageDimensions';
 

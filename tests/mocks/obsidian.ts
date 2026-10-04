@@ -1,4 +1,4 @@
-// Copied from Atlas VTT tests/mocks/obsidian.ts at 6c939e6 (AGPL-3.0-only).
+// Modified from Atlas VTT tests/mocks/obsidian.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc.
 /** Obsidian's key scope: handlers by modifiers and key; the most recently pushed scope is asked first. */
 export class Scope {
   keys: Array<{ modifiers: string[]; key: string; func: (event: KeyboardEvent) => unknown }> = [];
@@ -173,7 +173,8 @@ export function resolveSubpath(cache: { headings?: CachedHeading[] }, subpath: s
     index = headings.findIndex((h, i) => i > index && h.heading === part);
     if (index === -1) return null;
   }
-  return index === -1 ? null : { start: headings[index].position.start };
+  const heading = headings[index];
+  return heading ? { start: heading.position.start } : null;
 }
 
 export function normalizePath(path: string): string {

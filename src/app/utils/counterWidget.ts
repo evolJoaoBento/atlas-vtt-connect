@@ -1,4 +1,4 @@
-// Copied from Atlas VTT src/app/utils/counterWidget.ts at c1d4d15 (AGPL-3.0-only).
+// Modified from Atlas VTT src/app/utils/counterWidget.ts at c1d4d15 (AGPL-3.0-only); changes: dropped stepCounter and the storeFactory type import.
 import type { AnyWidget, SteppedWidget } from '../types/widgetTypes';
 
 export const DEFAULT_COUNTER_COLOR = '#ffc107';

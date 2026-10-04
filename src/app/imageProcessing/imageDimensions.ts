@@ -1,4 +1,4 @@
-// Copied from Atlas VTT src/app/imageProcessing/imageDimensions.ts at c1d4d15 (AGPL-3.0-only).
+// Modified from Atlas VTT src/app/imageProcessing/imageDimensions.ts at c1d4d15 (AGPL-3.0-only); changes: declares Size locally instead of importing imageLayout.
 /** Pixel size (Atlas declares it in imageLayout.ts, which pulls the image job types; only this shape is needed). */
 export interface Size {
   width: number;

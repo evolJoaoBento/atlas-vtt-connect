@@ -11,3 +11,9 @@ It works on top of an unmodified Atlas VTT, through Atlas's extension API.
 **Status:** being built. The implementation plan is in [docs/plans/2026-10-04-extension-api-and-connect.md](docs/plans/2026-10-04-extension-api-and-connect.md).
 
 Licence: AGPL-3.0-only. Connect contains code from Atlas VTT.
+
+## Development
+
+Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an install bug ("Cannot read properties of null (reading 'edgesOut')").
+
+Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. The build writes `dist/` only; copy `dist/main.js`, `dist/styles.css` and `manifest.json` into a test vault's `.obsidian/plugins/atlas-vtt-connect/` by hand, never into your main vault.

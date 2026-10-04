@@ -1,4 +1,4 @@
-// Copied from Atlas VTT tests/setup/obsidianDom.ts at 6c939e6 (AGPL-3.0-only).
+// Modified from Atlas VTT tests/setup/obsidianDom.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc.
 /**
  * Obsidian extends the DOM prototypes with element helpers (`createEl`,
  * `createDiv`, `empty`, ...). jsdom has none of them, so this setup file
@@ -155,7 +155,7 @@ if (typeof Element !== 'undefined' && typeof Element.prototype.animate !== 'func
   const prototype = Element.prototype as unknown as Record<string, unknown>;
   prototype.animate = (): Partial<Animation> => ({
     cancel: () => undefined, finish: () => undefined, pause: () => undefined, play: () => undefined,
-    onfinish: null, finished: Promise.resolve() as Promise<Animation>,
+    onfinish: null, finished: Promise.resolve() as unknown as Promise<Animation>,
   });
 }
 // jsdom never decodes images

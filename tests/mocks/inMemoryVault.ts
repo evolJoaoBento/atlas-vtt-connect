@@ -1,4 +1,4 @@
-// Copied from Atlas VTT tests/mocks/inMemoryVault.ts at 6c939e6 (AGPL-3.0-only).
+// Modified from Atlas VTT tests/mocks/inMemoryVault.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc.
 import { vi } from 'vitest';
 import { App, TFile, TFolder, type TAbstractFile } from 'obsidian';
 
@@ -13,6 +13,10 @@ export interface InMemoryApp {
   files: Map<string, string>;
   folders: Set<string>;
 }
+
+// The mock `obsidian` module (tests/mocks/obsidian.ts) takes the path; the real typings do not.
+const newFile = (path: string): TFile => new (TFile as unknown as new (path: string) => TFile)(path);
+const newFolder = (path: string): TFolder => new (TFolder as unknown as new (path: string) => TFolder)(path);
 
 const ALREADY_EXISTS = 'File already exists.';
 
@@ -59,11 +63,11 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
   for (const path of files.keys()) addParentFolders(path);
   /** A folder handle whose `children` list what lies directly inside it, as Obsidian's does. */
   const folderAt = (path: string): TFolder => {
-    const folder = new TFolder(path);
+    const folder = newFolder(path);
     const inside = (candidate: string): boolean => parentOf(candidate) === path;
     folder.children = [
-      ...[...folders].filter(inside).map((child) => new TFolder(child)),
-      ...[...files.keys()].filter(inside).map((child) => new TFile(child)),
+      ...[...folders].filter(inside).map((child) => newFolder(child)),
+      ...[...files.keys()].filter(inside).map((child) => newFile(child)),
     ];
     return folder;
   };
@@ -121,14 +125,14 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     },
     on: vi.fn(() => ({})),
     offref: vi.fn(),
-    getFiles: vi.fn(() => Array.from(files.keys()).filter((path) => !isHiddenPath(path)).map((path) => new TFile(path))),
+    getFiles: vi.fn(() => Array.from(files.keys()).filter((path) => !isHiddenPath(path)).map((path) => newFile(path))),
     getAbstractFileByPath: vi.fn((path: string): TAbstractFile | null => {
       if (isHiddenPath(path)) return null;
-      if (files.has(path)) return new TFile(path);
+      if (files.has(path)) return newFile(path);
       if (folders.has(path)) return folderAt(path);
       return null;
     }),
-    getFileByPath: vi.fn((path: string): TFile | null => (files.has(path) && !isHiddenPath(path) ? new TFile(path) : null)),
+    getFileByPath: vi.fn((path: string): TFile | null => (files.has(path) && !isHiddenPath(path) ? newFile(path) : null)),
     getFolderByPath: vi.fn((path: string): TFolder | null => (folders.has(path) && !isHiddenPath(path) ? folderAt(path) : null)),
     getRoot: vi.fn((): TFolder => folderAt('')),
     rename: vi.fn(moveFile),
@@ -150,12 +154,12 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     createBinary: vi.fn(async (path: string, content: ArrayBuffer) => {
       assertFree(path);
       writeFile(path, new TextDecoder().decode(content));
-      return new TFile(path);
+      return newFile(path);
     }),
     modifyBinary: vi.fn(async (file: TFile, content: ArrayBuffer) => {
       files.set(file.path, new TextDecoder().decode(content));
     }),
-  };
+  } as unknown as App['vault'];
 
   app.fileManager = {
     renameFile: vi.fn(moveFile),
@@ -168,7 +172,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
       const yaml = Object.entries(frontmatter).map(([key, value]) => `${key}: ${String(value)}`).join('\n');
       files.set(file.path, `---\n${yaml}\n---\n${body}`);
     }),
-  };
+  } as unknown as App['fileManager'];
 
   app.workspace = {
     layoutReady: true,
@@ -177,7 +181,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     on: vi.fn(() => ({})),
     offref: vi.fn(),
     trigger: vi.fn(),
-  };
+  } as unknown as App['workspace'];
 
   const linkDestination = (linkpath: string): string | undefined =>
     [...files.keys()].find((candidate) => candidate === linkpath || candidate.endsWith(`/${linkpath}`));
@@ -188,7 +192,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     getFileCache: vi.fn(() => null),
     getFirstLinkpathDest: vi.fn((linkpath: string): TFile | null => {
       const path = linkDestination(linkpath);
-      return path ? new TFile(path) : null;
+      return path ? newFile(path) : null;
     }),
     /** The wikilinks of every note, resolved as Obsidian does: by name or by the end of the path. */
     get resolvedLinks(): Record<string, Record<string, number>> {
@@ -204,7 +208,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
       }
       return links;
     },
-  };
+  } as unknown as App['metadataCache'];
 
   return { app, files, folders };
 }
