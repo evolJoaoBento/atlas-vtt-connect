@@ -32,6 +32,8 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-light-1': 'tested in B9',
   'C-light-2': 'tested in B9',
   'C-light-3': 'tested in B9',
+  'C-tok-1': 'tested in B10',
+  'C-tok-2': 'tested in B10',
 };
 
 describe('FakeAtlas follows the contract cases', () => {

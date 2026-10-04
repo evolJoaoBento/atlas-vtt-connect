@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.5.0";
+export declare const API_VERSION = "1.6.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -41,6 +41,7 @@ export declare interface AtlasExtension {
     readonly dice: DiceApi;
     readonly lasers: LasersApi;
     readonly lighting: LightingApi;
+    readonly tokens: TokensApi;
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
@@ -887,10 +888,50 @@ export declare interface Token extends BaseToken {
  */
 export declare type TokenEntity = Token | Character;
 
+export declare interface TokenMove {
+    tokenId: string;
+    x: number;
+    y: number;
+}
+
+export declare interface TokenMoveOptions {
+    /** Snap each token the way `snapPoint` does. Default true. */
+    snap?: boolean;
+    /** Keep each target on the map, `[0, width] x [0, height]`, before snapping. Default true; a map without a size is not clamped. */
+    clampToMap?: boolean;
+    /** Move hidden tokens too. Default false: a hidden token is refused. */
+    allowHidden?: boolean;
+}
+
+export declare type TokenMoveResult = {
+    ok: true;
+    positions: Readonly<Record<string, Readonly<Point>>>;
+} | {
+    ok: false;
+    reason: 'not-loaded' | 'unknown-token' | 'hidden' | 'invalid-position';
+};
+
 /** A bounded resource value saved on an individual map token. */
 declare interface TokenResourceValue {
     current: number;
     max: number;
+}
+
+export declare interface TokensApi {
+    /**
+     * Where a token of `tokenSize` cells dropped at `point` lands, as the GM's drag puts it: a cell centre, or where
+     * cells meet for an even footprint, also on a grid that is hidden or switched off; unchanged without a grid, with
+     * snapping off, or for an unknown view. Returns a frozen point. Throws when `point` is not finite { x, y } numbers
+     * or `tokenSize` is not a number above 0.
+     */
+    snapPoint(viewId: ViewId, point: Point, tokenSize: number): Readonly<Point>;
+    /**
+     * Moves tokens as one undo step, like a GM drag. Checked in this order, and nothing is written when any move
+     * fails: the map is loaded (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
+     * `allowHidden` (`hidden`), every position is a number within 1e9 of the origin (`invalid-position`, also when snapping would
+     * not give one). A token named twice moves to its last position. Throws when `moves` is not a list or `options` is malformed.
+     */
+    move(viewId: ViewId, moves: readonly TokenMove[], options?: TokenMoveOptions): TokenMoveResult;
 }
 
 /** One sense of a token, by the id of its definition. */

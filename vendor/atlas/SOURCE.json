@@ -1,8 +1,8 @@
 {
   "repository": "ByteMirror/atlas-vtt",
   "branch": "api/extension-api",
-  "commit": "26bd6b1b8be2bfe6df8c3c2740ce6fcaa5df71e2",
-  "apiVersion": "1.5.0",
+  "commit": "cd9ef8623e745609066e838a6b4a471114a0443b",
+  "apiVersion": "1.6.0",
   "contractCases": [
     "C-dice-1",
     "C-dice-2",
@@ -31,6 +31,8 @@
     "C-storage-2",
     "C-storage-3",
     "C-storage-4",
+    "C-tok-1",
+    "C-tok-2",
     "C-views-1",
     "C-views-2",
     "C-views-3",
@@ -40,7 +42,7 @@
     "C-views-7"
   ],
   "files": {
-    "api-types/atlas-vtt-api.d.ts": "eb5892c0e08546bda9595fa1cc911c15746bf40730df865270ca1344a513f44c",
+    "api-types/atlas-vtt-api.d.ts": "3126a11863e2dcecd1b5b7845cdc6b90b7e06fdb07273b06880365ddcd62a42b",
     "shared/dice3d.js": "7134d01142ffbd8ab748cc5285ba32c9af988b40655a6c40206ef3ec60b70776",
     "shared/diceLabels-DiaA4yev.js": "160a0539f20d1f58e77882e0bbc26afb1077aabb6684983aa38a0cb97beded0c",
     "shared/draw.js": "7ff9592d64d6eeefba4a0789eff31233cc0976b6d1396bb15f4761fb78830bc4",
