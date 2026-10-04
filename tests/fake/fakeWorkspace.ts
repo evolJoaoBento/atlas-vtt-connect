@@ -23,12 +23,14 @@ export function fakeWorkspaceApp(): {
   return { app: { workspace, plugins: { plugins } } as unknown as Plugin['app'], plugins, fire };
 }
 
-/** A stand-in for Connect's own plugin object. */
-export function fakeConnectPlugin(app: Plugin['app']): Plugin {
+/** A stand-in for Connect's own plugin object; `unload()` runs what it registered, as Obsidian does. */
+export function fakeConnectPlugin(app: Plugin['app']): Plugin & { unload(): void } {
+  const cleanups: Array<() => void> = [];
   return {
     app,
     manifest: { id: 'atlas-vtt-connect' },
-    register: () => undefined,
+    register: (cleanup: () => void) => { cleanups.push(cleanup); },
     registerEvent: () => undefined,
-  } as unknown as Plugin;
+    unload: () => { for (const cleanup of cleanups.splice(0)) cleanup(); },
+  } as unknown as Plugin & { unload(): void };
 }

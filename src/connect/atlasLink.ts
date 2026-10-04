@@ -15,7 +15,7 @@ export class AtlasLink {
   private stop: Disposer | null = null;
   private warnedMissing = false;
   private warnedVersion = false;
-  private sawIncompatible = false;
+  private atlasSeen = false;
 
   constructor(
     private readonly plugin: Plugin,
@@ -34,7 +34,7 @@ export class AtlasLink {
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
     workspace.onLayoutReady(() => {
-      if (this.extension || this.sawIncompatible || this.warnedMissing) return;
+      if (this.extension || this.atlasSeen || this.warnedMissing) return;
       this.warnedMissing = true;
       this.notify('Atlas VTT Connect needs Atlas VTT. Install or enable it, then reload.');
     });
@@ -43,21 +43,34 @@ export class AtlasLink {
   private attach(value: unknown): void {
     if (!isAtlasApi(value)) return;
     const major = Number(value.version.split('.')[0]);
+    this.atlasSeen = true;
+    this.detach();
     if (major !== SUPPORTED_MAJOR) {
-      this.sawIncompatible = true;
       if (!this.warnedVersion) this.notify(`Atlas VTT Connect needs Atlas VTT with extension API ${SUPPORTED_MAJOR}.x (found ${value.version}).`);
       this.warnedVersion = true;
       return;
     }
-    this.detach();
-    this.extension = value.connect(this.plugin);
-    this.stop = this.startWith(this.extension, value);
+    try {
+      const extension = value.connect(this.plugin);
+      const stop = this.startWith(extension, value);
+      this.extension = extension;
+      this.stop = stop;
+    } catch (error) {
+      this.extension = null;
+      this.stop = null;
+      console.error('Atlas VTT Connect could not start on this Atlas:', error);
+      this.notify(`Atlas VTT Connect could not start: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private detach(): void {
     const stop = this.stop;
     this.stop = null;
     this.extension = null;
-    stop?.();
+    try {
+      stop?.();
+    } catch (error) {
+      console.error('Atlas VTT Connect failed to stop cleanly:', error);
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AtlasLink } from '../../../src/connect/atlasLink';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeConnectPlugin, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
@@ -64,6 +64,69 @@ describe('AtlasLink', () => {
     const link = new AtlasLink(fakeConnectPlugin(app), () => { started += 1; return () => undefined; }, () => undefined);
     link.start();
     expect(started).toBe(0);
+    expect(link.connected).toBeNull();
+  });
+
+  it('stops everything when Connect itself unloads, and Atlas listeners go with it', () => {
+    const { app, plugins } = fakeWorkspaceApp();
+    const atlas = new FakeAtlas();
+    plugins['atlas-vtt'] = { api: atlas };
+    const plugin = fakeConnectPlugin(app);
+    const stops: string[] = [];
+    const link = new AtlasLink(plugin, (extension) => {
+      extension.on('unload', () => undefined);
+      return () => stops.push('stop');
+    }, () => undefined);
+    link.start();
+    expect(atlas.listenerCount()).toBe(1);
+    plugin.unload();
+    expect(stops).toEqual(['stop']);
+    expect(link.connected).toBeNull();
+    expect(atlas.listenerCount()).toBe(0);
+  });
+
+  it('a throw from connect is reported, nothing stays attached, and start() does not throw', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { app, plugins } = fakeWorkspaceApp();
+    const atlas = new FakeAtlas();
+    atlas.connect = () => { throw new Error('boom'); };
+    plugins['atlas-vtt'] = { api: atlas };
+    const notices: string[] = [];
+    const link = new AtlasLink(fakeConnectPlugin(app), () => () => undefined, (m) => notices.push(m));
+    expect(() => link.start()).not.toThrow();
+    expect(link.connected).toBeNull();
+    expect(notices).toEqual(['Atlas VTT Connect could not start: boom']);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('a throw from the start callback is reported and leaves nothing attached; a later api-ready recovers', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { app, fire } = fakeWorkspaceApp();
+    const notices: string[] = [];
+    let fail = true;
+    const link = new AtlasLink(fakeConnectPlugin(app), () => {
+      if (fail) throw new Error('bad start');
+      return () => undefined;
+    }, (m) => notices.push(m));
+    link.start();
+    expect(() => fire('atlas-vtt:api-ready', new FakeAtlas())).not.toThrow();
+    expect(link.connected).toBeNull();
+    expect(notices.at(-1)).toBe('Atlas VTT Connect could not start: bad start');
+    fail = false;
+    fire('atlas-vtt:api-ready', new FakeAtlas());
+    expect(link.connected?.id).toBe('atlas-vtt-connect');
+    error.mockRestore();
+  });
+
+  it('a wrong-major api-ready after a compatible connection detaches the old one', () => {
+    const { app, fire } = fakeWorkspaceApp();
+    const stops: string[] = [];
+    const link = new AtlasLink(fakeConnectPlugin(app), () => () => stops.push('stop'), () => undefined);
+    link.start();
+    fire('atlas-vtt:api-ready', new FakeAtlas());
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '2.0.0' }));
+    expect(stops).toEqual(['stop']);
     expect(link.connected).toBeNull();
   });
 });

@@ -1,53 +1,93 @@
 import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, ConnectingPlugin, Disposer } from '@atlas-vtt/api-types';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
+type Trigger = (name: string, ...args: unknown[]) => void;
+
+/** A plugin as `connect` sees it, plus `unload()` to run what it registered (what Obsidian does on unload). */
+export type FakeConnectingPlugin = ConnectingPlugin & { unload(): void };
 
 /** The two members of a plugin that `connect` reads. */
-export function connectingPlugin(id: string): ConnectingPlugin {
-  return { manifest: { id }, register: () => undefined } as unknown as ConnectingPlugin;
+export function connectingPlugin(id: string): FakeConnectingPlugin {
+  const cleanups: Array<() => void> = [];
+  return {
+    manifest: { id },
+    register: (cleanup: () => void) => { cleanups.push(cleanup); },
+    unload: () => { for (const cleanup of cleanups.splice(0)) cleanup(); },
+  } as unknown as FakeConnectingPlugin;
+}
+
+interface Connection {
+  plugin: ConnectingPlugin;
+  listeners: Listeners;
+  count(): number;
+  dispose(): void;
 }
 
 /** A test-only Atlas: the API as Connect sees it, with the documented edge cases (Appendix A). */
 export class FakeAtlas implements AtlasApi {
   readonly version: string;
-  private readonly listeners: Listeners = {};
   private readonly capabilities: Set<AtlasCapability>;
-  private readonly disposers = new Set<() => void>();
+  private readonly connections = new Map<string, Connection>();
+  private readonly registered = new WeakSet<object>();
+  private readonly trigger: Trigger;
+  private unloaded = false;
   connectedIds: string[] = [];
 
-  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[] } = {}) {
+  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
     this.version = options.version ?? '1.0.0';
     this.capabilities = new Set(options.capabilities ?? []);
+    this.trigger = options.trigger ?? (() => undefined);
   }
 
   has(capability: AtlasCapability): boolean {
     return this.capabilities.has(capability);
   }
 
+  /** Atlas publishes the API (workspace `atlas-vtt:api-ready`). */
+  publish(): void {
+    this.trigger('atlas-vtt:api-ready', this);
+  }
+
   connect(plugin: ConnectingPlugin): AtlasExtension {
-    this.connectedIds.push(plugin.manifest.id);
-    const on = <E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer => {
-      const set = (this.listeners[event] ??= new Set()) as Set<AtlasEvents[E]>;
-      set.add(listener);
-      const dispose = (): void => { set.delete(listener); this.disposers.delete(dispose); };
-      this.disposers.add(dispose);
-      return dispose;
+    if (this.unloaded) throw new Error('Atlas VTT has unloaded; wait for atlas-vtt:api-ready.');
+    const id = plugin.manifest.id;
+    this.connections.get(id)?.dispose(); // C-life-1: the first connection is disposed, without 'unload'
+    this.connectedIds.push(id);
+    const listeners: Listeners = {};
+    const connection: Connection = {
+      plugin,
+      listeners,
+      count: () => Object.values(listeners).reduce((sum, set) => sum + (set?.size ?? 0), 0),
+      dispose: () => {
+        for (const key of Object.keys(listeners) as Array<keyof AtlasEvents>) listeners[key]?.clear();
+        if (this.connections.get(id) === connection) this.connections.delete(id);
+      },
     };
-    return { id: plugin.manifest.id, on } as AtlasExtension;
+    this.connections.set(id, connection);
+    if (!this.registered.has(plugin)) {
+      this.registered.add(plugin);
+      // C-life-2: the plugin unloading removes its listeners (only if that plugin still owns the id)
+      plugin.register(() => { if (this.connections.get(id)?.plugin === plugin) this.connections.get(id)?.dispose(); });
+    }
+    const on = <E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer => {
+      const set = (listeners[event] ??= new Set()) as Set<AtlasEvents[E]>;
+      set.add(listener);
+      return () => { set.delete(listener); };
+    };
+    return { id, on };
   }
 
-  emit<E extends keyof AtlasEvents>(event: E, ...args: Parameters<AtlasEvents[E]>): void {
-    const set = this.listeners[event] as Set<(...a: Parameters<AtlasEvents[E]>) => void> | undefined;
-    for (const listener of [...(set ?? [])]) listener(...args);
-  }
-
-  /** Atlas unloads: 'unload', then everything is disposed (C-life-3). */
+  /** Atlas unloads (C-life-3): 'unload' to every extension in connection order, dispose all, then `atlas-vtt:api-unload`. */
   unload(): void {
-    this.emit('unload');
-    for (const dispose of [...this.disposers]) dispose();
+    if (this.unloaded) return;
+    this.unloaded = true;
+    const all = [...this.connections.values()];
+    for (const connection of all) for (const listener of [...(connection.listeners.unload ?? [])]) listener();
+    for (const connection of all) connection.dispose();
+    this.trigger('atlas-vtt:api-unload');
   }
 
   listenerCount(): number {
-    return Object.values(this.listeners).reduce((sum, set) => sum + (set?.size ?? 0), 0);
+    return [...this.connections.values()].reduce((sum, connection) => sum + connection.count(), 0);
   }
 }
