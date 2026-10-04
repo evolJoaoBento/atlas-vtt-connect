@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "target": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "types": ["vitest/globals"],
+    "paths": {
+      "@atlas-vtt/api-types": ["vendor/atlas/api-types/atlas-vtt-api.d.ts"],
+      "@atlas-vtt/shared/*": ["vendor/atlas/shared/types/src/shared/*"]
+    }
+  },
+  "include": ["main.ts", "src/**/*", "online-client/**/*", "tests/fake/**/*", "tests/unit/connect/**/*", "*.mts", "vite/**/*.mts"]
+}

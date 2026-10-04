@@ -1,0 +1,58 @@
+@use 'atlas-mixins' as *;
+
+.atlas-connect-button {
+  @include atlas-corner-shape;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+
+  &.is-sm {
+    padding: 2px 8px;
+    font-size: var(--font-ui-small);
+  }
+
+  &.mod-ghost {
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+
+    &:hover:not(:disabled) {
+      background: var(--background-modifier-hover);
+      color: var(--text-normal);
+    }
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.atlas-connect-tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.atlas-connect-tooltip {
+  @include atlas-elevated-surface;
+  position: absolute;
+  left: 50%;
+  z-index: var(--layer-tooltip, 100);
+  padding: 4px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+
+  &.is-top {
+    bottom: calc(100% + 4px);
+  }
+
+  &.is-bottom {
+    top: calc(100% + 4px);
+  }
+}

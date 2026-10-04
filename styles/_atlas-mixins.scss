@@ -1,0 +1,98 @@
+// Copied from Atlas VTT styles/_mixins.scss and styles/_tokens.scss at c1d4d15 (AGPL-3.0-only).
+// Only the mixins Connect uses, with the tokens they need.
+
+$spacing-s: 8px;
+$spacing-l: 16px;
+$radius-xl: var(--radius-l);
+$shadow-elevated: var(--shadow-l);
+$border-width-m: 1.5px;
+$border-opacity-default: 18%;
+$close-button-size: var(--input-height);
+$close-button-gap: $spacing-s;
+
+/// Elevated card surface — opaque background, visible stroke, drop shadow.
+/// Use for modals, popovers, hover previews, and floating panels.
+@mixin atlas-elevated-surface {
+  background: var(--background-primary);
+  border: $border-width-m solid color-mix(in oklch, var(--mono-100) $border-opacity-default, transparent);
+  border-radius: $radius-xl;
+  box-shadow: $shadow-elevated;
+}
+
+/// Obsidian's corner shape (a superellipse on macOS, round elsewhere), which it
+/// gives buttons, inputs, menus and modals. A panel and everything inset in its
+/// corners must share one shape: a squircle never runs parallel to a circle.
+@mixin atlas-corner-shape {
+  corner-shape: var(--corner-shape, round);
+}
+
+/// Radius of a panel that holds a close button. Also publishes the radius
+/// inside its border, which the close button's corner runs concentric with.
+/// @param {Length} $radius       - the panel's outer radius
+/// @param {Length} $border-width - the panel's border width
+@mixin atlas-panel-radius($radius, $border-width: $border-width-m) {
+  --atlas-panel-inner-radius: calc(#{$radius} - #{$border-width});
+  border-radius: $radius;
+  @include atlas-corner-shape;
+}
+
+/// Radius of an element $inset inside the border of a panel set up with
+/// `atlas-panel-radius`: concentric with the panel's corner (outer radius =
+/// inner radius + inset).
+/// @param {Length} $inset - distance from the panel's border to the element
+/// @param {Length} $max   - half the element's height in a capsule-shaped bar,
+///                          where the browser rounds the bar to half its height
+@function atlas-panel-inset-radius-value($inset, $max: null) {
+  $radius: calc(var(--atlas-panel-inner-radius, #{$radius-xl}) - #{$inset});
+  @if $max {
+    @return clamp(0px, #{$radius}, #{$max});
+  }
+  @return max(0px, #{$radius});
+}
+
+/// Rounds an element concentric with the corner of the panel it sits in (see
+/// `atlas-panel-inset-radius-value`). Pass corners to round only the ones that
+/// face the panel's corners; the others keep the element's own radius, so its
+/// edges run parallel to the panel's.
+/// @param {Length} $inset   - distance from the panel's border to the element
+/// @param {List}   $corners - top-left | top-right | bottom-left | bottom-right
+@mixin atlas-panel-inset-radius($inset, $corners...) {
+  $radius: atlas-panel-inset-radius-value($inset);
+  @include atlas-corner-shape;
+
+  @if length($corners) == 0 {
+    border-radius: $radius;
+  } @else {
+    @each $corner in $corners {
+      border-#{$corner}-radius: $radius;
+    }
+  }
+}
+
+/// A popover positioned by `useKeepInView`: shifted sideways off the view's
+/// edge, and scrolling when the view is too short for it. Without the hook's
+/// variables it stays put (no `translate`, so no new containing block).
+@mixin atlas-keep-in-view {
+  translate: var(--atlas-keep-in-view-x);
+
+  &.atlas-keep-in-view--capped {
+    box-sizing: border-box;
+    max-height: var(--atlas-keep-in-view-max-height);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    > * {
+      flex-shrink: 0;
+    }
+  }
+}
+
+/// Header along the top edge of a panel, ending in the close button: the
+/// button sits $close-button-gap from the panel's border, and the rest of the
+/// header centres on it.
+/// @param {Length} $inline-start - space before the title
+@mixin atlas-close-header($inline-start: $spacing-l) {
+  min-height: calc(#{$close-button-size} + 2 * #{$close-button-gap});
+  padding: $close-button-gap $close-button-gap $close-button-gap $inline-start;
+  align-items: center;
+}

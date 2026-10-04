@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-page/
+coverage/
+*.tsbuildinfo
+.DS_Store
+**/__screenshots__/
