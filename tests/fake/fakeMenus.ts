@@ -2,8 +2,9 @@ import type { MenuItem } from '@atlas-vtt/api-types';
 
 /**
  * Atlas's menus as the fake draws them (`menuEntriesOf` and `AtlasContextMenu` at api-pr-13-end). A menu's own items
- * are built once, when it opens; an open submenu reads its provider again each time it is shown (after `ui.invalidate()`
- * in Atlas), finding itself by its label path, the first item with each label. A plain item with `keepOpen: true`
+ * are built once, when it opens; an open submenu reads its provider again only when the slot changed (`ui.invalidate()`
+ * or a provider added or removed: Atlas's slot `subscribe`), finding itself by its label path, the first item with each
+ * label; until then it shows what it read last. A plain item with `keepOpen: true`
  * leaves the menu open when chosen; any other choice closes it.
  */
 
@@ -51,18 +52,29 @@ export interface OpenMenu {
   choose(path: readonly string[]): boolean;
 }
 
-/** Opens a menu whose items `read` gives (each call reads the providers again). */
-export function openMenu(read: () => MenuItem[]): OpenMenu {
+/** Opens a menu whose items `read` gives (each call reads the providers again); `changes` names the slot's state, as its `subscribe` would fire. */
+export function openMenu(read: () => MenuItem[], changes: () => unknown): OpenMenu {
   const items = read();
   let open = items.length > 0;
+  let seen = changes();
+  let live = items;
+  // What an open submenu shows: read again only after the slot changed.
+  const current = (): MenuItem[] => {
+    const now = changes();
+    if (now !== seen) {
+      seen = now;
+      live = read();
+    }
+    return live;
+  };
   return {
     items,
     get isOpen() { return open; },
-    submenu: (path) => (open ? itemAt(read(), path)?.submenu ?? [] : []),
+    submenu: (path) => (open ? itemAt(current(), path)?.submenu ?? [] : []),
     choose: (path) => {
       if (!open || path.length === 0) return false;
-      // A submenu's items are the live ones; the menu's own are those it opened with.
-      const item = path.length === 1 ? itemAt(items, path) : itemAt(read(), path);
+      // A submenu's items are the ones it shows; the menu's own are those it opened with.
+      const item = path.length === 1 ? itemAt(items, path) : itemAt(current(), path);
       if (!item || item.submenu || item.disabled) return false;
       try {
         item.onClick?.();

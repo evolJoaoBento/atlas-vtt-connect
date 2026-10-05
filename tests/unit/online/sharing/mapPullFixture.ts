@@ -35,9 +35,9 @@ export async function setup(options: { older?: boolean } = {}) {
   const { app, files } = vault;
   const pulled = PulledItems.create(app.vault.adapter, PATHS);
   await pulled.ready();
-  const { atlas, scenes: api } = scenesOver(vault);
+  const { atlas, scenes: api } = scenesOver(vault, options.older === true);
   // One addToCollection per pull: Atlas writes the images, the map file and the record under its own lock.
-  const scenes = { list: vi.fn(api.list), addToCollection: vi.fn(api.addToCollection), ...(options.older ? {} : { replaceMap: vi.fn(api.replaceMap!) }) };
+  const scenes = { list: vi.fn(api.list), addToCollection: vi.fn(api.addToCollection), ...(api.replaceMap ? { replaceMap: vi.fn(api.replaceMap) } : {}) };
   // The fork's tests count scene records added (`assets.addAsset`); one addToCollection adds one.
   const assets = { addAsset: scenes.addToCollection };
   const images = vi.fn(async (fingerprint: string): Promise<PulledItem> => ({

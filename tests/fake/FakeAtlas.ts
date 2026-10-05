@@ -93,7 +93,8 @@ export class FakeAtlas implements AtlasApi {
   readonly bundles: FakeBundles;
 
   /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
-  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault } = {}) {
+  /** `scenesBefore113`: Atlas's scenes as before API 1.13.0 (no saved map fields, no `replaceMap`). */
+  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault; scenesBefore113?: boolean } = {}) {
     this.version = options.version ?? '1.0.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
@@ -111,7 +112,7 @@ export class FakeAtlas implements AtlasApi {
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
     this.ui = this.capabilities.has('ui') ? new FakeUi(this.views) : undefined;
-    this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths());
+    this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths(), options.scenesBefore113 === true);
     this.bundles = new FakeBundles();
   }
 

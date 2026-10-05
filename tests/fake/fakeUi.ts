@@ -126,12 +126,12 @@ export class FakeUi {
 
   /** The "More options" menu opened in the view: its submenus are read anew, `keepOpen` items leave it open (`fakeMenus`). */
   openViewMenu(viewId: ViewId): OpenMenu {
-    return openMenu(() => this.viewMenu(viewId));
+    return openMenu(() => this.viewMenu(viewId), () => this.slotState());
   }
 
   /** A token's context menu opened in the view, as `openViewMenu`. */
   openTokenMenu(viewId: ViewId, tokenId: string, tokenKind: TokenMenuContext['tokenKind']): OpenMenu {
-    return openMenu(() => this.tokenMenu(viewId, tokenId, tokenKind));
+    return openMenu(() => this.tokenMenu(viewId, tokenId, tokenKind), () => this.slotState());
   }
 
   /** A token's context menu: the extension items, in GM views only. */
@@ -279,6 +279,11 @@ export class FakeUi {
 
   private closeEverywhere(entry: Entry<PanelSpec>): void {
     for (const viewId of [...(this.open.get(entry)?.keys() ?? [])]) this.closeIn(entry, viewId);
+  }
+
+  /** Changes when Atlas's slot `subscribe` fires: an `invalidate`, or a registration added or removed. */
+  private slotState(): string {
+    return `${this.versions}:${this.entries.size}`;
   }
 
   private ctxOf(viewId: ViewId): ViewContext {

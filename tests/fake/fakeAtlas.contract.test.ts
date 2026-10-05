@@ -12,6 +12,8 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-pres-2': 'Atlas-internal: the eye of a target is Atlas UI',
   'C-rules-6': "Atlas-internal: needs Atlas's settings service and its user system presets",
   'C-rules-7': "Atlas-internal: the asset index's own loading and its failure log",
+  'C-remote-3': "Atlas-internal (the plan's Appendix A): setScene in the remote view's store snapshot",
+  'C-remote-5': "Atlas-internal (the plan's Appendix A): the remote view's dice tray and log are Atlas UI",
 };
 
 /**
@@ -21,9 +23,7 @@ export const ATLAS_ONLY: Record<string, string> = {
 export const LATER_TASK: Record<string, string> = {
   'C-remote-1': 'B15: remoteViews.open, reuse and onClose',
   'C-remote-2': 'B15: unloading closes the remote views',
-  'C-remote-3': 'B15: setScene in the snapshot (Atlas-only, store, per the plan)',
   'C-remote-4': 'B15: token drops, lasers and camera moves in a remote view',
-  'C-remote-5': 'B15: the remote dice tray and log (Atlas-only, UI, per the plan)',
 };
 
 describe('FakeAtlas follows the contract cases', () => {

@@ -155,7 +155,8 @@ describe('FakeAtlas follows replaceMap (1.13.0)', () => {
     const { sceneId, mapPath } = await added(scenes);
     atlas.views.open('v1', [{ tabId: 't1', mapPath: 'other.atlasmap', name: 'Other' }, { tabId: 't2', mapPath, name: 'Cave' }]);
     const before = vault.files.get(mapPath);
-    await expect(scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] })).rejects.toThrow(/open in a map view/);
+    // Atlas's exact message (`sceneReplace.ts`): Connect tells this refusal from others by it (`mapPull.ts` isOpenRefusal).
+    await expect(scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] })).rejects.toThrow('[Atlas API] replaceMap: the scene is open in a map view; close its tab first.');
     expect(vault.files.get(mapPath)).toBe(before);
     atlas.views.close('v1');
     await expect(scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] })).resolves.toEqual({ sceneId, mapPath });
@@ -196,5 +197,28 @@ describe('FakeAtlas follows replaceMap (1.13.0)', () => {
     const state = (JSON.parse(vault.files.get(mapPath)!) as { state: Record<string, unknown> }).state;
     expect(state).toMatchObject(play);
     expect(state).not.toHaveProperty('exploredMask');
+  });
+
+  it('C-scenes-5: a write that fails leaves the map and its folder as they were', async () => {
+    const { atlas, vault, scenes } = inVault();
+    const { sceneId } = await added(scenes);
+    const before = new Map(vault.files);
+    atlas.scenes.beforeMapWrite = () => { throw new Error('disk full'); };
+    await expect(scenes.replaceMap!(sceneId, { map: emptyMap(), images: [image('new.webp')] })).rejects.toThrow('disk full');
+    expect(new Map(vault.files)).toEqual(before);
+  });
+
+  it('C-scenes-5: a change to the scene record during the call survives; only the image list is updated', async () => {
+    const { atlas, scenes } = inVault();
+    const { sceneId, mapPath } = await added(scenes);
+    atlas.scenes.beforeMapWrite = () => {
+      atlas.scenes.tag(sceneId, ['cave']);
+      atlas.scenes.moveMap(sceneId, `${FOLDER}/Moved.atlasmap`);
+    };
+    await scenes.replaceMap!(sceneId, { map: emptyMap({ background: 'one.webp' }), images: [image('one.webp')] });
+    expect(atlas.scenes.record(sceneId)).toMatchObject({
+      mapPath: `${FOLDER}/Moved.atlasmap`, data: { tags: ['cave'], createdBy: 'ext', createdImages: [`${FOLDER}/one.webp`] },
+    });
+    expect(mapPath).not.toBe(`${FOLDER}/Moved.atlasmap`);
   });
 });

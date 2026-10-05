@@ -291,6 +291,9 @@ describe('a received map is untrusted', () => {
     const switches = { ...map, tokenSettings: { showHPBars: false, showStressBars: true } };
     const second = await pullMap(deps({}), { ...input({ format: 'atlas-share-map-v1', mode: 'full', name: 'Inn', map: switches, notes: [], images: [] }), item: { ...input(playerSafe).item, item: 'x'.repeat(22) } });
     expect(mapState(files.get((second as { path: string }).path)).tokenSettings).toMatchObject({ hiddenResources: ['hp'], showHPBars: false, showStressBars: true });
+    const single = { ...map, tokenSettings: { showResources: false } };
+    const third = await pullMap(deps({}), { ...input({ format: 'atlas-share-map-v1', mode: 'full', name: 'Inn', map: single, notes: [], images: [] }), item: { ...input(playerSafe).item, item: 'y'.repeat(22) } });
+    expect(mapState(files.get((third as { path: string }).path)).tokenSettings).toMatchObject({ hiddenResources: ['hp', 'stress'] });
     expect(state).not.toHaveProperty('initiativeTrackerOpen');
   });
 });

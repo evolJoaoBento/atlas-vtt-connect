@@ -72,7 +72,11 @@ export class FakeScenes {
   beforeMapWrite: (() => void) | null = null;
 
   /** `openMaps`: the map paths open in a map view (loaded, or among its scene tabs), which `replaceMap` refuses. */
-  constructor(private readonly changed: () => void, vault?: FakeSceneVault, private readonly openMaps: () => ReadonlySet<string> = () => new Set()) {
+  /** `before113`: the scenes of an Atlas before API 1.13.0, without the saved map fields and `replaceMap`. */
+  constructor(
+    private readonly changed: () => void, vault?: FakeSceneVault, private readonly openMaps: () => ReadonlySet<string> = () => new Set(),
+    private readonly before113 = false,
+  ) {
     this.files = vault?.files ?? new Map();
     this.folders = vault?.folders ?? new Set();
   }
@@ -157,11 +161,15 @@ export class FakeScenes {
         const text = this.files.get(mapPath);
         if (text === undefined) return null;
         // The fields of `SavedMap`: the GM's note, the dice log, explored memory and the rest stay behind.
-        const map = savedMapInput(text);
+        const full = savedMapInput(text);
+        const { pins: _p, walls: _w, lights: _l, lightZones: _z, camera: _c, tokenSettings: _t, initiativeTrackerOpen: _i, ...older } = full;
+        const map = this.before113 ? older : full;
         return deepFreeze({ ...map, mapSize: (map.background ? this.imageSizes.get(map.background) : undefined) ?? { width: 0, height: 0 } });
       },
-      addToCollection: (input: AddInput) => this.exclusive(async () => importScene(this.importTarget(), input, extensionId)),
-      replaceMap: (sceneId: string, input: ReplaceInput) => this.exclusive(async () => replaceScene(this.replaceTarget(), extensionId, sceneId, input)),
+      addToCollection: (input: AddInput) => this.exclusive(async () => importScene(this.importTarget(), input, this.before113 ? null : extensionId)),
+      ...(this.before113 ? {} : {
+        replaceMap: (sceneId: string, input: ReplaceInput) => this.exclusive(async () => replaceScene(this.replaceTarget(), extensionId, sceneId, input)),
+      }),
     });
   }
 

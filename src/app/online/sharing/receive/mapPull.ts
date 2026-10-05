@@ -151,7 +151,17 @@ async function installUpdate(deps: MapPullDeps, add: () => Promise<Added>, known
   return { kind: 'updated', path: added.mapPath };
 }
 
+/**
+ * Atlas's refusal of an open scene, by its message (`src/api/sceneReplace.ts`: "the scene is open in a map view; close
+ * its tab first."); the fake copies it and C-scenes-5 checks it. Any other refusal adds a new scene instead.
+ */
 const isOpenRefusal = (error: unknown): boolean => error instanceof Error && /open in a map view/.test(error.message);
+
+/** The received map is open in a map view: the receiver is told to close it, and the pull stays pending. */
+function closeFirst(deps: MapPullDeps, input: MapPullInput): PullOutcome {
+  deps.notify?.(`${input.item.title} is open in a map view. ${CLOSE_TO_UPDATE}`);
+  return { kind: 'cancelled' };
+}
 
 /**
  * Replaces the received map in place (`replaceMap`), keeping its scene: the record keeps its path and takes the new
@@ -160,15 +170,10 @@ const isOpenRefusal = (error: unknown): boolean => error instanceof Error && /op
  * the caller adds a new scene instead.
  */
 async function replaceKnown(deps: MapPullDeps, known: PulledRecord & { sceneId: string }, input: MapPullInput, prepared: Prepared): Promise<PullOutcome | null> {
-  const closeFirst = (): PullOutcome => {
-    deps.notify?.(`${input.item.title} is open in a map view. ${CLOSE_TO_UPDATE}`);
-    return { kind: 'cancelled' };
-  };
-  if (deps.isOpen?.(known.path)) return closeFirst();
   try {
     await deps.scenes.replaceMap!(known.sceneId, { map: prepared.map, images: prepared.upload.images });
   } catch (error) {
-    if (isOpenRefusal(error)) return closeFirst();
+    if (isOpenRefusal(error)) return closeFirst(deps, input);
     console.error('[Atlas Connect] Atlas did not replace a received map; it arrives as a new scene:', error);
     return null;
   }
@@ -232,6 +237,8 @@ async function writeMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOut
   if (known && update) {
     const own = replaceable(deps, known);
     if (own && update.follow) {
+      // Checked before any image is pulled; Atlas's own refusal covers a tab opened meanwhile.
+      if (deps.isOpen?.(known.path)) return closeFirst(deps, input);
       const replaced = await replaceKnown(deps, own, input, await prepare(parentOf(known.path)));
       if (replaced) return replaced;
       return installUpdate(deps, add, known, true, input, REFUSED);

@@ -57,12 +57,16 @@ describe('a re-pull where Atlas can replace the received map', () => {
   });
 
   it(`a scene open in a map view is not replaced: the receiver is told "${CLOSE_TO_UPDATE}" and the pull stays pending until it is closed`, async () => {
-    const { files, atlas, pulled, scenes, notify, deps } = await setup();
+    const { files, atlas, pulled, scenes, images, notify, deps } = await setup();
     await pullMap(deps({}), input(playerSafe));
     const before = files.get(MAP);
     const open = new Set([MAP]);
     const withViews = { ...deps({}), isOpen: (path: string) => open.has(path) };
-    expect(await pullMap(withViews, newer(playerSafe))).toEqual({ kind: 'cancelled' });
+    images.mockClear();
+    const changedArt = { ...playerSafe, images: [MAP_IMAGE, 'N'.repeat(43)] };
+    expect(await pullMap(withViews, newer(changedArt))).toEqual({ kind: 'cancelled' });
+    // Nothing is pulled for a scene that cannot be replaced now.
+    expect(images).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(`Inn is open in a map view. ${CLOSE_TO_UPDATE}`);
     expect(files.get(MAP)).toBe(before);
     expect(scenes.replaceMap).not.toHaveBeenCalled();
@@ -121,6 +125,20 @@ describe('a re-pull where Atlas can replace the received map', () => {
     expect(await pullMap(deps({}), newer(playerSafe))).toEqual({ kind: 'updated', path: `${SCENES}/Inn (2).atlasmap` });
     expect(notify).toHaveBeenCalledWith(`The new version of Inn is a new scene, ${SCENES}/Inn (2).atlasmap: Atlas VTT did not replace your copy.`);
     expect(pulled.get(TABLE_ID, 'ana', ITEM)).toMatchObject({ path: `${SCENES}/Inn (2).atlasmap`, version: 'W'.repeat(43) });
+  });
+});
+
+describe('a received map on an Atlas before 1.13.0', () => {
+  it('arrives without the fields that Atlas ignores, and nothing throws', async () => {
+    const { files, scenes, deps } = await setup({ older: true });
+    files.set('Shared/Ana/Inn.md', 'note');
+    expect(await pullMap(deps({ [NOTE_ITEM]: 'Shared/Ana/Inn.md' }), input(full({ x: 9, y: 8, scale: 2 })))).toMatchObject({ kind: 'created' });
+    expect(scenes).not.toHaveProperty('replaceMap');
+    const state = mapState(files.get(MAP));
+    expect(state.objects).toMatchObject({ pins: {}, walls: {}, lights: {} });
+    expect(state.camera).toEqual({ x: 0, y: 0, scale: 1 });
+    expect(state).not.toHaveProperty('tokenSettings');
+    expect(state).not.toHaveProperty('initiativeTrackerOpen');
   });
 });
 

@@ -48,9 +48,9 @@ function withHidden(hidden: readonly string[], key: string, isHidden: boolean): 
 }
 
 /**
- * The four token settings Atlas knows, each of the right type; the rest are Atlas's defaults. A map file's two bar
- * switches (`showHPBars`, `showStressBars`, which a fork sender's file may hold) become the hidden resources, as
- * Atlas's `tokenSettingsFromFile` reads them.
+ * The four token settings Atlas knows, each of the right type; the rest are Atlas's defaults. A map file's bar
+ * switches (`showHPBars`, `showStressBars`, or the older `showResources`, which a fork sender's file may hold) become
+ * the hidden resources, as Atlas's `tokenSettingsFromFile` reads them.
  */
 function tokenSettings(value: unknown): Partial<TokenSettings> | undefined {
   if (!isRecord(value)) return undefined;
@@ -58,6 +58,9 @@ function tokenSettings(value: unknown): Partial<TokenSettings> | undefined {
   let hidden = Array.isArray(value.hiddenResources) && value.hiddenResources.every((key) => typeof key === 'string') ? [...value.hiddenResources] as string[] : null;
   if ('showHPBars' in value || 'showStressBars' in value) {
     hidden = withHidden(withHidden(hidden ?? [], 'hp', showHPBars === false), 'stress', showStressBars !== true);
+  } else if (value.showResources === false) {
+    // Builds of the feature had one switch for all resources.
+    hidden = ['hp', 'stress'];
   }
   return {
     ...(typeof showNameplates === 'boolean' ? { showNameplates } : {}),

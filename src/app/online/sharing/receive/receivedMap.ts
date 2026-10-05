@@ -16,7 +16,7 @@ import { setOwn } from '../../scene/sceneDiff';
 import { createDefaultInitiativeState } from '../../../types/initiativeDefaults';
 import { PATH_KEY, replaceStrings } from '../model/buildMapPayload';
 import { IMAGE_REF_PREFIX, NOTE_REF_PREFIX, type FullMapPayload, type MapPayload, type PlayerSafeMapPayload } from '../model/mapPayload';
-import { fullMapFields, receivedPins } from './receivedMapFields';
+import { fullMapFields, receivedPins, recordsOf } from './receivedMapFields';
 
 export interface ReceivedMapContext {
   /** Fingerprint → how the map names that image: its path in the upload, or the vault path of the one saved before. */
@@ -32,11 +32,7 @@ type Records = Record<string, Record<string, unknown>>;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The records of a kind: only entries that are records themselves, each under its own key. */
-function records(value: unknown): Records {
-  const result: Records = {};
-  if (isRecord(value)) for (const [id, record] of Object.entries(value)) if (isRecord(record)) setOwn(result, id, record);
-  return result;
-}
+const records = (value: unknown): Records => recordsOf<Record<string, unknown>>(value) ?? {};
 
 function numbers(value: unknown): Record<string, number> {
   const result: Record<string, number> = {};

@@ -1,5 +1,6 @@
 import { normalizePath } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
+import { mapStrings } from '../../src/app/utils/mapStrings';
 import { checkedSceneFields, isPlainRelative, withImagePaths } from './fakeMapFields';
 import { savedMapText } from './fakeSavedMap';
 
@@ -23,7 +24,7 @@ export interface ImportTarget {
   collections: Map<string, string>;
   /** Scene id → map path, of every record in the index. */
   scenes(): Map<string, string | null>;
-  addRecord(name: string, collectionId: string, mapPath: string, created: { createdBy: string; createdImages: string[] }): string;
+  addRecord(name: string, collectionId: string, mapPath: string, created: { createdBy?: string; createdImages?: string[] }): string;
   removeRecord(sceneId: string): void;
   /** A test's planned failure: after the writes, or after the record was added (the index save failing). */
   takeFailure(): { error: Error; after: 'writes' | 'record' } | null;
@@ -81,7 +82,12 @@ function freeMapPath(target: ImportTarget, folder: string, name: string): string
 
 const exists = (target: ImportTarget, path: string): boolean => target.files.has(path) || target.folders.has(path);
 
-export function importScene(target: ImportTarget, input: AddInput, owner: string): { sceneId: string; mapPath: string } {
+/**
+ * `owner`: the extension adding the scene, as Atlas 1.13.0 notes it. Null is an Atlas before 1.13.0 (abc1cea): it reads
+ * no optional field, rewrites image paths anywhere in the map, writes a new map's empty pins, walls and lights, and
+ * notes no maker.
+ */
+export function importScene(target: ImportTarget, input: AddInput, owner: string | null): { sceneId: string; mapPath: string } {
   if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
     throw new Error('[Atlas API] addToCollection needs { collection, name, folder, map, images }.');
   }
@@ -95,7 +101,7 @@ export function importScene(target: ImportTarget, input: AddInput, owner: string
     if (!isPlainRelative(folder) || !`${folder}/x`.startsWith(`${COLLECTIONS_DIR}/${collection.id}/`)) {
       throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${COLLECTIONS_DIR}/${collection.id}.`);
     }
-    const fields = checkedSceneFields(input.map);
+    const fields = owner === null ? null : checkedSceneFields(input.map);
     const targets = new Map<string, ArrayBuffer>();
     for (const image of input.images) {
       const path: unknown = image?.path;
@@ -114,10 +120,11 @@ export function importScene(target: ImportTarget, input: AddInput, owner: string
     mapPath = freeMapPath(target, folder, input.name);
     const imagePaths = new Map([...targets.keys()].map((at) => [at.slice(folder.length + 1), at]));
     written.push(mapPath);
-    target.files.set(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
+    const map = owner === null ? mapStrings(input.map, (text) => imagePaths.get(text) ?? text) : withImagePaths(input.map, imagePaths);
+    target.files.set(mapPath, savedMapText(map, mapPath, input.name.trim(), fields));
     const failure = target.takeFailure();
     if (failure?.after === 'writes') throw failure.error;
-    const sceneId = target.addRecord(input.name.trim(), collection.id, mapPath, { createdBy: owner, createdImages: [...targets.keys()] });
+    const sceneId = target.addRecord(input.name.trim(), collection.id, mapPath, owner === null ? {} : { createdBy: owner, createdImages: [...targets.keys()] });
     if (failure?.after === 'record') throw failure.error;
     return { sceneId, mapPath };
   } catch (error) {

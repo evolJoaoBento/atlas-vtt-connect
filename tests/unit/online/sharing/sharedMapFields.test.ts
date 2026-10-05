@@ -105,23 +105,18 @@ describe('a map read through Atlas 1.13.0', () => {
 
 describe('a map read through an Atlas before 1.13.0', () => {
   it('makes the same payloads as before: no pins, walls or camera, the tracker closed', async () => {
-    const atlas = new FakeAtlas({ capabilities: ['scenes'] });
+    const atlas = new FakeAtlas({ capabilities: ['scenes'], scenesBefore113: true });
     atlas.scenes.setMap(MAP, BASE, { saved: SAVED });
-    const current = atlas.connect(connectingPlugin('atlas-vtt-connect')).scenes;
-    // What `readMap` handed out before 1.13.0: none of its optional fields.
-    const older: Pick<ScenesApi, 'readMap'> = {
-      readMap: async (path) => {
-        const map = await current.readMap(path);
-        if (!map) return null;
-        const { pins: _p, walls: _w, lights: _l, lightZones: _z, camera: _c, tokenSettings: _t, initiativeTrackerOpen: _i, ...rest } = map;
-        return rest;
-      },
-    };
-    const source = (await readSharedMap(older, MAP))!;
+    const source = (await readSharedMap(atlas.connect(connectingPlugin('atlas-vtt-connect')).scenes, MAP))!;
+    // The source as Connect built it before 1.13.0, from the saved map itself: widgets and initiative over Atlas's defaults.
+    const widgets = { settings: { widgets: {}, globalVisible: true, position: 'top', scale: 1 }, values: {} } as SavedMapInput['widgets'];
     const before: SharedMapSource = {
       map: { background: BASE.background, grid: BASE.grid, objects: { tokens: BASE.objects.tokens as never, texts: {}, drawings: {}, fog: {}, pins: {} } },
-      state: { ...source.state, initiativeTrackerOpen: false },
-      extra: { widgetSettings: source.state.widgets.settings, widgetValues: source.state.widgets.values, initiative: source.state.initiative },
+      state: {
+        background: BASE.background, grid: BASE.grid, objects: BASE.objects, widgets, initiative: BASE.initiative,
+        initiativeTrackerOpen: false, mapPath: null, lighting: { enabled: false, ambient: 1 },
+      },
+      extra: { widgetSettings: widgets.settings, widgetValues: widgets.values, initiative: BASE.initiative },
       lit: false,
     };
     expect(JSON.stringify(fullPayload(source, 'Inn', ticked(ALL)))).toBe(JSON.stringify(fullPayload(before, 'Inn', ticked(ALL))));

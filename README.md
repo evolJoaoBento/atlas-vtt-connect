@@ -12,6 +12,13 @@ It works on top of an unmodified Atlas VTT, through Atlas's extension API.
 
 Licence: AGPL-3.0-only. Connect contains code from Atlas VTT.
 
+## Moving from the online preview
+
+Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
+- **Maps you received before.** A map someone shared with you before Connect ran on Atlas VTT with extension API 1.13 (including every map the online preview received) cannot be updated in place.
+- **The next new version of each such map** arrives as a second scene beside your copy, for example "Inn (2)", and a notice says so. Your old copy stays as it was, and you can delete it.
+- **After that,** new versions of the map replace it in place, as the preview did.
+
 ## Development
 
 Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an install bug ("Cannot read properties of null (reading 'edgesOut')").
