@@ -4,6 +4,7 @@
  * player page, so it imports nothing from Obsidian.
  */
 import { decodeControl, type ControlMessage } from './protocol';
+import { drawableGridFilter } from './scene/drawableGrid';
 import { PlayerSceneMirror } from './scene/PlayerSceneMirror';
 import { cameraOfMessage, type SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene } from './scene/sceneTypes';
@@ -15,19 +16,31 @@ export interface PlayerSceneInboxOptions {
   onScene(scene: PlayerScene | null): void;
   /** The GM's latest camera, whatever its scene. */
   onCamera(camera: SceneCamera): void;
+  /** Where a dropped grid is told, once per session; `console.warn` by default. */
+  warn?(message: string, grid: unknown): void;
 }
+
+export const UNDRAWABLE_GRID_WARNING = '[Atlas VTT Connect] The GM sent a grid that cannot be drawn safely; it is shown without a grid.';
 
 export class PlayerSceneInbox {
   private readonly mirror: PlayerSceneMirror;
   private lastCamera: SceneCamera | null = null;
+  /** Every scene leaves here through this, so no drawer gets a grid it would loop over (`drawableGrid`). */
+  private readonly drawable: (scene: PlayerScene | null) => PlayerScene | null;
 
   constructor(private readonly options: PlayerSceneInboxOptions) {
-    this.mirror = new PlayerSceneMirror({ sendResync: (seq) => options.sendResync(seq), onChange: (scene) => options.onScene(scene) });
+    let warned = false;
+    this.drawable = drawableGridFilter((grid) => {
+      if (warned) return;
+      warned = true;
+      (options.warn ?? ((message: string, details: unknown): void => console.warn(message, details)))(UNDRAWABLE_GRID_WARNING, grid);
+    });
+    this.mirror = new PlayerSceneMirror({ sendResync: (seq) => options.sendResync(seq), onChange: (scene) => options.onScene(this.drawable(scene)) });
   }
 
-  /** The presented scene as this player has it; null while the GM shows none. */
+  /** The presented scene as this player has it, its grid dropped when it cannot be drawn; null while the GM shows none. */
   get scene(): PlayerScene | null {
-    return this.mirror.scene;
+    return this.drawable(this.mirror.scene);
   }
 
   /** The GM's latest camera; null before the first. */
