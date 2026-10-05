@@ -84,6 +84,8 @@ describe('inline Dataview JS anywhere (re-review 2, R3)', () => {
       '```text\n$= dv.el("p", 1)\n```', '~~~\n$= dv.x\n~~~', '    $= dv.el("p", 1)', '```md\n  $= dv.x\n```',
       "<code>$= dv.el('p', 1)</code>", '<code>&#36;= dv.x</code>', '<code>$&#61; dv.x</code>', '<code>&#x24;&#x3D; dv.x</code>',
       '<code>&dollar;&equals; dv.x</code>', '<code>&#036;= dv.x</code>', 'plain $= prose',
+      // HTML decodes numeric entities without their semicolon (fork review I1).
+      '<div><code>&#36=dv.el("p", 1)</code></div>', '<code>&#x24= dv.x</code>', '<code>$&#61 dv.x</code>', '<code>&#36&#61 dv.x</code>',
     ];
     for (const probe of probes) {
       expect(findExecutable(probe), probe).toEqual(['dataview-inline']);
