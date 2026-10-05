@@ -145,6 +145,16 @@ export class MapView {
     this.tools.select(tool);
   }
 
+  /** The camera follows the GM's again (the Follow GM button). */
+  followGm(): void {
+    this.camera.followGm();
+  }
+
+  /** The camera fits the whole map (the Fit map button). */
+  fitMap(): void {
+    this.camera.fitMap();
+  }
+
   selectShape(shape: MeasureChoice): void {
     this.tools.selectShape(shape);
   }
