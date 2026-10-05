@@ -5,7 +5,7 @@ import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { AtlasLink } from '../../../src/connect/atlasLink';
 import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';
-import { startConnect } from '../../../src/connect/startConnect';
+import { startConnect, type ConnectOptions } from '../../../src/connect/startConnect';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeEvents, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
@@ -64,11 +64,18 @@ function slowFolder(atlas: FakeAtlas, gate: Promise<void>): void {
   });
 }
 
+/** What a test adds: files already in the vault, and options for `startConnect` (the migration's store). */
+export interface ConnectedExtra {
+  files?: Record<string, string>;
+  options?: Partial<ConnectOptions>;
+}
+
 /** Atlas with these capabilities, Connect linked to it, and an in-memory host every session uses. */
-export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>, playerKeys?: (hostId: string) => string) {
+export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>, playerKeys?: (hostId: string) => string, extra: ConnectedExtra = {}) {
   const workspace = fakeWorkspaceApp();
   const { app } = workspace;
-  const memory = createInMemoryApp().app;
+  const vault = createInMemoryApp({ files: extra.files ?? {} });
+  const memory = vault.app;
   const vaultEvents = fakeEvents();
   const cacheEvents = fakeEvents();
   Object.assign(app, {
@@ -96,6 +103,7 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
       table: async () => null,
       showRequest: (_player, answer) => { requests.push(answer); return { hide: () => {} }; },
     },
+    ...extra.options,
   }), () => undefined).start();
   /** A web player who asks to join and is allowed, recording what the GM sends. */
   const join = async (name: string): Promise<{ received: ControlMessage[]; send(message: ControlMessage): void }> => {
@@ -109,5 +117,5 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
     requests.at(-1)?.(true);
     return { received, send: (message) => link.send('control', encodeControl(message)) };
   };
-  return { atlas, connect, join, sharing, fire: workspace.fire, vaultEvents, cacheEvents, workspace: app.workspace as unknown as ReturnType<typeof fakeEvents> };
+  return { atlas, connect, join, sharing, files: vault.files, fire: workspace.fire, vaultEvents, cacheEvents, workspace: app.workspace as unknown as ReturnType<typeof fakeEvents> };
 }

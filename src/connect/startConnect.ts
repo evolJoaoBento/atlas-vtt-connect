@@ -12,6 +12,8 @@ import type { SharingLifetime } from '../app/online/sharing/sharingLifetime';
 import { need } from './capabilities';
 import { canShare, startConnectSharing } from './connectSharing';
 import { connectStorage } from './connectStorage';
+import type { MigrationSettings } from './migrateFromFork';
+import { startMigration, type MigrationStart } from './startMigration';
 import { startJoining, type JoinSettings } from './startJoining';
 
 export interface ConnectOptions {
@@ -25,6 +27,10 @@ export interface ConnectOptions {
   lifetime: SharingLifetime;
   /** Told whether the bound Atlas can share notes and maps (the settings tab says so when it cannot); null once it is gone. */
   sharing?: (available: boolean | null) => void;
+  /** The store the fork's data is brought into (`ConnectSettingsStore`); without it nothing is migrated. */
+  migration?: MigrationSettings;
+  /** Replaces the migration's notices and image caches; tests pass their own. */
+  migrationStart?: MigrationStart;
 }
 
 /** Hosting needs the presented scene, the views, the rules, Atlas's settings and a storage folder. */
@@ -74,12 +80,14 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   // exports and installs, whatever else Connect can start. Atlas remembers the key, so it stays stripped while Connect
   // is not loaded; the disposer would make Atlas forget it, so it is never called (ruling I5).
   need(api, atlas, 'bundles')?.stripNoteProperties([SHARE_PROPERTY]);
+  // The fork's device keys are brought over before joining can make new ones; hosting and sharing wait for the rest.
+  const migrated = startMigration(plugin.app, api, atlas, options.migration, options.migrationStart);
   // Joining needs no Atlas map and no capability, so it starts for every Atlas Connect binds to.
   const joining = startJoining(plugin, atlas, api, options.settings, options.playerKeys);
   keep(joining.stop);
   let sessions: Promise<OnlineSessionService | null> = Promise.resolve(null);
   if (canHost(api, atlas)) {
-    const hosting = startHosting(plugin, api, atlas, options, gone);
+    const hosting = migrated.then((ok) => (ok ? startHosting(plugin, api, atlas, options, gone) : { service: null, stop: () => undefined }));
     sessions = hosting.then((started) => {
       keep(started.stop);
       return started.service;
@@ -91,7 +99,8 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   const sharing = canShare(api, atlas);
   options.sharing?.(sharing);
   if (sharing) {
-    startConnectSharing(plugin, api, atlas, { joins: joining.service, sessions, settings: options.settings, lifetime: options.lifetime, gone }).then(keep, (error: unknown) => {
+    const start = { joins: joining.service, sessions, settings: options.settings, lifetime: options.lifetime, gone };
+    migrated.then((ok) => (ok ? startConnectSharing(plugin, api, atlas, start) : () => undefined)).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start sharing notes and maps:', error);
     });
   }

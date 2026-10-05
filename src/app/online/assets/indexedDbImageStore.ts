@@ -7,7 +7,7 @@
  */
 import type { ImageStore, StoredEntry, StoredImage } from './AssetCache';
 
-const DB_NAME = 'atlas-vtt-connect-images';
+export const IMAGES_DB_NAME = 'atlas-vtt-connect-images';
 const DB_VERSION = 1;
 const IMAGES = 'images';
 const ENTRIES = 'entries';
@@ -28,8 +28,8 @@ function finished(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function openDatabase(): Promise<IDBDatabase> {
-  const request = indexedDB.open(DB_NAME, DB_VERSION);
+function openDatabase(name: string): Promise<IDBDatabase> {
+  const request = indexedDB.open(name, DB_VERSION);
   request.onupgradeneeded = (): void => {
     const db = request.result;
     if (!db.objectStoreNames.contains(IMAGES)) db.createObjectStore(IMAGES, { keyPath: 'id' });
@@ -60,12 +60,15 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-/** Null when the browser has no IndexedDB or refuses to open it (some private windows, blocked storage). */
-export async function openIndexedDbImageStore(): Promise<ImageStore | null> {
+/**
+ * Null when the browser has no IndexedDB or refuses to open it (some private windows, blocked storage).
+ * `name` is Connect's database unless the migration opens the fork's.
+ */
+export async function openIndexedDbImageStore(name: string = IMAGES_DB_NAME): Promise<ImageStore | null> {
   let db: IDBDatabase;
   try {
     if (typeof indexedDB === 'undefined') return null;
-    db = await openDatabase();
+    db = await openDatabase(name);
   } catch {
     return null;
   }

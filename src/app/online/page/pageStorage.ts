@@ -4,8 +4,9 @@
  * old key and copied to the new one. Shared with the web page.
  */
 const PREFIX = 'atlas-vtt-connect:';
-// Migrates the fork's setting: the only place the old prefix may appear (B17's grep exempts this line).
-const FORK_PREFIX = 'atlas-online:';
+// Migrates the fork's settings and stores: the only place the fork's name may appear (B17's grep exempts this line).
+export const FORK_NAME = 'atlas-online';
+const FORK_PREFIX = `${FORK_NAME}:`;
 
 export const pageKey = (name: string): string => PREFIX + name;
 

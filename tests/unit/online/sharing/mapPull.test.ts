@@ -174,6 +174,19 @@ describe('pulling a map', () => {
     expect(await pulled.readBase(pulled.get(TABLE_ID, 'ana', 'm'.repeat(22))!)).toBe(files.get(`${SCENES}/Inn (2).atlasmap`));
   });
 
+  it("uses an image the fork's preview saved (Shared with me/files/<person>/) without pulling it again", async () => {
+    const { files, atlas, images, deps } = await setup();
+    // The fork's Shared with me collection, as Atlas indexes it, with the image the fork received for Ana.
+    atlas.scenes.addScene({ name: 'Old inn', collectionId: SHARED_COLLECTION, mapPath: `atlas-vtt/collections/${SHARED_COLLECTION}/scenes/Ana/Old inn.atlasmap` });
+    const forkImage = `atlas-vtt/collections/${SHARED_COLLECTION}/files/Ana/${MAP_IMAGE}.png`;
+    files.set(forkImage, 'map-bytes');
+    const outcome = await pullMap(deps({}), input(playerSafe));
+    expect(images).not.toHaveBeenCalled();
+    expect(files.has(IMAGE)).toBe(false);
+    expect(mapState(files.get((outcome as { path: string }).path)).background).toBe(forkImage);
+    expect(files.get(forkImage)).toBe('map-bytes');
+  });
+
   it('a re-pull of the version already pulled, still as Atlas saved it, is unchanged and adds no scene', async () => {
     const { pulled, scenes, images, confirmUpdate, notify, deps } = await setup();
     await pullMap(deps({}), input(playerSafe));

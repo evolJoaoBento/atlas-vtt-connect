@@ -23,6 +23,20 @@ describe('ConnectSettingsStore', () => {
     expect(store.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
   });
 
+  it('knows whether it has online settings of its own: stored, or changed since loading', async () => {
+    expect((await ConnectSettingsStore.load(fakeDataPlugin({ online: {} }))).hasOnline).toBe(true);
+    for (const data of [null, { online: 'x' }, { online: [] }, { migratedFromFork: 1 }]) {
+      expect((await ConnectSettingsStore.load(fakeDataPlugin(data))).hasOnline).toBe(false);
+    }
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+    store.set({ playerName: 'GM' });
+    expect(store.hasOnline).toBe(true);
+    const slashless = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt' } }));
+    expect(slashless.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    const lookalike = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-x/' } }));
+    expect(lookalike.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-x/');
+  });
+
   it('keeps one save for a burst of changes and tells listeners until they unsubscribe', async () => {
     vi.useFakeTimers();
     const plugin = fakeDataPlugin(undefined);

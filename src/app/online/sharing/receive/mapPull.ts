@@ -2,7 +2,8 @@
  * Adds a pulled map to the `Shared with me` collection with one `scenes.addToCollection`: Atlas writes its images,
  * the map file and the scene record under its asset index lock, and on failure leaves nothing behind. Each image is
  * checked against its fingerprint by the transfer and again here, since the fingerprint names its file; one saved
- * by an earlier pull from the same person is used again by its vault path. A re-pull of a map changed here asks
+ * by an earlier pull from the same person is used again by its vault path, also where the fork's online play preview
+ * saved it (`<collection>/files/<person>/`), so a map received there is not downloaded again. A re-pull of a map changed here asks
  * Keep both or Take theirs.
  *
  * Atlas cannot replace a scene's map yet, so the newer version always arrives as a new scene (`installUpdate`):
@@ -71,10 +72,19 @@ function linkedNotes(deps: MapPullDeps, input: MapPullInput): Map<string, string
   return notes;
 }
 
-async function pullImages(deps: MapPullDeps, folder: string, fingerprints: readonly string[]): Promise<Upload> {
+/** Where images from this person are already saved: Connect's folder, then the one the fork's preview used. */
+interface ImageFolders {
+  /** The scene folder; images go to its `files/`. */
+  folder: string;
+  fork: string;
+}
+
+async function pullImages(deps: MapPullDeps, folders: ImageFolders, fingerprints: readonly string[]): Promise<Upload> {
+  const { folder } = folders;
   const upload: Upload = { names: new Map(), images: [] };
+  const saved = [`${folder}/${IMAGES_DIR}`, folders.fork];
   for (const fingerprint of fingerprints) {
-    const existing = ASSET_MIMES.map((mime) => `${folder}/${IMAGES_DIR}/${fingerprint}.${extensionForMime(mime)}`).find((path) => fileAt(deps.app, path));
+    const existing = saved.flatMap((dir) => ASSET_MIMES.map((mime) => `${dir}/${fingerprint}.${extensionForMime(mime)}`)).find((path) => fileAt(deps.app, path));
     if (existing) {
       upload.names.set(fingerprint, existing);
       continue;
@@ -148,8 +158,9 @@ async function writeMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOut
   if (update === 'unchanged') return { kind: 'unchanged', path: known!.path };
   if (update === 'cancelled') return { kind: 'cancelled' };
   const collection = await sharedCollectionId(scenes);
-  const folder = `${COLLECTIONS_DIR}/${collection}/scenes/${safeFileName(input.personName, 'Someone')}`;
-  const upload = await pullImages(deps, folder, input.payload.images);
+  const person = safeFileName(input.personName, 'Someone');
+  const folder = `${COLLECTIONS_DIR}/${collection}/scenes/${person}`;
+  const upload = await pullImages(deps, { folder, fork: `${COLLECTIONS_DIR}/${collection}/${IMAGES_DIR}/${person}` }, input.payload.images);
   const map = receivedMapInput(input.payload, { images: upload.names, notes: linkedNotes(deps, input), isFile: (path) => path.length < 1024 && fileAt(app, path) !== null });
   const add = async (): Promise<Added> => {
     // Atlas checks that the folder lies inside the collection's and every image inside the folder, and names the file itself.

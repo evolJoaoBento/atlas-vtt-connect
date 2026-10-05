@@ -1,5 +1,5 @@
 import type { Plugin } from 'obsidian';
-import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, type OnlineSettings } from '../app/online/onlineSettings';
+import { DEFAULT_ONLINE_SETTINGS, isRecord, resolveOnlineSettings, type OnlineSettings } from '../app/online/onlineSettings';
 
 /** What Connect keeps in its `data.json`. */
 interface StoredData {
@@ -8,8 +8,13 @@ interface StoredData {
   migratedFromFork?: 1;
 }
 
-/** The player page the fork shipped before Connect had its own. */
-const FORK_PLAYER_PAGE = 'https://evoljoaobento.github.io/atlas-vtt/';
+/** The player page the fork shipped before Connect had its own, with or without the trailing slash. */
+const FORK_PLAYER_PAGE = /^https:\/\/evoljoaobento\.github\.io\/atlas-vtt\/?$/;
+
+/** Connect's own player page in place of the fork's old default; any other address is kept. */
+export function movedPlayerPage(url: string): string {
+  return FORK_PLAYER_PAGE.test(url) ? DEFAULT_ONLINE_SETTINGS.playerPageUrl : url;
+}
 const SAVE_DELAY_MS = 500;
 
 type DataPlugin = Pick<Plugin, 'loadData' | 'saveData'>;
@@ -19,25 +24,34 @@ export class ConnectSettingsStore {
   private readonly listeners = new Set<() => void>();
   private saveTimer: number | null = null;
   private migrated: boolean;
+  private stored: boolean;
 
-  private constructor(private readonly plugin: DataPlugin, private online: OnlineSettings, migrated: boolean) {
+  private constructor(private readonly plugin: DataPlugin, private online: OnlineSettings, migrated: boolean, stored: boolean) {
     this.migrated = migrated;
+    this.stored = stored;
   }
 
   static async load(plugin: DataPlugin): Promise<ConnectSettingsStore> {
     const stored: unknown = await plugin.loadData();
     const data = typeof stored === 'object' && stored !== null ? stored as Partial<Record<keyof StoredData, unknown>> : {};
     const online = resolveOnlineSettings(data.online);
-    if (online.playerPageUrl === FORK_PLAYER_PAGE) online.playerPageUrl = DEFAULT_ONLINE_SETTINGS.playerPageUrl;
-    return new ConnectSettingsStore(plugin, online, data.migratedFromFork === 1);
+    online.playerPageUrl = movedPlayerPage(online.playerPageUrl);
+    const hasOnline = isRecord(data.online);
+    return new ConnectSettingsStore(plugin, online, data.migratedFromFork === 1, hasOnline);
   }
 
   get(): OnlineSettings {
     return this.online;
   }
 
+  /** Whether Connect's data file has its own online settings (or they were changed since loading): then nothing is copied from the fork. */
+  get hasOnline(): boolean {
+    return this.stored;
+  }
+
   set(partial: Partial<OnlineSettings>): void {
     this.online = { ...this.online, ...partial };
+    this.stored = true;
     this.scheduleSave();
     for (const listener of [...this.listeners]) listener();
   }

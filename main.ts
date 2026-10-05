@@ -27,7 +27,7 @@ export default class AtlasVttConnectPlugin extends Plugin {
     // Heard from load on, before Atlas is bound: what the metadata cache parsed, and the vault's renames and deletions.
     const lifetime = sharingLifetime(this);
     new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, {
-      settings: this.settings, playerKeys: this.playerKeys, lifetime, sharing: (available) => { this.canShare = available; },
+      settings: this.settings, migration: this.settings, playerKeys: this.playerKeys, lifetime, sharing: (available) => { this.canShare = available; },
     })).start();
     // Further services are added task by task (plan B4 onwards).
   }

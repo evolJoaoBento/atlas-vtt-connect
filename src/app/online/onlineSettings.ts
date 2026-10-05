@@ -75,7 +75,7 @@ export function formatTurnServers(servers: TurnServer[]): string {
   return servers.map((server) => `${server.urls} ${server.username} ${server.credential}`).join('\n');
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
