@@ -63,7 +63,7 @@ export function atlasGrid(scene: Pick<PlayerScene, 'grid' | 'map' | 'measurement
     const snap = snapGridOf(scene);
     const geometry = snap ?? { type: 'square' as const, size: scene.map.cellSize, offsetX: 0, offsetY: 0 };
     // A hidden lattice Atlas would lay out past the limits (`isDrawableGeometry`): no grid at all, no snapping.
-    if (!isDrawableGeometry(geometry, scene.map)) return { enabled: false, visible: false, ...geometry, size: fallbackSize(scene.map), opacity: 0, ...units, snapToGrid: false };
+    if (!isDrawableGeometry(geometry, scene.map)) return { enabled: false, visible: false, ...geometry, size: fallbackSize(scene.map), offsetX: 0, offsetY: 0, opacity: 0, ...units, snapToGrid: false };
     return { enabled: true, visible: false, ...geometry, opacity: 0, ...units, ...(snap ? {} : { snapToGrid: false }) };
   }
   const numbers = playerCellNumbers(grid);

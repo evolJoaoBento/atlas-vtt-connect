@@ -28,7 +28,7 @@ describe('drawable grid', () => {
     expect(isDrawableGrid(grid({ size: 2 }), { width: 10, height: 4002 })).toBe(false);
     expect(isDrawableGrid(grid({ size: 1.5 }), { width: 200_000, height: 200_000 })).toBe(false);
     expect(isDrawableGrid(grid({ size: 100 }), { width: 200_000, height: 200_000 })).toBe(true);
-    expect(GRID_DRAW_LIMITS).toEqual({ minSize: 2, cellsPerSide: 2000 });
+    expect(GRID_DRAW_LIMITS).toEqual({ minSize: 2, cellsPerSide: 2000, maxOffset: 100_000 });
   });
 
   it('drops unknown types and line styles and non-finite numbers', () => {
@@ -78,6 +78,31 @@ describe('a player session', () => {
     expect(player.scene?.grid).toBeNull();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(UNDRAWABLE_GRID_WARNING, expect.objectContaining({ size: 1 }));
+  });
+});
+
+describe('grid offsets', () => {
+  it('drops a square or hex grid whose offset is past 100,000 px, keeps one at the limit', () => {
+    for (const type of ['square', 'hex-horizontal', 'hex-vertical']) {
+      for (const offset of [{ offsetX: 5.5e87 }, { offsetY: -5.5e87 }, { offsetX: 100_001 }, { offsetY: -100_001 }]) {
+        expect(isDrawableGrid(grid({ type, ...offset }), MAP), `${type} ${JSON.stringify(offset)}`).toBe(false);
+      }
+      expect(isDrawableGrid(grid({ type, offsetX: 100_000, offsetY: -100_000 }), MAP), type).toBe(true);
+    }
+  });
+
+  it('a session drops the grid and warns once; the hidden remote grid is off', () => {
+    const dropped: unknown[] = [];
+    const filter = drawableGridFilter((bad) => dropped.push(bad));
+    for (const type of ['square', 'hex-vertical']) {
+      expect(filter(playerScene({ grid: grid({ type, offsetX: 5.5e87 }) }))?.grid, type).toBeNull();
+    }
+    expect(dropped).toHaveLength(2);
+    const base = playerScene({ grid: null });
+    for (const type of ['square', 'hex-horizontal'] as const) {
+      const hidden = atlasGrid({ ...base, measurement: { ...base.measurement, snapGrid: { type, size: 70, offsetX: 5.5e87, offsetY: 0 } } });
+      expect(hidden, type).toMatchObject({ enabled: false, snapToGrid: false, offsetX: 0, offsetY: 0 });
+    }
   });
 });
 

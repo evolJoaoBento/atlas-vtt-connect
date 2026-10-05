@@ -7,7 +7,8 @@
  */
 import { PLAYER_GRID_LINES, PLAYER_GRID_TYPES, type PlayerGrid, type PlayerMap, type PlayerScene } from './sceneTypes';
 
-export const GRID_DRAW_LIMITS = { minSize: 2, cellsPerSide: 2000 } as const;
+/** `maxOffset`: past it a drawer's `x += size` no longer moves `x` (5.5e87 + 70 is 5.5e87) and never ends. */
+export const GRID_DRAW_LIMITS = { minSize: 2, cellsPerSide: 2000, maxOffset: 100_000 } as const;
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const known = <T extends string>(values: readonly T[], value: unknown): value is T => values.includes(value as T);
@@ -19,6 +20,7 @@ const known = <T extends string>(values: readonly T[], value: unknown): value is
 export function isDrawableGeometry(geometry: { type?: unknown; size?: unknown; offsetX?: unknown; offsetY?: unknown }, map: Pick<PlayerMap, 'width' | 'height'>): boolean {
   const { type, size, offsetX, offsetY } = geometry;
   if (!known(PLAYER_GRID_TYPES, type) || ![size, offsetX, offsetY].every(finite) || (size as number) < GRID_DRAW_LIMITS.minSize) return false;
+  if (Math.abs(offsetX as number) > GRID_DRAW_LIMITS.maxOffset || Math.abs(offsetY as number) > GRID_DRAW_LIMITS.maxOffset) return false;
   const side = Math.max(map.width, map.height);
   return finite(side) && side / (size as number) <= GRID_DRAW_LIMITS.cellsPerSide;
 }
