@@ -1,65 +1,109 @@
 /**
- * Code in a pulled note that other plugins run: Dataview JS and JS Engine blocks, Dataview's inline JS (`$=`),
- * Templater tags and HTML that embeds or runs something. A pull that finds any asks first (`confirmPulledCode`), and
- * "Pull without code" writes the note with that code made inert (`withoutCode`), still readable.
+ * Known kinds of content in a pulled note that other plugins run, or that loads from the internet: code blocks for
+ * plugins such as Dataview, Datacore or JS Engine, Dataview's inline JS (`$=`), Templater tags, HTML that runs or
+ * embeds something, and HTML that fetches a URL. A pull that finds any asks first (`confirmPulledCode`), and "Pull
+ * without code" writes the note with all of it made inert (`withoutCode`), still readable.
  *
- * Templater reads the raw file, code blocks included, so its tags count anywhere. Everything else counts only where
- * Obsidian renders it: outside fenced code (and, for HTML and `$=`, outside inline code). Fences are told conservatively:
- * only a CommonMark fence (at most three spaces of indent after any `>`) hides what is in it, while a `dataviewjs` or
- * `js-engine` opener counts at any indent (a fence in a list item sits deeper).
+ * Detection errs towards flagging: it reads the whole note, code blocks and inline code included, so no way of
+ * hiding a part from the parser (a fence that Markdown does not open, an HTML block, a quote that ends) hides it from
+ * the check. The parse into code and prose (`regionsOf`, as Obsidian reads fences, quote by quote, and inline code
+ * across line breaks) only chooses how each part is made inert: visibly escaped in prose, with an invisible break
+ * in code, where an escape would show. These are the kinds Connect knows; other plugins can run other code.
  */
 
-export type CodeKind = 'dataviewjs' | 'js-engine' | 'dataview-inline' | 'templater' | 'html';
+export type CodeKind = 'code-block' | 'dataview-inline' | 'templater' | 'html' | 'remote';
 
 /** Each kind as the pull dialog names it, in this order. */
 export const CODE_KIND_LABELS: Readonly<Record<CodeKind, string>> = {
-  dataviewjs: 'Dataview JS blocks',
-  'js-engine': 'JS Engine blocks',
+  'code-block': 'code blocks other plugins run (such as Dataview, Datacore or JS Engine)',
   'dataview-inline': 'inline Dataview JS (`$=`)',
   templater: 'Templater commands',
   html: 'embedded HTML (script, iframe, object or embed)',
+  remote: 'HTML that loads from the internet (style, img, link, audio, video or source), which can reveal your IP address',
 };
 const KIND_ORDER = Object.keys(CODE_KIND_LABELS) as CodeKind[];
 
-/** A fence opener or closer: its prefix (indent, `>` markers), its run of ` or ~, and the rest of the line. */
-const FENCE = /^([ \t>]*?)(`{3,}|~{3,})(.*)$/;
-/** An opener whose language another plugin runs; group 1 is everything up to the language. */
-const RUN_FENCE = /^([ \t>]*(?:`{3,}|~{3,})[ \t]*)(dataviewjs|js-engine)(?=[\s{]|$)/i;
+/** A fence language a plugin runs, or may: over-flagging plain `js` is accepted. */
+const RUN_LANGUAGE = /js|ts|jsx|tsx|dataview|datacore|engine|templater/i;
+/** A fence opener anywhere: after quote markers, list markers and any indent; group 2 is its language. */
+const OPENER = /^((?:[ \t>]|[-*+][ \t]|\d{1,9}[.)][ \t])*(?:`{3,}|~{3,})[ \t]*)([^\s`{]+)/;
 const TEMPLATER = /<%/g;
 const HTML_TAG = /<(\/?)(script|iframe|object|embed)(?=[\s/>]|$)/gi;
-const HAS_HTML_TAG = new RegExp(HTML_TAG.source, 'i');
-/** An inline code span: a run of backticks, its content, the same run again. */
-const CODE_SPAN = /(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g;
-const INLINE_JS = /^(\s*)\$=/;
+/** `<style>` can `@import` or `url()` anything; the other tags only when they name a URL off this device. */
+const REMOTE_TAG = /<(style)(?=[\s/>]|$)|<(img|link|audio|video|source)(?=[\s/>])[^>]*?(?:https?:)?\/\//gi;
+/** Dataview's inline JS: a backtick, then (across line breaks and quote markers) `$=`. */
+const INLINE_JS = /(`[\s>]*)\$=/g;
+/** An invisible break: `<` or `$` followed by it is neither a tag, a Templater tag nor Dataview's prefix. */
+const BREAK = '​';
 
-interface Line {
+function test(pattern: RegExp, text: string): boolean {
+  pattern.lastIndex = 0;
+  const found = pattern.test(text);
+  pattern.lastIndex = 0;
+  return found;
+}
+
+/** Whether a line opens a fence whose language a plugin runs (`RUN_LANGUAGE`). */
+function runsCode(line: string): boolean {
+  const language = OPENER.exec(line)?.[2];
+  return language !== undefined && RUN_LANGUAGE.test(language);
+}
+
+/** The kinds of known code in `text`, in `CODE_KIND_LABELS` order; empty for a note with none. */
+export function findExecutable(text: string): CodeKind[] {
+  const found = new Set<CodeKind>();
+  if (text.split('\n').some(runsCode)) found.add('code-block');
+  if (test(INLINE_JS, text)) found.add('dataview-inline');
+  if (test(TEMPLATER, text)) found.add('templater');
+  if (test(HTML_TAG, text)) found.add('html');
+  if (test(REMOTE_TAG, text)) found.add('remote');
+  return KIND_ORDER.filter((kind) => found.has(kind));
+}
+
+interface Region {
   text: string;
-  /** Inside fenced code (or its opening or closing line): not rendered as Markdown. */
-  fenced: boolean;
+  /** Shown as code (a fenced block or an inline span): an escape there would show. */
+  code: boolean;
 }
 
-/** A fence's prefix holds no more than three spaces of indent after its `>` markers, and no tab. */
-function isCommonMarkFence(prefix: string): boolean {
-  let rest = prefix;
-  while (/^ {0,3}>/.test(rest)) rest = rest.replace(/^ {0,3}> ?/, '');
-  return /^ {0,3}$/.test(rest);
+/** The quote depth of a line (`>` markers, each after at most three spaces) and what follows them. */
+function quoted(line: string): { depth: number; rest: string } {
+  let rest = line;
+  let depth = 0;
+  for (let marker = /^ {0,3}> ?/.exec(rest); marker; marker = /^ {0,3}> ?/.exec(rest)) {
+    depth++;
+    rest = rest.slice(marker[0].length);
+  }
+  return { depth, rest };
 }
 
-/** The note's lines (with their endings), each marked fenced or not. An unclosed fence runs to the end. */
-function linesOf(text: string): Line[] {
-  const lines: Line[] = [];
-  let open: { char: string; length: number } | null = null;
+/** Removes `depth` quote markers from the start of a line inside a fence (its own `>` are code). */
+function unquoted(line: string, depth: number): string {
+  let rest = line;
+  for (let index = 0; index < depth; index++) rest = rest.replace(/^ {0,3}> ?/, '');
+  return rest;
+}
+
+/** Lines as Obsidian reads fences: one opened in a quote ends where the quote ends; an unclosed one runs on. */
+function fencedLines(text: string): Array<{ text: string; fenced: boolean }> {
+  const lines: Array<{ text: string; fenced: boolean }> = [];
+  let open: { char: string; length: number; depth: number } | null = null;
   for (const raw of text.split(/(?<=\n)/)) {
     const body = raw.replace(/\r?\n$/, '');
-    const fence = FENCE.exec(body);
     if (open) {
-      lines.push({ text: raw, fenced: true });
-      const run = fence?.[2];
-      if (run && run[0] === open.char && run.length >= open.length && fence[3]!.trim() === '') open = null;
-      continue;
+      const { depth } = quoted(body);
+      if (depth >= open.depth) {
+        const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(unquoted(body, open.depth));
+        if (close && close[1]![0] === open.char && close[1]!.length >= open.length) open = null;
+        lines.push({ text: raw, fenced: true });
+        continue;
+      }
+      open = null;
     }
-    if (fence && isCommonMarkFence(fence[1]!) && !(fence[2]![0] === '`' && fence[3]!.includes('`'))) {
-      open = { char: fence[2]![0]!, length: fence[2]!.length };
+    const { depth, rest } = quoted(body);
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(rest);
+    if (fence && !(fence[1]![0] === '`' && fence[2]!.includes('`'))) {
+      open = { char: fence[1]![0]!, length: fence[1]!.length, depth };
       lines.push({ text: raw, fenced: true });
       continue;
     }
@@ -68,52 +112,60 @@ function linesOf(text: string): Line[] {
   return lines;
 }
 
-/** `text` with `outside` applied to what lies outside inline code spans, and `span` to each span's content. */
-function mapSpans(text: string, outside: (part: string) => string, span: (content: string) => string): string {
-  let result = '';
-  let last = 0;
-  for (const match of text.matchAll(CODE_SPAN)) {
-    result += outside(text.slice(last, match.index));
-    result += `${match[1]!}${span(match[2]!)}${match[1]!}`;
-    last = match.index + match[0].length;
+/** An inline code span, across line breaks but not a blank line; an escaped backtick opens none. */
+const CODE_SPAN = /(?<![\\`])(`+)(?!`)((?:(?!\n[ \t>]*\r?\n)[\s\S])*?[^`])\1(?!`)/g;
+
+/** The note as code and prose, in order: fenced blocks and inline spans are code. */
+function regionsOf(text: string): Region[] {
+  const regions: Region[] = [];
+  let prose = '';
+  const flush = (): void => {
+    let last = 0;
+    for (const match of prose.matchAll(CODE_SPAN)) {
+      const start = match.index + match[1]!.length;
+      regions.push({ text: prose.slice(last, start), code: false }, { text: match[2]!, code: true });
+      last = start + match[2]!.length;
+    }
+    regions.push({ text: prose.slice(last), code: false });
+    prose = '';
+  };
+  for (const line of fencedLines(text)) {
+    if (!line.fenced) {
+      prose += line.text;
+      continue;
+    }
+    flush();
+    regions.push({ text: line.text, code: true });
   }
-  return result + outside(text.slice(last));
+  flush();
+  return regions.filter((region) => region.text !== '');
 }
 
-/** The kinds of executable content in `text`, in `CODE_KIND_LABELS` order; empty for a note with none. */
-export function findExecutable(text: string): CodeKind[] {
-  const found = new Set<CodeKind>();
-  if (/<%/.test(text)) found.add('templater');
-  for (const line of linesOf(text)) {
-    const language = RUN_FENCE.exec(line.text)?.[2]?.toLowerCase();
-    if (language === 'dataviewjs' || language === 'js-engine') found.add(language);
-    if (line.fenced) continue;
-    mapSpans(line.text, (part) => {
-      if (HAS_HTML_TAG.test(part)) found.add('html');
-      return part;
-    }, (content) => {
-      if (INLINE_JS.test(content)) found.add('dataview-inline');
-      return content;
-    });
-  }
-  return KIND_ORDER.filter((kind) => found.has(kind));
+/** One region made inert: escaped as it reads in prose, broken invisibly in code. */
+function inert(region: Region): string {
+  const lt = region.code ? `<${BREAK}` : '&lt;';
+  return region.text
+    .split(/(?<=\n)/).map((line) => (runsCode(line) ? line.replace(OPENER, '$1text') : line)).join('')
+    .replace(TEMPLATER, region.code ? `<${BREAK}%` : '<\\%')
+    .replace(HTML_TAG, (_tag, slash: string, name: string) => `${lt}${slash}${name}`)
+    .replace(REMOTE_TAG, (tag: string) => `${lt}${tag.slice(1)}`)
+    .replace(INLINE_JS, `$1$${BREAK}=`);
 }
 
 /**
- * `text` with its executable content made inert, everything else byte for byte (line endings included): the fence
- * language becomes `text`, `$=` becomes `$ =`, `<%` becomes `<\%` (Markdown still shows `<%`), and the opening of a
- * script, iframe, object or embed tag becomes `&lt;`, so it shows as text.
+ * `text` with every known kind made inert and everything else byte for byte, line endings included: a fence
+ * language a plugin runs becomes `text`, Templater's `<%` becomes `<\%` (in code `<`, a zero-width space, `%`), a
+ * listed tag's `<` becomes `&lt;` (in code `<` and a zero-width space), and `$=` after a backtick becomes `$`,
+ * a zero-width space, `=`.
  */
 export function withoutCode(text: string): string {
-  return linesOf(text).map((line) => {
-    const defenced = line.text.replace(RUN_FENCE, '$1text').replace(TEMPLATER, '<\\%');
-    if (line.fenced) return defenced;
-    return mapSpans(defenced, (part) => part.replace(HTML_TAG, '&lt;$1$2'), (content) => content.replace(INLINE_JS, '$1$ ='));
-  }).join('');
+  // What straddles a region's edge (a tag whose URL sits in a span, `$=` after a span's backtick) is left after the
+  // regions: one more pass over the whole text, as prose, catches it.
+  return inert({ text: regionsOf(text).map(inert).join(''), code: false });
 }
 
-/** What the pull dialog says was found, as one sentence part: "Dataview JS blocks and Templater commands". */
+/** What the pull dialog says was found, as one sentence part: "Templater commands and embedded HTML (…)". */
 export function codeKindsText(kinds: readonly CodeKind[]): string {
   const labels = kinds.map((kind) => CODE_KIND_LABELS[kind]);
-  return labels.length <= 1 ? labels.join('') : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)!}`;
+  return labels.length <= 1 ? labels.join('') : `${labels.slice(0, -1).join('; ')}; and ${labels.at(-1)!}`;
 }

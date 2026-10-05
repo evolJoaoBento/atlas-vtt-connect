@@ -20,74 +20,124 @@ const ALL_KINDS = [
   'Gold: `$= dv.current().gold` coins',
   '<%* tR += await tp.system.prompt("x") %>',
   '<iframe src="https://evil.example"></iframe>',
+  '<img src="https://tracker.example/p.png">',
 ].join('\n\n');
+const ZW = '\u200B';
 
-describe('finding executable content', () => {
+describe('finding known code', () => {
   it('finds each kind, named in a fixed order', () => {
-    expect(findExecutable(ALL_KINDS)).toEqual(['dataviewjs', 'js-engine', 'dataview-inline', 'templater', 'html']);
+    expect(findExecutable(ALL_KINDS)).toEqual(['code-block', 'dataview-inline', 'templater', 'html', 'remote']);
     expect(findExecutable('<% tp.date.now() %>')).toEqual(['templater']);
-    for (const tag of ['<script>alert(1)</script>', '<object data="x">', '<embed src="x">', '<IFRAME src=x>', '</script>']) expect(findExecutable(tag)).toEqual(['html']);
-    expect(findExecutable(`> ${FENCE}dataviewjs\n> x\n> ${FENCE}`)).toEqual(['dataviewjs']);
-    expect(findExecutable(`- item\n\n      ${FENCE}DataviewJS\n      x\n      ${FENCE}`)).toEqual(['dataviewjs']);
-    expect(findExecutable(`${FENCE} js-engine {x}\nx\n${FENCE}`)).toEqual(['js-engine']);
+    for (const tag of ['<script>alert(1)</script>', '<object data="x">', '<embed src="x">', '<IFRAME src=x>', '</script>']) expect(findExecutable(tag), tag).toEqual(['html']);
   });
 
-  it('leaves ordinary code and prose alone: no false positives', () => {
+  it('treats any fence language a plugin may run as code, wherever the fence sits', () => {
+    for (const language of ['dataviewjs', 'DataviewJS', 'dataview', 'datacorejs', 'datacorejsx', 'datacorets', 'datacoretsx', 'js-engine', 'js-engine-debug', 'js', 'jsx', 'ts', 'tsx', 'templater']) {
+      for (const at of [`${FENCE}${language}`, `~~~ ${language} {x}`, `> ${FENCE}${language}`, `> > ${FENCE}${language}`, `- ${FENCE}${language}`, `1. ${FENCE}${language}`, `      ${FENCE}${language}`]) {
+        expect(findExecutable(`${at}\nx\n${FENCE}`), at).toEqual(['code-block']);
+      }
+    }
+  });
+
+  it('flags HTML that loads from the internet, not the same tags on this device', () => {
+    for (const tag of ['<style>@import url(x)</style>', '<img src="https://t.example/a.png">', '<img src=//t.example/a>', '<link rel=stylesheet href="http://t.example/a.css">', '<audio src="https://t.example/a.mp3">', '<VIDEO src=https://x>', '<source srcset="https://t.example/a.webp">']) {
+      expect(findExecutable(tag), tag).toEqual(['remote']);
+    }
+    expect(findExecutable('<img src="art/map.png"> <img src="data:image/png;base64,AA">')).toEqual([]);
+  });
+
+  it('catches the re-review bypasses: a fence that ends with its quote, and a span across a line break', () => {
+    const quoteThenProse = "> ```\n`$= dv.el('p', 1)`\n<iframe src=x></iframe>\n";
+    expect(findExecutable(quoteThenProse)).toEqual(['dataview-inline', 'html']);
+    const callout = "> [!note]\n> ```\n> x\n`$= dv.el('p', 1)`\n<iframe src=x></iframe>\n";
+    expect(findExecutable(callout)).toEqual(['dataview-inline', 'html']);
+    const wrapped = "text `\n$= dv.el('p', 1)` end\n";
+    expect(findExecutable(wrapped)).toEqual(['dataview-inline']);
+    expect(findExecutable("text `\n> $= dv.el('p', 1)` end\n")).toEqual(['dataview-inline']);
+    for (const text of [quoteThenProse, callout, wrapped]) expect(findExecutable(withoutCode(text)), text).toEqual([]);
+  });
+
+  it('reads code blocks and inline code too, so no fence Markdown does not open hides anything', () => {
+    // Inside an HTML block a fence line opens nothing, so what follows the blank line renders.
+    expect(findExecutable('<div>\n```\n</div>\n\n<iframe src=x></iframe>\n```\n')).toEqual(['html']);
+    expect(findExecutable('<span title="`"><iframe src=x></iframe><span title="`">')).toEqual(['html']);
+    expect(findExecutable(`${FENCE}html\n<script>1</script>\n${FENCE}`)).toEqual(['html']);
+    expect(findExecutable('\\`<iframe src=x>\\`')).toEqual(['html']);
+  });
+
+  it('leaves prose and code no plugin runs alone', () => {
     const ordinary = [
-      `${FENCE}js\nconst a = '<script>';\n${FENCE}`,
-      `${FENCE}html\n<iframe src="x"></iframe>\n<script>1</script>\n${FENCE}`,
-      `${FENCE}dataview\nTABLE file.name\n${FENCE}`,
-      '`<script>` and `<iframe>` are tags; `= this.file.name` is plain Dataview; $= outside code is text.',
-      'A scripted scene, an embedded quote, an objection, 100% sure, <b>bold</b>, a <scripture> tag.',
-      `${FENCE}dataviewjsx\nx\n${FENCE}`,
-      `~~~~\n${FENCE}dataviewjs (shown, not run)\n~~~~`.replace('dataviewjs (shown, not run)', 'text'),
+      `${FENCE}python\nprint('<b>')\n${FENCE}`,
+      `${FENCE}text\nplain\n${FENCE}`,
+      '`= this.file.name` is plain Dataview text; $= outside code is text.',
+      'A scripted scene, an embedded quote, an objection, 100% sure, <b>bold</b>, a <scripture> tag, <img src="art/a.png">.',
+      `${FENCE}markdown\n# Title\n${FENCE}`,
     ].join('\n\n');
     expect(findExecutable(ordinary)).toEqual([]);
     expect(withoutCode(ordinary)).toBe(ordinary);
   });
-
-  it('treats a fence indented four spaces as prose, so the HTML after it still counts', () => {
-    expect(findExecutable(`    ${FENCE}\n<iframe src="x"></iframe>\n`)).toEqual(['html']);
-    // An unclosed fence runs to the end: what follows is not rendered.
-    expect(findExecutable(`${FENCE}\n<iframe src="x"></iframe>\n`)).toEqual([]);
-    // A closer must use the opener's character and be at least as long.
-    expect(findExecutable(`${FENCE}${FENCE[0]}\n${FENCE}\n<iframe>\n${FENCE}${FENCE[0]}\n<iframe>`)).toEqual(['html']);
-  });
 });
 
 describe('pulling without code', () => {
-  it('makes each kind inert and keeps the rest byte for byte', () => {
+  it('makes each kind inert: escaped in prose, invisibly broken in code, the rest byte for byte', () => {
     const inert = withoutCode(ALL_KINDS);
     expect(findExecutable(inert)).toEqual([]);
     expect(inert).toContain(`${FENCE}text\ndv.paragraph(1)\n${FENCE}`);
     expect(inert).toContain('~~~text\nreturn 1\n~~~');
-    expect(inert).toContain('`$ = dv.current().gold` coins');
+    expect(inert).toContain(`\`$${ZW}= dv.current().gold\` coins`);
     expect(inert).toContain('<\\%* tR += await tp.system.prompt("x") %>');
     expect(inert).toContain('&lt;iframe src="https://evil.example">&lt;/iframe>');
+    expect(inert).toContain('&lt;img src="https://tracker.example/p.png">');
+  });
+
+  it('does not show an escape inside code: Templater and tags there get an invisible break', () => {
+    expect(withoutCode(`${FENCE}erb\n<%= name %>\n${FENCE}`)).toBe(`${FENCE}erb\n<${ZW}%= name %>\n${FENCE}`);
+    expect(withoutCode('Use `<% tp.date.now() %>` here')).toBe(`Use \`<${ZW}% tp.date.now() %>\` here`);
+    expect(withoutCode(`${FENCE}html\n<script>1</script>\n${FENCE}`)).toBe(`${FENCE}html\n<${ZW}script>1<${ZW}/script>\n${FENCE}`);
+    // A fence opened in a quote ends with it: the prose after it is escaped as prose.
+    expect(withoutCode('> ```\n> <% x %>\n<% y %>\n')).toBe(`> \`\`\`\n> <${ZW}% x %>\n<\\% y %>\n`);
   });
 
   it('keeps CRLF line endings, block quotes and info after the language', () => {
     const crlf = `> ${FENCE}dataviewjs\r\n> x\r\n> ${FENCE}\r\nok\r\n`;
     expect(withoutCode(crlf)).toBe(`> ${FENCE}text\r\n> x\r\n> ${FENCE}\r\nok\r\n`);
     expect(withoutCode(`${FENCE}js-engine {x}\n${FENCE}`)).toBe(`${FENCE}text {x}\n${FENCE}`);
+    expect(withoutCode(`- ${FENCE}datacorejsx\n  x\n  ${FENCE}`)).toBe(`- ${FENCE}text\n  x\n  ${FENCE}`);
   });
 
-  it('never leaves anything to find, whatever the mix', () => {
-    const parts = [ALL_KINDS, DVJS, '<%', '`$=x`', '<script', `${FENCE}js\n<% x %>\n${FENCE}`, '> <embed src=x>', '\r\n', '``$=``'];
-    for (let a = 0; a < parts.length; a++) {
-      for (let b = 0; b < parts.length; b++) {
-        const text = `${parts[a]!}\n${parts[b]!}`;
-        expect(findExecutable(withoutCode(text)), text).toEqual([]);
-        expect(withoutCode(withoutCode(text))).toBe(withoutCode(text));
+  it('never leaves anything to find, whatever the nesting (a table of parts, in pairs and with a tail)', () => {
+    const parts = [
+      ALL_KINDS, DVJS, '<%', '`$=x`', '<script', `${FENCE}js\n<% x %>\n${FENCE}`, '> <embed src=x>', '\r\n', '``$=``', '> ```', '> > ~~~~js',
+      '`', '\n\n', '<div>', '```', '- ```dataviewjs', '`\n$= x`', '<img src=//t', '`//t">`', '<style>', '\\`', '> [!note]', '~~~', '    ```ts',
+    ];
+    for (const a of parts) {
+      for (const b of parts) {
+        const text = `${a}\n${b}`;
+        const once = withoutCode(text);
+        expect(findExecutable(once), JSON.stringify(text)).toEqual([]);
+        expect(withoutCode(once)).toBe(once);
+        for (const c of ['\n<iframe src=x>', '\n`$= y`', '\n<% z %>']) expect(findExecutable(withoutCode(`${text}${c}`)), JSON.stringify(text + c)).toEqual([]);
       }
     }
   });
 
-  it('names what was found in the dialog, with Pull without code focused last', () => {
-    const kinds: CodeKind[] = ['dataviewjs', 'templater'];
-    expect(codeKindsText(kinds)).toBe('Dataview JS blocks and Templater commands');
+  it('a seeded fuzz of nested quotes, fences, spans and code never leaves anything to find', () => {
+    const atoms = ['> ', '> > ', '```', '````', '~~~', 'dataviewjs', 'js', '\n', '\r\n', '`', '``', '$=', '<%', '<iframe', '<img src=//x', '<style', '\\', ' ', 'text', '- ', '1. ', '    '];
+    let seed = 7;
+    const next = (): number => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed; };
+    for (let round = 0; round < 3000; round++) {
+      let text = '';
+      for (let index = next() % 30; index > 0; index--) text += atoms[next() % atoms.length];
+      expect(findExecutable(withoutCode(text)), JSON.stringify(text)).toEqual([]);
+    }
+  });
+
+  it('names what was found in the dialog as known kinds, with Pull without code focused last', () => {
+    const kinds: CodeKind[] = ['code-block', 'templater'];
+    expect(codeKindsText(kinds)).toBe('code blocks other plugins run (such as Dataview, Datacore or JS Engine); and Templater commands');
     const dialog = pulledCodeDialog('Cave', 'Ana', kinds);
-    expect(dialog.message[0]).toContain('Dataview JS blocks and Templater commands');
+    expect(dialog.message[0]).toContain('Templater commands');
+    expect(dialog.message.join(' ')).toContain('known kinds');
     expect(dialog.choices.map((choice) => choice.label)).toEqual(['Pull as is (I trust Ana)', 'Pull without code']);
     expect(dialog.choices.at(-1)?.value).toBe('without');
   });
@@ -121,7 +171,7 @@ describe('a pull that finds code', () => {
   it('asks which kinds were found; Pull without code writes the note inert', async () => {
     const { files, pull, asked } = await setup(['without']);
     await pull();
-    expect(asked).toEqual([['dataviewjs']]);
+    expect(asked).toEqual([['code-block']]);
     expect(files.get('Shared/Ana/Cave.md')).toBe(withoutCode(DVJS));
     expect(files.get('Shared/Ana/Cave.md')).toContain(`${FENCE}text`);
   });

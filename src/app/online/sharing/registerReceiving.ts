@@ -51,8 +51,8 @@ const confirmMapUpdate = (title: string, replaces: boolean): Promise<'both' | 't
 export const pulledCodeDialog = (title: string, personName: string, kinds: readonly CodeKind[]): ChoiceDialogOptions<PulledCodeChoice> => ({
   title: `${title} holds code`,
   message: [
-    `This note from ${personName} has ${codeKindsText(kinds)}. If plugins such as Dataview, JS Engine or Templater are installed, they can run this code with full access to your vault and computer.`,
-    'Pull without code keeps the text but stops it from running. Pull as is only from people you trust.',
+    `This note from ${personName} has known kinds of code or remote content: ${codeKindsText(kinds)}. If plugins such as Dataview, Datacore, JS Engine or Templater are installed, they can run this code with full access to your vault and computer.`,
+    'Pull without code keeps the text but stops these known kinds from running or loading; code examples in the note may change slightly. Other plugins can run other code, so pull as is only from people you trust.',
   ],
   choices: [{ label: `Pull as is (I trust ${personName})`, value: 'as-is', style: 'warning' }, { label: 'Pull without code', value: 'without', style: 'cta' }],
 });

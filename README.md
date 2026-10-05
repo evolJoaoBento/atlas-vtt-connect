@@ -34,7 +34,7 @@ If you use the online play preview (the fork's built-in online play, Atlas VTT 0
 
 Commands: **People…**, **Share with…**, **Ask to pull…**, **Shared with me…**, **Undo last merge** and **Forget remembered choice**. Nothing is shared until you share it, and only with the people you pick. Private parts of a note stay private. See [PRIVACY.md](PRIVACY.md).
 
-Pulled notes can hold code that other plugins run, such as Dataview JS, JS Engine or Templater blocks and embedded HTML. If those plugins are installed, the code runs in your Obsidian. Connect tells you when a note holds such code and pulls it without the code unless you choose **Pull as is**. Only do that for people you trust.
+Pulled notes can hold code that other plugins run, such as Dataview, Datacore, JS Engine or Templater blocks and embedded HTML, or HTML that loads from the internet. If those plugins are installed, the code runs in your Obsidian. Connect looks for these known kinds of code, tells you when a note holds one, and pulls it without the code unless you choose **Pull as is**. Other plugins can run code Connect does not know, so pull only from people you trust.
 
 ## Hosts it talks to
 
