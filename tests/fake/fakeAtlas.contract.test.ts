@@ -15,6 +15,17 @@ export const ATLAS_ONLY: Record<string, string> = {
   // The fake does not simulate these namespaces yet; the task named in each reason adds its cases and removes the entry.
   'C-tok-1': 'tested in B10',
   'C-tok-2': 'tested in B10',
+  'C-ui-1': 'tested in B11',
+  'C-ui-2': 'tested in B11',
+  'C-ui-3': 'tested in B11',
+  'C-scenes-1': 'tested in B13',
+  'C-scenes-2': 'tested in B13',
+  'C-scenes-3': 'tested in B13',
+  'C-scenes-4': 'tested in B13',
+  'C-bundles-1': 'tested in B13',
+  'C-bundles-2': 'tested in B13',
+  'C-bundles-3': 'tested in B13',
+  'C-bundles-4': 'tested in B13',
 };
 
 describe('FakeAtlas follows the contract cases', () => {

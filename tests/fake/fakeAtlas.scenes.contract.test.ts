@@ -221,6 +221,34 @@ describe('FakeAtlas follows the views, rules and presentation cases', () => {
     expect(await presentation.present('v1')).toBe(false);
   });
 
+  it('C-pres-3: presentationId is stable while a presentation is held and resumed, and new for every present', async () => {
+    const { atlas, extension } = connected();
+    const { presentation } = extension;
+    atlas.views.open('v1', [{ tabId: 'a', mapPath: MAP, name: 'A' }, { tabId: 'b', mapPath: 'maps/b.atlasmap', name: 'B' }]);
+    atlas.views.setSnapshot('v1', loaded());
+    const heard: Array<[string, string]> = [];
+    presentation.subscribe({
+      presented: (scene, resumed) => heard.push([resumed ? 'resumed' : 'presented', scene.presentationId]),
+      held: (scene) => heard.push(['held', scene.presentationId]),
+      cleared: (scene) => heard.push(['cleared', scene.presentationId]),
+    });
+    expect(await presentation.present('v1', 'a')).toBe(true);
+    const first = presentation.current()!.presentationId;
+    expect(first).toEqual(expect.any(String));
+    atlas.views.setActiveTab('v1', 'b');
+    expect(presentation.current()).toMatchObject({ held: true, presentationId: first });
+    atlas.views.setActiveTab('v1', 'a');
+    await Promise.resolve();
+    expect(presentation.current()).toMatchObject({ held: false, presentationId: first });
+    expect(heard).toEqual([['presented', first], ['held', first], ['resumed', first]]);
+    expect(await presentation.present('v1', 'a')).toBe(true);
+    const second = presentation.current()!.presentationId;
+    expect(second).not.toBe(first);
+    expect(heard.at(-1)).toEqual(['presented', second]);
+    presentation.stop();
+    expect(heard.at(-1)).toEqual(['cleared', second]);
+  });
+
   it('present waits for a loading tab and then presents it, as Atlas does: no hold, no resume', async () => {
     const { atlas, extension } = connected();
     atlas.views.open('v1', [{ tabId: 'a', mapPath: MAP, name: 'A' }, { tabId: 'b', mapPath: 'maps/b.atlasmap', name: 'B' }]);

@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.6.0";
+export declare const API_VERSION = "1.11.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -31,6 +31,8 @@ export declare interface AtlasEvents {
     'rules-changed': (collectionId: string | null) => void;
     /** A setting's value changed; read it again with `settings.get`. */
     'settings-changed': (key: AtlasSettingKey) => void;
+    /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
+    'scenes-changed': () => void;
 }
 
 export declare interface AtlasExtension {
@@ -45,6 +47,9 @@ export declare interface AtlasExtension {
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
+    readonly ui: UiApi;
+    readonly scenes: ScenesApi;
+    readonly bundles: BundlesApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -110,6 +115,21 @@ export declare interface BaseToken {
     layer?: number;
     /** Instance number for distinguishing multiple tokens of the same type (same imagePath) */
     instanceNumber?: number;
+}
+
+export declare interface BundlesApi {
+    /**
+     * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share').
+     * Atlas remembers them per extension id, so they stay stripped when the extension is not loaded (switched off, or
+     * Atlas starting first). Unloading the extension does not forget them; calling the returned disposer does, and that
+     * is the only thing that does. Handing the disposer to Obsidian's `this.register()` therefore forgets the keys on
+     * every unload, which is usually not wanted: keep it for an extension that really stops stripping.
+     * The keys of an extension that crashed or was uninstalled stay until something calls the disposer, or
+     * `forgetNoteProperties`.
+     */
+    stripNoteProperties(keys: readonly string[]): Disposer;
+    /** Forgets every note property this extension asked Atlas to strip, also those remembered from earlier sessions. Keys it registered in this session keep stripping until it unloads. */
+    forgetNoteProperties(): void;
 }
 
 /**
@@ -210,6 +230,16 @@ declare type CritRule = 'natural' | 'roll-under' | 'doubles' | 'high-total' | 'n
  * them, `colour` the map's own colours.
  */
 declare type DarkSightLook = 'system' | 'grey' | 'colour';
+
+export declare interface DashboardTile {
+    /** Unique among this extension's tiles. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    title: string;
+    description: string;
+    onClick(): void;
+}
 
 /**
  * How diagonal steps count on square grids: `equidistant` counts each as 1 (D&D 5e),
@@ -603,6 +633,53 @@ export declare interface MeasurementSettings {
     coneAngle: number;
 }
 
+export declare interface MenuItem {
+    label: string;
+    /** Lucide name */
+    icon?: string;
+    onClick?(): void;
+    submenu?: MenuItem[];
+    checked?: boolean;
+    disabled?: boolean;
+}
+
+export declare interface PaletteCommand {
+    /** Unique within its section. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    label: string;
+    keywords?: string[];
+    run(): void;
+}
+
+export declare interface PaletteSection {
+    /** Unique among this extension's sections. */
+    id: string;
+    title: string;
+    /** Read again each time the palette draws and after `invalidate()`. */
+    commands(ctx: ViewContext): PaletteCommand[];
+}
+
+export declare interface PanelHandle {
+    /** Opens the panel in `viewId`, default the active map view; does nothing when there is none. */
+    open(viewId?: ViewId): void;
+    /** Closes the panel in `viewId`, or in every view when none is given. */
+    close(viewId?: ViewId): void;
+    toggle(viewId?: ViewId): void;
+    isOpen(viewId?: ViewId): boolean;
+    /** Closes the panel in every view and removes it; calling it again does nothing. */
+    dispose(): void;
+}
+
+export declare interface PanelSpec {
+    /** Unique among this extension's panels. */
+    id: string;
+    title: string;
+    /** Runs when the panel opens in a view; the returned disposer runs when it closes, its view closes, or the panel is disposed. */
+    mount(container: HTMLElement, ctx: ViewContext): Disposer;
+}
+
 /** How the player window shows a token: seen, outlined only (sensed), or not at all. */
 export declare type Perception = 'seen' | 'sensed' | 'unseen';
 
@@ -685,6 +762,11 @@ export declare interface PresentationTarget {
 }
 
 export declare interface PresentedSceneInfo {
+    /**
+     * Names one presentation: the same while it is held and resumed, new for every `present` (and every
+     * presentation the GM starts), even of the same tab, and never repeated after Atlas reloads. Compare it to tell a new presentation from the one you know.
+     */
+    presentationId: string;
     viewId: ViewId;
     tabId: string;
     mapPath: string;
@@ -768,6 +850,17 @@ export declare interface RulesApi {
     forMap(mapPath: string | null): MapRules;
 }
 
+/** The parts of a saved map an extension may read and write; everything else in the file stays Atlas's. */
+export declare interface SavedMapInput {
+    /** As in `SceneSnapshot`. Written with `addToCollection`, image paths are relative to its `images` and become vault paths; `readMap` returns vault paths. */
+    background: BackgroundState;
+    grid: GridState | null;
+    objects: SceneSnapshot['objects'];
+    widgets: SceneSnapshot['widgets'];
+    initiative: InitiativeState;
+    lighting?: SceneLighting;
+}
+
 /** Dynamic lighting of one scene. Saved in the map file, never undo-tracked. */
 export declare interface SceneLighting {
     enabled: boolean;
@@ -796,6 +889,51 @@ export declare interface SceneLighting {
     darkSightLook?: DarkSightLook;
     /** Tint of that picture, `#rrggbb`; unset is none. Read with `darkSightTintOf`. */
     darkSightTint?: string;
+}
+
+export declare interface SceneRecord {
+    id: string;
+    name: string;
+    collectionId: string;
+    mapPath: string | null;
+}
+
+export declare interface ScenesApi {
+    list(): Promise<SceneRecord[]>;
+    findByMap(mapPath: string): Promise<SceneRecord | null>;
+    /** This extension's data on the scene record (`data.extensions[<extension id>]`); a frozen copy, undefined when unset. */
+    getData(sceneId: string): Promise<Json | undefined>;
+    /** Sets or (null) clears it. Atlas drops it from copies, exports and imports, and leaves it out of fingerprints. */
+    setData(sceneId: string, value: Json | null): Promise<void>;
+    /** A saved `.atlasmap` file, migrated to the current format, without opening a view; a frozen copy. Null when there is no such file. */
+    readMap(mapPath: string): Promise<(SavedMapInput & {
+        mapSize: {
+            width: number;
+            height: number;
+        };
+    }) | null>;
+    /**
+     * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
+     * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
+     * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused.
+     */
+    addToCollection(input: {
+        collection: {
+            id: string;
+        } | {
+            name: string;
+        };
+        name: string;
+        folder: string;
+        map: SavedMapInput;
+        images: ReadonlyArray<{
+            path: string;
+            data: ArrayBuffer;
+        }>;
+    }): Promise<{
+        sceneId: string;
+        mapPath: string;
+    }>;
 }
 
 /** The scene in a view's store. Records are the store's frozen data, passed by reference: never mutate them. */
@@ -888,6 +1026,12 @@ export declare interface Token extends BaseToken {
  */
 export declare type TokenEntity = Token | Character;
 
+/** What a token menu provider is told: the view, the token, and its kind (`tokenKind`, since `kind` is the view's). */
+export declare type TokenMenuContext = ViewContext & {
+    tokenId: string;
+    tokenKind: TokenEntity['kind'];
+};
+
 export declare interface TokenMove {
     tokenId: string;
     x: number;
@@ -897,7 +1041,11 @@ export declare interface TokenMove {
 export declare interface TokenMoveOptions {
     /** Snap each token the way `snapPoint` does. Default true. */
     snap?: boolean;
-    /** Keep each target on the map, `[0, width] x [0, height]`, before snapping. Default true; a map without a size is not clamped. */
+    /**
+     * Keep each token's final position on the map, `[0, width] x [0, height]`: when its snapped position is off the map,
+     * the nearest snapped position inside it is used. Default true; a map without a size is not clamped. The GM's own
+     * drag does not clamp, this is the API's extra.
+     */
     clampToMap?: boolean;
     /** Move hidden tokens too. Default false: a hidden token is refused. */
     allowHidden?: boolean;
@@ -926,7 +1074,7 @@ export declare interface TokensApi {
      */
     snapPoint(viewId: ViewId, point: Point, tokenSize: number): Readonly<Point>;
     /**
-     * Moves tokens as one undo step, like a GM drag. Checked in this order, and nothing is written when any move
+     * Moves tokens as one undo step, like a GM drop: the moved tokens rise to the top of the stack and are no longer held. Checked in this order, and nothing is written when any move
      * fails: the map is loaded (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
      * `allowHidden` (`hidden`), every position is a number within 1e9 of the origin (`invalid-position`, also when snapping would
      * not give one). A token named twice moves to its last position. Throws when `moves` is not a list or `options` is malformed.
@@ -965,12 +1113,51 @@ declare interface TokenVision {
     senses?: TokenSense[];
 }
 
+export declare interface ToolbarItem {
+    /** Unique among this extension's toolbar items. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    label: string;
+    shortcut?: string;
+    /** Where it sits among Atlas's own items, which have 45–100; lower priorities move into "More tools" first. Default 50. */
+    priority?: number;
+    /** Default ['map']. */
+    views?: ReadonlyArray<'map' | 'remote'>;
+    /** Draws the button as the one in use, and keeps it in the bar rather than in "More tools". */
+    isActive?(ctx: ViewContext): boolean;
+    /** A dot (`true`) or a count on the button; `null` shows nothing. */
+    badge?(ctx: ViewContext): string | number | true | null;
+    onClick(ctx: ViewContext): void;
+}
+
+export declare interface UiApi {
+    addToolbarItem(item: ToolbarItem): Disposer;
+    addPaletteSection(section: PaletteSection): Disposer;
+    addDashboardTile(tile: DashboardTile): Disposer;
+    /** The map's "More options" menu. */
+    addViewMenuItems(provider: (ctx: ViewContext) => MenuItem[]): Disposer;
+    /** A token's context menu (GM views only); `tokenKind` lets a provider act on characters only. */
+    addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
+    /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
+    addPanel(panel: PanelSpec): PanelHandle;
+    /** Re-reads `isActive`, `badge`, palette commands and menu providers now. */
+    invalidate(): void;
+}
+
 /** The visible world area: its centre and size in world units. */
 export declare interface ViewCamera {
     centerX: number;
     centerY: number;
     width: number;
     height: number;
+}
+
+/** What a slot callback is told about the view it is drawn or run in. */
+export declare interface ViewContext {
+    viewId: ViewId;
+    kind: 'map' | 'remote';
+    isPlayerView: boolean;
 }
 
 /** An Atlas map view (`AtlasView.viewId`); never reused once the view closed. */

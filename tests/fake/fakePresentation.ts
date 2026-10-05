@@ -2,6 +2,8 @@ import type { Disposer, PresentationApi, PresentationListener, PresentationTarge
 import type { FakeViews, Own } from './fakeViews';
 
 interface Presented {
+  /** Names this presentation: kept while it is held and resumed, new for every present. */
+  presentationId: string;
   viewId: ViewId;
   tabId: string;
 }
@@ -16,6 +18,7 @@ export class FakePresentation {
   private scene: Presented | null = null;
   private held = false;
   private resumeToken = 0;
+  private presentations = 0;
   /** The token a resume waits with; null while none waits. */
   private waiting: number | null = null;
   private readonly listeners = new Set<PresentationListener>();
@@ -54,7 +57,7 @@ export class FakePresentation {
 
   /** Atlas's `PresentedScene.present`: held unless the view shows the tab's loaded map. True when presented. */
   private register(viewId: ViewId, target: string): boolean {
-    const scene: Presented = { viewId, tabId: target };
+    const scene: Presented = { presentationId: `presentation-${++this.presentations}`, viewId, tabId: target };
     this.scene = scene;
     this.held = this.views.tabsOf(viewId)?.activeTabId !== target || !this.views.showsTab(viewId, target);
     this.resumeToken++;
@@ -169,7 +172,7 @@ export class FakePresentation {
 
   private info(scene: Presented, held: boolean): PresentedSceneInfo {
     const mapPath = this.views.tabsOf(scene.viewId)?.tabs.find((tab) => tab.tabId === scene.tabId)?.mapPath ?? '';
-    return Object.freeze({ viewId: scene.viewId, tabId: scene.tabId, mapPath, held });
+    return Object.freeze({ presentationId: scene.presentationId, viewId: scene.viewId, tabId: scene.tabId, mapPath, held });
   }
 
   /** Each listener runs guarded, as Atlas's `PresentedScene.emit` does. */
