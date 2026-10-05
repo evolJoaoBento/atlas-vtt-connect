@@ -12,15 +12,6 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-pres-2': 'Atlas-internal: the eye of a target is Atlas UI',
   'C-rules-6': "Atlas-internal: needs Atlas's settings service and its user system presets",
   'C-rules-7': "Atlas-internal: the asset index's own loading and its failure log",
-  // The fake does not simulate these namespaces yet; the task named in each reason adds its cases and removes the entry.
-  'C-scenes-1': 'tested in B13',
-  'C-scenes-2': 'tested in B13',
-  'C-scenes-3': 'tested in B13',
-  'C-scenes-4': 'tested in B13',
-  'C-bundles-1': 'tested in B13',
-  'C-bundles-2': 'tested in B13',
-  'C-bundles-3': 'tested in B13',
-  'C-bundles-4': 'tested in B13',
 };
 
 describe('FakeAtlas follows the contract cases', () => {
