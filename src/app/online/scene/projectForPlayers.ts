@@ -110,7 +110,8 @@ function darkCovers(context: ProjectionContext, lighting: LightingFrame): Covers
       const right = bounds.x + Math.max(0, bounds.width);
       const bottom = bounds.y + Math.max(0, bounds.height);
       if (!(width > 0 && height > 0 && [bounds.x, bounds.y, right, bottom].every(Number.isFinite))) return true;
-      if (right < 0 || bottom < 0 || bounds.x > width || bounds.y > height) return true;
+      // One that only touches the map from outside has no part inside it: the clip would be empty, which no grid covers.
+      if (right <= 0 || bottom <= 0 || bounds.x >= width || bounds.y >= height) return true;
       const x = Math.max(bounds.x, 0);
       const y = Math.max(bounds.y, 0);
       return dark.isCovered({ x, y, width: Math.min(right, width) - x, height: Math.min(bottom, height) - y });

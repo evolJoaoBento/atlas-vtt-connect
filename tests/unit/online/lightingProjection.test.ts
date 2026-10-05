@@ -96,6 +96,21 @@ describe('dynamic lighting for online players', () => {
     expect(Object.keys(projected.drawings)).toEqual(['in']);
   });
 
+  it('leaves out a text or drawing that only touches the map edge from outside, lit or dark', () => {
+    // One letter in a 40 by 20 box: its bounds are the box, centred on (x, y).
+    const boxed = (id: string, x: number, y: number): TextElement => ({ ...text(id, x, y), text: 'x', width: 40, height: 20 });
+    const state = walled({
+      // Their bounds start exactly at the right or bottom edge, or end exactly at the left or top one.
+      texts: { right: boxed('right', MAP.width + 20, 200), bottom: boxed('bottom', 200, MAP.height + 10), left: boxed('left', -20, 200), top: boxed('top', 200, -10) },
+      drawings: { left: drawing('left', -12, 200), top: { ...drawing('top', 200, -2), points: [{ x: 200, y: -2 }, { x: 210, y: -2 }] } },
+    });
+    for (const answer of [ready({ hero: 'seen' }, () => true), WALLED]) {
+      const projected = projectLit(state, answer);
+      expect(projected.texts).toEqual({});
+      expect(projected.drawings).toEqual({});
+    }
+  });
+
   it('covers what no light reaches at night, shows what the torch lights and the hero standing in the dark', () => {
     const projected = projectLit(night(), torchlit());
     expect(isDark(projected, { x: 400, y: 400 })).toBe(false);

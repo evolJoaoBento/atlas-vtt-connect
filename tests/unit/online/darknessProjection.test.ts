@@ -72,9 +72,8 @@ describe('leak repros', () => {
   it('C1: a map load is dark until Atlas knows the new map, also where the snapshot reads unlit', async () => {
     const host = hostLit(litTavern({ tokens: { hero: character('hero', 140, 140) } }), { lighting: true, visibility: ready({ hero: 'seen' }, () => true) });
     expect(Object.keys(host.players().tokens)).toEqual(['hero']);
-    host.store.setState({ isMapLoading: true });
     // Atlas answers pending from the start of the load until the new map's sight is worked out.
-    host.atlas.lighting.setVisibility(host.view, PENDING);
+    host.store.setState({ isMapLoading: true });
     host.store.setState((state) => ({ isMapLoading: false, lighting: { enabled: false, ambient: 1 }, objects: { ...state.objects, tokens: { hero: character('hero', 210, 140) } } }));
     await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
     expect(host.players().tokens).toEqual({});

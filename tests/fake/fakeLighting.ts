@@ -16,8 +16,8 @@ function copyOf(visibility: PlayerVisibility): PlayerVisibility {
 }
 
 /**
- * Atlas's player visibility as the test sets it, per view (`setVisibility`). A view the test has not set, one
- * that is not open and one loading a map are `pending`: what Atlas cannot tell is dark. `watch` fires on every
+ * Atlas's player visibility as the test sets it, per view (`setVisibility`). A view the test has not set (since
+ * its map last loaded), one that is not open and one loading a map are `pending`: what Atlas cannot tell is dark. `watch` fires on every
  * `setVisibility` of its view and when its map is marked loaded, and ends when the view closes.
  */
 export class FakeLighting {
@@ -32,7 +32,16 @@ export class FakeLighting {
     this.changed(viewId);
   }
 
-  /** What `viewId` shows may have changed (a visibility set, a map marked loaded): its watchers run, guarded. */
+  /**
+   * The view's store holds a newly loaded map: nothing worked out for the last one stands in, so the view reads
+   * `pending` until the test says what the new map shows; its watchers run.
+   */
+  mapLoaded(viewId: ViewId): void {
+    this.visibility.delete(viewId);
+    this.changed(viewId);
+  }
+
+  /** What `viewId` shows may have changed: its watchers run, guarded. */
   changed(viewId: ViewId): void {
     for (const listener of [...(this.watchers.get(viewId) ?? [])]) {
       try {

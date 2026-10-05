@@ -92,7 +92,7 @@ export class FakeAtlas implements AtlasApi {
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
     this.views = new FakeViews({
-      emitMapLoaded: (info) => { this.emit('map-loaded', info); this.lighting.changed(info.viewId); },
+      emitMapLoaded: (info) => { this.emit('map-loaded', info); this.lighting.mapLoaded(info.viewId); },
       emitMapClosed: (viewId) => this.emit('map-closed', viewId),
       storeChanged: (viewId) => this.presentation.storeChanged(viewId),
       tabsChanged: (viewId) => this.presentation.tabsChanged(viewId),

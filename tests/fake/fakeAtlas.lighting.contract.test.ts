@@ -31,12 +31,23 @@ describe('FakeAtlas follows the lighting contract cases', () => {
     expect(lighting.playerVisibility('v1')).toEqual({ status: 'pending' });
   });
 
-  it('C-light-1: a map load or tab switch on a lit scene is pending until the new map is loaded, never unlit', () => {
+  it('C-light-1: a map load or tab switch on a lit scene is pending until the new map and its lighting are known, never unlit', () => {
     const { atlas, lighting } = litAtlas();
     atlas.lighting.setVisibility('v1', { status: 'unlit' });
     atlas.views.update('v1', { loaded: false });
     expect(lighting.playerVisibility('v1').status).toBe('pending');
     atlas.views.update('v1', { loaded: true });
+    // Nothing worked out for the last map stands in for the one now loaded.
+    expect(lighting.playerVisibility('v1').status).toBe('pending');
+    atlas.lighting.setVisibility('v1', READY);
+    // A tab switch loads the other tab's map: pending again until its lighting is known.
+    atlas.views.addTab('v1', { tabId: 't2', mapPath: 'maps/b.atlasmap', name: 'B' });
+    atlas.views.setActiveTab('v1', 't2');
+    atlas.views.update('v1', { mapPath: 'maps/b.atlasmap', loaded: false });
+    expect(lighting.playerVisibility('v1').status).toBe('pending');
+    atlas.views.update('v1', { loaded: true });
+    expect(lighting.playerVisibility('v1').status).toBe('pending');
+    atlas.lighting.setVisibility('v1', { status: 'unlit' });
     expect(lighting.playerVisibility('v1').status).toBe('unlit');
   });
 
