@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Character, DrawingStroke, FogOperation, SceneSnapshot, TextElement } from '@atlas-vtt/api-types';
-import { tokenBounds } from '../../../src/app/online/scene/objectBounds';
+import { textBounds, tokenBounds } from '../../../src/app/online/scene/objectBounds';
 import type { ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { playerSafePayload, type PayloadContext } from '../../../src/app/online/sharing/model/buildMapPayload';
 import { coverageOfFog, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
 import { mapFile, sourceOf } from './sharing/mapFileFixture';
 
-// Ruling F-POS: on a fogged scene an item reaches players only if every fog cell its in-map bounds touch is proven
-// revealed. The partial cell at a map edge that is not a multiple of 8 counts as fogged unless revealed, and parts
-// outside the map prove nothing.
+// Ruling F-POS (refined): on a fogged scene a text, drawing or pin reaches players only if every fog cell its in-map
+// bounds touch is proven revealed, a token if any is (the player window draws a token whose part shows). The partial
+// cell at a map edge that is not a multiple of 8 counts as fogged unless revealed, space outside the map counts as
+// fogged, and a fogged map of unknown size sends nothing.
 
 const MAP = { width: 700, height: 700 };
 const RULES = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
@@ -67,6 +68,20 @@ describe('fog positive check (F-POS)', () => {
     const shown = project(fog, [CLEAR_AT, [697, 350], [380, 350]]);
     expect(shown).toEqual({ tokens: ['600_350'], texts: ['600_350'], drawings: ['600_350'] });
     expect(sharedPins(fog, [CLEAR_AT, [697, 350], [380, 350]])).toEqual([[600, 350]]);
+  });
+
+  it('sends a half-revealed token, but not a half-revealed text, drawing or pin', () => {
+    const fog = fogOf(rect(0, 0, 700, 700), rect(400, 200, 300, 300, true));
+    // 400 lies on a cell edge: the cell left of it is fogged, the one right of it revealed.
+    expect(project(fog, [[400, 350]])).toEqual({ tokens: ['400_350'], texts: [], drawings: [] });
+    expect(sharedPins(fog, [[400, 350]])).toEqual([]);
+  });
+
+  it('hides a token only in the edge strip, and one straddling the map edge and the strip', () => {
+    const fog = fogOf(rect(0, 0, 700, 700), rect(400, 200, 300, 300, true));
+    // Revealed up to 696; 696–704 is the partial edge cell, still fogged, and past 700 is off the map.
+    expect(project(fog, [[698, 350], [700, 350], [700.4, 350]]).tokens).toEqual([]);
+    expect(project(fog, [[695, 350]]).tokens).toEqual(['695_350']);
   });
 
   it('a fully revealed map sends everything on it', () => {
@@ -164,10 +179,11 @@ function randomOp(random: () => number, width: number, height: number, isErasing
 }
 
 describe('fog positive check against pixel truth', () => {
-  it('whatever is sent is unfogged in every pixel of its in-map part, on maps whose sides are not multiples of 8', () => {
+  it('a sent text is unfogged in every pixel of its in-map part and a sent token in some, on maps whose sides are not multiples of 8', () => {
     const random = seeded(2026);
     let sent = 0;
     let hidden = 0;
+    let sentUnderFog = 0;
     for (let run = 0; run < 120; run++) {
       const width = 40 + 8 * Math.floor(random() * 25) + (random() < 0.9 ? 1 + Math.floor(random() * 7) : 0);
       const height = 40 + 8 * Math.floor(random() * 25) + 1 + Math.floor(random() * 7);
@@ -179,20 +195,35 @@ describe('fog positive check against pixel truth', () => {
       const scene = projectForPlayers({ ...sceneWith(fog, at) }, {
         sceneId: 's', rules: RULES, coverage, assets: fakeAssetIds(), mapSize: { width, height },
       });
-      for (const [id, sentToken] of Object.entries(scene.tokens)) {
-        const box = tokenBounds({ x: sentToken.x, y: sentToken.y, size: sentToken.size }, 1);
+      const inMap = (box: { x: number; y: number; width: number; height: number }): number[] => {
         const x0 = Math.max(0, Math.floor(box.x));
         const y0 = Math.max(0, Math.floor(box.y));
         const x1 = Math.min(width, Math.max(x0 + 1, Math.ceil(box.x + box.width)));
         const y1 = Math.min(height, Math.max(y0 + 1, Math.ceil(box.y + box.height)));
+        const pixels: number[] = [];
+        for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) pixels.push(py * width + px);
+        // A pixel only partly under the box counts whole: the truth is checked on every pixel the box touches.
         // Without fog nothing is hidden, also off the map; with fog only what lies on the map can be sent.
-        if (coverage.hasFog) expect(x0 < width && y0 < height && box.x + box.width > 0 && box.y + box.height > 0, `token ${id} sent off the map`).toBe(true);
-        for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) expect(truth[py * width + px], `token ${id} pixel ${px},${py}`).toBe(0);
+        if (coverage.hasFog) expect(x0 < width && y0 < height && box.x + box.width > 0 && box.y + box.height > 0, 'sent off the map').toBe(true);
+        return pixels;
+      };
+      for (const [id, sentToken] of Object.entries(scene.tokens)) {
+        // A token: some pixel of its in-map part is unfogged.
+        const pixels = inMap(tokenBounds({ x: sentToken.x, y: sentToken.y, size: sentToken.size }, 1));
+        if (pixels.length > 0 || coverage.hasFog) expect(pixels.some((pixel) => truth[pixel] === 0), `token ${id}`).toBe(true);
         sent++;
       }
-      hidden += at.length - Object.keys(scene.tokens).length;
+      for (const [id, sentText] of Object.entries(scene.texts)) {
+        // A text: every pixel of its in-map part is unfogged.
+        const pixels = inMap(textBounds(sentText as unknown as TextElement));
+        expect(pixels.filter((pixel) => truth[pixel] !== 0), `text ${id}`).toEqual([]);
+        sent++;
+        if (coverage.hasFog) sentUnderFog++;
+      }
+      hidden += 2 * at.length - Object.keys(scene.tokens).length - Object.keys(scene.texts).length;
     }
     expect(sent).toBeGreaterThan(0);
+    expect(sentUnderFog).toBeGreaterThan(0);
     expect(hidden).toBeGreaterThan(0);
   }, 30_000);
 });

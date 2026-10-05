@@ -2,9 +2,9 @@
  * Where the fog of war lies, coarsely, to decide what players may receive. Replays the fog operations like
  * `FogCanvasCompositor` (in order, erase clearing) onto one cell per 8 world pixels.
  *
- * `reveals` is the check every projection asks (ruling F-POS). It is fail closed by construction: it replays the fog
- * the other way round (`reveal` mode: paint fogs every cell it touches, erase clears only cells it covers whole), so a
- * cell left clear is proven revealed, and it answers from a summed-area table in O(1). `isCovered` (where fog surely
+ * `reveals` and `revealsSome` are the checks every projection asks (ruling F-POS). They are fail closed by
+ * construction: the fog is replayed the other way round (`reveal` mode: paint fogs every cell it touches, erase clears
+ * only cells it covers whole), so a cell left clear is proven revealed, and they answer from a summed-area table in O(1). `isCovered` (where fog surely
  * lies, `hide` mode) never decides what is sent; it is built only when asked.
  */
 import { CLEAR, FOGGED, fillBrush, fillLasso, fillRect, type CellGrid, type RasterMode } from './fogRaster';
@@ -66,34 +66,54 @@ export class FogCoverage {
   }
 
   /**
-   * Whether no part of `bounds` inside the map can be under fog (ruling F-POS): true only when every cell its in-map
-   * part touches is proven revealed, the partial cells at the map's edges included. A scene without fog reveals
-   * everything, as the player window shows it. With fog, an item wholly outside the map or only touching it from
-   * outside, and any item on a map without a size, are not revealed: parts outside the map never prove anything. A
-   * zero-area item is judged by the cell under it.
+   * Whether no part of `bounds` inside the map can be under fog (ruling F-POS, for texts, drawings and pins, whose
+   * content under fog is data): true only when every cell its in-map part touches is proven revealed, the partial
+   * cells at the map's edges included. A zero-area item is judged by the cell under it.
    */
   reveals(bounds: WorldBounds, map: MapSize): boolean {
+    const cells = this.inMapCells(bounds, map);
+    return cells === true || (cells !== null && cells.fogged === 0);
+  }
+
+  /**
+   * Whether some cell of `bounds` inside the map is proven revealed (ruling F-POS, for tokens: the player window draws
+   * a token whose part shows, so a half-fogged token stays). Partial edge cells count as fogged unless revealed, and
+   * space outside the map counts as fogged.
+   */
+  revealsSome(bounds: WorldBounds, map: MapSize): boolean {
+    const cells = this.inMapCells(bounds, map);
+    return cells === true || (cells !== null && cells.fogged < cells.total);
+  }
+
+  /**
+   * The fog cells the in-map part of `bounds` touches: how many there are and how many may be fogged. True for a scene
+   * without fog, which hides nothing, as the player window shows it. Null (hidden) on a fogged scene for an item
+   * wholly outside the map or only touching it from outside, and for any item while the map's size is unknown: parts
+   * outside the map never prove anything.
+   */
+  private inMapCells(bounds: WorldBounds, map: MapSize): { total: number; fogged: number } | true | null {
     const grid = this.revealed;
     if (!this.hasFog || !grid?.sums) return true;
     const right = bounds.x + Math.max(0, bounds.width);
     const bottom = bounds.y + Math.max(0, bounds.height);
-    if (!(map.width > 0 && map.height > 0) || ![bounds.x, bounds.y, right, bottom, map.width, map.height].every(Number.isFinite)) return false;
-    if (right <= 0 || bottom <= 0 || bounds.x >= map.width || bounds.y >= map.height) return false;
+    if (!(map.width > 0 && map.height > 0) || ![bounds.x, bounds.y, right, bottom, map.width, map.height].every(Number.isFinite)) return null;
+    if (right <= 0 || bottom <= 0 || bounds.x >= map.width || bounds.y >= map.height) return null;
     const size = grid.cellSize;
     const c0 = Math.floor((Math.max(bounds.x, 0) - grid.originX) / size);
     const r0 = Math.floor((Math.max(bounds.y, 0) - grid.originY) / size);
     const c1 = Math.max(c0, Math.ceil((Math.min(right, map.width) - grid.originX) / size) - 1);
     const r1 = Math.max(r0, Math.ceil((Math.min(bottom, map.height) - grid.originY) / size) - 1);
+    const total = (c1 - c0 + 1) * (r1 - r0 + 1);
     // Cells off the grid lie past the padding around everything painted: no fog reaches them.
     const left = Math.max(0, c0);
     const top = Math.max(0, r0);
     const last = Math.min(grid.cols - 1, c1);
     const lastRow = Math.min(grid.rows - 1, r1);
-    if (left > last || top > lastRow) return true;
+    if (left > last || top > lastRow) return { total, fogged: 0 };
     const width = grid.cols + 1;
     const { sums } = grid;
     const fogged = sums[(lastRow + 1) * width + last + 1]! - sums[top * width + last + 1]! - sums[(lastRow + 1) * width + left]! + sums[top * width + left]!;
-    return fogged === 0;
+    return { total, fogged };
   }
 
   /** `reveals` bound to one map, as texts, drawings and lit scenes are checked. */

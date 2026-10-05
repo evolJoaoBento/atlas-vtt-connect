@@ -27,6 +27,36 @@ export class TickTimer {
   }
 }
 
+/** How often a projection made while the map's size was unknown asks again whether it is known. */
+export const MAP_SIZE_POLL_MS = 250;
+
+/**
+ * Atlas reads a map's size from its drawn background (`loadedMapSize`), which can settle after the store says the map
+ * is loaded, with no store change to tell. On a fogged scene nothing is sent until the size is known (ruling F-POS), so
+ * a projection made without it watches for it here, and `known` projects again once it is there.
+ */
+export class MapSizeWait {
+  private timer: number | null = null;
+
+  constructor(private readonly known: () => void) {}
+
+  /** Asks `read` every `MAP_SIZE_POLL_MS` until it gives a size above 0, then stops and calls `known` once. */
+  watch(read: () => { width: number; height: number } | null | undefined): void {
+    if (this.timer !== null) return;
+    this.timer = window.setInterval(() => {
+      const size = read();
+      if (!size || !(size.width > 0 && size.height > 0)) return;
+      this.stop();
+      this.known();
+    }, MAP_SIZE_POLL_MS);
+  }
+
+  stop(): void {
+    if (this.timer !== null) window.clearInterval(this.timer);
+    this.timer = null;
+  }
+}
+
 /** The snapshot messages of the scene players have, built once per projection. */
 export class SnapshotCache {
   private snapshot: { scene: PlayerScene; messages: SceneOutgoing[] | null } | null = null;

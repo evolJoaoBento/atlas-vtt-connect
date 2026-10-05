@@ -30,9 +30,9 @@ export interface ProjectionContext {
   sceneId: string;
   rules: PlayerViewRules;
   /**
-   * The GM's fog players receive; rebuilt by the caller only when the fog operations change. On a fogged scene a token,
-   * text or drawing is sent only where it proves every cell its in-map part touches revealed (ruling F-POS,
-   * `FogCoverage.reveals`), so nothing is sent while the map's size is unknown.
+   * The GM's fog players receive; rebuilt by the caller only when the fog operations change. On a fogged scene (ruling
+   * F-POS) a text or drawing is sent only where every fog cell its in-map part touches is proven revealed
+   * (`FogCoverage.reveals`), a token where some is (`revealsSome`), and nothing while the map's size is unknown.
    */
   coverage: FogCoverage;
   /**
@@ -185,8 +185,9 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // The token as the GM draws it (raw values) and as players do (the wire's clamped ones) must both be revealed (F-POS).
-  const revealed = (at: { x: number; y: number; size: number }): boolean => context.coverage.reveals(tokenBounds(at, cellSize), context.mapSize);
+  // Some cell of the token, as the GM draws it (raw values) and as players do (the wire's clamped ones), must be proven
+  // revealed (F-POS): the player window draws a token whose part shows, so a half-fogged token is sent.
+  const revealed = (at: { x: number; y: number; size: number }): boolean => context.coverage.revealsSome(tokenBounds(at, cellSize), context.mapSize);
   const wire = { x: finiteOr(x, 0, SCENE_RANGES.coordinate), y: finiteOr(y, 0, SCENE_RANGES.coordinate), size: finiteOr(size, 1, SCENE_RANGES.tokenSize) };
   if (!revealed({ x, y, size }) || !revealed(wire)) return null;
   const character = token.kind === 'character' ? token : null;

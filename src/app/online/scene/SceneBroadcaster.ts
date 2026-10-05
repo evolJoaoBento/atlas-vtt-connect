@@ -22,7 +22,7 @@ import {
   FOG_TRUNCATED_NOTICE, FogCoverageCache, type FogCoverages, sameSlice, sceneContext, sliceOf,
   type SceneBroadcasterOptions, type ShownScene,
 } from './sceneSources';
-import { SnapshotCache, TickTimer } from './sceneTicks';
+import { MapSizeWait, SnapshotCache, TickTimer } from './sceneTicks';
 import type { PlayerScene } from './sceneTypes';
 
 export type { PlayerViewSettingsSource, PresentedSceneSource, SceneBroadcasterOptions, SceneSession } from './sceneSources';
@@ -51,6 +51,8 @@ export class SceneBroadcaster implements SessionHandler {
   /** The presented view's lighting, while a scene is shown. */
   private lighting: PresentationLighting | null = null;
   private readonly ticks = new TickTimer(() => this.tick());
+  /** Projects again once a map size unknown at projection becomes known (ruling F-POS hides a fogged scene until then). */
+  private readonly sizeWait = new MapSizeWait(() => { if (this.live && !this.live.loading) this.ticks.schedule(); });
   private fogNoticeShownFor: string | null = null;
   private readonly channels: PlayerChannels;
 
@@ -173,6 +175,7 @@ export class SceneBroadcaster implements SessionHandler {
 
   private detach(): void {
     this.ticks.cancel();
+    this.sizeWait.stop();
     this.live?.unsubscribe();
     this.live = null;
     this.lighting?.dispose();
@@ -265,6 +268,7 @@ export class SceneBroadcaster implements SessionHandler {
 
   private project(live: ShownScene, { snapshot, lighting, fog }: Prepared): PlayerScene {
     live.slice = sliceOf(snapshot);
+    if (!(snapshot.mapSize.width > 0 && snapshot.mapSize.height > 0)) this.sizeWait.watch(() => live.scene.snapshot()?.mapSize);
     return projectForPlayers(snapshot, {
       sceneId: live.sceneId,
       rules: this.rules,

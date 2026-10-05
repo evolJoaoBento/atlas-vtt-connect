@@ -9,6 +9,7 @@ import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
+import { MAP_SIZE_POLL_MS } from '../../../src/app/online/scene/sceneTicks';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { fingerprintOf, memoryImageFiles, nodeHash, type MemoryImageFiles } from './assetFixtures';
@@ -209,6 +210,24 @@ describe('SceneBroadcaster', () => {
     expect(player.scene?.tokens.hero?.x).toBe(140);
     await tick();
     expect(player.scene?.tokens.hero?.x).toBe(300);
+    expect(player.scene).toEqual(h.broadcaster.currentProjection());
+  });
+
+  it('projects a fogged scene again once its map size, unknown at first, is known, with no store change (F-POS)', async () => {
+    const h = setup();
+    // Atlas reads the size from the drawn background, which can settle after the store says the map is loaded.
+    const size = { width: 0, height: 0 };
+    const fog = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 1000, y: 1000, width: 100, height: 100 } as FogOperation };
+    const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140) }, fog), size);
+    h.presented.present(view, tavern);
+    const player = await join(h);
+    expect(player.scene?.tokens).toEqual({});
+    await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 2);
+    expect(player.scene?.tokens).toEqual({});
+    size.width = 2000;
+    size.height = 1500;
+    await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS + SCENE_TICK_MS);
+    expect(player.scene?.tokens.hero?.x).toBe(140);
     expect(player.scene).toEqual(h.broadcaster.currentProjection());
   });
 
