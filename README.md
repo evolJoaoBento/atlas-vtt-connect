@@ -13,7 +13,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 - Obsidian 1.8.7 or newer, on desktop.
 - **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.13.0. Without the API, Connect shows a notice and stays off.
 - TODO (fill in once upstream ships it): the first Atlas release that includes the extension API.
-- TODO(user): name the public repository and branch of the Atlas extension API build. Until then the API branch is not public, and nobody but the maintainer can get a working Atlas for Connect.
+- The Atlas extension API build is the repository `evolJoaoBento/atlas-vtt`, branch `api/extension-api`. Once that branch is pushed and public, build Atlas from it (see Developing). Until then nobody but the maintainer can get a working Atlas for Connect.
 
 ## Install with BRAT
 
@@ -67,7 +67,7 @@ Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an
 
 Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. `npm run build` writes `dist/` only. Copy `dist/main.js`, `dist/styles.css` and `manifest.json` by hand into a test vault's `.obsidian/plugins/atlas-vtt-connect/`, never into your main vault. `npm run build:page` builds the join page into `dist-page/`.
 
-To test against a real Atlas, check out the Atlas branch `api/extension-api`, build it with `npm run build:ci` (which never copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
+To test against a real Atlas, check out the Atlas branch `api/extension-api` of `evolJoaoBento/atlas-vtt`, build it with `npm run build:ci` (which never copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
 
 ### Syncing the vendored Atlas
 
@@ -86,7 +86,7 @@ A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.
 
 Release checklist, before the first tag:
 
-1. Publish the Atlas extension API branch somewhere public, and fill the TODO(user) in this README and in THIRD_PARTY_NOTICES.md with its repository and branch. Connect's source for the vendored Atlas code must be reachable (AGPL).
+1. Push the Atlas extension API branch to `evolJoaoBento/atlas-vtt` (branch `api/extension-api`) and check that it is public, as named in this README and in THIRD_PARTY_NOTICES.md. Connect's source for the vendored Atlas code must be reachable (AGPL).
 2. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
 3. Fill the version TODOs in this README: the first Atlas release with the extension API, and the release version to pick in BRAT. Remove the lines when done.
 4. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.

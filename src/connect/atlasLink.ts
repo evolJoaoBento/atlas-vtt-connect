@@ -5,8 +5,12 @@ const SUPPORTED_MAJOR = 1;
 /** The first API minor with everything Connect uses (`replaceMap`, the `readMap` pins, `maxDice`). */
 const MINIMUM_MINOR = 13;
 
-export const MISSING_ATLAS_NOTICE = 'Install or enable Atlas VTT.';
-export const NO_API_NOTICE = `This Atlas VTT has no extension API (${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer) yet.`;
+/** How long after layout ready Atlas gets to publish its API before Connect says it is missing (Atlas publishes it after its own start-up work). */
+export const ATLAS_GRACE_MS = 10_000;
+
+export const MISSING_ATLAS_NOTICE = 'Atlas VTT Connect: Install or enable Atlas VTT.';
+export const NO_API_NOTICE = `Atlas VTT Connect: this Atlas VTT has no extension API (${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer) yet.`;
+export const oldApiNotice = (found: string): string => `Atlas VTT Connect needs extension API ${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer (found ${found}).`;
 
 function isAtlasApi(value: unknown): value is AtlasApi {
   const api = value as Partial<AtlasApi> | null;
@@ -21,13 +25,16 @@ export class AtlasLink {
   private warnedMissing = false;
   private warnedVersion = false;
   private atlasSeen = false;
+  /** The "missing" notice while it is showing: it goes away the moment Atlas's API arrives. */
+  private missingNotice: Notice | null = null;
+  private graceTimer: number | null = null;
   /** Disposes what Atlas registered for the current connection (it would otherwise wait for Connect to unload). */
   private release: (() => void) | null = null;
 
   constructor(
     private readonly plugin: Plugin,
     private readonly startWith: (atlas: AtlasExtension, api: AtlasApi) => Disposer,
-    private readonly notify: (message: string) => void = (message) => new Notice(message),
+    private readonly notify: (message: string) => unknown = (message) => new Notice(message),
   ) {}
 
   get connected(): AtlasExtension | null {
@@ -41,20 +48,36 @@ export class AtlasLink {
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
     workspace.onLayoutReady(() => {
-      if (this.extension || this.atlasSeen || this.warnedMissing) return;
-      this.warnedMissing = true;
-      // Atlas loaded but offering no API (an Atlas without the extension API) is not the same as Atlas missing or disabled.
-      this.notify(this.plugin.app.plugins?.plugins['atlas-vtt'] ? NO_API_NOTICE : MISSING_ATLAS_NOTICE);
+      if (this.atlasSeen) return;
+      this.graceTimer = window.setTimeout(() => this.warnMissing(), ATLAS_GRACE_MS);
+      this.plugin.register(() => this.stopGrace());
     });
+  }
+
+  private stopGrace(): void {
+    if (this.graceTimer !== null) window.clearTimeout(this.graceTimer);
+    this.graceTimer = null;
+  }
+
+  /** Atlas has had its grace period and published nothing: say why, unless the API arrived meanwhile. */
+  private warnMissing(): void {
+    if (this.extension || this.atlasSeen || this.warnedMissing) return;
+    this.warnedMissing = true;
+    // Atlas loaded but offering no API (an Atlas without the extension API) is not the same as Atlas missing or disabled.
+    const shown = this.notify(this.plugin.app.plugins?.plugins['atlas-vtt'] ? NO_API_NOTICE : MISSING_ATLAS_NOTICE);
+    this.missingNotice = shown instanceof Notice ? shown : null;
   }
 
   private attach(value: unknown): void {
     if (!isAtlasApi(value)) return;
     const [major, minor] = value.version.split('.').map(Number);
     this.atlasSeen = true;
+    this.stopGrace();
+    this.missingNotice?.hide();
+    this.missingNotice = null;
     this.detach();
     if (major !== SUPPORTED_MAJOR || !((minor ?? 0) >= MINIMUM_MINOR)) {
-      if (!this.warnedVersion) this.notify(major === SUPPORTED_MAJOR ? NO_API_NOTICE : `Atlas VTT Connect needs Atlas VTT with extension API ${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer (found ${value.version}).`);
+      if (!this.warnedVersion) this.notify(oldApiNotice(value.version));
       this.warnedVersion = true;
       return;
     }

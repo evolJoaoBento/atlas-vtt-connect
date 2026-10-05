@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AtlasLink, MISSING_ATLAS_NOTICE, NO_API_NOTICE } from '../../../src/connect/atlasLink';
+import { Notice } from 'obsidian';
+import { ATLAS_GRACE_MS, AtlasLink, MISSING_ATLAS_NOTICE, NO_API_NOTICE } from '../../../src/connect/atlasLink';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeConnectPlugin, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
 
@@ -45,29 +46,73 @@ describe('AtlasLink', () => {
     new AtlasLink(fakeConnectPlugin(app), (atlas) => { started.push(atlas.id); return () => undefined; }, (m) => notices.push(m)).start();
     fire('atlas-vtt:api-ready', new FakeAtlas({ version: '2.0.0' }));
     fire('atlas-vtt:api-ready', new FakeAtlas({ version: '2.0.0' }));
-    expect(notices.filter((m) => m.includes('found'))).toEqual(['Atlas VTT Connect needs Atlas VTT with extension API 1.13 or newer (found 2.0.0).']);
+    expect(notices.filter((m) => m.includes('found'))).toEqual(['Atlas VTT Connect needs extension API 1.13 or newer (found 2.0.0).']);
     expect(notices).toHaveLength(1);
     expect(started).toEqual([]);
   });
 
-  it('says once that Atlas is missing after layout-ready', () => {
-    const notices: string[] = [];
-    const { app } = fakeWorkspaceApp();
-    new AtlasLink(fakeConnectPlugin(app), () => () => undefined, (m) => notices.push(m)).start();
-    expect(notices).toEqual([MISSING_ATLAS_NOTICE]);
-    expect(MISSING_ATLAS_NOTICE).toBe('Install or enable Atlas VTT.');
+  it('says once that Atlas is missing, only after the grace period past layout-ready', () => {
+    vi.useFakeTimers();
+    try {
+      const notices: string[] = [];
+      const { app } = fakeWorkspaceApp();
+      new AtlasLink(fakeConnectPlugin(app), () => () => undefined, (m) => notices.push(m)).start();
+      vi.advanceTimersByTime(ATLAS_GRACE_MS - 1);
+      expect(notices).toEqual([]);
+      vi.advanceTimersByTime(1);
+      expect(notices).toEqual([MISSING_ATLAS_NOTICE]);
+      expect(MISSING_ATLAS_NOTICE).toBe('Atlas VTT Connect: Install or enable Atlas VTT.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('says Atlas has no extension API when Atlas is loaded without one', () => {
-    const notices: string[] = [];
-    const { app, plugins } = fakeWorkspaceApp();
-    plugins['atlas-vtt'] = {};
-    new AtlasLink(fakeConnectPlugin(app), () => () => undefined, (m) => notices.push(m)).start();
-    expect(notices).toEqual([NO_API_NOTICE]);
-    expect(NO_API_NOTICE).toBe('This Atlas VTT has no extension API (1.13 or newer) yet.');
+    vi.useFakeTimers();
+    try {
+      const notices: string[] = [];
+      const { app, plugins } = fakeWorkspaceApp();
+      plugins['atlas-vtt'] = {};
+      new AtlasLink(fakeConnectPlugin(app), () => () => undefined, (m) => notices.push(m)).start();
+      vi.advanceTimersByTime(ATLAS_GRACE_MS);
+      expect(notices).toEqual([NO_API_NOTICE]);
+      expect(NO_API_NOTICE).toBe('Atlas VTT Connect: this Atlas VTT has no extension API (1.13 or newer) yet.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('refuses an API older than 1.13 with the no-API notice, once, and connects from 1.13 on', () => {
+  it('shows no notice when the API arrives within the grace period, and drops one already showing when it arrives late', () => {
+    vi.useFakeTimers();
+    try {
+      const early: string[] = [];
+      const first = fakeWorkspaceApp();
+      first.plugins['atlas-vtt'] = {};
+      const earlyStarted: string[] = [];
+      new AtlasLink(fakeConnectPlugin(first.app), (atlas) => { earlyStarted.push(atlas.id); return () => undefined; }, (m) => early.push(m)).start();
+      vi.advanceTimersByTime(ATLAS_GRACE_MS - 1);
+      first.fire('atlas-vtt:api-ready', new FakeAtlas());
+      vi.advanceTimersByTime(ATLAS_GRACE_MS);
+      expect(early).toEqual([]);
+      expect(earlyStarted).toEqual(['atlas-vtt-connect']);
+
+      const shown = new Notice('Atlas VTT Connect: late');
+      const hide = vi.spyOn(shown, 'hide');
+      const second = fakeWorkspaceApp();
+      second.plugins['atlas-vtt'] = {};
+      const lateStarted: string[] = [];
+      new AtlasLink(fakeConnectPlugin(second.app), (atlas) => { lateStarted.push(atlas.id); return () => undefined; }, () => shown).start();
+      vi.advanceTimersByTime(ATLAS_GRACE_MS);
+      expect(hide).not.toHaveBeenCalled();
+      second.fire('atlas-vtt:api-ready', new FakeAtlas());
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(lateStarted).toEqual(['atlas-vtt-connect']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refuses an API older than 1.13 with its version, once, and connects from 1.13 on', () => {
     const notices: string[] = [];
     const started: string[] = [];
     const { app, plugins, fire } = fakeWorkspaceApp();
@@ -75,7 +120,7 @@ describe('AtlasLink', () => {
     const link = new AtlasLink(fakeConnectPlugin(app), (atlas) => { started.push(atlas.id); return () => undefined; }, (m) => notices.push(m));
     link.start();
     fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.9.0' }));
-    expect(notices).toEqual([NO_API_NOTICE]);
+    expect(notices).toEqual(['Atlas VTT Connect needs extension API 1.13 or newer (found 1.12.0).']);
     expect(started).toEqual([]);
     fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.13.0' }));
     expect(started).toEqual(['atlas-vtt-connect']);

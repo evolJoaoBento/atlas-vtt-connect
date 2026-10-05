@@ -31,9 +31,9 @@ What players never receive:
 - With dynamic lighting on, anything the lighting hides from your players' tokens: tokens, texts and drawings in the dark are never sent. If Connect cannot tell what is lit (the map is still loading, or Atlas cannot compute it yet), players get only the dark map: no tokens, texts or drawings.
 - Walls, lights, light zones and how tokens see. Which side a combatant is on is sent, but not why.
 - Resource names and numbers. Players see a bar for each resource your collection shows to players, with a fill rounded to hundredths, and the HP bar in the initiative list.
-- Hidden tokens. Pins are never sent during play.
+- Hidden tokens.
 
-The map image is sent whole, so the parts of the picture under fog of war are visible to anyone who inspects the page. Tokens, texts, drawings and pins under fog are not.
+The map image is sent whole, so the parts of the picture under fog of war are visible to anyone who inspects the page. Tokens wholly under fog, and texts and drawings that are not wholly revealed, are not sent.
 
 Players also receive:
 
