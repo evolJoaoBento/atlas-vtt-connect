@@ -1,7 +1,7 @@
 import type { DiceRollResult } from '@atlas-vtt/api-types';
 import { rollFormula } from '@atlas-vtt/shared/rules';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { diceHostPart } from '../../../src/app/online/atlas/toolParts';
+import { diceHostPart, tokenControlPart } from '../../../src/app/online/atlas/toolParts';
 import { OnlineSessionService, type Deps } from '../../../src/app/online/OnlineSessionService';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
@@ -13,6 +13,7 @@ import { PeopleBook } from '../../../src/app/online/sharing/people/PeopleBook';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
 import { memorySettings } from '../connect/memorySettings';
 import { fingerprintOf } from './assetFixtures';
+import { partyState } from './controlFixtures';
 import { emptySceneState, FakeViewport, presenter, sceneView, viewWithViewport, type Presenter } from './presentedFixtures';
 import { createDefaultInitiativeState } from './sceneFixtures';
 import { PATHS } from './sharing/sharingPathsFixture';
@@ -35,13 +36,14 @@ function atlasDeps(presented: Presenter = presenter()): Pick<Deps, 'presented' |
 
 afterEach(() => { resetOnlineSessionStore(); vi.useRealTimers(); });
 
-function service(network = new MemoryNetwork(), presented = presenter(), images?: ImageFiles) {
+function service(network = new MemoryNetwork(), presented = presenter(), images?: ImageFiles, extra: Partial<Deps> = {}) {
   const host = network.host('gm-id');
   const notices: Array<{ name: string; answer: (allow: boolean) => void; hidden: boolean }> = [];
   const svc = new OnlineSessionService(app, settings, {
     table: async () => null, createHost: async () => host,
     ...atlasDeps(presented),
     ...(images ? { images } : {}),
+    ...extra,
     showRequest: (player, answer) => {
       const notice = { name: player.name, answer, hidden: false };
       notices.push(notice);
@@ -316,8 +318,49 @@ describe('OnlineSessionService', () => {
     debug.mockRestore();
   });
 
-  // 'lets admitted players move the tokens the GM assigns, until they are removed or the session stops' needs the
-  // token control host and its moves (plan B10).
+  it('lets admitted players move the tokens the GM assigns, until they are removed or the session stops', async () => {
+    const presented = presenter();
+    const { view, store, tavern } = sceneView(presented, partyState(), { mapSize: { width: 2000, height: 1500 } });
+    presented.present(view, tavern);
+    const { svc, notices, network } = service(new MemoryNetwork(), presented, undefined, { tokenControl: tokenControlPart(presented.extension.tokens) });
+    await svc.start();
+    const link = await network.client().connect('gm-id');
+    const received: ControlMessage[] = [];
+    link.onMessage((_channel, data) => {
+      const decoded = decodeControl(data);
+      if (decoded.kind === 'message') received.push(decoded.message);
+    });
+    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    notices[0]!.answer(true);
+    const { players, tokenControl } = onlineSessionStore.getState();
+    const playerId = players[0]!.playerId;
+    tokenControl!.set('hero', playerId, true);
+    expect(received.filter((message) => message.type === 'token-control').at(-1)).toEqual({ v: 1, type: 'token-control', tokenIds: ['hero'] });
+    const snapshot = received.find((message) => message.type === 'scene-snapshot') as Extract<ControlMessage, { type: 'scene-snapshot' }>;
+    link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId: snapshot.scene.sceneId, tokenId: 'hero', x: 300, y: 150 }));
+    expect(store.getState().objects.tokens.hero).toMatchObject({ x: 315, y: 175 });
+    expect(presented.atlas.tokens.undoSteps(view)).toBe(1);
+    svc.kick(playerId);
+    expect(tokenControl!.tokensOf(playerId)).toEqual([]);
+    svc.stop();
+    expect(onlineSessionStore.getState().tokenControl).toBeNull();
+  });
+
+  it('hosts without token control on an Atlas without tokens: nobody controls a token and no control list is sent', async () => {
+    const { svc, notices, network } = service(new MemoryNetwork());
+    await svc.start();
+    expect(onlineSessionStore.getState().tokenControl).toBeNull();
+    const link = await network.client().connect('gm-id');
+    const received: ControlMessage[] = [];
+    link.onMessage((_channel, data) => {
+      const decoded = decodeControl(data);
+      if (decoded.kind === 'message') received.push(decoded.message);
+    });
+    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    notices[0]!.answer(true);
+    expect(received.some((message) => message.type === 'token-control')).toBe(false);
+    svc.stop();
+  });
 
   it("sends the measurement of the presented map's collection", async () => {
     const presented = presenter();

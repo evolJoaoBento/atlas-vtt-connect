@@ -12,11 +12,10 @@ function pointer(target: EventTarget, type: string, x: number, y: number): void 
 
 /**
  * What `main.mts` does: a `PlayerSession` feeding a `MapView` (`TokenMoves` + `ViewInput`),
- * over the GM's real session, broadcaster and control lists on an in-memory network. The GM's move
- * handler is `controlWorld`'s stand-in (it takes a controlled token's move as sent and refuses any
- * other); the snapping, undo step and held-scene refusal of the real handler are B10's (`tokens.move`).
+ * over the GM's real session, broadcaster and token control host (moves through `tokens.move` of a fake
+ * Atlas) on an in-memory network.
  */
-async function page(controlled = 'hero') {
+async function page() {
   document.body.innerHTML = [
     '<section><canvas id="map"></canvas>',
     '<div id="view-buttons" hidden><button id="follow-gm" type="button">Follow GM</button>',
@@ -26,7 +25,7 @@ async function page(controlled = 'hero') {
   const element = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
   const canvas = element<HTMLCanvasElement>('map');
   Object.defineProperties(canvas, { clientWidth: { value: 800 }, clientHeight: { value: 600 } });
-  const w = controlWorld({ scene: true });
+  const w = controlWorld();
   let player: ControlPlayer | null = null;
   const view = new MapView({
     canvas, surface: new RecordingSurface(), images: () => null, frames: fakeFrames(), isHidden: () => false,
@@ -44,8 +43,8 @@ async function page(controlled = 'hero') {
     onMoveRefused: (tokenId) => view.moveRefused(tokenId),
   });
   view.setConnected(true);
-  w.control.set(controlled, player.playerId, true);
-  await vi.advanceTimersByTimeAsync(300);
+  w.control.set('hero', player.playerId, true);
+  await w.tick();
   const previews = (): number => (view as unknown as { moves: { overlay(): { positions: Map<string, unknown> } } }).moves.overlay().positions.size;
   /** Finds the hero on the canvas by the grab cursor the view shows over it. */
   const heroPoint = (): { x: number; y: number } => {
@@ -64,42 +63,47 @@ describe('players moving their tokens on the join page', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('drags with the pointer, sends one drop, and shows the drop spot until the scene update', async () => {
+  it('drags with the pointer, snaps in the GM store with one undo step, and settles on the patch', async () => {
     const t = await page();
     expect(t.player.controlLists().at(-1)).toEqual(['hero']);
     const start = t.heroPoint();
+    const steps = t.w.undoSteps();
     pointer(t.canvas, 'pointerdown', start.x, start.y);
     pointer(t.canvas, 'pointermove', start.x + 40, start.y + 5);
     pointer(t.canvas, 'pointermove', start.x + 80, start.y + 10);
     expect(t.previews()).toBe(1);
-    expect(t.w.moves).toEqual([]);
+    expect(t.w.token('hero')).toMatchObject({ x: 140, y: 140 });
     pointer(t.canvas, 'pointerup', start.x + 80, start.y + 10);
-    expect(t.w.moves).toHaveLength(1);
-    expect(t.w.moves[0]).toMatchObject({ playerId: t.player.playerId, tokenId: 'hero' });
-    expect(t.w.moves[0]!.x).toBeGreaterThan(140);
+    const moved = t.w.token('hero')!;
+    expect(moved.x).toBeGreaterThan(140);
+    expect((moved.x - 35) % 70).toBe(0);
+    expect((moved.y - 35) % 70).toBe(0);
+    expect(t.w.undoSteps()).toBe(steps + 1);
     // The player still shows the drop spot until the scene update arrives.
     expect(t.previews()).toBe(1);
+    await t.w.tick();
+    expect(t.player.session.scene?.tokens.hero).toMatchObject({ x: moved.x, y: moved.y });
+    expect(t.previews()).toBe(0);
+    t.w.undo();
+    expect(t.w.token('hero')).toMatchObject({ x: 140, y: 140 });
     t.view.dispose();
     t.w.finish();
   });
 
-  it('puts a token the GM refuses back at once, with the notice, not after the timeout', async () => {
-    const t = await page('ally');
-    // The GM's handler refuses this drop (a held scene, in the real one): the stand-in answers as it would.
-    t.w.gm.use({
-      onMessage: (player, message) => {
-        if (message.type === 'token-move') t.w.gm.send(player.playerId, { v: 1, type: 'token-move-refused', tokenId: message.tokenId });
-      },
-    });
+  it('puts a token dropped in a held scene back at once, with the notice, not after the timeout', async () => {
+    const t = await page();
     const start = t.heroPoint();
+    t.w.tabs.getState().setActiveTab(t.w.dungeon);
+    expect(t.w.presented.isHeld()).toBe(true);
     pointer(t.canvas, 'pointerdown', start.x, start.y);
     pointer(t.canvas, 'pointermove', start.x + 80, start.y);
-    expect(t.previews()).toBe(1);
     pointer(t.canvas, 'pointerup', start.x + 80, start.y);
-    expect(t.player.received.flatMap((message) => (message.type === 'token-move-refused' ? [message.tokenId] : []))).toEqual(['ally']);
+    expect(t.player.refusals()).toEqual(['hero']);
     expect(t.previews()).toBe(0);
     expect(t.notice.hidden).toBe(false);
     expect(t.notice.textContent).toBe(MOVE_REFUSED_TEXT);
+    expect(t.w.token('hero')).toMatchObject({ x: 140, y: 140 });
+    expect(t.w.undoSteps()).toBe(0);
     t.view.dispose();
     t.w.finish();
   });

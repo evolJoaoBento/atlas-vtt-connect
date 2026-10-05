@@ -4,12 +4,10 @@ import { FakeLasers } from './fakeLasers';
 import { FakeLighting } from './fakeLighting';
 import { FakePresentation } from './fakePresentation';
 import { FakeRules } from './fakeRules';
+import { FakeTokens } from './fakeTokens';
 import { FakeViews, type Own } from './fakeViews';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
-
-/** Namespaces the fake does not simulate yet; the extension carries a throwing stand-in once their capability is on. */
-const NAMESPACES = ['tokens'] as const;
 
 /** Atlas's settings as the fake starts with them; `setSetting` changes them. */
 const DEFAULT_SETTINGS: AtlasSettingsView = {
@@ -25,10 +23,6 @@ const deepFreeze = <T>(value: T): T => {
   return Object.freeze(value);
 };
 
-/** A namespace whose simulation lands with the feature that first uses it (B10 tokens). */
-function notSimulated(name: string): unknown {
-  return new Proxy({}, { get: (_target, member) => { throw new Error(`FakeAtlas does not simulate ${name}.${String(member)} yet.`); } });
-}
 type Trigger = (name: string, ...args: unknown[]) => void;
 
 /** A plugin as `connect` sees it, plus `unload()` to run what it registered (what Obsidian does on unload). */
@@ -86,6 +80,8 @@ export class FakeAtlas implements AtlasApi {
   readonly lasers: FakeLasers;
   /** What each view's player window shows (`lighting.playerVisibility`). */
   readonly lighting: FakeLighting;
+  /** Token moves: each successful move is one GM undo step (`undoSteps`, `undo`). */
+  readonly tokens: FakeTokens;
 
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
     this.version = options.version ?? '1.0.0';
@@ -103,6 +99,7 @@ export class FakeAtlas implements AtlasApi {
     this.dice = new FakeDice(this.rules);
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
+    this.tokens = new FakeTokens(this.views);
   }
 
   has(capability: AtlasCapability): boolean {
@@ -155,13 +152,13 @@ export class FakeAtlas implements AtlasApi {
       return dispose;
     };
     const extension: Record<string, unknown> = { id, on };
-    for (const name of NAMESPACES) if (this.capabilities.has(name)) extension[name] = notSimulated(name);
     if (this.capabilities.has('views')) extension.views = this.views.api(own);
     if (this.capabilities.has('presentation')) extension.presentation = this.presentation.api(own);
     if (this.capabilities.has('rules')) extension.rules = this.rules.api();
     if (this.capabilities.has('dice')) extension.dice = this.dice.api(own);
     if (this.capabilities.has('lasers')) extension.lasers = this.lasers.api(own);
     if (this.capabilities.has('lighting')) extension.lighting = this.lighting.api(own);
+    if (this.capabilities.has('tokens')) extension.tokens = this.tokens.api();
     if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
     if (this.capabilities.has('storage')) extension.storage = storageApi(id);
     return extension as unknown as AtlasExtension;

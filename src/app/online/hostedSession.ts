@@ -1,6 +1,6 @@
 /**
  * One hosted session, from the host transport to its handlers: the body of `OnlineSessionService.start`.
- * The scene broadcaster, the camera sender and the asset server always run. Token control (plan B10),
+ * The scene broadcaster, the camera sender and the asset server always run. Token control (needs Atlas's `tokens`),
  * players' dice and lasers (B7) are optional parts: each starts only when its dep is given, and without
  * it the session runs without that feature (no token assignments, no dice, no lasers relayed).
  */
@@ -51,7 +51,7 @@ export interface HostedPart {
 
 /** Parts later features bring; each is started only when given. */
 export interface OptionalParts {
-  /** Players move the tokens the GM assigns them (plan B10). Without it nobody controls a token. */
+  /** Players move the tokens the GM assigns them, through Atlas's `tokens.move`. Without it nobody controls a token. */
   tokenControl?: (context: HostedContext) => HostedPart & { readonly control: TokenControl };
   /** Players' dice, rolled and logged through Atlas's dice (B7). Without it players cannot roll. */
   dice?: (context: HostedContext) => HostedPart;

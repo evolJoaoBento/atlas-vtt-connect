@@ -138,7 +138,7 @@ export function hostLit(state: ViewState, options: { lighting: boolean; visibili
   const { view, store, tavern } = sceneView(presenting, state, { mapSize: MAP });
   if (options.visibility) atlas.lighting.setVisibility(view, options.visibility);
   const { extension } = presenting;
-  const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: extension.lighting ?? null });
+  const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: extension.lighting ?? null, tokens: null });
   const sent: ControlMessage[] = [];
   const notices: string[] = [];
   const broadcaster = new SceneBroadcaster({

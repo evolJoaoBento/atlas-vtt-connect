@@ -4,8 +4,6 @@ import { RESYNC_MIN_INTERVAL_MS } from '../../../src/app/online/scene/PlayerScen
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { controlWorld, partyTokens } from './controlFixtures';
 
-// With `scene: true` the world runs the scene broadcaster before the lists and drops deleted tokens, as the fork's
-// world did with the token control host (plan B10 brings the host itself, and the moves).
 describe('control lists', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
@@ -23,7 +21,7 @@ describe('control lists', () => {
   });
 
   it('sends the list on admission, again with every resync, and after a reconnect with the same key', async () => {
-    const w = controlWorld({ scene: true });
+    const w = controlWorld();
     w.present();
     const a = await w.join('A');
     expect(a.controlLists()).toEqual([[]]);
@@ -43,7 +41,7 @@ describe('control lists', () => {
   });
 
   it('holds the list back with a snapshot the throttle defers, so it still follows it', async () => {
-    const w = controlWorld({ scene: true });
+    const w = controlWorld();
     w.present();
     const a = await w.join('A');
     w.control.set('hero', a.playerId, true);
@@ -77,7 +75,7 @@ describe('control lists', () => {
   });
 
   it('drops the assignments of a token deleted from the presented scene, and tells its players', async () => {
-    const w = controlWorld({ scene: true });
+    const w = controlWorld();
     const scene = w.scene!;
     w.present();
     const a = await w.join('A');
@@ -96,7 +94,7 @@ describe('control lists', () => {
   });
 
   it('keeps assignments while the scene is held, another map loads or presenting stops', async () => {
-    const w = controlWorld({ scene: true });
+    const w = controlWorld();
     const scene = w.scene!;
     const noTokens = (): void => scene.store.setState((state) => ({ objects: { ...state.objects, tokens: {} } }));
     w.present();

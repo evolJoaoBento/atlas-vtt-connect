@@ -81,6 +81,11 @@ export class FakeViews {
     });
   }
 
+  /** The view's store scene now; undefined for a view that is closed or was never opened. */
+  sceneOf(viewId: ViewId): Readonly<Scene> | undefined {
+    return this.views.get(viewId)?.scene;
+  }
+
   /** The view's store now holds `snapshot` (its `viewId` is ignored); opens the view with one tab for its map when it is new. */
   setSnapshot(viewId: ViewId, snapshot: Omit<SceneSnapshot, 'viewId'> & { viewId?: ViewId }): void {
     if (!this.views.has(viewId)) this.open(viewId, [{ tabId: 't1', mapPath: snapshot.mapPath ?? '', name: 't1' }]);

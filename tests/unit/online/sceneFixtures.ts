@@ -1,9 +1,10 @@
-import type { FogOperation, InitiativeState, SceneSnapshot } from '@atlas-vtt/api-types';
+import type { FogOperation, GridState, InitiativeState, Point, SceneSnapshot } from '@atlas-vtt/api-types';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { projectForPlayers as projectWithMemo, type ProjectionContext, type ProjectionInput } from '../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
 import type { AssetIds } from '../../../src/app/online/scene/sceneContracts';
 import type { PlayerFogOp, PlayerScene, PlayerSceneBody, PlayerToken, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
+import { connectingPlugin, FakeAtlas } from '../../fake/FakeAtlas';
 
 /** An idle tracker, as Atlas starts one (the type only reaches Connect, so the value is built here). */
 export const createDefaultInitiativeState = (): InitiativeState => ({
@@ -26,6 +27,15 @@ export function snapshotOf(partial: Partial<SceneSnapshot> = {}): SceneSnapshot 
     lighting: { enabled: false, ambient: 1 },
     ...partial,
   };
+}
+
+/** Where the GM's own drag lands a token on a map holding `grid`: Atlas's `tokens.snapPoint`, which the fake mirrors (C-tok-2). */
+export function gmSnapPoint(grid: GridState | null): (point: Point, tokenSize: number) => Readonly<Point> {
+  const atlas = new FakeAtlas({ capabilities: ['views', 'tokens'] });
+  const { viewId: _viewId, ...scene } = snapshotOf({ grid });
+  atlas.views.setSnapshot('view-1', scene);
+  const { tokens } = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+  return (point, tokenSize) => tokens.snapPoint('view-1', point, tokenSize);
 }
 
 /** `projectForPlayers` with a memo of its own for each call. */

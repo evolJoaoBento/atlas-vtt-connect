@@ -6,10 +6,10 @@ import { connectingPlugin, FakeAtlas } from '../../fake/FakeAtlas';
 
 const MAP = 'maps/a.atlasmap';
 
-function deps(capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers']) {
+function deps(capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers', 'tokens']) {
   const atlas = new FakeAtlas({ capabilities });
   const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
-  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null, lighting: extension.lighting ?? null }) };
+  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null, lighting: extension.lighting ?? null, tokens: extension.tokens ?? null }) };
 }
 
 describe('sessionDeps', () => {
@@ -53,6 +53,11 @@ describe('sessionDeps', () => {
     const older = deps(['views', 'presentation', 'rules', 'settings', 'storage']).deps;
     expect(older).not.toHaveProperty('dice');
     expect(older).not.toHaveProperty('laser');
+  });
+
+  it("lets players move tokens through Atlas's tokens when it has them; without, no control host and no control list", () => {
+    expect(deps().deps).toHaveProperty('tokenControl');
+    expect(deps(['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers']).deps).not.toHaveProperty('tokenControl');
   });
 
   it("reads players' darkness from Atlas's lighting when it has it; without, the broadcaster's closed stub applies", () => {

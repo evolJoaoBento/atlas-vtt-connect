@@ -101,7 +101,7 @@ export interface Presenter extends PresentedSceneSource {
   clear(): void;
 }
 
-export function presenter(atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers'] })): Presenter {
+export function presenter(atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers', 'tokens'] })): Presenter {
   const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
   const source = presentedSource(extension);
   return {
@@ -130,6 +130,11 @@ export function sceneView<S extends ViewState>(
   const mirror = (next: S): void => atlas.views.setSnapshot(view, snapshotOfState(next, mapSize, TAVERN_MAP));
   mirror(state);
   store.subscribe(mirror);
+  // Atlas writes into the view too (tokens.move): the store follows, so the test's next change builds on the move.
+  presenting.extension.views.subscribe(view, (snapshot) => {
+    const current = store.getState();
+    if (snapshot.objects.tokens !== current.objects.tokens) store.setState({ objects: { ...current.objects, tokens: snapshot.objects.tokens } } as Partial<S>);
+  });
   let added = 0;
   const tabs: FakeTabs = {
     getState: () => ({

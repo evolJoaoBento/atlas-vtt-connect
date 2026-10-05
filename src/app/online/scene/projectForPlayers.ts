@@ -153,7 +153,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
 }
 
 /**
- * The grid a player's drop lands on (`snapDroppedToken`): the GM's grid, also hidden or switched off, as
+ * The grid a player's drop lands on (`tokens.snapPoint`): the GM's grid, also hidden or switched off, as
  * its geometry alone; null where the GM snaps nothing (no grid state, or no usable cell size).
  */
 function projectSnapGrid(grid: GridState | null): PlayerSnapGrid | null {

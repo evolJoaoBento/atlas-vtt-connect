@@ -1,8 +1,14 @@
-/** Players' dice and lasers as hosted parts, over Atlas's `dice` and `lasers` (each exists only on an Atlas that has the capability). */
-import type { DiceApi, LasersApi, SettingsApi } from '@atlas-vtt/api-types';
+/** Players' tokens, dice and lasers as hosted parts, over Atlas's `tokens`, `dice` and `lasers` (each exists only on an Atlas that has the capability). */
+import type { DiceApi, LasersApi, SettingsApi, TokensApi } from '@atlas-vtt/api-types';
 import type { OptionalParts } from '../hostedSession';
+import { TokenControlHost } from '../control/TokenControlHost';
 import { DiceHost } from '../tools/DiceHost';
 import { LaserRelay } from '../tools/LaserRelay';
+
+/** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
+export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
+  return ({ session, presented, projection }) => new TokenControlHost({ session, presented, projection, tokens });
+}
 
 /** Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log. */
 export function diceHostPart(dice: DiceApi): NonNullable<OptionalParts['dice']> {

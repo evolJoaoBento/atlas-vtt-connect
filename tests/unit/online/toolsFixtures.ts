@@ -3,13 +3,12 @@
  * side: the dice host and the laser relay, built as the session service builds them, over a fake Atlas
  * whose dice roll the middle of every die and whose view shows the lasers it is given.
  */
-import type { DiceRollResult, FogOperation, ViewId } from '@atlas-vtt/api-types';
+import type { DiceRollResult, ViewId } from '@atlas-vtt/api-types';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { diceHostPart, laserRelayPart } from '../../../src/app/online/atlas/toolParts';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import type { HostedContext } from '../../../src/app/online/hostedSession';
-import { controlWorld, partyState, type ControlPlayer } from './controlFixtures';
-import type { ViewState } from './presentedFixtures';
+import { controlWorld, type ControlPlayer } from './controlFixtures';
 
 /** Rolls the middle of every die: a d4 rolls 3, a d6 4, a d8 5, a d20 11. */
 export const MIDDLE_ROLL = (): number => 0.5;
@@ -17,18 +16,8 @@ export const MIDDLE_ROLL = (): number => 0.5;
 type Laser = Extract<ControlMessage, { type: 'laser' }>;
 type DiceLog = Extract<ControlMessage, { type: 'dice-log' }>;
 
-/** The party in the open and under one fog rectangle: goblin sits at (1050, 1050), the fog from (900, 900) to (1300, 1300). */
-export function toolsState(): ViewState {
-  const state = partyState();
-  const fog = {
-    f1: { id: 'f1', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 900, y: 900, width: 400, height: 400 },
-  } as unknown as Record<string, FogOperation>;
-  const goblin = { id: 'goblin', kind: 'character', x: 1050, y: 1050, imagePath: 'art/goblin.png', name: 'Goblin' } as ViewState['objects']['tokens'][string];
-  return { ...state, objects: { ...state.objects, fog, tokens: { ...state.objects.tokens, goblin } } };
-}
-
 export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
-  const world = controlWorld({ scene: { state: toolsState(), rules: { showTokenNameplates: true, ...options.rules } } });
+  const world = controlWorld({ scene: { rules: { showTokenNameplates: true, ...options.rules } } });
   const scene = world.scene!;
   const { atlas, extension } = scene.presented;
   atlas.dice.setRandom(MIDDLE_ROLL);

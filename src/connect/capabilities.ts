@@ -10,6 +10,7 @@ export interface NeedMap {
   dice: AtlasExtension['dice'];
   lasers: AtlasExtension['lasers'];
   lighting: AtlasExtension['lighting'];
+  tokens: AtlasExtension['tokens'];
 }
 
 /** The namespace for `capability` when this Atlas has it; null on an older Atlas. */

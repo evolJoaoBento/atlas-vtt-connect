@@ -4,15 +4,18 @@ import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
-import { fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
+import { toolGridOf } from '../../../src/app/online/view/tools/toolGrid';
+import { fakeAssetIds, gmSnapPoint, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 /**
  * A grid players do not see (hidden, switched off, or kept from them by the player view rules) still
  * decides where the GM's check puts a dropped token (`tokens.snapPoint`). The projection must send that
  * grid's geometry in the measurement so the page's drag ruler and the Online scene's drag land on the same
- * point. This file pins what the projection sends; that the GM, the page ruler and the Online scene then
- * land on one point is checked where they exist (the token snapping, the join page and the player tab).
+ * point. This file pins what the projection sends, and that the GM's check and the page's drag ruler then
+ * land on one point; the Online scene's own drag is checked with the player tab (B15).
  */
+const POINTS = [{ x: 300, y: 150 }, { x: 517.3, y: 402.9 }, { x: 33, y: 760 }];
+const SIZES = [1, 1.5, 2.5] as const;
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 
 function project(grid: GridState | null, rules: PlayerViewRules = ALL_ON): PlayerScene {
@@ -38,10 +41,23 @@ describe('snapping on a grid players do not see', () => {
     const { fog: _fog, drawings: _drawings, ...body } = scene;
     expect(isPlayerSceneBody(body)).toBe(true);
     expect(scene.measurement.snapGrid).toEqual({ type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY });
+    // The GM's check and the page's ruler land on one point, though players see no grid.
+    const gm = gmSnapPoint(grid);
+    for (const size of SIZES) {
+      for (const point of POINTS) {
+        const landed = gm(point, size);
+        const ruler = toolGridOf(scene).snapDrag(point, size);
+        expect(ruler.x).toBeCloseTo(landed.x, 6);
+        expect(ruler.y).toBeCloseTo(landed.y, 6);
+      }
+    }
   });
 
   it('snaps nowhere on a map without a grid, as the GM does not', () => {
     const scene = project(null);
     expect(scene.measurement.snapGrid).toBeNull();
+    const point = { x: 301.5, y: 149.25 };
+    expect(gmSnapPoint(null)(point, 1.5)).toEqual(point);
+    expect(toolGridOf(scene).snapDrag(point, 1.5)).toEqual(point);
   });
 });
