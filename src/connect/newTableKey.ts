@@ -6,7 +6,8 @@
 import type { Plugin } from 'obsidian';
 import { Notice } from 'obsidian';
 import { webIdentityCrypto, type IdentityCrypto } from '../app/online/sharing/identity/identityCrypto';
-import { makeTableIdentity, type TableSettings } from '../app/online/sharing/identity/tableKey';
+import { newTableIdentity, storedTable } from '../app/online/sharing/identity/tableKey';
+import type { ConnectSettingsStore } from './settingsStore';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { confirmAction, type ConfirmDialogOptions } from '../app/ui/confirmDialog';
 
@@ -22,11 +23,14 @@ export const NEW_TABLE_KEY_CONFIRM: ConfirmDialogOptions = {
 };
 export const STOP_HOSTING_FIRST = 'Stop the online session first, then make a new table key.';
 export const NEW_TABLE_KEY_DONE = 'Made a new table key. Approve your players again when they next join.';
+export const NEW_TABLE_KEY_NOT_KEPT = "Couldn't save a new table key on this device, so your table keeps its old key.";
 /** Shown once after a table key moved out of the settings file or came over from the online play preview. */
 export const KEY_MOVED_NOTICE = 'Atlas VTT Connect now keeps your table key on this device only. If a copy of your vault, its sync history or a backup reached someone else, choose New table key in the settings.';
 
+type KeySettings = Pick<ConnectSettingsStore, 'replaceTable'>;
+
 export interface NewTableKeyDeps {
-  settings: TableSettings;
+  settings: KeySettings;
   crypto?: IdentityCrypto;
   /** Whether a session is hosted or starting (`onlineSessionStore`). */
   isHosting?: () => boolean;
@@ -36,8 +40,11 @@ export interface NewTableKeyDeps {
 
 const hosting = (): boolean => ['hosting', 'starting'].includes(onlineSessionStore.getState().status);
 
-/** `hosting`: refused while a session runs; `cancelled`: the GM said no; `made`: the new key is stored. */
-export async function newTableKey(deps: NewTableKeyDeps): Promise<'made' | 'cancelled' | 'hosting'> {
+/**
+ * `hosting`: refused while a session runs; `cancelled`: the GM said no; `made`: the new key is stored; `not-kept`:
+ * local storage refused the new key, so the old one stays.
+ */
+export async function newTableKey(deps: NewTableKeyDeps): Promise<'made' | 'cancelled' | 'hosting' | 'not-kept'> {
   const isHosting = deps.isHosting ?? hosting;
   const notify = deps.notify ?? ((message: string): void => { new Notice(message); });
   if (isHosting()) {
@@ -50,12 +57,16 @@ export async function newTableKey(deps: NewTableKeyDeps): Promise<'made' | 'canc
     notify(STOP_HOSTING_FIRST);
     return 'hosting';
   }
-  await makeTableIdentity(deps.settings, deps.crypto ?? webIdentityCrypto);
+  const table = await newTableIdentity(deps.crypto ?? webIdentityCrypto);
+  if (!deps.settings.replaceTable(storedTable(table))) {
+    notify(NEW_TABLE_KEY_NOT_KEPT);
+    return 'not-kept';
+  }
   notify(NEW_TABLE_KEY_DONE);
   return 'made';
 }
 
 /** The command; there whether or not Atlas is bound, since the key is Connect's own. */
-export function registerNewTableKey(plugin: Pick<Plugin, 'addCommand'>, settings: TableSettings): void {
+export function registerNewTableKey(plugin: Pick<Plugin, 'addCommand'>, settings: KeySettings): void {
   plugin.addCommand({ id: 'new-table-key', name: `${NEW_TABLE_KEY_LABEL}…`, callback: () => { void newTableKey({ settings }); } });
 }

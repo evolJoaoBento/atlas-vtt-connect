@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { migrateForkSettings } from '../../../src/connect/migrateForkSettings';
-import { ConnectSettingsStore, TABLE_KEY_STORAGE } from '../../../src/connect/settingsStore';
+import { ConnectSettingsStore, TABLE_KEY_NOT_KEPT_NOTICE, TABLE_KEY_STORAGE } from '../../../src/connect/settingsStore';
 import { FORK_TABLE_KEY_STORAGE } from '../../../src/connect/migrateLocalStores';
 import { ensureTableIdentity } from '../../../src/app/online/sharing/identity/tableKey';
 import { memoryKeyValueStore, type KeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
@@ -14,8 +14,8 @@ const OTHER = { id: 'b'.repeat(43), publicKey: 'other-key', privateKey: { kty: '
 /** What the last save put in data.json's `online`. */
 const savedOnline = (plugin: { saved: unknown[] }): Record<string, unknown> => (plugin.saved.at(-1) as { online: Record<string, unknown> }).online;
 
-/** A local storage that drops every write, as one that is full or blocked. */
-const refusingStore = (): KeyValueStore => ({ get: () => null, set: () => {} });
+/** A local storage that drops every write, as one that is full or blocked; it reads what it held before. */
+const refusingStore = (held: Record<string, unknown> = {}): KeyValueStore => ({ get: (key) => held[key] ?? null, set: () => {} });
 
 describe('the table key lives in local storage on this device, never in data.json', () => {
   it('moves a key found in data.json to local storage and strips it from the file', async () => {
@@ -168,3 +168,42 @@ describe("the online play preview's table key on this device", () => {
     expect(local.get(TABLE_KEY_STORAGE)).toEqual(OTHER);
   });
 });
+
+describe('a table key local storage refuses, which was never in data.json', () => {
+  it("keeps the preview's key in memory only, says so once, and never writes it to the file", async () => {
+    const plugin = fakeDataPlugin(null);
+    const notices: string[] = [];
+    const store = await ConnectSettingsStore.load(plugin, refusingStore({ [FORK_TABLE_KEY_STORAGE]: OTHER }), (message) => { notices.push(message); });
+    expect(store.get().table).toEqual(OTHER);
+    expect(store.takeKeyMoved()).toBe(false);
+    store.set({ playerName: 'GM' });
+    await store.flush();
+    store.set({ playerName: 'Rin' });
+    await store.flush();
+    expect(plugin.saved.length).toBeGreaterThan(0);
+    expect(JSON.stringify(plugin.saved)).not.toContain(OTHER.privateKey.d);
+    expect(notices).toEqual([TABLE_KEY_NOT_KEPT_NOTICE]);
+  });
+
+  it('keeps a key made at the first hosting in memory only, once noticed, never in the file', async () => {
+    const plugin = fakeDataPlugin(null);
+    const notices: string[] = [];
+    const store = await ConnectSettingsStore.load(plugin, refusingStore(), (message) => { notices.push(message); });
+    const table = await ensureTableIdentity(store, nodeIdentityCrypto);
+    expect(store.get().table?.id).toBe(table.id);
+    await store.flush();
+    expect(JSON.stringify(plugin.saved)).not.toContain(String(table.keys.privateKey.d));
+    expect(notices).toEqual([TABLE_KEY_NOT_KEPT_NOTICE]);
+  });
+
+  it('still lets the key data.json already held stay there, without that notice', async () => {
+    const plugin = fakeDataPlugin({ online: { table: TABLE } });
+    const notices: string[] = [];
+    const store = await ConnectSettingsStore.load(plugin, refusingStore(), (message) => { notices.push(message); });
+    store.set({ playerName: 'GM' });
+    await store.flush();
+    expect(savedOnline(plugin).table).toEqual(TABLE);
+    expect(notices).toEqual([]);
+  });
+});
+

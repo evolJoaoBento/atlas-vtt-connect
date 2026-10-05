@@ -22,7 +22,7 @@ export default class AtlasVttConnectPlugin extends Plugin {
   private canShare: boolean | null = null;
 
   async onload(): Promise<void> {
-    this.settings = await ConnectSettingsStore.load(this, obsidianLocalStore(this.app));
+    this.settings = await ConnectSettingsStore.load(this, obsidianLocalStore(this.app), (message) => { new Notice(message); });
     if (this.settings.takeKeyMoved()) new Notice(KEY_MOVED_NOTICE);
     registerNewTableKey(this, this.settings);
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.

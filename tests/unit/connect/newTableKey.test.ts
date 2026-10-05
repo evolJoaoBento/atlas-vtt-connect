@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { NEW_TABLE_KEY_CONFIRM, NEW_TABLE_KEY_DONE, newTableKey, STOP_HOSTING_FIRST } from '../../../src/connect/newTableKey';
+import { NEW_TABLE_KEY_CONFIRM, NEW_TABLE_KEY_DONE, NEW_TABLE_KEY_NOT_KEPT, newTableKey, STOP_HOSTING_FIRST } from '../../../src/connect/newTableKey';
 import { ConnectSettingsStore, TABLE_KEY_STORAGE } from '../../../src/connect/settingsStore';
 import { memoryKeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
 import { nodeIdentityCrypto } from '../online/sharing/sharingFixtures';
@@ -52,4 +52,18 @@ describe('New table key', () => {
     expect(await started.run()).toBe('hosting');
     expect(started.store.get().table).toEqual(TABLE);
   });
+
+  it('keeps the old key, and says so, when local storage refuses the new one', async () => {
+    const plugin = fakeDataPlugin(null);
+    const held = { [TABLE_KEY_STORAGE]: TABLE };
+    const store = await ConnectSettingsStore.load(plugin, { get: (key) => held[key as keyof typeof held] ?? null, set: () => {} });
+    const notices: string[] = [];
+    const result = await newTableKey({ settings: store, crypto: nodeIdentityCrypto, isHosting: () => false, confirm: async () => true, notify: (message) => { notices.push(message); } });
+    expect(result).toBe('not-kept');
+    expect(store.get().table).toEqual(TABLE);
+    expect(notices).toEqual([NEW_TABLE_KEY_NOT_KEPT]);
+    await store.flush();
+    expect(JSON.stringify(plugin.saved)).not.toContain('"d"');
+  });
 });
+
