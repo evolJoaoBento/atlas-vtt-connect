@@ -1,7 +1,7 @@
 /** Receiving: the Shared with me command and buttons, push prompts, and pulled files that follow renames. */
 import { Notice, type App } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
-import { chooseAction, confirmAction } from '../../ui/confirmDialog';
+import { chooseAction, confirmAction, type ChoiceDialogOptions } from '../../ui/confirmDialog';
 import { peopleListNames } from './model/forwardedParts';
 import { undoLastMerge, type MergeHistory, type UndoOutcome } from './merge/MergeHistory';
 import { createUpdatePolicy } from './merge/noteUpdate';
@@ -23,12 +23,17 @@ const UNDO_NOTICE: Record<UndoOutcome, string> = {
   nothing: 'There is no merge to undo for this note.',
 };
 
-const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction({
+/**
+ * The question for a received map changed here and shared again. Atlas cannot replace a scene yet (`installUpdate` in
+ * mapPull.ts), so both answers add a scene and neither destroys anything: no warning style.
+ */
+export const mapUpdateDialog = (title: string): ChoiceDialogOptions<'both' | 'theirs'> => ({
   title: `${title} changed here and was shared again`,
-  // Atlas cannot replace a scene yet (`installUpdate` in mapPull.ts): both answers add the new version as a scene.
-  message: ['Keep both adds the new version as a second scene, and later pulls keep updating yours. Take theirs adds it as a new scene that later pulls update, and your copy stays.'],
-  choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const, style: 'warning' }],
+  message: ['Both answers add the new version as a new scene; your copy stays as it is. Take theirs makes later pulls follow the new scene; Keep both keeps them on yours.'],
+  choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const }],
 });
+
+const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction(mapUpdateDialog(title));
 
 const sessionName = (personId: string): string | null =>
   shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
@@ -62,7 +67,7 @@ function sharedWithMeFor(app: App, services: ReceivingServices): () => SharedWit
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => sessionName(personId) ?? 'Someone',
           nameAt: peopleListNames(people, session.tableId),
-          scenes, confirmMapUpdate,
+          scenes, confirmMapUpdate, notify: (text) => new Notice(text),
         }),
       };
     }

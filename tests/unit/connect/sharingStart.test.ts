@@ -141,6 +141,25 @@ describe('sharing, through startConnect', () => {
     expect((again.scenes.record(sceneId)!.data.extensions!['atlas-vtt-connect'] as { notes: string[] }).notes).toEqual(['Notes/Cave.md']);
   });
 
+  it('a cold binding: pulled files renamed or deleted before Atlas binds follow, though the record of what was pulled is read only then', async () => {
+    let open = (): void => undefined;
+    const gate = new Promise<void>((resolve) => { open = resolve; });
+    const { connect, vaultEvents } = connected(SHARING, gate);
+    const record = (item: string, path: string) => ({ key: `${'T'.repeat(43)}/gm/${item}`, tableId: 'T'.repeat(43), from: 'gm', item, kind: 'note', path, version: 'v', baseKey: `base${item.slice(0, 4)}`, pulledAt: 1 });
+    await connect.plugin.app.vault.adapter.write(PATHS.pulled, JSON.stringify({ version: 1, records: [record('p'.repeat(22), 'Shared/GM/Cave.md'), record('q'.repeat(22), 'Shared/GM/Gone.md')] }));
+    vaultEvents.fire('rename', { path: 'Notes/Cave.md' }, 'Shared/GM/Cave.md');
+    vaultEvents.fire('delete', { path: 'Shared/GM/Gone.md' });
+    open();
+    await vi.advanceTimersByTimeAsync(0);
+    const pulled = PulledItems.forApp(connect.plugin.app, PATHS);
+    await pulled.ready();
+    expect(pulled.byPath('Notes/Cave.md')?.item).toBe('p'.repeat(22));
+    expect(pulled.byPath('Shared/GM/Cave.md')).toBeNull();
+    expect(pulled.get('T'.repeat(43), 'gm', 'q'.repeat(22))?.path).toBe('');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await connect.plugin.app.vault.adapter.read(PATHS.pulled)).toContain('Notes/Cave.md');
+  });
+
   it('takes off what it registered when registering fails partway, so the next binding does not add it twice', () => {
     const connect = hostPlugin(connected([]).connect.plugin.app);
     const atlas = new FakeAtlas({ capabilities: ['scenes', 'rules', 'settings'] });

@@ -8,7 +8,7 @@
  * Atlas cannot replace a scene's map yet, so the newer version always arrives as a new scene (`installUpdate`):
  * with Take theirs later pulls follow the new one, with Keep both they keep following the first.
  */
-import type { App } from 'obsidian';
+import type { App, TFile } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
 import { ASSET_MIMES, extensionForMime } from '../../assets/assetIds';
 import type { MapPayload } from '../model/mapPayload';
@@ -35,6 +35,8 @@ export interface MapPullDeps {
   notes: ReadonlyMap<string, string>;
   /** The received map changed here since the last pull. */
   confirmUpdate(title: string): Promise<'both' | 'theirs' | null>;
+  /** Tells the receiver something the outcome does not say (where an unasked newer version went). */
+  notify?(text: string): void;
   now?: () => number;
 }
 
@@ -90,16 +92,30 @@ async function pullImages(deps: MapPullDeps, folder: string, fingerprints: reado
   return upload;
 }
 
-/** The newer version as a new scene: `follow` moves the record onto it (Take theirs), else it stays on the first (Keep both). */
-async function installUpdate(deps: MapPullDeps, add: () => Promise<{ mapPath: string; text: string; sceneId: string }>, known: PulledRecord, follow: boolean, version: string): Promise<PullOutcome> {
+type Added = { mapPath: string; sceneId: string; text: string | null };
+
+/** The text Atlas wrote is the base, so "changed here" compares with what Atlas saved; none when it cannot be read back. */
+async function writeBaseOf(pulled: PulledItems, record: PulledRecord, added: Added): Promise<void> {
+  if (added.text !== null) await pulled.writeBase(record, added.text);
+}
+
+/**
+ * The newer version as a new scene: `follow` moves the record onto it (Take theirs), else it stays on the first (Keep both).
+ * Unasked (the map is not changed here), the receiver is told where it went, since Atlas cannot replace the old scene yet.
+ */
+async function installUpdate(deps: MapPullDeps, add: () => Promise<Added>, known: PulledRecord, follow: boolean, input: MapPullInput, asked: boolean): Promise<PullOutcome> {
   const added = await add();
+  if (!asked) deps.notify?.(`The new version of ${input.item.title} is a new scene, ${added.mapPath}: Atlas VTT cannot replace a scene yet.`);
   if (!follow) return { kind: 'both', path: added.mapPath };
-  const record = deps.pulled.update(known.key, { path: added.mapPath, sceneId: added.sceneId, version, pulledAt: (deps.now ?? Date.now)() }) ?? known;
-  await deps.pulled.writeBase(record, added.text);
+  const record = deps.pulled.update(known.key, { path: added.mapPath, sceneId: added.sceneId, version: input.item.version, pulledAt: (deps.now ?? Date.now)() }) ?? known;
+  await writeBaseOf(deps.pulled, record, added);
   return { kind: 'updated', path: added.mapPath };
 }
 
-/** Connect's own pulls one at a time: which images are already saved is decided right before Atlas writes the others. */
+/**
+ * Connect's own pulls one at a time: which images are already saved is decided right before Atlas writes the others.
+ * The queue is module-wide, so a Keep both / Take theirs dialog left open holds every other map pull until it closes.
+ */
 let writing: Promise<unknown> = Promise.resolve();
 
 function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
@@ -112,34 +128,41 @@ export function pullMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOut
   return oneAtATime(() => writeMap(deps, input));
 }
 
+/** For a map pulled before whose file is still there: unchanged, cancelled, or whether later pulls follow the new scene. */
+async function updateChoice(deps: MapPullDeps, known: PulledRecord, file: TFile, input: MapPullInput): Promise<'unchanged' | 'cancelled' | { follow: boolean; asked: boolean }> {
+  const base = await deps.pulled.readBase(known);
+  const changedHere = base !== null && (await deps.app.vault.read(file)) !== base;
+  // The version already pulled, still as Atlas saved it: nothing to add.
+  if (base !== null && !changedHere && known.version === input.item.version) return 'unchanged';
+  if (!changedHere) return { follow: true, asked: false };
+  const choice = await deps.confirmUpdate(input.item.title);
+  return choice === null ? 'cancelled' : { follow: choice === 'theirs', asked: true };
+}
+
 async function writeMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOutcome> {
   const { app, scenes, pulled } = deps;
   await pulled.ready();
+  const known = pulled.get(input.tableId, input.from, input.item.item);
+  const knownFile = known ? fileAt(app, known.path) : null;
+  const update = known && knownFile ? await updateChoice(deps, known, knownFile, input) : null;
+  if (update === 'unchanged') return { kind: 'unchanged', path: known!.path };
+  if (update === 'cancelled') return { kind: 'cancelled' };
   const collection = await sharedCollectionId(scenes);
   const folder = `${COLLECTIONS_DIR}/${collection}/scenes/${safeFileName(input.personName, 'Someone')}`;
   const upload = await pullImages(deps, folder, input.payload.images);
   const map = receivedMapInput(input.payload, { images: upload.names, notes: linkedNotes(deps, input), isFile: (path) => path.length < 1024 && fileAt(app, path) !== null });
-  const add = async (): Promise<{ mapPath: string; text: string; sceneId: string }> => {
+  const add = async (): Promise<Added> => {
     // Atlas checks that the folder lies inside the collection's and every image inside the folder, and names the file itself.
     const added = await scenes.addToCollection({ collection: { name: SHARED_COLLECTION }, name: safeFileName(input.payload.name), folder, map, images: upload.images });
     const file = fileAt(app, added.mapPath);
-    // The base is the text Atlas wrote, so "changed here" compares with what Atlas saved.
-    return { ...added, text: file ? await app.vault.read(file) : '' };
+    return { ...added, text: file ? await app.vault.read(file) : null };
   };
-  const known = pulled.get(input.tableId, input.from, input.item.item);
-  const knownFile = known ? fileAt(app, known.path) : null;
-  if (known && knownFile) {
-    const base = await pulled.readBase(known);
-    const changedHere = base !== null && (await app.vault.read(knownFile)) !== base;
-    const choice = changedHere ? await deps.confirmUpdate(input.item.title) : 'theirs';
-    if (choice === null) return { kind: 'cancelled' };
-    return installUpdate(deps, add, known, choice === 'theirs', input.item.version);
-  }
+  if (known && update) return installUpdate(deps, add, known, update.follow, input, update.asked);
   const added = await add();
   const record = pulled.put({
     tableId: input.tableId, from: input.from, item: input.item.item, kind: 'map', path: added.mapPath, version: input.item.version,
     pulledAt: (deps.now ?? Date.now)(), sceneId: added.sceneId, ...(known ? { baseKey: known.baseKey } : {}),
   });
-  await pulled.writeBase(record, added.text);
+  await writeBaseOf(pulled, record, added);
   return { kind: 'created', path: added.mapPath };
 }

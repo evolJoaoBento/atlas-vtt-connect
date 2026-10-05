@@ -66,6 +66,26 @@ function parseRecord(value: unknown): PulledRecord | null {
   };
 }
 
+type PathChange = { rename: [from: string, to: string] } | { removed: string };
+
+/** The records after a vault change; the same array when no record is inside it. */
+function withChange(records: PulledRecord[], change: PathChange): PulledRecord[] {
+  let changed = false;
+  const next = records.map((record) => {
+    if ('rename' in change) {
+      const [from, to] = change.rename;
+      if (!pathWithin(record.path, from)) return record;
+      changed = true;
+      return { ...record, path: to + record.path.slice(from.length) };
+    }
+    // A deleted file's record keeps its base but owns no file, so no later file is taken for theirs.
+    if (record.path === '' || !pathWithin(record.path, change.removed)) return record;
+    changed = true;
+    return { ...record, path: '' };
+  });
+  return changed ? next : records;
+}
+
 function parsePulled(value: unknown): PulledData {
   const records = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).records : null;
   return { version: 1, records: Array.isArray(records) ? records.flatMap((entry) => parseRecord(entry) ?? []) : [] };
@@ -101,6 +121,8 @@ export class PulledItems {
   private loading: Promise<void> | null = null;
   private loaded = false;
   private unsaved = false;
+  /** Renames and deletions seen before the stored file was read, replayed on its records as it arrives (as `ShareItems` does). */
+  private unread: PathChange[] = [];
   private readonly listeners = new Set<() => void>();
 
   constructor(private readonly adapter: DataAdapterLike, private readonly file: JsonDataFile<PulledData>, private readonly basesDir: string) {}
@@ -108,9 +130,14 @@ export class PulledItems {
   ready(): Promise<void> {
     this.loading ??= this.file.load().then((data) => {
       const known = new Set(this.records.map((record) => record.key));
-      this.records = [...data.records.filter((record) => !known.has(record.key)), ...this.records];
+      let stored = data.records.filter((record) => !known.has(record.key));
+      for (const change of this.unread) stored = withChange(stored, change);
+      const replayed = this.unread.length > 0;
+      this.unread = [];
+      this.records = [...stored, ...this.records];
       this.loaded = true;
-      if (this.unsaved) void this.file.save({ version: 1, records: this.records });
+      if (this.unsaved || replayed) void this.file.save({ version: 1, records: this.records });
+      if (replayed) this.listeners.forEach((listener) => listener());
     });
     return this.loading;
   }
@@ -172,29 +199,25 @@ export class PulledItems {
 
   /** The pulled files at or below `from` now live at `to`. */
   renamed(from: string, to: string): void {
-    let changed = false;
-    this.records = this.records.map((record) => {
-      if (!pathWithin(record.path, from)) return record;
-      changed = true;
-      return { ...record, path: to + record.path.slice(from.length) };
-    });
-    if (changed) this.changed();
+    this.pathChange({ rename: [from, to] });
   }
 
   /** The files at or below `path` were deleted: their records keep their bases but own no file, so no later file is taken for theirs. */
   deleted(path: string): void {
-    let changed = false;
-    this.records = this.records.map((record) => {
-      if (record.path === '' || !pathWithin(record.path, path)) return record;
-      changed = true;
-      return { ...record, path: '' };
-    });
-    if (changed) this.changed();
+    this.pathChange({ removed: path });
   }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };
+  }
+
+  private pathChange(change: PathChange): void {
+    if (!this.loaded) this.unread.push(change);
+    const next = withChange(this.records, change);
+    if (next === this.records) return;
+    this.records = next;
+    this.changed();
   }
 
   /** Saves only once the stored file was read, so a save never replaces records not yet loaded. */

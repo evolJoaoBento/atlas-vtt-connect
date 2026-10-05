@@ -5,9 +5,18 @@
  */
 import type { AnyWidget, CounterWidget, InitiativeEntry, InitiativeState, TimerWidget, TokenEntity, WidgetSettings } from '@atlas-vtt/api-types';
 import { createDefaultInitiativeState, DEFAULT_INITIATIVE_CONFIG } from '../../types/initiativeDefaults';
-import { resolveWidgetIcon } from '../../types/widgetIcons';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerWidget } from '../scene/sceneTypes';
+
+type WidgetIconName = AnyWidget['icon'];
+
+/** The icon names older Atlas versions stored, as Atlas's `resolveWidgetIcon` maps them; Atlas resolves every other name as it draws. */
+const LEGACY_WIDGET_ICONS: Readonly<Record<string, WidgetIconName>> = { timer: 'hourglass', book: 'spellbook', hand: 'strength' };
+
+/** A received icon name as Atlas stores it: legacy names mapped, every other name passed through (unknown ones draw as Atlas's default). */
+export function widgetIconName(icon: string): WidgetIconName {
+  return Object.hasOwn(LEGACY_WIDGET_ICONS, icon) ? LEGACY_WIDGET_ICONS[icon]! : (icon as WidgetIconName);
+}
 
 export interface AtlasWidgets {
   widgetSettings: WidgetSettings;
@@ -28,7 +37,7 @@ export function atlasWidgets(widgets: readonly PlayerWidget[]): AtlasWidgets {
   const values: Record<string, number> = {};
   widgets.forEach((widget, order) => {
     const common = {
-      id: widget.id, label: widget.label, icon: resolveWidgetIcon(widget.icon), visible: true, visibleToPlayers: true,
+      id: widget.id, label: widget.label, icon: widgetIconName(widget.icon), visible: true, visibleToPlayers: true,
       value: widget.value, order, scope: 'scene' as const,
     };
     if (widget.type === 'timer') {

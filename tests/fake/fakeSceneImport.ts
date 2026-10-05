@@ -1,3 +1,4 @@
+import { normalizePath } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
 import { mapStrings } from '../../src/app/utils/mapStrings';
 import { savedMapText } from './fakeSavedMap';
@@ -61,6 +62,11 @@ function resolveCollection(target: ImportTarget, ref: AddInput['collection']): {
   const match = [...target.collections].find(([id, name]) => id.toLowerCase() === key || name.toLowerCase() === key);
   if (match) return { id: match[0], created: false };
   const id = ref.name.trim();
+  // As Atlas's `assertCollectionFolderName`: a folder of that name (ignoring case) that no collection indexes is in the way.
+  const folderKey = id.toLocaleLowerCase();
+  const taken = [...target.folders, ...target.files.keys()].some((path) => path.startsWith(`${COLLECTIONS_DIR}/`)
+    && !path.slice(COLLECTIONS_DIR.length + 1).includes('/') && path.slice(COLLECTIONS_DIR.length + 1).trim().toLocaleLowerCase() === folderKey);
+  if (taken) throw new Error(`A folder named "${id}" already exists in the collections folder`);
   target.collections.set(id, id);
   return { id, created: true };
 }
@@ -90,14 +96,14 @@ export function importScene(target: ImportTarget, input: AddInput): { sceneId: s
   let createdFolder: string | null = null;
   let mapPath = '';
   try {
-    const folder = typeof input.folder === 'string' ? input.folder : '';
+    const folder = typeof input.folder === 'string' ? normalizePath(input.folder) : '';
     if (!isPlainRelative(folder) || !`${folder}/x`.startsWith(`${COLLECTIONS_DIR}/${collection.id}/`)) {
       throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${COLLECTIONS_DIR}/${collection.id}.`);
     }
     const targets = new Map<string, ArrayBuffer>();
     for (const image of input.images) {
       const path: unknown = image?.path;
-      if (!isPlainRelative(path)) throw new Error(`[Atlas API] The image path "${String(path)}" must stay inside the folder.`);
+      if (!isPlainRelative(path) || !normalizePath(`${folder}/${path}`).startsWith(`${normalizePath(folder)}/`)) throw new Error(`[Atlas API] The image path "${String(path)}" must stay inside the folder.`);
       const at = `${folder}/${path}`;
       if (targets.has(at) || exists(target, at)) throw new Error(`[Atlas API] There is already a file at ${at}.`);
       targets.set(at, image.data);

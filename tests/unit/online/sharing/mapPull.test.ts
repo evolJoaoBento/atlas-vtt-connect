@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
 import { pullMap, SHARED_COLLECTION, type MapPullDeps } from '../../../../src/app/online/sharing/receive/mapPull';
 import { PulledItems } from '../../../../src/app/online/sharing/receive/PulledItems';
+import { mapUpdateDialog } from '../../../../src/app/online/sharing/registerReceiving';
 import type { PulledItem } from '../../../../src/app/online/sharing/transport/ShareNode';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { fingerprintOf } from '../assetFixtures';
@@ -41,10 +42,11 @@ async function setup() {
     kind: 'image', version: fingerprint, mime: 'image/png', bytes: new TextEncoder().encode('map-bytes').buffer as ArrayBuffer,
   }));
   const confirmUpdate = vi.fn(async (): Promise<'both' | 'theirs' | null> => 'theirs');
+  const notify = vi.fn();
   const deps = (notes: Record<string, string>): MapPullDeps => ({
-    app, scenes, pulled, pullImage: images, notes: new Map(Object.entries(notes)), confirmUpdate,
+    app, scenes, pulled, pullImage: images, notes: new Map(Object.entries(notes)), confirmUpdate, notify,
   });
-  return { app, files, pulled, atlas, scenes, images, confirmUpdate, deps };
+  return { app, files, pulled, atlas, scenes, images, confirmUpdate, notify, deps };
 }
 
 const input = (payload: MapPayload) => ({
@@ -123,8 +125,10 @@ describe('pulling a map', () => {
   it('clears every *Path field of the map types, and a new one fails this test until it is covered', async () => {
     // The map's record types are Atlas's (the vendored API types) and the note pin (`sharedMapFile.ts`).
     const api = readFileSync(resolve(__dirname, '../../../../vendor/atlas/api-types/atlas-vtt-api.d.ts'), 'utf8');
-    const records = ['BaseToken', 'Character', 'Token', 'TextElement', 'DrawingStroke', 'FogBrushStroke', 'FogLassoFill', 'FogRectangleFill']
-      .map((name) => api.match(new RegExp(`export declare interface ${name}\\b[^{]*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? `missing ${name}`);
+    // The initiative list and the widgets travel in a saved map too.
+    const records = ['BaseToken', 'Character', 'Token', 'TextElement', 'DrawingStroke', 'FogBrushStroke', 'FogLassoFill', 'FogRectangleFill',
+      'InitiativeEntry', 'InitiativeState', 'Widget', 'ClockWidget', 'CounterWidget', 'TimerWidget', 'WidgetSettings']
+      .map((name) => api.match(new RegExp(`(?:export )?declare interface ${name}\\b[^{]*\\{([\\s\\S]*?)\\n\\}`))?.[1] ?? `missing ${name}`);
     const types = [...records, readFileSync(resolve(__dirname, '../../../../src/app/online/sharing/model/sharedMapFile.ts'), 'utf8')].join('\n');
     expect(types).not.toContain('missing');
     const fields = [...new Set([...types.matchAll(/\b(\w*Path)\??:/g)].map((match) => match[1] as string))].sort();
@@ -139,6 +143,8 @@ describe('pulling a map', () => {
           tokens: { t: { id: 't', kind: 'character', x: 0, y: 0, ...foreign } },
           pins: { p: { id: 'p', kind: 'pin', x: 0, y: 0, ...foreign } },
         },
+        initiative: { entries: [{ id: 'e', tokenId: 't', name: 'E', ...foreign }] },
+        widgetSettings: { widgets: { w: { id: 'w', type: 'counter', label: 'W', ...foreign } } },
       },
       notes: [], images: [],
     };
@@ -157,9 +163,10 @@ describe('pulling a map', () => {
   });
 
   it('a re-pull of a newer version arrives as a new scene that later pulls follow, its saved images used again (Atlas cannot replace a scene yet)', async () => {
-    const { files, pulled, scenes, images, deps } = await setup();
+    const { files, pulled, scenes, images, notify, deps } = await setup();
     await pullMap(deps({}), input(playerSafe));
     expect(await pullMap(deps({}), newer(playerSafe))).toEqual({ kind: 'updated', path: `${SCENES}/Inn (2).atlasmap` });
+    expect(notify).toHaveBeenCalledWith(`The new version of Inn is a new scene, ${SCENES}/Inn (2).atlasmap: Atlas VTT cannot replace a scene yet.`);
     expect(images).toHaveBeenCalledTimes(1);
     expect(scenes.addToCollection.mock.calls[1]![0].images).toEqual([]);
     expect(mapState(files.get(`${SCENES}/Inn (2).atlasmap`)).background).toBe(IMAGE);
@@ -167,8 +174,19 @@ describe('pulling a map', () => {
     expect(await pulled.readBase(pulled.get(TABLE_ID, 'ana', 'm'.repeat(22))!)).toBe(files.get(`${SCENES}/Inn (2).atlasmap`));
   });
 
+  it('a re-pull of the version already pulled, still as Atlas saved it, is unchanged and adds no scene', async () => {
+    const { pulled, scenes, images, confirmUpdate, notify, deps } = await setup();
+    await pullMap(deps({}), input(playerSafe));
+    expect(await pullMap(deps({}), input(playerSafe))).toEqual({ kind: 'unchanged', path: `${SCENES}/Inn.atlasmap` });
+    expect(scenes.addToCollection).toHaveBeenCalledTimes(1);
+    expect(images).toHaveBeenCalledTimes(1);
+    expect(confirmUpdate).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(pulled.list()).toHaveLength(1);
+  });
+
   it('a map changed here asks first: Keep both adds the new version and keeps following the first; closing changes nothing', async () => {
-    const { files, pulled, scenes, confirmUpdate, deps } = await setup();
+    const { files, pulled, scenes, confirmUpdate, notify, deps } = await setup();
     await pullMap(deps({}), input(playerSafe));
     files.set(`${SCENES}/Inn.atlasmap`, `${files.get(`${SCENES}/Inn.atlasmap`)!} `);
     confirmUpdate.mockResolvedValueOnce(null);
@@ -176,6 +194,7 @@ describe('pulling a map', () => {
     expect(scenes.addToCollection).toHaveBeenCalledTimes(1);
     confirmUpdate.mockResolvedValueOnce('both');
     expect(await pullMap(deps({}), newer(playerSafe))).toEqual({ kind: 'both', path: `${SCENES}/Inn (2).atlasmap` });
+    expect(notify).not.toHaveBeenCalled();
     expect(confirmUpdate).toHaveBeenCalledWith('Inn');
     expect(pulled.get(TABLE_ID, 'ana', 'm'.repeat(22))).toMatchObject({ path: `${SCENES}/Inn.atlasmap`, version: 'V'.repeat(43) });
   });
@@ -203,10 +222,21 @@ describe('pulling a map', () => {
     expect(pulled.list()).toEqual([]);
   });
 
-  it('a failed add rejects with the error that made it fail, and records nothing (M6)', async () => {
+  it('a failed add rejects with its own error and records nothing', async () => {
     const { pulled, atlas, deps } = await setup();
     atlas.scenes.failNextAdd = { error: new Error('no scene'), after: 'writes' };
     await expect(pullMap(deps({}), input(playerSafe))).rejects.toThrow('no scene');
+    expect(pulled.list()).toEqual([]);
+  });
+
+  it('fails closed when a folder named Shared with me that no collection indexes is in the way, as Atlas refuses to create the collection', async () => {
+    const vault = createInMemoryApp();
+    vault.folders.add(`atlas-vtt/collections/shared WITH me`);
+    const pulled = PulledItems.create(vault.app.vault.adapter, PATHS);
+    const { scenes } = scenesOver(vault);
+    const deps: MapPullDeps = { app: vault.app, scenes, pulled, pullImage: async () => { throw new Error('gone'); }, notes: new Map(), confirmUpdate: async () => 'theirs' };
+    await expect(pullMap(deps, input(playerSafe))).rejects.toThrow('A folder named "Shared with me" already exists in the collections folder');
+    expect([...vault.files.keys()].filter((path) => path.startsWith('atlas-vtt/collections/'))).toEqual([]);
     expect(pulled.list()).toEqual([]);
   });
 
@@ -252,5 +282,14 @@ describe('a received map is untrusted', () => {
     expect(state.background).toBeNull();
     expect(text).not.toContain('Private/secret.md');
     expect(({} as Record<string, unknown>).background).toBeUndefined();
+  });
+});
+
+describe('the question for a received map changed here', () => {
+  it('says that both answers add a scene and neither replaces the receiver’s copy, with no warning style', () => {
+    const dialog = mapUpdateDialog('Inn');
+    expect(dialog.title).toBe('Inn changed here and was shared again');
+    expect(dialog.message).toEqual(['Both answers add the new version as a new scene; your copy stays as it is. Take theirs makes later pulls follow the new scene; Keep both keeps them on yours.']);
+    expect(dialog.choices).toEqual([{ label: 'Keep both', value: 'both' }, { label: 'Take theirs', value: 'theirs' }]);
   });
 });

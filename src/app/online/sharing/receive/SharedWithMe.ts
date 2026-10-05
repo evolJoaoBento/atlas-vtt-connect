@@ -41,6 +41,8 @@ export interface SharedWithMeDeps {
   nameAt: (personId: string) => string | null;
   scenes: MapPullDeps['scenes'];
   confirmMapUpdate: (title: string) => Promise<'both' | 'theirs' | null>;
+  /** Tells the receiver something a pull's outcome does not say. */
+  notify?: (text: string) => void;
   replaced?: (record: PulledRecord, before: string, after: string) => Promise<void>;
   rehomed?: (record: PulledRecord) => Promise<void>;
 }
@@ -86,6 +88,7 @@ export class SharedWithMe {
       app: this.deps.app, scenes: this.deps.scenes, pulled: this.deps.pulled, notes,
       pullImage: (fingerprint) => node.pull(personId, `${item.item}/${fingerprint}`, 'image'),
       confirmUpdate: (title) => this.deps.confirmMapUpdate(title),
+      ...(this.deps.notify ? { notify: this.deps.notify } : {}),
     }, { tableId, from: personId, personName, item, payload });
   }
 
