@@ -154,7 +154,7 @@ export class CanvasScene implements OnlineSceneSink {
   /**
    * The player's own live roll, as a result card. Atlas throws a given result with its own 3D dice only in one of its
    * map views (`dice.throw`, API 1.13.0, or a remote view's `throwRoll`); this tab is Connect's own view, and a second
-   * three.js would not load beside Atlas's. The remote view (B15) throws them with Atlas's own dice.
+   * three.js would not load beside Atlas's. The remote view (`remote/RemoteSceneClient.ts`) throws them with Atlas's own dice.
    */
   ownRoll(entry: DiceLogEntry): void {
     this.log.log.toastRoll(entry);

@@ -1,7 +1,7 @@
 /**
  * The fork's lighting projection cases, fed Atlas's answers (`playerVisibility`) instead of walls and lights
- * worked out here. Dropped to B15: "is an Atlas fog lasso in the Obsidian online scene" (needs
- * `obsidian/playerSceneToAtlasState`, which lands with the remote view tab).
+ * worked out here. "Is an Atlas fog lasso in the Obsidian online scene" checks the record the remote view gets;
+ * that Atlas's fog renderer traces and fills it is Atlas's own test.
  */
 import { describe, expect, it } from 'vitest';
 import type { DrawingStroke, FogOperation, InitiativeEntry, TextElement } from '@atlas-vtt/api-types';
@@ -10,6 +10,7 @@ import { closedFrame } from '../../../src/app/online/scene/lightingFrame';
 import { diffScenes } from '../../../src/app/online/scene/sceneDiff';
 import { patchMessage, snapshotMessages } from '../../../src/app/online/scene/sceneMessages';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
+import { RemoteSceneMemo } from '../../../src/app/online/obsidian/remote/toRemoteScene';
 import { FogLayer } from '../../../src/app/online/view/layers/fogLayer';
 import { character, MAP, PENDING, project, projectLit, ready, scene, UNLIT } from './lightingFixtures';
 import { frame, RecordingSurface } from './recordingSurface';
@@ -195,5 +196,17 @@ describe('the darkness on both players\' clients', () => {
     const [ring] = paths[0]!.paths;
     expect(insideByNonzero(ring!, { x: 800, y: 400 })).toBe(true);
     expect(insideByNonzero(ring!, { x: 300, y: 400 })).toBe(false);
+  });
+
+  it('is an Atlas fog lasso in the Obsidian online scene, filled where it is dark', () => {
+    const projected = projectLit(night(), torchlit());
+    const { fog } = new RemoteSceneMemo().input(projected, { background: () => null, token: () => null }).objects;
+    const op = fog[DARKNESS_FOG_ID];
+    expect(op).toMatchObject({ id: DARKNESS_FOG_ID, kind: 'fog', type: 'lasso', isErasing: false, timestamp: DARKNESS_ORDER });
+    // Atlas's fog renderer fills the lasso's ring (nonzero): dark where no light reaches, clear in the torchlight.
+    const ring = op?.type === 'lasso' ? op.points : [];
+    expect(ring).toEqual(darknessRing(projected));
+    expect(insideByNonzero(ring, { x: 900, y: 100 })).toBe(true);
+    expect(insideByNonzero(ring, { x: 400, y: 400 })).toBe(false);
   });
 });

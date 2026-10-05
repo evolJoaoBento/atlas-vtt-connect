@@ -7,12 +7,13 @@
  * remote store hides from the token UI (`hiddenResources`): Atlas greys the token and marks it with a
  * skull while it is spent, as in the window, and eases back when it is not.
  *
- * Received maps (`sharing/receive/receivedMap.ts`) use the token values; the remote view (B15) adds the
- * per-token definitions and the initiative health here.
+ * Received maps (`sharing/receive/receivedMap.ts`) use the token values; the remote view also takes the
+ * per-token definitions and the initiative health.
  */
 import type { ResourceDefinition, ResourceValue } from '@atlas-vtt/api-types';
 import { BAR_SLOTS } from '@atlas-vtt/shared/rules';
-import type { PlayerResource, PlayerToken } from '../scene/sceneTypes';
+import { setOwn } from '../scene/sceneDiff';
+import type { PlayerInitiative, PlayerResource, PlayerToken } from '../scene/sceneTypes';
 
 /** A bar's share, as the stand-in value's `current` out of this. */
 export const SHARE_SCALE = 100;
@@ -59,4 +60,23 @@ export function atlasBars(token: PlayerToken): AtlasBars | null {
   });
   values[DOWNED_KEY] = { current: token.downed === true ? 0 : 1, max: 1 };
   return { values, definitions };
+}
+
+/** The stand-in definitions of every token that has any, by token id (the remote view's `tokenUi.resources`). */
+export function atlasResourceDefinitions(tokens: Readonly<Record<string, PlayerToken>>): Record<string, readonly ResourceDefinition[]> {
+  const byToken: Record<string, readonly ResourceDefinition[]> = {};
+  for (const [id, token] of Object.entries(tokens)) {
+    const bars = atlasBars(token);
+    if (bars) setOwn(byToken, id, bars.definitions);
+  }
+  return byToken;
+}
+
+/** The bar after each combatant's name in the initiative list, by token id: the share out of `SHARE_SCALE`. */
+export function atlasInitiativeHealth(initiative: PlayerInitiative | null): Record<string, { value: number; max: number }> {
+  const health: Record<string, { value: number; max: number }> = {};
+  for (const entry of initiative?.entries ?? []) {
+    if (typeof entry.hpShare === 'number') setOwn(health, entry.tokenId, { value: Math.round(entry.hpShare * SHARE_SCALE), max: SHARE_SCALE });
+  }
+  return health;
 }

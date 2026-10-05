@@ -4,6 +4,7 @@ import { FakeDice } from './fakeDice';
 import { FakeLasers } from './fakeLasers';
 import { FakeLighting } from './fakeLighting';
 import { FakePresentation } from './fakePresentation';
+import { FakeRemoteViews } from './fakeRemoteViews';
 import { FakeRules } from './fakeRules';
 import { FakeScenes, type FakeSceneVault } from './fakeScenes';
 import { FakeTokens } from './fakeTokens';
@@ -91,6 +92,10 @@ export class FakeAtlas implements AtlasApi {
   readonly scenes: FakeScenes;
   /** The note properties exports and installs strip. */
   readonly bundles: FakeBundles;
+  /** The remote views extensions opened (1.12.0), each with a handle that records its calls. */
+  readonly remoteViews: FakeRemoteViews;
+  /** Atlas's UI slots, which every connection gets, as every namespace; `ui` is the test's view of them with the capability. */
+  private readonly slots: FakeUi;
 
   /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
   /** `scenesBefore113`: Atlas's scenes as before API 1.13.0 (no saved map fields, no `replaceMap`). */
@@ -111,9 +116,11 @@ export class FakeAtlas implements AtlasApi {
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
-    this.ui = this.capabilities.has('ui') ? new FakeUi(this.views) : undefined;
+    this.slots = new FakeUi(this.views);
+    this.ui = this.capabilities.has('ui') ? this.slots : undefined;
     this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths(), options.scenesBefore113 === true);
     this.bundles = new FakeBundles();
+    this.remoteViews = new FakeRemoteViews(this.views);
   }
 
   has(capability: AtlasCapability): boolean {
@@ -165,20 +172,24 @@ export class FakeAtlas implements AtlasApi {
       owned.add(dispose);
       return dispose;
     };
-    const extension: Record<string, unknown> = { id, on };
-    if (this.capabilities.has('views')) extension.views = this.views.api(own);
-    if (this.capabilities.has('presentation')) extension.presentation = this.presentation.api(own);
-    if (this.capabilities.has('rules')) extension.rules = this.rules.api();
-    if (this.capabilities.has('dice')) extension.dice = this.dice.api(own);
-    if (this.capabilities.has('lasers')) extension.lasers = this.lasers.api(own);
-    if (this.capabilities.has('lighting')) extension.lighting = this.lighting.api(own);
-    if (this.capabilities.has('tokens')) extension.tokens = this.tokens.api();
-    if (this.ui) extension.ui = this.ui.api(id, own);
-    if (this.capabilities.has('scenes')) extension.scenes = this.scenes.api(id);
-    if (this.capabilities.has('bundles')) extension.bundles = this.bundles.api(id, own);
-    if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
-    if (this.capabilities.has('storage')) extension.storage = storageApi(id);
-    return extension as unknown as AtlasExtension;
+    // Every namespace, as Atlas gives them (`has()` says which have landed); `remoteViews` only with `remote-view`.
+    const extension: AtlasExtension = {
+      id, on,
+      views: this.views.api(own),
+      presentation: this.presentation.api(own),
+      rules: this.rules.api(),
+      dice: this.dice.api(own),
+      lasers: this.lasers.api(own),
+      lighting: this.lighting.api(own),
+      tokens: this.tokens.api(),
+      ui: this.slots.api(id, own),
+      scenes: this.scenes.api(id),
+      bundles: this.bundles.api(id, own),
+      settings: this.settingsApi(),
+      storage: storageApi(id),
+      ...(this.capabilities.has('remote-view') ? { remoteViews: this.remoteViews.api(id, own) } : {}),
+    };
+    return extension;
   }
 
   /** Atlas unloads (C-life-3): 'unload' to every extension in connection order, dispose all, then `atlas-vtt:api-unload`. */

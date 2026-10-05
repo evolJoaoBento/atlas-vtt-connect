@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { decodeToObjectUrls, urlsOf } from '../../../../src/app/online/obsidian/objectUrlImages';
+import { decodeToObjectUrls, shownUrls, urlsOf } from '../../../../src/app/online/obsidian/objectUrlImages';
 
 const created: string[] = [];
 const revoked: string[] = [];
@@ -47,5 +47,21 @@ describe('decodeToObjectUrls', () => {
   it('finds no URLs on an image another decoder made', () => {
     expect(urlsOf({ image: {} as HTMLImageElement, width: 1, height: 1, release: () => {} })).toBeNull();
     expect(urlsOf(null)).toBeNull();
+  });
+
+  it('revokes a released URL a remote view still shows only once the view shows a scene without it, or lets go', async () => {
+    const image = await decodeToObjectUrls(new ArrayBuffer(8), 'image/png');
+    const urls = urlsOf(image)!;
+    const view = {};
+    const other = {};
+    shownUrls.show(view, [urls.token]);
+    shownUrls.show(other, [urls.background]);
+    // The loader lets the image go as the next scene arrives, before that scene reaches the views.
+    image?.release();
+    expect(revoked).toEqual([]);
+    shownUrls.show(view, []);
+    expect(revoked).toEqual([urls.token]);
+    shownUrls.drop(other);
+    expect(revoked.sort()).toEqual([urls.background, urls.token].sort());
   });
 });

@@ -5,14 +5,15 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import { toolGridOf } from '../../../src/app/online/view/tools/toolGrid';
+import { remoteDropPoint } from './remoteDrop';
 import { fakeAssetIds, gmSnapPoint, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 /**
  * A grid players do not see (hidden, switched off, or kept from them by the player view rules) still
  * decides where the GM's check puts a dropped token (`tokens.snapPoint`). The projection must send that
  * grid's geometry in the measurement so the page's drag ruler and the Online scene's drag land on the same
- * point. This file pins what the projection sends, and that the GM's check and the page's drag ruler then
- * land on one point; the Online scene's own drag is checked with the player tab (B15).
+ * point. This file pins what the projection sends, and that the GM's check, the page's drag ruler and the
+ * remote view's own drag (Atlas snapping over the grid Connect feeds it) then land on one point.
  */
 const POINTS = [{ x: 300, y: 150 }, { x: 517.3, y: 402.9 }, { x: 33, y: 760 }];
 const SIZES = [1, 1.5, 2.5] as const;
@@ -35,6 +36,19 @@ const HIDDEN: ReadonlyArray<{ name: string; grid: GridState; rules?: PlayerViewR
 ];
 
 describe('snapping on a grid players do not see', () => {
+  it.each(HIDDEN)("lands the remote view's drag where the GM's check does, the grid kept hidden: $name", async ({ grid, rules }) => {
+    const scene = project(grid, rules);
+    const gm = gmSnapPoint(grid);
+    for (const size of SIZES) {
+      for (const point of POINTS) {
+        const landed = gm(point, size);
+        const online = await remoteDropPoint(scene, point, size);
+        expect(online?.x).toBeCloseTo(landed.x, 6);
+        expect(online?.y).toBeCloseTo(landed.y, 6);
+      }
+    }
+  });
+
   it.each(HIDDEN)('sends the GM grid as the snap grid while players see none: $name', ({ grid, rules }) => {
     const scene = project(grid, rules);
     expect(scene.grid).toBeNull();
@@ -59,5 +73,10 @@ describe('snapping on a grid players do not see', () => {
     const point = { x: 301.5, y: 149.25 };
     expect(gmSnapPoint(null)(point, 1.5)).toEqual(point);
     expect(toolGridOf(scene).snapDrag(point, 1.5)).toEqual(point);
+  });
+
+  it('drops nowhere snapped in the remote view on a map without a grid', async () => {
+    const point = { x: 301.5, y: 149.25 };
+    expect(await remoteDropPoint(project(null), point, 1.5)).toEqual(point);
   });
 });

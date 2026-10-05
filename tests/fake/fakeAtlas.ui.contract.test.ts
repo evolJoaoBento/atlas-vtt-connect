@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AtlasExtension } from '@atlas-vtt/api-types';
+import { need } from '../../src/connect/capabilities';
 import { connectingPlugin, FakeAtlas } from './FakeAtlas';
 import type { FakeUi, SlotCounts } from './fakeUi';
 
@@ -49,10 +50,11 @@ describe('FakeAtlas follows the ui contract cases', () => {
     expect(ui.version()).toBeGreaterThan(before);
   });
 
-  it('has no ui without the capability', () => {
+  it('has no ui without the capability: has() says so, as Atlas does (its namespaces are always there)', () => {
     const atlas = new FakeAtlas({ capabilities: ['views'] });
     expect(atlas.ui).toBeUndefined();
-    expect((atlas.connect(connectingPlugin('x')) as { ui?: unknown }).ui).toBeUndefined();
+    expect(atlas.has('ui')).toBe(false);
+    expect(need(atlas, atlas.connect(connectingPlugin('x')), 'ui')).toBeNull();
   });
 
   it('connecting again with the same id removes what the first connection registered', () => {

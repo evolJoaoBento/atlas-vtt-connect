@@ -3,6 +3,7 @@
  * lights, moved to Atlas with `playerVisibility`): Atlas's answers as a test writes them, a lit scene, and
  * the projection as the broadcaster makes it from an answer.
  */
+import { need } from '../../../src/connect/capabilities';
 import type { AtlasCapability, Character, LightingApi, Perception, PlayerVisibility, SceneLighting, SceneSnapshot } from '@atlas-vtt/api-types';
 import { sessionDeps } from '../../../src/app/online/atlas/sessionDeps';
 import type { ControlMessage } from '../../../src/app/online/protocol';
@@ -138,7 +139,7 @@ export function hostLit(state: ViewState, options: { lighting: boolean; visibili
   const { view, store, tavern } = sceneView(presenting, state, { mapSize: MAP });
   if (options.visibility) atlas.lighting.setVisibility(view, options.visibility);
   const { extension } = presenting;
-  const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: extension.lighting ?? null, tokens: null });
+  const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: need(atlas, extension, 'lighting'), tokens: null });
   const sent: ControlMessage[] = [];
   const notices: string[] = [];
   const broadcaster = new SceneBroadcaster({

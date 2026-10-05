@@ -2,6 +2,7 @@ import type { AtlasCapability } from '@atlas-vtt/api-types';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CONE_ANGLE } from '@atlas-vtt/shared/grid';
 import { sessionDeps } from '../../../src/app/online/atlas/sessionDeps';
+import { need } from '../../../src/connect/capabilities';
 import { connectingPlugin, FakeAtlas } from '../../fake/FakeAtlas';
 
 const MAP = 'maps/a.atlasmap';
@@ -9,7 +10,7 @@ const MAP = 'maps/a.atlasmap';
 function deps(capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers', 'tokens']) {
   const atlas = new FakeAtlas({ capabilities });
   const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
-  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null, lighting: extension.lighting ?? null, tokens: extension.tokens ?? null }) };
+  return { atlas, deps: sessionDeps(extension, { dice: need(atlas, extension, 'dice'), lasers: need(atlas, extension, 'lasers'), lighting: need(atlas, extension, 'lighting'), tokens: need(atlas, extension, 'tokens') }) };
 }
 
 describe('sessionDeps', () => {

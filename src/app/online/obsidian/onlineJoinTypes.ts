@@ -47,7 +47,7 @@ export interface OnlineSceneControls {
   rollDice(dice: DiceSelection, modifier: number): string | null;
 }
 
-/** The object URLs the scene's images show by (the remote view, B15); null while an image is not ready. */
+/** The object URLs the scene's images show by (the remote view); null while an image is not ready. */
 export interface RemoteImages {
   background(assetId: string | null): string | null;
   token(assetId: string | null): string | null;

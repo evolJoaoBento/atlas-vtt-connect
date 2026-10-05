@@ -1,9 +1,10 @@
 /**
  * The widget bar and the initiative order as Atlas holds them. Players receive only what the
  * GM shows them, so every widget is visible to players and every entry is shown. Received maps
- * (`sharing/receive/receivedMap.ts`) use them; the remote view (B15) adds the initiative rules here.
+ * (`sharing/receive/receivedMap.ts`) and the remote view use them.
  */
-import type { AnyWidget, CounterWidget, InitiativeEntry, InitiativeState, TimerWidget, TokenEntity, WidgetSettings } from '@atlas-vtt/api-types';
+import type { AnyWidget, CounterWidget, InitiativeEntry, InitiativeRules, InitiativeState, TimerWidget, TokenEntity, WidgetSettings } from '@atlas-vtt/api-types';
+import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { createDefaultInitiativeState, DEFAULT_INITIATIVE_CONFIG } from '../../types/initiativeDefaults';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerWidget } from '../scene/sceneTypes';
@@ -74,9 +75,22 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
       round: initiative.round,
       isActive: initiative.active,
       config: { ...DEFAULT_INITIATIVE_CONFIG },
-      // A fight by sides keeps its mode (`listedBySides`); before one, the remote view's rules say the list is by sides
+      // A fight by sides keeps its mode (`listedBySides`); before one, `atlasInitiativeRules` says the list is by sides
       ...(initiative.active && initiative.sides && { sides: { first: initiative.sides.first, active: initiative.sides.active ?? initiative.sides.first } }),
     },
     initiativeTrackerOpen: true,
+  };
+}
+
+/**
+ * The initiative rules the remote view's list reads: the player's own collection says nothing of the GM's table, so
+ * the GM's grouping arrives as rules: by sides when the window groups by sides, else in turn order. The roll is the
+ * GM's alone and is never sent.
+ */
+export function atlasInitiativeRules(initiative: PlayerInitiative | null): InitiativeRules {
+  return {
+    mode: initiative?.sides ? 'sides' : 'turn-order',
+    roll: DEFAULT_INITIATIVE_RULES.roll,
+    firstSide: initiative?.sides?.first ?? DEFAULT_INITIATIVE_RULES.firstSide,
   };
 }

@@ -22,7 +22,7 @@ const JOIN_COMMAND = 'join-online-session';
 export function startJoining(plugin: Plugin, atlas: AtlasExtension, api: AtlasApi, settings: JoinSettings, playerKeyFor?: (hostId: string) => string): { service: OnlineJoinService; stop: Disposer } {
   const { app } = plugin;
   const service = new OnlineJoinService(app, settings, plugin.manifest.version, {
-    openSceneTab: () => openSceneTab(app),
+    openSceneTab: () => openSceneTab(app, api, atlas),
     ...(playerKeyFor ? { playerKeyFor } : {}),
   });
   plugin.addCommand({ id: JOIN_COMMAND, name: JOIN_SESSION_LABEL, callback: () => openJoinSessionModal(app) });

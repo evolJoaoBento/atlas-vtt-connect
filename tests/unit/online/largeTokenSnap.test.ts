@@ -6,6 +6,7 @@ import { snapGridOfState } from '../../../src/app/online/scene/projectForPlayers
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import { toolGridOf } from '../../../src/app/online/view/tools/toolGrid';
+import { remoteDropPoint } from './remoteDrop';
 import { fakeAssetIds, gmSnapPoint, playerScene, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 /**
@@ -13,7 +14,8 @@ import { fakeAssetIds, gmSnapPoint, playerScene, projectForPlayers, snapshotOf }
  * projection's share of that is the snap grid it sends: the GM grid's type, size and offsets while the
  * GM snaps, and none where the GM snaps nothing. That a token of each size then lands on the same point
  * on the GM and on the page is checked here against `tokens.snapPoint` (the fake mirrors Atlas's C-tok-2) and the
- * page's drag ruler (`ToolGrid.snapDrag`); the Online scene in Obsidian drags with Atlas's own controller (B15).
+ * page's drag ruler (`ToolGrid.snapDrag`), and the remote view's own drag, which Atlas snaps over the grid Connect
+ * feeds it (`toRemoteScene`).
  */
 const SIZE = 70;
 const OFFSET = { x: 13, y: 29 };
@@ -81,6 +83,21 @@ describe("the GM's check of a token drop and the page's drag ruler snap alike", 
         expect(ruler.y).toBeCloseTo(landed.y, 6);
       }
     }
+  });
+
+  it.each(TYPES)('lands every token size on the same point on the GM and in the remote view (%s)', async (type) => {
+    const gm = gmSnapPoint(gridState(type));
+    const scene = project(gridState(type));
+    for (const tokenSize of TOKEN_SIZES) {
+      for (const point of POINTS) {
+        const landed = gm(point, tokenSize);
+        const online = await remoteDropPoint(scene, point, tokenSize);
+        expect(online?.x).toBeCloseTo(landed.x, 6);
+        expect(online?.y).toBeCloseTo(landed.y, 6);
+      }
+    }
+    // Snapping off on the GM's map: the remote view drops where the player let go, as the GM's drag does.
+    expect(await remoteDropPoint(project(gridState(type, { snapToGrid: false })), { x: 300.5, y: 150.25 }, 1.5)).toEqual({ x: 300.5, y: 150.25 });
   });
 
   it('puts a Large token on a square grid where four cells meet', () => {

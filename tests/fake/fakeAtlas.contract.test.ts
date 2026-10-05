@@ -16,15 +16,8 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-remote-5': "Atlas-internal (the plan's Appendix A): the remote view's dice tray and log are Atlas UI",
 };
 
-/**
- * Cases a later task simulates, each with its owner: the remote view (`remoteViews`, 1.12.0) is B15's, which brings it
- * into Connect. The fake already lists a remote view among the views (`FakeViews.openRemote`), as 1.12.0 does.
- */
-export const LATER_TASK: Record<string, string> = {
-  'C-remote-1': 'B15: remoteViews.open, reuse and onClose',
-  'C-remote-2': 'B15: unloading closes the remote views',
-  'C-remote-4': 'B15: token drops, lasers and camera moves in a remote view',
-};
+/** Cases a later task simulates, each with its owner; none is left since the remote view came to Connect. */
+export const LATER_TASK: Record<string, string> = {};
 
 describe('FakeAtlas follows the contract cases', () => {
   it('C-storage-1: folder() is the extension folder and is stable', async () => {

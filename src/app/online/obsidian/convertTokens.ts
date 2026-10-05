@@ -1,12 +1,17 @@
 /**
  * The GM's tokens as Atlas records, field by field: only what `PlayerToken` names, so a field
- * the network adds never reaches the store. Received maps (`sharing/receive/receivedMap.ts`) use
- * them; the remote view (B15) adds the neutral condition definitions here.
+ * the network adds never reaches the store. Received maps (`sharing/receive/receivedMap.ts`) and the
+ * remote view use them. Condition badges get neutral definitions, as on the join page: players never
+ * receive the GM's.
  */
-import type { BaseToken, Character, Token, TokenEntity } from '@atlas-vtt/api-types';
+import type { BaseToken, Character, ConditionDefinition, Token, TokenEntity } from '@atlas-vtt/api-types';
 import { setOwn } from '../scene/sceneDiff';
 import { atlasBars } from './convertResources';
 import type { PlayerCondition, PlayerToken, ScenePoint } from '../scene/sceneTypes';
+import { NEUTRAL_BADGE_COLOR } from '../view/layers/tokenUiDrawing';
+
+/** The name of every condition players see: they receive ids and values only. */
+export const REMOTE_CONDITION_NAME = 'Condition';
 
 function conditionFields(conditions: readonly PlayerCondition[]): Partial<Pick<BaseToken, 'conditions' | 'conditionValues'>> {
   if (conditions.length === 0) return {};
@@ -53,4 +58,15 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     ...(bars ? { resources: bars.values } : {}),
   };
   return character;
+}
+
+/** A neutral definition for each condition id the tokens show, valued where any token sent a value. */
+export function neutralConditions(tokens: Readonly<Record<string, PlayerToken>>): ConditionDefinition[] {
+  const valued = new Map<string, boolean>();
+  for (const token of Object.values(tokens)) {
+    for (const condition of token.conditions) valued.set(condition.id, valued.get(condition.id) === true || condition.value !== null);
+  }
+  return [...valued].map(([id, isValued]) => ({
+    id, name: REMOTE_CONDITION_NAME, color: NEUTRAL_BADGE_COLOR, ...(isValued ? { valued: true } : {}),
+  }));
 }

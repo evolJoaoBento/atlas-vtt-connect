@@ -2,7 +2,7 @@
  * A scene as players receive it (`PlayerScene`), rebuilt as Atlas's own records: the background,
  * grid, tokens, fog, texts, drawings, widgets and initiative. Pure, in the API's types, so a received
  * map (`sharing/receive/receivedMap.ts`) is saved through `scenes.addToCollection` and the remote view
- * (B15) shows the same records. Only fields players are sent are read; nothing else can reach Atlas.
+ * (`remote/toRemoteScene.ts`) shows the same records. Only fields players are sent are read; nothing else can reach Atlas.
  */
 import type { GridState, InitiativeState, SavedMapInput } from '@atlas-vtt/api-types';
 import { playerCellNumbers } from '../scene/playerCellNumbers';
