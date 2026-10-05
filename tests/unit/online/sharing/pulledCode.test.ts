@@ -69,12 +69,40 @@ describe('finding known code', () => {
     const ordinary = [
       `${FENCE}python\nprint('<b>')\n${FENCE}`,
       `${FENCE}text\nplain\n${FENCE}`,
-      '`= this.file.name` is plain Dataview text; $= outside code is text.',
+      '`= this.file.name` is plain Dataview text; a $ sign and = signs are text.',
       'A scripted scene, an embedded quote, an objection, 100% sure, <b>bold</b>, a <scripture> tag, <img src="art/a.png">.',
       `${FENCE}markdown\n# Title\n${FENCE}`,
     ].join('\n\n');
     expect(findExecutable(ordinary)).toEqual([]);
     expect(withoutCode(ordinary)).toBe(ordinary);
+  });
+});
+
+describe('inline Dataview JS anywhere (re-review 2, R3)', () => {
+  it('flags $= wherever Dataview could read it, entity forms included, and makes each inert', () => {
+    const probes = [
+      '```text\n$= dv.el("p", 1)\n```', '~~~\n$= dv.x\n~~~', '    $= dv.el("p", 1)', '```md\n  $= dv.x\n```',
+      "<code>$= dv.el('p', 1)</code>", '<code>&#36;= dv.x</code>', '<code>$&#61; dv.x</code>', '<code>&#x24;&#x3D; dv.x</code>',
+      '<code>&dollar;&equals; dv.x</code>', '<code>&#036;= dv.x</code>', 'plain $= prose',
+    ];
+    for (const probe of probes) {
+      expect(findExecutable(probe), probe).toEqual(['dataview-inline']);
+      const once = withoutCode(probe);
+      expect(findExecutable(once), once).toEqual([]);
+      expect(withoutCode(once)).toBe(once);
+    }
+    expect(withoutCode('<code>&#36;= dv.x</code>')).toBe('<code>&amp;#36;= dv.x</code>');
+    expect(withoutCode('```text\n$= dv.x\n```')).toBe(`\`\`\`text\n$${ZW}= dv.x\n\`\`\``);
+  });
+});
+
+describe('frames and webviews (re-review 2, M-R5)', () => {
+  it('flags webview, frame and frameset as HTML that embeds something', () => {
+    for (const tag of ['<webview src="https://x">', '<frame src=x>', '<frameset rows="*">', '</FRAMESET>']) {
+      expect(findExecutable(tag), tag).toEqual(['html']);
+      expect(findExecutable(withoutCode(tag))).toEqual([]);
+    }
+    expect(findExecutable('a <framework> and <frames>')).toEqual([]);
   });
 });
 
@@ -122,7 +150,7 @@ describe('pulling without code', () => {
   });
 
   it('a seeded fuzz of nested quotes, fences, spans and code never leaves anything to find', () => {
-    const atoms = ['> ', '> > ', '```', '````', '~~~', 'dataviewjs', 'js', '\n', '\r\n', '`', '``', '$=', '<%', '<iframe', '<img src=//x', '<style', '\\', ' ', 'text', '- ', '1. ', '    '];
+    const atoms = ['> ', '> > ', '```', '````', '~~~', 'dataviewjs', 'js', '\n', '\r\n', '`', '``', '$=', '$', '=', '&#36;', '&', '#61;', '<%', '<iframe', '<frame', '<img src=//x', '<style', '\\', ' ', 'text', '- ', '1. ', '    '];
     let seed = 7;
     const next = (): number => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed; };
     for (let round = 0; round < 3000; round++) {

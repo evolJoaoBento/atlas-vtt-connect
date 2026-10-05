@@ -16,7 +16,7 @@ export type CodeKind = 'code-block' | 'dataview-inline' | 'templater' | 'html' |
 /** Each kind as the pull dialog names it, in this order. */
 export const CODE_KIND_LABELS: Readonly<Record<CodeKind, string>> = {
   'code-block': 'code blocks other plugins run (such as Dataview, Datacore or JS Engine)',
-  'dataview-inline': 'inline Dataview JS (`$=`)',
+  'dataview-inline': 'inline Dataview JS (`$=`, anywhere in the note)',
   templater: 'Templater commands',
   html: 'embedded HTML (script, iframe, object or embed)',
   remote: 'HTML that loads from the internet (style, img, link, audio, video or source), which can reveal your IP address',
@@ -28,11 +28,18 @@ const RUN_LANGUAGE = /js|ts|jsx|tsx|dataview|datacore|engine|templater/i;
 /** A fence opener anywhere: after quote markers, list markers and any indent; group 2 is its language. */
 const OPENER = /^((?:[ \t>]|[-*+][ \t]|\d{1,9}[.)][ \t])*(?:`{3,}|~{3,})[ \t]*)([^\s`{]+)/;
 const TEMPLATER = /<%/g;
-const HTML_TAG = /<(\/?)(script|iframe|object|embed)(?=[\s/>]|$)/gi;
+const HTML_TAG = /<(\/?)(script|iframe|object|embed|webview|frameset|frame)(?=[\s/>]|$)/gi;
 /** `<style>` can `@import` or `url()` anything; the other tags only when they name a URL off this device. */
 const REMOTE_TAG = /<(style)(?=[\s/>]|$)|<(img|link|audio|video|source)(?=[\s/>])[^>]*?(?:https?:)?\/\//gi;
-/** Dataview's inline JS: a backtick, then (across line breaks and quote markers) `$=`. */
-const INLINE_JS = /(`[\s>]*)\$=/g;
+/**
+ * Dataview's inline JS prefix, `$=`, anywhere: Dataview reads it at the start of any rendered code element (an inline
+ * span, a whole code block in any language, a raw-HTML `<code>`, where entities are decoded first), so its place in
+ * the Markdown says nothing. Entity forms of `$` and `=` count too.
+ */
+const INLINE_JS = /(?:\$|&#0*36;|&#x0*24;|&dollar;)(?:=|&#0*61;|&#x0*3d;|&equals;)/gi;
+
+/** `$=` gets an invisible break; an entity form gets its `&` written as `&amp;`, so it no longer decodes. */
+const inertInline = (match: string): string => (match.includes('&') ? match.replace(/&/g, '&amp;') : `$${BREAK}=`);
 /** An invisible break: `<` or `$` followed by it is neither a tag, a Templater tag nor Dataview's prefix. */
 const BREAK = '​';
 
@@ -149,7 +156,7 @@ function inert(region: Region): string {
     .replace(TEMPLATER, region.code ? `<${BREAK}%` : '<\\%')
     .replace(HTML_TAG, (_tag, slash: string, name: string) => `${lt}${slash}${name}`)
     .replace(REMOTE_TAG, (tag: string) => `${lt}${tag.slice(1)}`)
-    .replace(INLINE_JS, `$1$${BREAK}=`);
+    .replace(INLINE_JS, inertInline);
 }
 
 /**
