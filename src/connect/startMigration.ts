@@ -28,12 +28,12 @@ export interface MigrationStart {
   rereadDelayMs?: number;
 }
 
-/** What the user can do about a failure, from its cause. */
-export function failureNotice(error: unknown): string {
+/** What the user can do about a failure, from its cause; `file` names the settings file that was not whole. */
+export function failureNotice(error: unknown, file = FORK_SETTINGS_FILE): string {
   const code = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
   const hint = code === 'ENOSPC' ? 'Free some disk space.'
     : code === 'EACCES' || code === 'EPERM' || code === 'EBUSY' || code === 'EROFS' ? "Check that the vault's files can be written and aren't open elsewhere."
-      : error === 'settings' ? `Check that ${FORK_SETTINGS_FILE} is whole (Atlas VTT rewrites it as settings change).`
+      : error === 'settings' ? `Check that ${file} is whole (Atlas VTT rewrites it as settings change).`
         : 'The developer console has the details.';
   return `${FAILED} ${hint} ${AGAIN}`;
 }
@@ -60,7 +60,7 @@ function copyImages(settings: MigrationSettings, local: KeyValueStore, images: I
  */
 async function migrateSettingsOnly(app: App, settings: MigrationSettings, start: MigrationStart, notify: (message: string) => void): Promise<void> {
   try {
-    const step = await migrateForkSettings({ adapter: app.vault.adapter, settings, ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }) });
+    const step = await migrateForkSettings({ adapter: app.vault.adapter, configDir: app.vault.configDir, settings, ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }) });
     if (step.result === 'copied') notify(MIGRATED_NOTICE);
     if (settings.takeKeyMoved()) notify(KEY_MOVED_NOTICE);
   } catch (error) {
@@ -77,12 +77,13 @@ async function migrateVault(app: App, api: AtlasApi, atlas: AtlasExtension, sett
     copyImages(settings, local, start.images);
     return true;
   }
+  let unreadable: string | undefined;
   try {
     if (!settings.migratedFromFork) {
-      await migrateFromFork({
-        adapter: app.vault.adapter, settings, storageFolder: await storage.folder(), scenes: need(api, atlas, 'scenes'), notify,
+      ({ unreadable } = await migrateFromFork({
+        adapter: app.vault.adapter, configDir: app.vault.configDir, settings, storageFolder: await storage.folder(), scenes: need(api, atlas, 'scenes'), notify,
         ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }),
-      });
+      }));
     }
     if (settings.takeKeyMoved()) notify(KEY_MOVED_NOTICE);
   } catch (error) {
@@ -92,7 +93,7 @@ async function migrateVault(app: App, api: AtlasApi, atlas: AtlasExtension, sett
   }
   copyImages(settings, local, start.images);
   if (settings.forkStepDone('settings')) return true;
-  notify(failureNotice('settings'));
+  notify(failureNotice('settings', unreadable));
   return false;
 }
 

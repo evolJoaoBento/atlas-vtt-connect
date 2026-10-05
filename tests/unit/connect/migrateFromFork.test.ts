@@ -25,7 +25,7 @@ function scenesWith(ids: string[], shared: string[] = []): Pick<ScenesApi, 'list
 
 function deps(app: App, settings: ConnectSettingsStore, scenes: MigrationDeps['scenes'] = scenesWith([])): MigrationDeps & { notices: string[] } {
   const notices: string[] = [];
-  return { adapter: app.vault.adapter, settings, storageFolder: STORAGE, scenes, notify: (message) => { notices.push(message); }, rereadDelayMs: 0, notices };
+  return { adapter: app.vault.adapter, configDir: app.vault.configDir, settings, storageFolder: STORAGE, scenes, notify: (message) => { notices.push(message); }, rereadDelayMs: 0, notices };
 }
 
 /** What a run that copied the fork's sharing folder says. */

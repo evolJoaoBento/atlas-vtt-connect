@@ -2,7 +2,7 @@
  * Brings over what the fork's online play preview kept in the vault, for someone moving to upstream Atlas plus
  * Connect: its online settings (table key included, `migrateForkSettings`), its sharing folder (people, shares, pulls,
  * `migrateSharingFolder`), and a count of the scenes with Connect's data, where Atlas itself moved the map shares.
- * Never destructive: Atlas's settings file is only read, the fork's folder only copied. Each step is marked once done
+ * Never destructive: Atlas's plugin data and settings file are only read, the fork's folder only copied. Each step is marked once done
  * and never runs again, so a run cut short repeats only what it had not finished; once all are, the store is migrated.
  */
 import type { ScenesApi } from '@atlas-vtt/api-types';
@@ -19,6 +19,8 @@ export type MigrationSettings = ForkSettingsStore & Pick<ConnectSettingsStore, '
 
 export interface MigrationDeps {
   adapter: MigrationAdapter;
+  /** The vault's configuration folder (`app.vault.configDir`), where Atlas's plugin data is. */
+  configDir: string;
   settings: MigrationSettings;
   /** Connect's storage folder (`storage.folder()`). */
   storageFolder: string;
@@ -34,6 +36,8 @@ export interface MigrationReport {
   sharing: SharingMigration;
   /** Scenes with Connect's data: the fork's map shares Atlas moved, and any Connect wrote since an earlier unfinished run. */
   mapShares: number;
+  /** The settings file that was not JSON, when that left the settings step to do. */
+  unreadable?: string;
 }
 
 /**
@@ -74,5 +78,5 @@ export async function migrateFromFork(deps: MigrationDeps): Promise<MigrationRep
   if (mapShares.done) deps.settings.markForkStep('mapShares');
   if (sharing === 'moved') deps.notify(`${MIGRATED_NOTICE} ${LEFTOVER_NOTICE}`);
   else if (settings.result === 'copied' || sharing === 'merged') deps.notify(MIGRATED_NOTICE);
-  return { settings: settings.result, sharing, mapShares: mapShares.result };
+  return { settings: settings.result, sharing, mapShares: mapShares.result, ...(settings.unreadable ? { unreadable: settings.unreadable } : {}) };
 }

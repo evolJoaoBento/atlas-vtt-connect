@@ -96,7 +96,7 @@ describe('the table key lives in local storage on this device, never in data.jso
     const plugin = fakeDataPlugin(null);
     const local = memoryKeyValueStore();
     const settings = await ConnectSettingsStore.load(plugin, local);
-    expect((await migrateForkSettings({ adapter: app.vault.adapter, settings, rereadDelayMs: 0 })).result).toBe('copied');
+    expect((await migrateForkSettings({ adapter: app.vault.adapter, configDir: app.vault.configDir, settings, rereadDelayMs: 0 })).result).toBe('copied');
     await settings.flush();
     expect(local.get(TABLE_KEY_STORAGE)).toEqual(TABLE);
     expect(settings.get().table).toEqual(TABLE);
@@ -163,7 +163,7 @@ describe("the online play preview's table key on this device", () => {
     const local = memoryKeyValueStore();
     local.set(FORK_TABLE_KEY_STORAGE, OTHER);
     const settings = await ConnectSettingsStore.load(fakeDataPlugin(null), local);
-    await migrateForkSettings({ adapter: app.vault.adapter, settings, rereadDelayMs: 0 });
+    await migrateForkSettings({ adapter: app.vault.adapter, configDir: app.vault.configDir, settings, rereadDelayMs: 0 });
     expect(settings.get().table).toEqual(OTHER);
     expect(local.get(TABLE_KEY_STORAGE)).toEqual(OTHER);
   });

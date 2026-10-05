@@ -18,7 +18,7 @@ async function device(data: unknown, local = memoryKeyValueStore()): Promise<{ s
   const plugin = fakeDataPlugin(data);
   const store = await ConnectSettingsStore.load(plugin, local);
   const { app } = createInMemoryApp({ files: { [FORK_SETTINGS]: JSON.stringify({ online: { table: OLD } }) } });
-  await migrateForkSettings({ adapter: app.vault.adapter, settings: store, rereadDelayMs: 0 });
+  await migrateForkSettings({ adapter: app.vault.adapter, configDir: app.vault.configDir, settings: store, rereadDelayMs: 0 });
   await store.flush();
   return { store, plugin, local };
 }

@@ -96,6 +96,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
   const app = new App();
 
   app.vault = {
+    configDir: '.obsidian',
     adapter: {
       exists: vi.fn(async (path: string) => files.has(path) || folders.has(path)),
       mkdir: vi.fn(async (path: string) => {
