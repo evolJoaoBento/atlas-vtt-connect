@@ -54,7 +54,10 @@ describe('FakeAtlas follows the ui contract cases', () => {
     const atlas = new FakeAtlas({ capabilities: ['views'] });
     expect(atlas.ui).toBeUndefined();
     expect(atlas.has('ui')).toBe(false);
-    expect(need(atlas, atlas.connect(connectingPlugin('x')), 'ui')).toBeNull();
+    const extension = atlas.connect(connectingPlugin('x'));
+    expect(need(atlas, extension, 'ui')).toBeNull();
+    // Called anyway, it throws, as on an older Atlas that has no `ui`.
+    expect(() => extension.ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: noop })).toThrow(/without the ui capability/);
   });
 
   it('connecting again with the same id removes what the first connection registered', () => {

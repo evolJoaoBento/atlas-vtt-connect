@@ -172,21 +172,30 @@ export class FakeAtlas implements AtlasApi {
       owned.add(dispose);
       return dispose;
     };
-    // Every namespace, as Atlas gives them (`has()` says which have landed); `remoteViews` only with `remote-view`.
+    // Every namespace, as Atlas gives them (`has()` says which have landed); `remoteViews` only with `remote-view`. A
+    // namespace whose capability this Atlas lacks throws when called, as an older Atlas without it would.
+    const gate = <T extends object>(capability: AtlasCapability, api: T): T => (this.capabilities.has(capability) ? api : new Proxy({ ...api }, {
+      get: (target, key) => {
+        const member: unknown = Reflect.get(target, key);
+        return typeof member === 'function'
+          ? (): never => { throw new Error(`[FakeAtlas] ${capability}.${String(key)} used without the ${capability} capability.`); }
+          : member;
+      },
+    }));
     const extension: AtlasExtension = {
       id, on,
-      views: this.views.api(own),
-      presentation: this.presentation.api(own),
-      rules: this.rules.api(),
-      dice: this.dice.api(own),
-      lasers: this.lasers.api(own),
-      lighting: this.lighting.api(own),
-      tokens: this.tokens.api(),
-      ui: this.slots.api(id, own),
-      scenes: this.scenes.api(id),
-      bundles: this.bundles.api(id, own),
-      settings: this.settingsApi(),
-      storage: storageApi(id),
+      views: gate('views', this.views.api(own)),
+      presentation: gate('presentation', this.presentation.api(own)),
+      rules: gate('rules', this.rules.api()),
+      dice: gate('dice', this.dice.api(own)),
+      lasers: gate('lasers', this.lasers.api(own)),
+      lighting: gate('lighting', this.lighting.api(own)),
+      tokens: gate('tokens', this.tokens.api()),
+      ui: gate('ui', this.slots.api(id, own)),
+      scenes: gate('scenes', this.scenes.api(id)),
+      bundles: gate('bundles', this.bundles.api(id, own)),
+      settings: gate('settings', this.settingsApi()),
+      storage: gate('storage', storageApi(id)),
       ...(this.capabilities.has('remote-view') ? { remoteViews: this.remoteViews.api(id, own) } : {}),
     };
     return extension;
