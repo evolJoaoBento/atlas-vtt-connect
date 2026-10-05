@@ -81,10 +81,17 @@ export interface HostedSession {
   readonly requests: HostIdentity;
   readonly table: HostedTable | null;
   readonly hostId: string;
+  readonly joinUrl: string;
+  /** The note to show while hosting: the join link is too long to work, or none. */
+  readonly linkError: string | null;
+  readonly tokenControl: TokenControl | null;
   stop(): void;
 }
 
-/** Starts hosting; null when a stop or a newer start made this one stale (its host is closed). */
+/**
+ * Starts hosting; null when a stop or a newer start made this one stale (its host is closed). The caller
+ * holds the session before it tells the UI it is hosting, so a stop from a store listener finds it.
+ */
 export async function hostSession(env: HostEnvironment, sharing: HostedSharingHooks | null): Promise<HostedSession | null> {
   const online = env.settings.get();
   const host = await env.createHost(peerServerOptions(online));
@@ -187,8 +194,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stop();
     throw error;
   }
-  onlineSessionStore.setState({
-    status: 'hosting', peerId: host.id, joinUrl, error: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null,
-  });
-  return { session, requests, table, hostId: host.id, stop };
+  return {
+    session, requests, table, hostId: host.id, joinUrl, linkError: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null, stop,
+  };
 }

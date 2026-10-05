@@ -112,7 +112,7 @@ export class OnlineSessionService {
     const generation = ++this.generation;
     const { deps } = this;
     try {
-      this.hosted = await hostSession({
+      const hosted = await hostSession({
         ...(deps.tokenControl ? { tokenControl: deps.tokenControl } : {}),
         ...(deps.dice ? { dice: deps.dice } : {}),
         ...(deps.laser ? { laser: deps.laser } : {}),
@@ -136,6 +136,16 @@ export class OnlineSessionService {
         },
         isCurrent: () => generation === this.generation,
       }, this.sharingHooks);
+      if (generation !== this.generation) {
+        hosted?.stop();
+        return;
+      }
+      if (!hosted) return;
+      // Held before the UI hears of it, as the fork did: a stop from a store listener then stops this session.
+      this.hosted = hosted;
+      onlineSessionStore.setState({
+        status: 'hosting', peerId: hosted.hostId, joinUrl: hosted.joinUrl, error: hosted.linkError, tokenControl: hosted.tokenControl,
+      });
     } catch (error) {
       if (generation === this.generation) onlineSessionStore.setState({ status: 'error', error: errorText(error) });
     }
@@ -143,8 +153,10 @@ export class OnlineSessionService {
 
   stop(): void {
     this.generation++;
-    this.hosted?.stop();
+    // Let go first: a store listener that stops again while this one tears down finds nothing to stop.
+    const hosted = this.hosted;
     this.hosted = null;
+    hosted?.stop();
     resetOnlineSessionStore();
   }
 

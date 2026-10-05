@@ -163,6 +163,20 @@ describe('OnlineSessionService', () => {
     expect(svc.session).toBeNull();
   });
 
+  it('holds the session before it says it is hosting, so a stop from a store listener stops it', async () => {
+    const host = new MemoryNetwork().host('gm-id');
+    const closeSpy = vi.spyOn(host, 'close');
+    const svc = new OnlineSessionService(app, settings, {
+      table: async () => null, createHost: async () => host, showRequest: () => ({ hide: () => {} }), ...atlasDeps(),
+    });
+    const unsubscribe = onlineSessionStore.subscribe((state) => { if (state.status === 'hosting') svc.stop(); });
+    await svc.start();
+    unsubscribe();
+    expect(svc.session).toBeNull();
+    expect(closeSpy).toHaveBeenCalled();
+    expect(onlineSessionStore.getState().status).toBe('idle');
+  });
+
   it('does not report a late failure after stop', async () => {
     let reject!: (e: unknown) => void;
     const svc = new OnlineSessionService(app, settings, {

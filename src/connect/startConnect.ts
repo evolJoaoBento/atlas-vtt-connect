@@ -4,8 +4,8 @@ import { sessionDeps } from '../app/online/atlas/sessionDeps';
 import { OnlineSessionService, type Deps, type SessionSettings } from '../app/online/OnlineSessionService';
 import { registerOnline } from '../app/online/registerOnline';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
-import { sharingPaths } from '../app/online/sharing/sharingPaths';
 import { need } from './capabilities';
+import { connectStorage } from './connectStorage';
 
 export interface ConnectOptions {
   /** Connect's own settings (`ConnectSettingsStore`). */
@@ -14,20 +14,18 @@ export interface ConnectOptions {
   hosting?: Partial<Deps>;
 }
 
-/** The namespaces hosting needs; null on an Atlas that lacks any of them. */
-function hostingAtlas(api: AtlasApi, atlas: AtlasExtension): Pick<AtlasExtension, 'views' | 'presentation' | 'rules' | 'settings' | 'storage' | 'on'> | null {
-  const views = need(api, atlas, 'views');
-  const presentation = need(api, atlas, 'presentation');
-  const rules = need(api, atlas, 'rules');
-  const settings = need(api, atlas, 'settings');
-  const storage = need(api, atlas, 'storage');
-  if (!views || !presentation || !rules || !settings || !storage) return null;
-  return { views, presentation, rules, settings, storage, on: atlas.on.bind(atlas) };
+/** Hosting needs the presented scene, the views, the rules, Atlas's settings and a storage folder. */
+const HOSTING = ['views', 'presentation', 'rules', 'settings', 'storage'] as const;
+
+function canHost(api: AtlasApi, atlas: AtlasExtension): boolean {
+  return HOSTING.every((capability) => need(api, atlas, capability) !== null);
 }
 
 /** Hosting online sessions: the session service, its commands, the status bar item and the presentation target. */
-async function startHosting(plugin: Plugin, atlas: NonNullable<ReturnType<typeof hostingAtlas>>, options: ConnectOptions): Promise<Disposer> {
-  const people = PeopleBook.forApp(plugin.app, sharingPaths(await atlas.storage.folder()));
+async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension, options: ConnectOptions): Promise<Disposer> {
+  const paths = await connectStorage(api, atlas);
+  if (!paths) return () => undefined;
+  const people = PeopleBook.forApp(plugin.app, paths);
   const service = new OnlineSessionService(plugin.app, options.settings, { ...sessionDeps(atlas), people, ...options.hosting });
   return registerOnline(plugin, service, { presentation: atlas.presentation });
 }
@@ -41,9 +39,8 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
     if (disposed) stop();
     else stops.push(stop);
   };
-  const hosting = hostingAtlas(api, atlas);
-  if (hosting) {
-    startHosting(plugin, hosting, options).then(keep, (error: unknown) => {
+  if (canHost(api, atlas)) {
+    startHosting(plugin, api, atlas, options).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start hosting online sessions:', error);
     });
   }

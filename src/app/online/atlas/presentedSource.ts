@@ -110,6 +110,8 @@ export function presentedSource(atlas: Atlas): PresentedSceneSource {
         if (listeners.size > 0) return;
         stopWatching?.();
         stopWatching = null;
+        // Unwatched, a re-present would go unseen: the next presentation read is a new object.
+        known = null;
       };
     },
   };
