@@ -38,7 +38,6 @@ export class DiceHost implements SessionHandler {
   private readonly history: Array<{ entry: DiceLogEntry; rolledBy: string | null }> = [];
   /** The player whose roll Atlas is rolling now: the feed hears it before `roll` returns, so before its id is known. */
   private rolling: { playerId: string; name: string } | null = null;
-  private liveMapPath: string | null = null;
   private readonly stops: Array<() => void> = [];
 
   constructor(private readonly options: DiceHostOptions) {}
@@ -73,14 +72,14 @@ export class DiceHost implements SessionHandler {
   }
 
   /**
-   * The map players have: the presented scene's, or while the GM holds it (looks at another tab of
-   * the view, whose store then holds that tab's map) the one last seen live.
+   * The map players have: the live scene's, or while the GM holds the scene (looks at another tab of the
+   * view, whose store then holds that tab's map) the presented tab's, which is what players still see.
    */
   private playersMapPath(): string | null {
     const { presented } = this.options;
-    const mapPath = presented.current()?.snapshot()?.mapPath ?? null;
-    if (!presented.isHeld()) this.liveMapPath = mapPath;
-    return this.liveMapPath ?? mapPath;
+    const scene = presented.current();
+    if (!scene) return null;
+    return (presented.isHeld() ? scene.info.mapPath : scene.snapshot()?.mapPath) || null;
   }
 
   /** Drops the windows of players who left the session: a reconnect must not reset one. */

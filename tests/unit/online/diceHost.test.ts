@@ -1,5 +1,5 @@
 import type { DiceRules } from '@atlas-vtt/api-types';
-import { rollFormula } from '@atlas-vtt/shared/rules';
+import { persistableDiceLog, rollFormula } from '@atlas-vtt/shared/rules';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DICE_LIMITS } from '../../../src/app/online/tools/toolMessages';
 import { TAVERN_MAP } from './presentedFixtures';
@@ -39,6 +39,8 @@ describe('DiceHost', () => {
     expect(a.session.sendDiceRoll({ d20: 1 }, 2)).toBe(true);
     expect(w.logged).toHaveLength(1);
     expect(w.logged[0]).toMatchObject({ formula: 'd20+2', rolledBy: 'A', total: 13 });
+    // Nothing is stored: a player's roll stays in the live log, out of the map file's.
+    expect(persistableDiceLog(w.logged)).toEqual([]);
     w.finish();
   });
 
@@ -251,6 +253,21 @@ describe('DiceHost', () => {
     w.publish(rollFormula('d6'));
     expect(w.logs(a)).toHaveLength(count);
     expect(w.logged).toHaveLength(1);
+    w.finish();
+  });
+
+  it("takes the rules of the presented map when the GM holds the scene before anyone has rolled", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    // Only the Tavern's collection explodes sixes; the Dungeon has none.
+    setDiceRules(w, { defaultRoll: '1d6', crit: 'natural', explode: { dice: 'all', repeats: false, highFaces: 1, lowFaces: 0 } });
+    w.tabs.getState().setActiveTab(w.dungeon);
+    await vi.advanceTimersByTimeAsync(100);
+    w.atlas.dice.setRandom(() => 0.999);
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.atlas.dice.rolledFor).toEqual([TAVERN_MAP]);
+    expect(w.logged[0]?.rolls.map((die) => die.exploded === true)).toEqual([false, true]);
     w.finish();
   });
 });

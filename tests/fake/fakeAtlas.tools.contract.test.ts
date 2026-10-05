@@ -1,4 +1,4 @@
-import { rollFormula } from '@atlas-vtt/shared/rules';
+import { persistableDiceLog, rollFormula } from '@atlas-vtt/shared/rules';
 import type { DiceRollResult, LocalLaserEvent } from '@atlas-vtt/api-types';
 import { describe, expect, it } from 'vitest';
 import { connectingPlugin, FakeAtlas } from './FakeAtlas';
@@ -23,7 +23,7 @@ function atlasWithExplodingD6() {
 // C-laser-2 (fading, and a sender silent for a second is let go) is drawn by Atlas: the fake has no drawing, and
 // the vendored SOURCE.json lists no such case, so it has no ATLAS_ONLY entry either (the meta-test would reject one).
 describe('FakeAtlas follows the dice and laser contract cases', () => {
-  it('C-dice-1: roll uses the collection dice rules, sets rolledBy, and reaches onRolled', () => {
+  it('C-dice-1: roll uses the collection dice rules, sets rolledBy, reaches onRolled, and is not persisted', () => {
     const { atlas, dice } = atlasWithExplodingD6();
     const seen: DiceRollResult[] = [];
     dice.onRolled((result) => seen.push(result));
@@ -38,6 +38,7 @@ describe('FakeAtlas follows the dice and laser contract cases', () => {
     expect(seen).toEqual([result]);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(seen[0])).toBe(true);
+    expect(persistableDiceLog([result])).toEqual([]);
   });
 
   it('C-dice-1: outside a collection nothing explodes, and a bonus is added to the default roll', () => {
