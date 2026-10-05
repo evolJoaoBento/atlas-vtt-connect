@@ -23,15 +23,36 @@ describe('Controlled by', () => {
     const control = harness.host(players);
     expect(menu().map((item) => item.label)).toEqual([CONTROLLED_BY_LABEL]);
     expect(menu()[0]).toMatchObject({ icon: 'users' });
-    expect(submenu().map(({ label, checked }) => ({ label, checked }))).toEqual([
-      { label: 'Anna', checked: false },
-      { label: 'Ben', checked: false },
+    expect(submenu().map(({ label, checked, keepOpen }) => ({ label, checked, keepOpen }))).toEqual([
+      { label: 'Anna', checked: false, keepOpen: true },
+      { label: 'Ben', checked: false, keepOpen: true },
     ]);
     submenu()[1]!.onClick!();
     expect(control.tokensOf('p2')).toEqual(['hero']);
     expect(submenu()[1]!.checked).toBe(true);
     submenu()[1]!.onClick!();
     expect(control.tokensOf('p2')).toEqual([]);
+  });
+
+  it('stays open while players are ticked in a row, its ticks following each choice (API 1.13.0)', () => {
+    const control = harness.host(players);
+    const open = harness.ui.openTokenMenu(harness.scene.view, 'hero', 'character');
+    expect(open.choose([CONTROLLED_BY_LABEL, 'Anna'])).toBe(true);
+    expect(open.choose([CONTROLLED_BY_LABEL, 'Ben'])).toBe(true);
+    expect(open.isOpen).toBe(true);
+    expect(open.submenu([CONTROLLED_BY_LABEL]).map(({ label, checked }) => ({ label, checked }))).toEqual([
+      { label: 'Anna', checked: true },
+      { label: 'Ben', checked: true },
+    ]);
+    expect([control.tokensOf('p1'), control.tokensOf('p2')]).toEqual([['hero'], ['hero']]);
+    expect(open.choose([CONTROLLED_BY_LABEL, 'Anna'])).toBe(true);
+    expect(open.submenu([CONTROLLED_BY_LABEL])[0]).toMatchObject({ label: 'Anna', checked: false });
+  });
+
+  it("is not offered in a remote view, a player's since API 1.12.0", () => {
+    harness.host(players);
+    harness.atlas.views.openRemote('remote-1');
+    expect(harness.ui.tokenMenu('remote-1', 'hero', 'character')).toEqual([]);
   });
 
   it('says no players are connected while nobody is admitted', () => {
