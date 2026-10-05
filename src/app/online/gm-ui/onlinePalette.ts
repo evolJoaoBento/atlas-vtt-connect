@@ -11,12 +11,13 @@ export interface PaletteEnv {
   views: Pick<ViewsApi, 'list'>;
 }
 
-/** The palette's last section: the online play commands that apply now. */
+/** The palette's last section: the online play commands that apply now, in a GM map view (none in a remote view). */
 export function onlinePaletteSection(env: PaletteEnv): PaletteSection {
   return {
     id: 'online',
     title: ONLINE_SECTION_TITLE,
     commands: (ctx): PaletteCommand[] => {
+      if (ctx.kind !== 'map') return [];
       const { present, stop } = presentingActions(env, ctx);
       return [
         { id: 'online-session', icon: 'network', label: ONLINE_SESSION_LABEL, keywords: ['online', 'players', 'join', 'link', 'host'], run: () => env.panel.open(ctx.viewId) },

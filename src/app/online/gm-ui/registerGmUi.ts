@@ -1,6 +1,7 @@
 /**
  * The GM's online play in Atlas's UI slots (API `ui`): the toolbar button, the palette section, the view menu items,
- * the token menu's "Controlled by" and the panel. Without the `ui` capability none of it exists, and the commands, the
+ * the token menu's "Controlled by" and the panel, in the GM's map views only: since API 1.12.0 Atlas also lists remote
+ * views (`kind: 'remote'`), where none of it shows. Without the `ui` capability none of it exists, and the commands, the
  * status bar item and the modal run a session instead (`registerOnline`).
  */
 import type { App } from 'obsidian';
@@ -56,6 +57,8 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
     ui.addToolbarItem(onlineToolbarItem({ panel, session: () => onlineSessionStore.getState() })),
     ui.addPaletteSection(onlinePaletteSection({ service, panel, presentation, views })),
     ui.addViewMenuItems((ctx) => {
+      // Online play is hosted from the GM's map views; a remote view (a player's, since API 1.12.0) offers none of it.
+      if (ctx.kind !== 'map') return [];
       const { present, stop } = presentingActions({ presentation, views }, ctx);
       return [
         { label: `${ONLINE_SESSION_LABEL}…`, icon: 'radio-tower', onClick: () => panel.open(ctx.viewId) },
@@ -89,6 +92,7 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
     for (const dispose of stops.splice(0).reverse()) dispose();
   };
   const openPanel = (app: App): boolean => {
+    // `active()` is only ever a GM map view; the list also holds remote views (API 1.12.0), which never host.
     const active = views.active();
     const target = active ?? views.list().find((view) => view.kind === 'map');
     if (!target) return false;

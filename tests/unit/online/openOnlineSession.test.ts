@@ -51,6 +51,28 @@ describe('Online session… command', () => {
     expect(openOnlineSessionModal).not.toHaveBeenCalled();
   });
 
+  it('never picks a remote view (API 1.12.0): the first GM map view gets the panel, and with only a remote view open the modal', () => {
+    harness.atlas.views.close(harness.scene.view);
+    harness.atlas.views.openRemote('remote-1');
+    harness.atlas.views.setActive('remote-1');
+    openOnlineSession(appWith(['remote-1']).app, harness.gm);
+    expect(harness.ui.panelContainer('online', 'remote-1')).toBeNull();
+    expect(openOnlineSessionModal).toHaveBeenCalledOnce();
+    // Listed after the remote view: a pick that ignored the kind would take the remote one.
+    const gmView = secondView();
+    openOnlineSession(appWith(['remote-1', gmView]).app, harness.gm);
+    expect(harness.ui.panelContainer('online', gmView)).not.toBeNull();
+    expect(harness.ui.panelContainer('online', 'remote-1')).toBeNull();
+  });
+
+  it("offers nothing of online play in a remote view's menu, palette or toolbar", () => {
+    harness.atlas.views.openRemote('remote-1');
+    expect(harness.ui.viewMenu('remote-1')).toEqual([]);
+    expect(harness.ui.palette('remote-1')).toEqual([]);
+    expect(harness.ui.drawToolbar('remote-1')).toEqual([]);
+    expect(harness.ui.viewMenu(harness.scene.view).length).toBeGreaterThan(0);
+  });
+
   it('opens the modal when no map view is open', () => {
     harness.atlas.views.close(harness.scene.view);
     const { app } = appWith([]);
