@@ -95,4 +95,13 @@ describe('FakeAtlas follows the tokens cases', () => {
     atlas.views.close('v1');
     expect(tokens.move('v1', [{ tokenId: 'a', x: 1, y: 1 }])).toEqual({ ok: false, reason: 'not-loaded' });
   });
+
+  it('refuses malformed options before anything else, as Atlas does', () => {
+    const { tokens } = setup();
+    expect(() => tokens.move('v1', [], 5 as never)).toThrow(/options/);
+    expect(() => tokens.move('v1', [], [] as never)).toThrow(/options/);
+    expect(() => tokens.move('v1', [], { snap: 'yes' } as never)).toThrow(/snap/);
+    expect(() => tokens.move('nobody', [], { clampToMap: 1 } as never)).toThrow(/clampToMap/);
+    expect(() => tokens.move('v1', [{ tokenId: 'a', x: 1, y: 1 }], { allowHidden: null } as never)).toThrow(/allowHidden/);
+  });
 });

@@ -57,6 +57,21 @@ function raised(tokens: Tokens, ids: readonly string[]): Tokens {
   return Object.fromEntries(Object.entries(tokens).map(([id, token]) => [id, layers.has(id) ? { ...token, layer: layers.get(id)! } : token]));
 }
 
+/** The options with every flag settled; throws on a malformed one (Atlas's `settled`). */
+function settled(options: unknown): Required<TokenMoveOptions> {
+  if (options !== undefined && (typeof options !== 'object' || options === null || Array.isArray(options))) {
+    throw new Error('tokens.move: "options" must be an object.');
+  }
+  const given = (options ?? {}) as Record<string, unknown>;
+  const flag = (name: keyof TokenMoveOptions, fallback: boolean): boolean => {
+    const value = given[name];
+    if (value === undefined) return fallback;
+    if (typeof value !== 'boolean') throw new Error(`tokens.move: "${name}" must be true or false.`);
+    return value;
+  };
+  return { snap: flag('snap', true), clampToMap: flag('clampToMap', true), allowHidden: flag('allowHidden', false) };
+}
+
 /** Atlas's `tokens` over the fake views; each successful move is one undo step, which `undo` takes back. */
 export class FakeTokens {
   private readonly steps = new Map<ViewId, Tokens[]>();
@@ -83,13 +98,13 @@ export class FakeTokens {
         const scene = this.views.sceneOf(viewId);
         return frozenPoint(scene ? snapDropped(scene.grid, { x: point.x, y: point.y }, tokenSize) : point);
       },
-      move: (viewId: ViewId, moves: readonly TokenMove[], options?: TokenMoveOptions): TokenMoveResult => this.move(viewId, moves, options ?? {}),
+      move: (viewId: ViewId, moves: readonly TokenMove[], options?: TokenMoveOptions): TokenMoveResult => this.move(viewId, moves, options),
     });
   }
 
-  private move(viewId: ViewId, moves: readonly TokenMove[], options: TokenMoveOptions): TokenMoveResult {
+  private move(viewId: ViewId, moves: readonly TokenMove[], options: unknown): TokenMoveResult {
+    const { snap, clampToMap, allowHidden } = settled(options);
     if (!Array.isArray(moves)) throw new Error('tokens.move: "moves" must be a list of { tokenId, x, y }.');
-    const { snap = true, clampToMap = true, allowHidden = false } = options;
     const wanted = new Map<string, Partial<TokenMove>>();
     for (const move of moves as unknown[]) {
       const entry = (typeof move === 'object' && move !== null ? move : {}) as Partial<TokenMove>;
