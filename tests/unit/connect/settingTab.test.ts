@@ -4,9 +4,10 @@ import { UPDATE_ATLAS_TO_SHARE } from '../../../src/connect/connectSharing';
 import { ConnectSettingTab } from '../../../src/connect/settingTab';
 import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
 import { fakeDataPlugin } from './fakeDataPlugin';
+import { memoryKeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
 
 async function renderTab(): Promise<{ tab: ConnectSettingTab; store: ConnectSettingsStore; el: HTMLElement }> {
-  const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+  const store = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
   const tab = new ConnectSettingTab(new App(), {} as Plugin, store);
   tab.display();
   return { tab, store, el: tab.containerEl };
@@ -95,7 +96,7 @@ describe('ConnectSettingTab', () => {
   });
 
   it('says to update Atlas while the bound Atlas cannot share notes and maps, and not otherwise', async () => {
-    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
     let notice: string | null = UPDATE_ATLAS_TO_SHARE;
     const tab = new ConnectSettingTab(new App(), {} as Plugin, store, () => notice);
     tab.display();

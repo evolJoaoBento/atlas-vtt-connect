@@ -1,5 +1,12 @@
 import type { Plugin } from 'obsidian';
-import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, type OnlineSettings } from '../app/online/onlineSettings';
+import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, validStoredTable, type OnlineSettings, type StoredTable } from '../app/online/onlineSettings';
+import type { KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
+
+/**
+ * Where the GM's table key lives: Obsidian's local storage, which Obsidian keeps per vault on each device. Never in
+ * `data.json`, which sits in the vault's configuration folder and syncs, or is handed to players with the vault.
+ */
+export const TABLE_KEY_STORAGE = 'atlas-vtt-connect:table-key';
 
 /**
  * The vault's steps of the migration from the fork (`migrateFromFork`), each marked once it is done; together they
@@ -9,9 +16,9 @@ import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, type OnlineSettings } f
 export const FORK_STEPS = ['settings', 'sharing', 'mapShares'] as const;
 export type ForkStep = typeof FORK_STEPS[number];
 
-/** What Connect keeps in its `data.json`. */
+/** What Connect keeps in its `data.json`: never a private key (`table` only while local storage refuses it). */
 interface StoredData {
-  online: OnlineSettings;
+  online: Omit<OnlineSettings, 'table'> & { table?: StoredTable };
   /** Set once every migration step is done; each counts as done then. */
   migratedFromFork?: 1;
   /** The migration steps done so far. */
@@ -35,26 +42,49 @@ const SAVE_DELAY_MS = 500;
 
 type DataPlugin = Pick<Plugin, 'loadData' | 'saveData'>;
 
-/** Connect's own settings, in the plugin's data file. Changes save 500 ms after the last one; migration marks at once. */
+const sameTable = (a: StoredTable | null, b: StoredTable): boolean => a !== null && a.id === b.id && a.publicKey === b.publicKey && a.privateKey.d === b.privateKey.d;
+
+/**
+ * Connect's own settings, in the plugin's data file, and the table key in local storage on this device. Changes save
+ * 500 ms after the last one; migration marks at once.
+ */
 export class ConnectSettingsStore {
   private readonly listeners = new Set<() => void>();
   private saveTimer: number | null = null;
   private migrated: boolean;
   private readonly steps: Set<ForkStep>;
   private readonly changed: Set<keyof OnlineSettings>;
+  /** Whether the table key is safely in local storage (read back after writing), or there is none: then `data.json` holds none. */
+  private tableKept = true;
 
-  private constructor(private readonly plugin: DataPlugin, private online: OnlineSettings, migrated: boolean, steps: ForkStep[], ownKeys: Array<keyof OnlineSettings>) {
+  private constructor(
+    private readonly plugin: DataPlugin, private readonly local: KeyValueStore, private online: OnlineSettings,
+    migrated: boolean, steps: ForkStep[], ownKeys: Array<keyof OnlineSettings>,
+  ) {
     this.migrated = migrated;
     this.steps = new Set(steps);
     this.changed = new Set(this.forkStepDone('settings') ? [] : ownKeys);
   }
 
-  static async load(plugin: DataPlugin): Promise<ConnectSettingsStore> {
+  /**
+   * `local` is Obsidian's local storage (`obsidianLocalStore`). A table key found in `data.json` (written before keys
+   * moved out, or synced from a device that still runs such a version) is moved once: written to local storage, read
+   * back, and only then stripped from `data.json`. A key already in local storage wins over the synced one.
+   */
+  static async load(plugin: DataPlugin, local: KeyValueStore): Promise<ConnectSettingsStore> {
     const stored: unknown = await plugin.loadData();
     const data = typeof stored === 'object' && stored !== null ? stored as Partial<Record<keyof StoredData, unknown>> : {};
     const online = resolveOnlineSettings(data.online);
     online.playerPageUrl = movedPlayerPage(online.playerPageUrl);
-    return new ConnectSettingsStore(plugin, online, data.migratedFromFork === 1, listOf(data.forkSteps, isForkStep), listOf(data.forkOwnKeys, isSettingKey));
+    const synced = online.table;
+    const kept = validStoredTable(local.get(TABLE_KEY_STORAGE));
+    online.table = kept ?? synced;
+    const store = new ConnectSettingsStore(plugin, local, online, data.migratedFromFork === 1, listOf(data.forkSteps, isForkStep), listOf(data.forkOwnKeys, isSettingKey));
+    const inFile = typeof data.online === 'object' && data.online !== null && 'table' in data.online;
+    if (!kept && synced) store.tableKept = store.keepTable(synced);
+    // Strip the key from the file (or the leftover entry) once it is safe on this device.
+    if (inFile && store.tableKept) store.saveNow();
+    return store;
   }
 
   get(): OnlineSettings {
@@ -67,6 +97,7 @@ export class ConnectSettingsStore {
   }
 
   set(partial: Partial<OnlineSettings>): void {
+    if (partial.table !== undefined && partial.table !== this.online.table) this.tableKept = this.keepTable(partial.table);
     this.online = { ...this.online, ...partial };
     if (!this.forkStepDone('settings')) for (const key of Object.keys(partial) as Array<keyof OnlineSettings>) this.changed.add(key);
     this.scheduleSave();
@@ -124,9 +155,22 @@ export class ConnectSettingsStore {
     void this.save();
   }
 
+  /** Writes the table key (or its removal) to local storage; true once it reads back the same. */
+  private keepTable(table: StoredTable | null): boolean {
+    this.local.set(TABLE_KEY_STORAGE, table);
+    const back = this.local.get(TABLE_KEY_STORAGE);
+    if (table === null) return back === null || back === undefined;
+    const ok = sameTable(validStoredTable(back), table);
+    if (!ok) console.error('[Atlas VTT Connect] Could not keep the table key on this device; it stays in the settings file for now.');
+    return ok;
+  }
+
   private async save(): Promise<void> {
+    // Retried on every save while local storage refused it, so the file holds the key no longer than needed.
+    if (!this.tableKept && this.online.table) this.tableKept = this.keepTable(this.online.table);
+    const { table, ...rest } = this.online;
     const data: StoredData = {
-      online: this.online,
+      online: !this.tableKept && table ? { ...rest, table } : rest,
       ...(this.migrated ? { migratedFromFork: 1 as const } : {}),
       ...(this.steps.size > 0 ? { forkSteps: [...this.steps] } : {}),
       ...(this.changed.size > 0 ? { forkOwnKeys: [...this.changed] } : {}),

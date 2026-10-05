@@ -60,8 +60,8 @@ When you join with Connect (**Join online session…**), it connects to the sign
 
 When you and others play from Obsidian, Connect identifies each of you with a key that stays on your device. Joining sends a signature made with it and the public key, never the private key.
 
-- **The GM's table key** is kept in Connect's settings file, `plugins/atlas-vtt-connect/data.json` in the vault's configuration folder (`.obsidian` by default), so it travels with the vault: anyone who can read the vault, or a copy or sync of it, can act as that table. Using one vault on several machines keeps it one table. After moving from the online play preview, the key is also still in Atlas's settings (see below).
-- **A player's device key** is kept in Obsidian's local storage on this device, one per table, never in the vault. Obsidian keeps local storage per vault on each device, so a second vault or device is a new device to the GM, who can link it to the person.
+- **The GM's table key** is kept in Obsidian's local storage on this device, never in the vault. Obsidian keeps local storage per vault on each device. Connect's settings file (`plugins/atlas-vtt-connect/data.json` in the vault's configuration folder) holds only the table's public id. A vault you sync, copy or hand to players therefore does not carry the key, and nobody who gets the vault can act as your table. Each device you host from has its own table, and players who know one table meet a new one on another device. Versions of Connect before this kept the key in its settings file. On its first start, Connect moves the key to local storage, reads it back, and only then removes it from the file. If the key cannot be kept in local storage, it stays in the file and Connect tries again on the next save. After moving from the online play preview, the key is also still in Atlas's settings (see below).
+- **A player's device key** is kept in Obsidian's local storage on this device, one per table, never in the vault or in Connect's settings file. Obsidian keeps local storage per vault on each device, so a second vault or device is a new device to the GM, who can link it to the person.
 - **The people list** (names, device ids, when they were last seen) is kept in `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing/people.json`: the GM's for everyone admitted, a player's for the people they met.
 
 ## Sharing notes and maps
@@ -85,13 +85,13 @@ What you pull is written into your vault: notes into `Shared/<person>/`, maps an
 ## What stays on your device
 
 - **In your vault:** your notes and maps as usual, the people list and sharing records above, and what you pull.
-- **In Connect's settings file:** `plugins/atlas-vtt-connect/data.json` in the vault's configuration folder holds your online settings, including your table key and any relay username and password.
-- **In Obsidian's storage on this device, outside the vault:** the device keys (Obsidian keeps these per vault, on each device) and, with **Keep online images on this device** on (the default), the images you received, up to 500 MB. Switching it off deletes them. The images are shared by all vaults on the device.
+- **In Connect's settings file:** `plugins/atlas-vtt-connect/data.json` in the vault's configuration folder holds your online settings, including any relay username and password (players receive these in the join link). It holds no private key.
+- **In Obsidian's storage on this device, outside the vault:** the table key and the device keys, under `atlas-vtt-connect:` names (Obsidian keeps these per vault, on each device) and, with **Keep online images on this device** on (the default), the images you received, up to 500 MB. Switching it off deletes them. The images are shared by all vaults on the device.
 - **In the player's browser, on the join page:** with **Keep images on this device** on (the default), the images it received, up to 500 MB, until the player switches it off or chooses **Clear saved images**. With it off, images are kept only while the page is open. The page also keeps the player's name, a random player key per session (it is tied to the GM's random session id, so it identifies nobody across sessions), the keep-images switch, the diagnostics switch and the display choices (roll display, laser colour).
 
 ## Moving from the online play preview
 
-Atlas VTT Connect copies the preview's online settings, including your table key, from `atlas-vtt/.atlas-data/settings.json` into its own settings. It never edits Atlas's settings file, so the old copy of the key stays there until you remove the `online` entry from that file by hand while Obsidian is closed. Both copies are in your vault; nothing is sent anywhere.
+Atlas VTT Connect copies the preview's online settings from `atlas-vtt/.atlas-data/settings.json` into its own settings, and the preview's table key into Obsidian's local storage on this device. It never edits Atlas's settings file, so the old copy of the key stays there, in your vault, until you remove the `online` entry from that file by hand while Obsidian is closed. Nothing is sent anywhere.
 
 Atlas VTT Connect copies, and never removes, what the preview kept:
 
@@ -101,7 +101,7 @@ Atlas VTT Connect copies, and never removes, what the preview kept:
 
 The folder stays in your vault until you delete it; the notice shown after the move names it. Delete it once you've checked your people and shares. The device keys and images stay in Obsidian's storage on this device; Connect never removes them, and turning off **Keep online images on this device** clears only Connect's images.
 
-Atlas VTT Connect sends none of this anywhere. A sync tool you use may copy these files, including Connect's own settings file in the vault's configuration folder, which holds your table key.
+Atlas VTT Connect sends none of this anywhere. A sync tool you use may copy these files, including Connect's own settings file in the vault's configuration folder, which holds no private key. Atlas's settings file may still hold the preview's table key until you remove it.
 
 ## Clipboard
 

@@ -9,7 +9,7 @@ import type { ImageStore } from '../app/online/assets/AssetCache';
 import { IMAGES_DB_NAME } from '../app/online/assets/indexedDbImageStore';
 import { isRecord } from '../app/online/onlineSettings';
 import { FORK_NAME, pageKey } from '../app/online/page/pageStorage';
-import { DEVICE_KEYS_STORAGE, isKeyPairJwk, type KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
+import { DEVICE_KEYS_STORAGE, isKeyPairJwk, OLD_DEVICE_KEYS_STORAGE, type KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 
 export const FORK_DEVICE_KEYS_STORAGE = `${FORK_NAME}-device-keys`;
 export const FORK_IMAGES_DB_NAME = `${FORK_NAME}-images`;
@@ -20,19 +20,24 @@ export const imagesCopied = (store: KeyValueStore): boolean => store.get(IMAGES_
 export const markImagesCopied = (store: KeyValueStore): void => { store.set(IMAGES_COPIED_KEY, true); };
 
 /**
- * Adds the fork's device key of each table this device has no key for yet, so the GM still knows this device when it
- * joins again; a key Connect made itself wins. Malformed entries are dropped. Cheap and safe to repeat, so it runs on
- * every start (no mark: one in the vault's settings would sync to devices whose keys were never merged). Returns how
- * many keys were added.
+ * Adds the device key of each table this device has no key for yet from Connect's old local storage name, then from
+ * the fork's, so the GM still knows this device when it joins again; a key under the current name wins. Malformed
+ * entries are dropped; the old entries are left as they were (they are on this device only). Cheap and safe to
+ * repeat, so it runs on every start (no mark: one in the vault's settings would sync to devices whose keys were never
+ * merged). Returns how many keys were added.
  */
 export function migrateDeviceKeys(store: KeyValueStore): number {
-  const fork = store.get(FORK_DEVICE_KEYS_STORAGE);
-  if (!isRecord(fork)) return 0;
-  const stored = store.get(DEVICE_KEYS_STORAGE);
-  const own = isRecord(stored) ? stored : {};
-  const added = Object.entries(fork).filter(([table, keys]) => table.length <= 200 && !isKeyPairJwk(own[table]) && isKeyPairJwk(keys));
-  if (added.length > 0) store.set(DEVICE_KEYS_STORAGE, { ...own, ...Object.fromEntries(added) });
-  return added.length;
+  let added = 0;
+  for (const source of [OLD_DEVICE_KEYS_STORAGE, FORK_DEVICE_KEYS_STORAGE]) {
+    const older = store.get(source);
+    if (!isRecord(older)) continue;
+    const stored = store.get(DEVICE_KEYS_STORAGE);
+    const own = isRecord(stored) ? stored : {};
+    const missing = Object.entries(older).filter(([table, keys]) => table.length <= 200 && !isKeyPairJwk(own[table]) && isKeyPairJwk(keys));
+    if (missing.length > 0) store.set(DEVICE_KEYS_STORAGE, { ...own, ...Object.fromEntries(missing) });
+    added += missing.length;
+  }
+  return added;
 }
 
 export interface ImageCacheDeps {

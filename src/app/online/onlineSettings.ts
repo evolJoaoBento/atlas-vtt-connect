@@ -14,7 +14,7 @@ export interface StoredTable {
 }
 
 /** A stored table key of the right shape; null for anything else. */
-function validStoredTable(value: unknown): StoredTable | null {
+export function validStoredTable(value: unknown): StoredTable | null {
   if (!isRecord(value)) return null;
   const { id, publicKey, privateKey } = value;
   if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(id)) return null;
@@ -34,7 +34,10 @@ export interface OnlineSettings {
   playerName: string;
   /** Joining from Atlas: keep a session's images on this device (outside the vault) for the next one. */
   keepImages: boolean;
-  /** The GM's table key (sharing between Obsidian clients): made the first time this Atlas hosts; null before. */
+  /**
+   * The GM's table key (sharing between Obsidian clients): made the first time this Atlas hosts; null before. Kept in
+   * Obsidian's local storage on this device, never in `data.json` (`ConnectSettingsStore`).
+   */
   table: StoredTable | null;
   /** Note properties that shared notes keep (all others are stripped; `atlas-share` always). */
   shareableProperties: string[];

@@ -6,7 +6,9 @@
 import type { App } from 'obsidian';
 import type { IdentityCrypto, KeyPairJwk } from './identityCrypto';
 
-export const DEVICE_KEYS_STORAGE = 'atlas-vtt-connect-device-keys';
+export const DEVICE_KEYS_STORAGE = 'atlas-vtt-connect:device-keys';
+/** Where Connect kept them before its local storage keys took the `atlas-vtt-connect:` prefix; merged in on start. */
+export const OLD_DEVICE_KEYS_STORAGE = 'atlas-vtt-connect-device-keys';
 
 export interface KeyValueStore {
   get(key: string): unknown;

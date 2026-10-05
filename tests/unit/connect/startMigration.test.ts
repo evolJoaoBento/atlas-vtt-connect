@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtlasCapability } from '@atlas-vtt/api-types';
 import { resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
-import { DEVICE_KEYS_STORAGE } from '../../../src/app/online/sharing/identity/deviceKeys';
+import { DEVICE_KEYS_STORAGE, memoryKeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
 import { LEFTOVER_NOTICE, MIGRATED_NOTICE } from '../../../src/connect/migrateFromFork';
 import { FORK_DEVICE_KEYS_STORAGE, IMAGES_COPIED_KEY, type ImageCacheDeps } from '../../../src/connect/migrateLocalStores';
 import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
@@ -24,7 +24,7 @@ const noImages: ImageCacheDeps = { exists: async () => false, open: async () => 
 
 /** Connect bound to an Atlas with these capabilities over a vault holding `files`; the storage folder waits for `answer()`. */
 async function bound(capabilities: AtlasCapability[], files: Record<string, string>, start: MigrationStart = {}) {
-  const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+  const store = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
   const notices: string[] = [];
   let answer = (): void => undefined;
   const gate = new Promise<void>((resolve) => { answer = resolve; });
@@ -111,10 +111,10 @@ describe('the fork migration when Connect binds to Atlas', () => {
 
   it('a setting typed during a stuck settings step survives a restart; the fork settings then come over under it', async () => {
     const data = fakeDataPlugin(null);
-    const before = await ConnectSettingsStore.load(data);
+    const before = await ConnectSettingsStore.load(data, memoryKeyValueStore());
     before.set({ playerName: 'Rin' }); // the step was stuck on a half-written file when this was typed
     await before.flush();
-    const store = await ConnectSettingsStore.load(fakeDataPlugin(data.saved.at(-1))); // Obsidian restarted
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(data.saved.at(-1)), memoryKeyValueStore()); // Obsidian restarted
     const { plugin } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { playerName: 'GM', table: TABLE } }) } }).connect;
     const atlas = new FakeAtlas({ capabilities: [] });
     await startMigration(plugin.app, atlas, atlas.connect(plugin), store, { notify: () => undefined, images: noImages, rereadDelayMs: 0 });
@@ -134,7 +134,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
   });
 
   it('copies the device keys before joining starts, once; without storage the settings still come over', async () => {
-    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
     const { connect } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { table: TABLE } }) } });
     Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
@@ -176,7 +176,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
 
   it("a vault whose settings were synced from another device still merges this device's keys and copies its images", async () => {
     const synced = { online: {}, migratedFromFork: 1, forkSteps: ['settings', 'sharing', 'mapShares', 'keys', 'images'] };
-    const store = await ConnectSettingsStore.load(fakeDataPlugin(synced));
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(synced), memoryKeyValueStore());
     const exists = vi.fn(async () => false);
     const { connect } = connected([], undefined, undefined, {});
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);

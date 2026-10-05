@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FORK_DEVICE_KEYS_STORAGE, FORK_IMAGES_DB_NAME, migrateDeviceKeys, migrateImageCache, type ImageCacheDeps } from '../../../src/connect/migrateLocalStores';
 import { IMAGES_DB_NAME } from '../../../src/app/online/assets/indexedDbImageStore';
-import { DEVICE_KEYS_STORAGE, memoryKeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
+import { DEVICE_KEYS_STORAGE, memoryKeyValueStore, OLD_DEVICE_KEYS_STORAGE } from '../../../src/app/online/sharing/identity/deviceKeys';
 import { MemoryStore } from '../online/assetFixtures';
 
 const keys = (name: string): unknown => ({ publicKey: `public-${name}`, privateKey: { kty: 'EC', crv: 'P-256', d: `d-${name}`, x: 'x', y: 'y' } });
@@ -21,6 +21,16 @@ describe('migrateDeviceKeys', () => {
     // Twice is the same as once.
     expect(migrateDeviceKeys(store)).toBe(0);
     expect(store.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': keys('fork-a'), 'table-b': keys('own-b') });
+  });
+
+  it("adds the keys Connect kept under its old name first, then the fork's; both stay where they were", () => {
+    const store = memoryKeyValueStore();
+    store.set(OLD_DEVICE_KEYS_STORAGE, { 'table-a': keys('old-a') });
+    store.set(FORK_DEVICE_KEYS_STORAGE, { 'table-a': keys('fork-a'), 'table-b': keys('fork-b') });
+    expect(DEVICE_KEYS_STORAGE).toBe('atlas-vtt-connect:device-keys');
+    expect(migrateDeviceKeys(store)).toBe(2);
+    expect(store.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': keys('old-a'), 'table-b': keys('fork-b') });
+    expect(store.get(OLD_DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': keys('old-a') });
   });
 
   it('does nothing without fork keys, or with fork keys of any other shape', () => {
