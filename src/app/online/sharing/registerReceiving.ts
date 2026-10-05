@@ -9,7 +9,8 @@ import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
 import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems, PulledRecord } from './receive/PulledItems';
 import { pushPromptListener } from './receive/pushPrompts';
-import { SharedWithMe } from './receive/SharedWithMe';
+import { codeKindsText, type CodeKind } from './receive/executableContent';
+import { SharedWithMe, type PulledCodeChoice } from './receive/SharedWithMe';
 import { showPushPrompt } from './receive/ui/pushPrompt';
 import { openSharedWithMeModal } from './receive/ui/SharedWithMeModal';
 import { setSharedOpener } from './sharedFromView';
@@ -42,6 +43,22 @@ export const mapUpdateDialog = (title: string, replaces = false): ChoiceDialogOp
   });
 
 const confirmMapUpdate = (title: string, replaces: boolean): Promise<'both' | 'theirs' | null> => chooseAction(mapUpdateDialog(title, replaces));
+
+/**
+ * The question for a pulled note that holds code other plugins run. Pull without code is the last button, so it has
+ * focus; Pull as is names the sender, since their code then runs here wherever those plugins are installed.
+ */
+export const pulledCodeDialog = (title: string, personName: string, kinds: readonly CodeKind[]): ChoiceDialogOptions<PulledCodeChoice> => ({
+  title: `${title} holds code`,
+  message: [
+    `This note from ${personName} has ${codeKindsText(kinds)}. If plugins such as Dataview, JS Engine or Templater are installed, they can run this code with full access to your vault and computer.`,
+    'Pull without code keeps the text but stops it from running. Pull as is only from people you trust.',
+  ],
+  choices: [{ label: `Pull as is (I trust ${personName})`, value: 'as-is', style: 'warning' }, { label: 'Pull without code', value: 'without', style: 'cta' }],
+});
+
+const confirmCode = (title: string, personName: string, kinds: readonly CodeKind[]): Promise<PulledCodeChoice | null> =>
+  chooseAction(pulledCodeDialog(title, personName, kinds));
 
 const sessionName = (personId: string): string | null =>
   shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
@@ -77,7 +94,7 @@ function sharedWithMeFor(app: App, services: ReceivingServices): () => SharedWit
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => sessionName(personId) ?? 'Someone',
           nameAt: peopleListNames(people, session.tableId),
-          scenes, confirmMapUpdate, notify: (text) => new Notice(text), ...(isOpen ? { isOpen } : {}),
+          scenes, confirmMapUpdate, confirmCode, notify: (text) => new Notice(text), ...(isOpen ? { isOpen } : {}),
         }),
       };
     }

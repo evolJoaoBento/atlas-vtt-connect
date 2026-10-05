@@ -79,7 +79,7 @@ function receiver(vault: InMemoryApp, pulled: PulledItems, node: Pick<ShareNode,
     app: vault.app, pulled, node, tableId: TABLE_ID, nameOf: (id) => people.find((person) => person.personId === id)?.name ?? 'Someone',
     nameAt: (id) => people.find((person) => person.personId === id)?.name ?? null,
     policy: createUpdatePolicy({ pulled, ask: async () => ({ choice: 'auto', remember: true, silent: true }), merge: async () => null }),
-    scenes: {} as never, confirmMapUpdate: async () => 'theirs',
+    scenes: {} as never, confirmMapUpdate: async () => 'theirs', confirmCode: async () => 'without',
   });
 }
 

@@ -25,7 +25,7 @@ async function setup() {
   };
   const service = new SharedWithMe({
     app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', nameAt: () => 'Ana',
-    scenes: {} as never, confirmMapUpdate: async () => 'theirs',
+    scenes: {} as never, confirmMapUpdate: async () => 'theirs', confirmCode: async () => 'without',
   });
   return { files, service, node, bump: (next: string) => { version = next; } };
 }
@@ -90,7 +90,7 @@ describe('Shared with me', () => {
     };
     const { atlas, scenes } = scenesOver(vault);
     atlas.scenes.collections.set('Shared with me', 'Shared with me');
-    const service = new SharedWithMe({ app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', nameAt: () => 'Ana', scenes, confirmMapUpdate: async () => 'theirs' });
+    const service = new SharedWithMe({ app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', nameAt: () => 'Ana', scenes, confirmMapUpdate: async () => 'theirs', confirmCode: async () => 'without' });
     const [map] = (await service.refresh('ana')).items;
     await service.pull('ana', map!, [NOTE]);
     expect(files.get('Shared/Ana/Cave.md')).toBe(`text of ${NOTE}`);
