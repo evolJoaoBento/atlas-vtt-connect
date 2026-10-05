@@ -13,7 +13,7 @@ export const KEPT_FORK_COPY_NOTICE = "Atlas VTT Connect kept its sharing data an
 /** Added to a copy until it is verified; an interrupted copy is overwritten next time. */
 const PENDING = '.migrating';
 
-export type MigrationAdapter = Pick<DataAdapter, 'exists' | 'list' | 'read' | 'readBinary' | 'writeBinary' | 'rename' | 'mkdir'>;
+export type MigrationAdapter = Pick<DataAdapter, 'exists' | 'list' | 'read' | 'readBinary' | 'writeBinary' | 'rename' | 'mkdir' | 'remove' | 'rmdir'>;
 export type SharingMigration = 'moved' | 'merged' | 'none';
 
 const parentOf = (path: string): string => path.slice(0, Math.max(0, path.lastIndexOf('/')));
@@ -82,4 +82,15 @@ export async function migrateSharingFolder(adapter: MigrationAdapter, target: st
   if ((await copyMissing(adapter, files, target)) === 0) return 'none';
   notify(KEPT_FORK_COPY_NOTICE);
   return 'merged';
+}
+
+/** Once the step is done: what an interrupted copy left (a staging folder, `.migrating` files) is removed; clutter only, so failures are ignored. */
+export async function removePending(adapter: MigrationAdapter, target: string): Promise<void> {
+  try {
+    if (await adapter.exists(target + PENDING)) await adapter.rmdir(target + PENDING, true);
+    if (!(await adapter.exists(target))) return;
+    for (const file of await filesUnder(adapter, target)) if (file.endsWith(PENDING)) await adapter.remove(`${target}/${file}`);
+  } catch (error) {
+    console.error("[Atlas VTT Connect] Could not tidy up after bringing over the preview's sharing data:", error);
+  }
 }

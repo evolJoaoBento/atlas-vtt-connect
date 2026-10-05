@@ -1,20 +1,21 @@
 /**
- * Brings over what the fork's online play preview kept, for someone moving to upstream Atlas plus Connect: its online
- * settings (table key included), its sharing folder (people, shares, pulls), and a count of the map shares Atlas moved
- * into Connect's scene data itself. Idempotent, and never destructive: Atlas's settings file is only read, the fork's
- * folder only copied. The store is marked migrated only after every step succeeded, so a run cut short starts again.
+ * Brings over what the fork's online play preview kept in the vault, for someone moving to upstream Atlas plus
+ * Connect: its online settings (table key included, `migrateForkSettings`), its sharing folder (people, shares, pulls,
+ * `migrateSharingFolder`), and a count of the scenes with Connect's data, where Atlas itself moved the map shares.
+ * Never destructive: Atlas's settings file is only read, the fork's folder only copied. Each step is marked once done
+ * and never runs again, so a run cut short repeats only what it had not finished; once all are, the store is migrated.
  */
 import type { ScenesApi } from '@atlas-vtt/api-types';
-import { isRecord, resolveOnlineSettings } from '../app/online/onlineSettings';
 import { sharingPaths } from '../app/online/sharing/sharingPaths';
-import { migrateSharingFolder, type MigrationAdapter, type SharingMigration } from './migrateSharingFolder';
-import { movedPlayerPage, type ConnectSettingsStore } from './settingsStore';
+import { migrateForkSettings, type ForkSettingsStore, type Step } from './migrateForkSettings';
+import { FORK_SHARING_DIR, migrateSharingFolder, removePending, type MigrationAdapter, type SharingMigration } from './migrateSharingFolder';
+import type { ConnectSettingsStore } from './settingsStore';
 
-/** Atlas's settings file, where the fork kept its `online` settings. Atlas rewrites it on a debounce; Connect never writes it. */
-export const FORK_SETTINGS_FILE = 'atlas-vtt/.atlas-data/settings.json';
 export const MIGRATED_NOTICE = 'Atlas VTT Connect brought over your online play settings, people and shares from the preview.';
+/** Added when the sharing folder was copied: the preview's copy stays, and the user should know what it holds. */
+export const LEFTOVER_NOTICE = `The preview's copy stays in ${FORK_SHARING_DIR} and still holds the old text of notes shared with you. Delete it once you've checked your people and shares.`;
 
-export type MigrationSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'hasOnline' | 'migratedFromFork' | 'markMigrated'>;
+export type MigrationSettings = ForkSettingsStore & Pick<ConnectSettingsStore, 'migratedFromFork'>;
 
 export interface MigrationDeps {
   adapter: MigrationAdapter;
@@ -24,45 +25,24 @@ export interface MigrationDeps {
   /** Null on an Atlas older than 1.8, which has not moved the fork's map shares yet. */
   scenes: Pick<ScenesApi, 'list' | 'getData'> | null;
   notify(message: string): void;
+  /** See `ForkSettingsDeps.rereadDelayMs`. */
+  rereadDelayMs?: number;
 }
 
 export interface MigrationReport {
   settings: 'copied' | 'skipped' | 'none';
   sharing: SharingMigration;
+  /** Scenes with Connect's data: the fork's map shares Atlas moved, and any Connect wrote since an earlier unfinished run. */
   mapShares: number;
-}
-
-interface Step<T> {
-  result: T;
-  /** False when this run could not finish the step for now (the next run tries again); true otherwise. */
-  done: boolean;
-}
-
-/** Copies the fork's online settings into a store that has none of its own; Atlas's file is never written. */
-async function migrateSettings({ adapter, settings }: MigrationDeps): Promise<Step<MigrationReport['settings']>> {
-  if (settings.hasOnline) return { result: 'skipped', done: true };
-  if (!(await adapter.exists(FORK_SETTINGS_FILE))) return { result: 'none', done: true };
-  // A read that fails rejects the run: nothing is marked, and the next start reads again.
-  const text = await adapter.read(FORK_SETTINGS_FILE);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    // Most likely caught while Atlas rewrites it: tried again next start, without holding up the rest.
-    return { result: 'none', done: false };
-  }
-  if (!isRecord(parsed) || !isRecord(parsed.online)) return { result: 'none', done: true };
-  const online = resolveOnlineSettings(parsed.online);
-  settings.set({ ...online, playerPageUrl: movedPlayerPage(online.playerPageUrl) });
-  return { result: 'copied', done: true };
 }
 
 /**
  * Atlas moved each scene's legacy `data.sharing` into Connect's scene data when it loaded the index, so there is
- * nothing to write: the scenes with Connect's data are counted. Without `scenes` Atlas cannot have moved them, and a
- * list that fails says nothing either; both wait for the next run. A scene whose data cannot be read is not counted.
+ * nothing to write: the scenes with Connect's data are counted, for the report. Without `scenes` Atlas cannot have
+ * moved them, and a list that fails says nothing either; both wait for the next run. A scene whose data cannot be read
+ * is not counted.
  */
-async function countMapShares(scenes: MigrationDeps['scenes']): Promise<Step<number>> {
+async function countScenesWithData(scenes: MigrationDeps['scenes']): Promise<Step<number>> {
   if (!scenes) return { result: 0, done: false };
   let records;
   try {
@@ -75,12 +55,24 @@ async function countMapShares(scenes: MigrationDeps['scenes']): Promise<Step<num
   return { result: data.filter((value) => value !== undefined && value !== null).length, done: true };
 }
 
-/** Runs the steps in order; rejects when a step fails (nothing is marked, the next run starts again). */
+/** The sharing step, once: Connect's copy is its own from then on, so files it later removes are never put back. */
+async function sharingStep(deps: MigrationDeps): Promise<SharingMigration> {
+  const { adapter, settings } = deps;
+  if (settings.forkStepDone('sharing')) return 'none';
+  const target = sharingPaths(deps.storageFolder).root;
+  const sharing = await migrateSharingFolder(adapter, target, (message) => deps.notify(message));
+  settings.markForkStep('sharing');
+  await removePending(adapter, target);
+  return sharing;
+}
+
+/** Runs the steps not done yet, in order; rejects when one fails (it runs again next time, the done ones do not). */
 export async function migrateFromFork(deps: MigrationDeps): Promise<MigrationReport> {
-  const settings = await migrateSettings(deps);
-  const sharing = await migrateSharingFolder(deps.adapter, sharingPaths(deps.storageFolder).root, (message) => deps.notify(message));
-  const mapShares = await countMapShares(deps.scenes);
-  if (settings.result === 'copied' || sharing !== 'none') deps.notify(MIGRATED_NOTICE);
-  if (settings.done && mapShares.done) deps.settings.markMigrated();
+  const settings = await migrateForkSettings(deps);
+  const sharing = await sharingStep(deps);
+  const mapShares = deps.settings.forkStepDone('mapShares') ? { result: 0, done: true } : await countScenesWithData(deps.scenes);
+  if (mapShares.done) deps.settings.markForkStep('mapShares');
+  if (sharing === 'moved') deps.notify(`${MIGRATED_NOTICE} ${LEFTOVER_NOTICE}`);
+  else if (settings.result === 'copied' || sharing === 'merged') deps.notify(MIGRATED_NOTICE);
   return { settings: settings.result, sharing, mapShares: mapShares.result };
 }

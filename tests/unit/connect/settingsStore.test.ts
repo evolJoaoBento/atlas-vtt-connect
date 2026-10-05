@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
+import { ConnectSettingsStore, FORK_PLAYER_PAGE_URL, type ForkStep } from '../../../src/connect/settingsStore';
 import { fakeDataPlugin } from './fakeDataPlugin';
 
 afterEach(() => { vi.useRealTimers(); });
@@ -23,18 +23,33 @@ describe('ConnectSettingsStore', () => {
     expect(store.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
   });
 
-  it('knows whether it has online settings of its own: stored, or changed since loading', async () => {
-    expect((await ConnectSettingsStore.load(fakeDataPlugin({ online: {} }))).hasOnline).toBe(true);
-    for (const data of [null, { online: 'x' }, { online: [] }, { migratedFromFork: 1 }]) {
-      expect((await ConnectSettingsStore.load(fakeDataPlugin(data))).hasOnline).toBe(false);
-    }
-    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
-    store.set({ playerName: 'GM' });
-    expect(store.hasOnline).toBe(true);
+  it('knows which settings changed since loading, and moves the old default page with or without its slash', async () => {
+    const store = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerName: 'Stored' } }));
+    expect([...store.changedSinceLoad]).toEqual([]);
+    store.set({ playerName: 'GM', keepImages: false });
+    expect([...store.changedSinceLoad]).toEqual(['playerName', 'keepImages']);
     const slashless = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt' } }));
     expect(slashless.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
     const lookalike = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-x/' } }));
     expect(lookalike.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-x/');
+    expect(FORK_PLAYER_PAGE_URL).toBe('https://evoljoaobento.github.io/atlas-vtt/');
+  });
+
+  it("keeps each migration step's mark; the vault's three together mark the migration, the device's stay apart", async () => {
+    vi.useFakeTimers();
+    const plugin = fakeDataPlugin({ online: {}, forkSteps: ['settings', 'nonsense', 'keys'] });
+    const store = await ConnectSettingsStore.load(plugin);
+    expect(['settings', 'sharing', 'mapShares', 'keys', 'images'].map((step) => store.forkStepDone(step as ForkStep))).toEqual([true, false, false, true, false]);
+    store.markForkStep('sharing');
+    expect(store.migratedFromFork).toBe(false);
+    store.markForkStep('mapShares');
+    expect(store.migratedFromFork).toBe(true);
+    expect(store.forkStepDone('images')).toBe(false);
+    vi.advanceTimersByTime(500);
+    expect(plugin.saved.at(-1)).toMatchObject({ migratedFromFork: 1, forkSteps: ['settings', 'keys', 'sharing', 'mapShares'] });
+    // Marked migrated before steps had marks: the vault's steps count as done, the device's do not.
+    const older = await ConnectSettingsStore.load(fakeDataPlugin({ online: {}, migratedFromFork: 1 }));
+    expect([older.forkStepDone('settings'), older.forkStepDone('sharing'), older.forkStepDone('keys')]).toEqual([true, true, false]);
   });
 
   it('keeps one save for a burst of changes and tells listeners until they unsubscribe', async () => {

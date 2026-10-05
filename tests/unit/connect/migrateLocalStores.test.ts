@@ -60,6 +60,17 @@ describe('migrateImageCache', () => {
     expect(await migrateImageCache(caches(fork, own))).toBe(0);
   });
 
+  it("stops at the cache's limit, the most recently shown first", async () => {
+    const fork = new MemoryStore();
+    const own = new MemoryStore();
+    await own.put(image('o'), 1); // 1 byte already kept
+    await fork.put(image('a'), 10);
+    await fork.put(image('b'), 30);
+    await fork.put(image('c'), 20);
+    expect(await migrateImageCache(caches(fork, own), 3)).toBe(2);
+    expect([...own.images.keys()].sort()).toEqual([id('b'), id('c'), id('o')]);
+  });
+
   it('never opens (so never creates) a fork database that is not there', async () => {
     const run = caches(new MemoryStore(), new MemoryStore(), false);
     expect(await migrateImageCache(run)).toBe(0);
@@ -73,7 +84,9 @@ describe('migrateImageCache', () => {
     await fork.put(image('b'), 2);
     own.quota = 1;
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(await migrateImageCache(caches(fork, own))).toBe(1);
+    // Past the given limit nothing more is copied; a store that refuses (here, its quota) fails the copy: tried again later.
+    expect(await migrateImageCache(caches(fork, own))).toBeNull();
+    expect(own.images.size).toBe(1);
     expect(error).toHaveBeenCalled();
     expect(await migrateImageCache(caches(null, own))).toBe(0);
     expect(IMAGES_DB_NAME).toBe('atlas-vtt-connect-images');
