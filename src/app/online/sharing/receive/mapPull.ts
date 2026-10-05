@@ -6,8 +6,12 @@
  * saved it (`<collection>/files/<person>/`), so a map received there is not downloaded again. A re-pull of a map changed here asks
  * Keep both or Take theirs.
  *
- * Atlas cannot replace a scene's map yet, so the newer version always arrives as a new scene (`installUpdate`):
- * with Take theirs later pulls follow the new one, with Keep both they keep following the first.
+ * With Atlas's `scenes.replaceMap` (1.13.0), a re-pull replaces the received map in place, as the fork did: unchanged
+ * here, or with Take theirs; Keep both adds the new version as a second scene that later pulls do not follow. A scene
+ * open in a map view is not replaced: the receiver is told to close it, and the pull stays pending. A scene Atlas will
+ * not let Connect replace (the fork's preview made it) gets the new version as a new scene, as on an older Atlas, where
+ * the newer version always arrives as a new scene (`installUpdate`): with Take theirs later pulls follow the new one,
+ * with Keep both they keep following the first.
  */
 import type { App, TFile } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
@@ -28,14 +32,16 @@ const IMAGES_DIR = 'files';
 
 export interface MapPullDeps {
   app: App;
-  scenes: Pick<ScenesApi, 'addToCollection' | 'list'>;
+  scenes: Pick<ScenesApi, 'addToCollection' | 'list' | 'replaceMap'>;
+  /** Whether the map file is open in a GM map view (loaded or among its scene tabs), where Atlas will not replace it. */
+  isOpen?(mapPath: string): boolean;
   pulled: PulledItems;
   /** Pulls one image of the map by fingerprint (checked by the transfer). */
   pullImage(fingerprint: string): Promise<PulledItem>;
   /** The map's linked notes the receiver ticked in this pull: item id → vault path. */
   notes: ReadonlyMap<string, string>;
-  /** The received map changed here since the last pull. */
-  confirmUpdate(title: string): Promise<'both' | 'theirs' | null>;
+  /** The received map changed here since the last pull; `replaces`: Take theirs replaces the receiver's copy (`replaceMap`). */
+  confirmUpdate(title: string, replaces: boolean): Promise<'both' | 'theirs' | null>;
   /** Tells the receiver something the outcome does not say (where an unasked newer version went). */
   notify?(text: string): void;
   now?: () => number;
@@ -74,12 +80,15 @@ function linkedNotes(deps: MapPullDeps, input: MapPullInput): Map<string, string
 
 /** Where images from this person are already saved: Connect's folder, then the one the fork's preview used. */
 interface ImageFolders {
-  /** The scene folder; images go to its `files/`. */
+  /** The folder of the map file; images go to its `files/`. */
   folder: string;
   fork: string;
 }
 
-async function pullImages(deps: MapPullDeps, folders: ImageFolders, fingerprints: readonly string[]): Promise<Upload> {
+/** Images pulled in this pull by fingerprint, so a second upload (to another folder) does not pull them again. */
+type PulledImages = Map<string, PulledItem | null>;
+
+async function pullImages(deps: MapPullDeps, folders: ImageFolders, fingerprints: readonly string[], fetched: PulledImages = new Map()): Promise<Upload> {
   const { folder } = folders;
   const upload: Upload = { names: new Map(), images: [] };
   const saved = [`${folder}/${IMAGES_DIR}`, folders.fork];
@@ -90,7 +99,8 @@ async function pullImages(deps: MapPullDeps, folders: ImageFolders, fingerprints
       continue;
     }
     // An image that cannot be pulled is skipped like one with the wrong bytes: the map still arrives, without it.
-    const image = await deps.pullImage(fingerprint).catch(() => null);
+    if (!fetched.has(fingerprint)) fetched.set(fingerprint, await deps.pullImage(fingerprint).catch(() => null));
+    const image = fetched.get(fingerprint);
     if (!image) continue;
     // The transfer checked the bytes against the fingerprint asked for; it is checked here again, since this is what names the file.
     if (!image.mime || image.version !== fingerprint || upload.names.has(fingerprint)) continue;
@@ -103,23 +113,60 @@ async function pullImages(deps: MapPullDeps, folders: ImageFolders, fingerprints
 }
 
 type Added = { mapPath: string; sceneId: string; text: string | null };
+/** A received map ready for Atlas: the map and the images it names, for one folder. */
+type Prepared = { upload: Upload; map: ReturnType<typeof receivedMapInput> };
+
+const parentOf = (path: string): string => path.slice(0, path.lastIndexOf('/'));
 
 /** The text Atlas wrote is the base, so "changed here" compares with what Atlas saved; none when it cannot be read back. */
 async function writeBaseOf(pulled: PulledItems, record: PulledRecord, added: Added): Promise<void> {
   if (added.text !== null) await pulled.writeBase(record, added.text);
 }
 
+/** Why a newer version went to a new scene, told when the receiver was not asked or was told Take theirs replaces. */
+const CANNOT_REPLACE = 'Atlas VTT cannot replace a scene yet.';
+const NOT_CONNECTS = 'Atlas VTT replaces only a scene Atlas VTT Connect added.';
+/** Told when the received map is open: the pull stays pending until it is closed. */
+export const CLOSE_TO_UPDATE = 'Close the scene to update it.';
+
 /**
  * The newer version as a new scene: `follow` moves the record onto it (Take theirs), else it stays on the first (Keep both).
- * Unasked (the map is not changed here), the receiver is told where it went, since Atlas cannot replace the old scene yet.
+ * `why` is told with where it went (null: say nothing, the receiver chose it).
  */
-async function installUpdate(deps: MapPullDeps, add: () => Promise<Added>, known: PulledRecord, follow: boolean, input: MapPullInput, asked: boolean): Promise<PullOutcome> {
+async function installUpdate(deps: MapPullDeps, add: () => Promise<Added>, known: PulledRecord, follow: boolean, input: MapPullInput, why: string | null): Promise<PullOutcome> {
   const added = await add();
-  if (!asked) deps.notify?.(`The new version of ${input.item.title} is a new scene, ${added.mapPath}: Atlas VTT cannot replace a scene yet.`);
+  if (why) deps.notify?.(`The new version of ${input.item.title} is a new scene, ${added.mapPath}: ${why}`);
   if (!follow) return { kind: 'both', path: added.mapPath };
   const record = deps.pulled.update(known.key, { path: added.mapPath, sceneId: added.sceneId, version: input.item.version, pulledAt: (deps.now ?? Date.now)() }) ?? known;
   await writeBaseOf(deps.pulled, record, added);
   return { kind: 'updated', path: added.mapPath };
+}
+
+const isOpenRefusal = (error: unknown): boolean => error instanceof Error && /open in a map view/.test(error.message);
+
+/**
+ * Replaces the received map in place (`replaceMap`), keeping its scene: the record keeps its path and takes the new
+ * version, and the text Atlas wrote is its base. An open scene is not touched: the receiver is told to close it and the
+ * pull stays pending (cancelled). Null when Atlas refuses for another reason (not a scene Connect added): the caller
+ * adds a new scene instead.
+ */
+async function replaceKnown(deps: MapPullDeps, known: PulledRecord & { sceneId: string }, input: MapPullInput, prepared: Prepared): Promise<PullOutcome | null> {
+  const closeFirst = (): PullOutcome => {
+    deps.notify?.(`${input.item.title} is open in a map view. ${CLOSE_TO_UPDATE}`);
+    return { kind: 'cancelled' };
+  };
+  if (deps.isOpen?.(known.path)) return closeFirst();
+  try {
+    await deps.scenes.replaceMap!(known.sceneId, { map: prepared.map, images: prepared.upload.images });
+  } catch (error) {
+    if (isOpenRefusal(error)) return closeFirst();
+    console.error('[Atlas Connect] Atlas did not replace a received map; it arrives as a new scene:', error);
+    return null;
+  }
+  const record = deps.pulled.update(known.key, { version: input.item.version, pulledAt: (deps.now ?? Date.now)() }) ?? known;
+  const file = fileAt(deps.app, known.path);
+  if (file) await deps.pulled.writeBase(record, await deps.app.vault.read(file));
+  return { kind: 'updated', path: known.path };
 }
 
 /**
@@ -145,7 +192,7 @@ async function updateChoice(deps: MapPullDeps, known: PulledRecord, file: TFile,
   // The version already pulled, still as Atlas saved it: nothing to add.
   if (base !== null && !changedHere && known.version === input.item.version) return 'unchanged';
   if (!changedHere) return { follow: true, asked: false };
-  const choice = await deps.confirmUpdate(input.item.title);
+  const choice = await deps.confirmUpdate(input.item.title, typeof deps.scenes.replaceMap === 'function' && known.sceneId !== undefined);
   return choice === null ? 'cancelled' : { follow: choice === 'theirs', asked: true };
 }
 
@@ -160,15 +207,29 @@ async function writeMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOut
   const collection = await sharedCollectionId(scenes);
   const person = safeFileName(input.personName, 'Someone');
   const folder = `${COLLECTIONS_DIR}/${collection}/scenes/${person}`;
-  const upload = await pullImages(deps, { folder, fork: `${COLLECTIONS_DIR}/${collection}/${IMAGES_DIR}/${person}` }, input.payload.images);
-  const map = receivedMapInput(input.payload, { images: upload.names, notes: linkedNotes(deps, input), isFile: (path) => path.length < 1024 && fileAt(app, path) !== null });
+  const fetched: PulledImages = new Map();
+  // The map and its images for the folder its map file goes in: images are named relative to it.
+  const prepare = async (inFolder: string): Promise<Prepared> => {
+    const upload = await pullImages(deps, { folder: inFolder, fork: `${COLLECTIONS_DIR}/${collection}/${IMAGES_DIR}/${person}` }, input.payload.images, fetched);
+    return { upload, map: receivedMapInput(input.payload, { images: upload.names, notes: linkedNotes(deps, input), isFile: (path) => path.length < 1024 && fileAt(app, path) !== null }) };
+  };
   const add = async (): Promise<Added> => {
+    const { upload, map } = await prepare(folder);
     // Atlas checks that the folder lies inside the collection's and every image inside the folder, and names the file itself.
     const added = await scenes.addToCollection({ collection: { name: SHARED_COLLECTION }, name: safeFileName(input.payload.name), folder, map, images: upload.images });
     const file = fileAt(app, added.mapPath);
     return { ...added, text: file ? await app.vault.read(file) : null };
   };
-  if (known && update) return installUpdate(deps, add, known, update.follow, input, update.asked);
+  if (known && update) {
+    const canReplace = typeof scenes.replaceMap === 'function';
+    const { sceneId } = known;
+    if (canReplace && update.follow && sceneId !== undefined) {
+      const replaced = await replaceKnown(deps, { ...known, sceneId }, input, await prepare(parentOf(known.path)));
+      if (replaced) return replaced;
+      return installUpdate(deps, add, known, true, input, NOT_CONNECTS);
+    }
+    return installUpdate(deps, add, known, update.follow, input, update.asked ? null : CANNOT_REPLACE);
+  }
   const added = await add();
   const record = pulled.put({
     tableId: input.tableId, from: input.from, item: input.item.item, kind: 'map', path: added.mapPath, version: input.item.version,

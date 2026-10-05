@@ -40,7 +40,9 @@ export interface SharedWithMeDeps {
    */
   nameAt: (personId: string) => string | null;
   scenes: MapPullDeps['scenes'];
-  confirmMapUpdate: (title: string) => Promise<'both' | 'theirs' | null>;
+  /** Whether a map file is open in a GM map view (`MapPullDeps.isOpen`). */
+  isOpen?: (mapPath: string) => boolean;
+  confirmMapUpdate: (title: string, replaces: boolean) => Promise<'both' | 'theirs' | null>;
   /** Tells the receiver something a pull's outcome does not say. */
   notify?: (text: string) => void;
   replaced?: (record: PulledRecord, before: string, after: string) => Promise<void>;
@@ -87,8 +89,9 @@ export class SharedWithMe {
     return pullMap({
       app: this.deps.app, scenes: this.deps.scenes, pulled: this.deps.pulled, notes,
       pullImage: (fingerprint) => node.pull(personId, `${item.item}/${fingerprint}`, 'image'),
-      confirmUpdate: (title) => this.deps.confirmMapUpdate(title),
+      confirmUpdate: (title, replaces) => this.deps.confirmMapUpdate(title, replaces),
       ...(this.deps.notify ? { notify: this.deps.notify } : {}),
+      ...(this.deps.isOpen ? { isOpen: this.deps.isOpen } : {}),
     }, { tableId, from: personId, personName, item, payload });
   }
 

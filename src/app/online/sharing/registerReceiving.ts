@@ -24,16 +24,24 @@ const UNDO_NOTICE: Record<UndoOutcome, string> = {
 };
 
 /**
- * The question for a received map changed here and shared again. Atlas cannot replace a scene yet (`installUpdate` in
- * mapPull.ts), so both answers add a scene and neither destroys anything: no warning style.
+ * The question for a received map changed here and shared again. With `replaces` (Atlas's `replaceMap`), the fork's:
+ * Take theirs replaces the receiver's copy, so it has the warning style. Without it (an older Atlas, or a scene Connect
+ * did not add), Atlas cannot replace the scene (`installUpdate` in mapPull.ts), so both answers add a scene and neither
+ * destroys anything: no warning style.
  */
-export const mapUpdateDialog = (title: string): ChoiceDialogOptions<'both' | 'theirs'> => ({
-  title: `${title} changed here and was shared again`,
-  message: ['Both answers add the new version as a new scene; your copy stays as it is. Take theirs makes later pulls follow the new scene; Keep both keeps them on yours.'],
-  choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const }],
-});
+export const mapUpdateDialog = (title: string, replaces = false): ChoiceDialogOptions<'both' | 'theirs'> => (replaces
+  ? {
+    title: `${title} changed here and was shared again`,
+    message: ['Keep both saves the new version as a second scene. Take theirs replaces your copy.'],
+    choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const, style: 'warning' }],
+  }
+  : {
+    title: `${title} changed here and was shared again`,
+    message: ['Both answers add the new version as a new scene; your copy stays as it is. Take theirs makes later pulls follow the new scene; Keep both keeps them on yours.'],
+    choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const }],
+  });
 
-const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction(mapUpdateDialog(title));
+const confirmMapUpdate = (title: string, replaces: boolean): Promise<'both' | 'theirs' | null> => chooseAction(mapUpdateDialog(title, replaces));
 
 const sessionName = (personId: string): string | null =>
   shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
@@ -42,15 +50,17 @@ export interface ReceivingServices {
   pulled: PulledItems;
   people: PeopleBook;
   history: MergeHistory;
-  /** Where received maps are added (`Shared with me`). */
-  scenes: Pick<ScenesApi, 'addToCollection' | 'list'>;
+  /** Where received maps are added (`Shared with me`), and replaced where Atlas can (`replaceMap`). */
+  scenes: Pick<ScenesApi, 'addToCollection' | 'list' | 'replaceMap'>;
+  /** Whether a map file is open in a GM map view, where Atlas will not replace it; unknown without Atlas's `views`. */
+  isOpen?: (mapPath: string) => boolean;
   /** The vault's renames and deletions, for the plugin's lifetime: pulled files follow them. */
   vaultChanges: Pick<VaultChanges, 'attach'>;
 }
 
 /** One service per share session: a new session (a new node) gets a fresh one. */
 function sharedWithMeFor(app: App, services: ReceivingServices): () => SharedWithMe | null {
-  const { pulled, history, people, scenes } = services;
+  const { pulled, history, people, scenes, isOpen } = services;
   // Choices and the merge page run only inside a pull the receiver started.
   const policy = createUpdatePolicy({
     pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request), warn: (message) => new Notice(message),
@@ -67,7 +77,7 @@ function sharedWithMeFor(app: App, services: ReceivingServices): () => SharedWit
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => sessionName(personId) ?? 'Someone',
           nameAt: peopleListNames(people, session.tableId),
-          scenes, confirmMapUpdate, notify: (text) => new Notice(text),
+          scenes, confirmMapUpdate, notify: (text) => new Notice(text), ...(isOpen ? { isOpen } : {}),
         }),
       };
     }

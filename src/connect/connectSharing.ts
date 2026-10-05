@@ -37,8 +37,9 @@ export async function startConnectSharing(plugin: Plugin, api: AtlasApi, atlas: 
   const paths = await connectStorage(api, atlas);
   const sessions = await start.sessions;
   if (!paths || start.gone()) return () => undefined;
+  const views = need(api, atlas, 'views');
   return registerSharing(plugin, {
-    atlas: { scenes: atlas.scenes, rules: atlas.rules, playerView: () => atlas.settings.get('playerView') },
+    atlas: { scenes: atlas.scenes, rules: atlas.rules, playerView: () => atlas.settings.get('playerView'), ...(views ? { views } : {}) },
     lifetime: start.lifetime,
     joins: start.joins,
     people: PeopleBook.forApp(plugin.app, paths),

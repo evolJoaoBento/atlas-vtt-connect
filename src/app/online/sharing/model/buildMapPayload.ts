@@ -13,7 +13,7 @@ import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
 import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
-import type { SharedMapFile } from './sharedMapFile';
+import { readablePins, type SharedMapFile } from './sharedMapFile';
 
 /** A saved map: its file's map data, the state the projection reads, and the scene settings a full share carries. */
 export interface SharedMapSource {
@@ -57,8 +57,9 @@ const UNLIT = { enabled: false, ambient: 1 } as const;
 
 /**
  * Reads a saved map through Atlas (`scenes.readMap`, migrated); null when there is none or it cannot be read.
- * Atlas gives no pins, walls, lights, camera or token settings, and not whether the initiative tracker was open:
- * a shared map has none of them, and its initiative list counts as closed.
+ * Atlas 1.13.0 and later also give the pins, walls, lights, light zones, camera, token settings and whether the
+ * initiative tracker was open, which the payloads carry as the fork's did; an older Atlas gives none of them, so a
+ * map shared from it has none, and its initiative list counts as closed.
  */
 export async function readSharedMap(scenes: Pick<ScenesApi, 'readMap'>, mapPath: string): Promise<SharedMapSource | null> {
   const read = await readSharedMapOrError(scenes, mapPath);
@@ -78,13 +79,27 @@ export async function readSharedMapOrError(scenes: Pick<ScenesApi, 'readMap'>, m
   }
   if (!saved) return null;
   const { tokens, texts, drawings, fog } = saved.objects;
-  const map: SharedMapFile = { background: saved.background, grid: saved.grid, objects: { tokens, texts, drawings, fog, pins: {} } };
+  // The fork's map file shape: pins, walls, lights and light zones among the objects, the camera beside them. A field
+  // this Atlas does not hand out is left out, so a map read from an older Atlas makes the same payload as before.
+  const lighting = {
+    ...(saved.walls !== undefined ? { walls: saved.walls } : {}), ...(saved.lights !== undefined ? { lights: saved.lights } : {}),
+    ...(saved.lightZones !== undefined ? { lightZones: saved.lightZones } : {}),
+  };
+  const map: SharedMapFile = {
+    background: saved.background, grid: saved.grid, objects: { tokens, texts, drawings, fog, pins: readablePins(saved.pins), ...lighting },
+    ...(saved.camera !== undefined ? { camera: saved.camera } : {}),
+  };
+  const trackerOpen = saved.initiativeTrackerOpen === true;
   // The projection checks every field it reads, as for a live store. The GM's map path is never part of it.
   const state: ProjectionInput = {
     background: saved.background, grid: saved.grid, objects: saved.objects, widgets: saved.widgets,
-    initiative: saved.initiative, initiativeTrackerOpen: false, mapPath: null, lighting: saved.lighting ?? UNLIT,
+    initiative: saved.initiative, initiativeTrackerOpen: trackerOpen, mapPath: null, lighting: saved.lighting ?? UNLIT,
   };
-  const extra = { widgetSettings: saved.widgets.settings, widgetValues: saved.widgets.values, initiative: saved.initiative };
+  const extra = {
+    widgetSettings: saved.widgets.settings, widgetValues: saved.widgets.values, initiative: saved.initiative,
+    ...(saved.initiativeTrackerOpen !== undefined ? { initiativeTrackerOpen: trackerOpen } : {}),
+    ...(saved.tokenSettings !== undefined ? { tokenSettings: saved.tokenSettings } : {}),
+  };
   return { map, state, extra, lit: saved.lighting?.enabled === true };
 }
 

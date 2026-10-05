@@ -4,7 +4,7 @@
  * `bundles`; the returned disposer takes everything off again. Receiving (Shared with me, pulls, merges and push
  * prompts) registers in the same scope.
  */
-import type { Disposer, RulesApi, ScenesApi } from '@atlas-vtt/api-types';
+import type { Disposer, RulesApi, ScenesApi, ViewsApi } from '@atlas-vtt/api-types';
 import type { OnlineJoinService } from '../obsidian/OnlineJoinService';
 import type { OnlineSessionService } from '../OnlineSessionService';
 import type { PlayerViewRules } from '../scene/playerViewRules';
@@ -29,6 +29,13 @@ export interface SharingAtlas {
   rules: Pick<RulesApi, 'forMap'>;
   /** Atlas's player view rules (`settings.get('playerView')`). */
   playerView: () => PlayerViewRules;
+  /** Atlas's map views, where a received map open there is not replaced; absent on an Atlas without `views`. */
+  views?: Pick<ViewsApi, 'list'>;
+}
+
+/** Whether a map file is open in a GM map view, loaded or among its scene tabs (remote views hold no vault map). */
+export function mapOpenIn(views: Pick<ViewsApi, 'list'>): (mapPath: string) => boolean {
+  return (mapPath) => views.list().some((view) => view.kind === 'map' && (view.mapPath === mapPath || view.tabs.some((tab) => tab.mapPath === mapPath)));
 }
 
 export interface SharingServices {
@@ -62,7 +69,7 @@ export function registerSharing(plugin: ScopePlugin, services: SharingServices):
     registerTagDisplay(scope);
     registerSharePropertyDisplay(scope, people);
     registerAskToPull(scope, { items, people, sections, scenes: atlas.scenes });
-    registerReceiving(scope, { pulled, people, history, scenes: atlas.scenes, vaultChanges });
+    registerReceiving(scope, { pulled, people, history, scenes: atlas.scenes, vaultChanges, ...(atlas.views ? { isOpen: mapOpenIn(atlas.views) } : {}) });
     registerSessionHooks(scope, { joins, people, sessions, catalogue });
     scope.register(lifetime.vaultChanges.attach(vaultChanges.dispatch));
   } catch (error) {
