@@ -219,6 +219,12 @@ describe('FakeAtlas draws slots as Atlas does', () => {
     error.mockRestore();
   });
 
+  it('draws checked and disabled as booleans, as Atlas does', () => {
+    const { ui, ext } = setup();
+    ext.ui.addViewMenuItems(() => [{ label: 'Odd', checked: 'yes', disabled: 1 }, { label: 'Plain' }] as never);
+    expect(ui.viewMenu('v1')).toEqual([{ label: 'Odd', checked: false, disabled: false }, { label: 'Plain' }]);
+  });
+
   it('normalises menu entries, commands and badges', () => {
     const { ui, ext } = setup();
     ext.ui.addViewMenuItems(() => [

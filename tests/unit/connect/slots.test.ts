@@ -44,7 +44,7 @@ describe('the GM\'s UI in Atlas\'s slots', () => {
   it('with ui, startConnect registers the slots beside the commands and removes both when Atlas unloads', async () => {
     const { atlas, connect } = connected([...HOSTING, 'ui']);
     await vi.advanceTimersByTimeAsync(0);
-    expect(atlas.ui!.counts()).toEqual({ toolbar: 1, palette: 1, dashboard: 0, viewMenu: 1, tokenMenu: 1, panel: 1 });
+    expect(atlas.ui!.counts()).toEqual({ toolbar: 1, palette: 1, dashboard: 1, viewMenu: 1, tokenMenu: 1, panel: 1 });
     expect([...connect.commands.keys()]).toContain('start-online-session');
     atlas.unload();
     expect(atlas.ui!.counts()).toEqual(NONE);

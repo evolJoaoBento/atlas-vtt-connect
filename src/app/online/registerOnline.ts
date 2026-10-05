@@ -1,8 +1,8 @@
-import type { App, Plugin } from 'obsidian';
+import type { Plugin } from 'obsidian';
 import type { Disposer, PresentationApi } from '@atlas-vtt/api-types';
 import { onlineSessionStore, type OnlineSessionState } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
-import { JOIN_SESSION_LABEL, ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
+import { ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
 import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
 
 /** The presentation target Connect holds while hosting: Atlas's eye then presents to online players. */
@@ -10,8 +10,6 @@ export const ONLINE_TARGET = { id: 'atlas-vtt-connect', label: 'online players',
 
 export interface RegisterOnlineOptions {
   presentation: Pick<PresentationApi, 'addTarget'>;
-  /** Opens "Join online session…" (joining comes with plan B12); without it there is no join command. */
-  joinSession?: (app: App) => void;
   /** Atlas's UI slots, when it has them: "Online session…" then opens the panel in a map view. */
   gmUi?: PanelOpener;
 }
@@ -49,11 +47,6 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
       return true;
     },
   });
-  const { joinSession } = options;
-  if (joinSession) {
-    commands.push('join-online-session');
-    plugin.addCommand({ id: 'join-online-session', name: JOIN_SESSION_LABEL, callback: () => joinSession(plugin.app) });
-  }
 
   const item = plugin.addStatusBarItem();
   item.addClass('mod-clickable');

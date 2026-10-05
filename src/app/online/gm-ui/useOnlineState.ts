@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useReducer, useSyncExternalStore } from 'react';
 import type { ViewId, ViewsApi } from '@atlas-vtt/api-types';
 import type { TokenControl } from '../control/TokenControl';
+import { isInSession, joinedSessionStore } from '../obsidian/joinedSessionStore';
 import { onlineSessionStore, type OnlineSessionState } from '../onlineSessionStore';
 import type { PresentedSceneSummaries, PresentedSceneSummary } from '../ui/presentedSceneSummary';
 
 /** The online session as the GM's UI sees it. */
 export function useOnlineSession(): OnlineSessionState {
   return useSyncExternalStore(onlineSessionStore.subscribe, onlineSessionStore.getState);
+}
+
+/** Whether this Obsidian is in an online session it joined (connecting, waiting or admitted). */
+export function useInJoinedSession(): boolean {
+  return useSyncExternalStore(joinedSessionStore.subscribe, () => isInSession(joinedSessionStore.getState()));
 }
 
 /** The presented scene: its tab, name and characters. */

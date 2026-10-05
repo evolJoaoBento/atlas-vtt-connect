@@ -56,7 +56,7 @@ function drawableMenu(items: unknown): MenuItem[] {
       const children = drawableMenu(submenu);
       return children.length > 0 ? [{ label, ...(icon ? { icon } : {}), submenu: children }] : [];
     }
-    return [{ label, ...(icon ? { icon } : {}), ...(onClick ? { onClick } : {}), ...(checked !== undefined ? { checked } : {}), ...(disabled !== undefined ? { disabled } : {}) }];
+    return [{ label, ...(icon ? { icon } : {}), ...(onClick ? { onClick } : {}), ...(checked !== undefined ? { checked: checked === true } : {}), ...(disabled !== undefined ? { disabled: disabled === true } : {}) }];
   });
 }
 

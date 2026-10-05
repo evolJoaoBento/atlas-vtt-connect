@@ -11,7 +11,7 @@ import { JOIN_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../
 import { OnlinePlayerList } from './OnlinePlayerList';
 import { OnlinePresenting } from './OnlinePresenting';
 import type { PresentingEnv } from './presentingHere';
-import { useOnlineSession } from './useOnlineState';
+import { useInJoinedSession, useOnlineSession } from './useOnlineState';
 
 export const START_HELP = 'Start a session to get a link your players can open in a browser. You approve each player who joins.';
 
@@ -40,6 +40,7 @@ export function OnlinePanel({ env, ctx }: PanelProps): React.ReactElement {
 
 function StartView({ session, env }: { session: OnlineSessionState; env: PanelEnv }): React.ReactElement {
   const starting = session.status === 'starting';
+  const joined = useInJoinedSession();
   return (
     <section className="atlas-connect-panel__section">
       <p className="atlas-connect-panel__help">{START_HELP}</p>
@@ -47,7 +48,7 @@ function StartView({ session, env }: { session: OnlineSessionState; env: PanelEn
         <p className="atlas-connect-panel__error" role="alert">{session.error}</p>
       )}
       <div className="atlas-connect-panel__footer">
-        {env.joinSession && <Button disabled={starting} onClick={env.joinSession}>{JOIN_SESSION_LABEL}</Button>}
+        {env.joinSession && <Button disabled={starting || joined} onClick={env.joinSession}>{JOIN_SESSION_LABEL}</Button>}
         <Button variant="cta" disabled={starting} onClick={() => { void env.service.start(); }}>
           {starting ? 'Starting…' : START_SESSION_LABEL}
         </Button>

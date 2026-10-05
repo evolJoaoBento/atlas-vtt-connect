@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TOKENS_UNAVAILABLE_NOTICE } from '../../src/app/online/control/TokenControlHost';
+import { joinedSessionStore } from '../../src/app/online/obsidian/joinedSessionStore';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../src/app/online/onlineSessionStore';
 import { anna, ben, dan, gmUiHarness, type GmUiHarness } from './online/gmUiFixtures';
 
@@ -13,6 +14,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(() => Promise.resolve()) } });
 });
 afterEach(() => {
+  joinedSessionStore.setState({ session: null });
   harness.gm();
   cleanup();
   act(() => { resetOnlineSessionStore(); });
@@ -163,6 +165,14 @@ describe('online panel', () => {
     cleanup();
     harness = gmUiHarness();
     expect(within(await harness.openPanel()).queryByRole('button', { name: 'Join online session…' })).toBeNull();
+  });
+
+  it('does not offer a second join while already in a session', async () => {
+    joinedSessionStore.setState({ session: { status: 'admitted', playerId: 'p', title: 'T', players: [], reason: null } });
+    const panel = within(await harness.openPanel());
+    expect((panel.getByRole('button', { name: 'Join online session…' }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => { joinedSessionStore.setState({ session: null }); });
+    expect((panel.getByRole('button', { name: 'Join online session…' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('marks a player who joined from Obsidian', async () => {

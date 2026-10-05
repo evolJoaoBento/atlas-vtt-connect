@@ -34,7 +34,7 @@ export interface Deps extends OptionalParts {
   playerViewSettings: PlayerViewSettingsSource;
   /** Atlas's map views; the online log reads the active tab. */
   views: Pick<ViewsApi, 'list'>;
-  /** Whether this Atlas is in a session it joined (joining is plan B12); without it, never. */
+  /** Whether this Obsidian is in a session it joined (`joinedSessionStore`); without it, never. */
   isJoined?: () => boolean;
   createHost?: (options: PeerServerOptions) => Promise<HostTransport>;
   showRequest?: (player: SessionPlayer, answer: (allow: boolean) => void, info?: JoinRequestInfo) => { hide(): void };

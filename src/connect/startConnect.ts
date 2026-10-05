@@ -1,16 +1,19 @@
 import type { Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 import { sessionDeps } from '../app/online/atlas/sessionDeps';
-import { OnlineSessionService, type Deps, type SessionSettings } from '../app/online/OnlineSessionService';
+import { isInSession, joinedSessionStore } from '../app/online/obsidian/joinedSessionStore';
+import { openJoinSessionModal } from '../app/online/obsidian/ui/JoinSessionModal';
+import { OnlineSessionService, type Deps } from '../app/online/OnlineSessionService';
 import { registerGmUi } from '../app/online/gm-ui/registerGmUi';
 import { registerOnline } from '../app/online/registerOnline';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
 import { need } from './capabilities';
 import { connectStorage } from './connectStorage';
+import { startJoining, type JoinSettings } from './startJoining';
 
 export interface ConnectOptions {
   /** Connect's own settings (`ConnectSettingsStore`). */
-  settings: SessionSettings;
+  settings: JoinSettings;
   /** Replaces parts of the hosting deps; tests pass an in-memory host and table. */
   hosting?: Partial<Deps>;
 }
@@ -28,11 +31,11 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
   if (!paths || gone()) return () => undefined;
   const people = PeopleBook.forApp(plugin.app, paths);
-  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens') }), people, ...options.hosting };
+  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens') }), people, isJoined: () => isInSession(joinedSessionStore.getState()), ...options.hosting };
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
-  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views }, service, { presented: deps.presented }) : undefined;
+  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views }, service, { presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app) }) : undefined;
   const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, ...(gmUi ? { gmUi } : {}) });
   return () => {
     gmUi?.();
@@ -49,6 +52,8 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
     if (disposed) stop();
     else stops.push(stop);
   };
+  // Joining needs no Atlas map and no capability, so it starts for every Atlas Connect binds to.
+  keep(startJoining(plugin, atlas, api, options.settings));
   if (canHost(api, atlas)) {
     startHosting(plugin, api, atlas, options, () => disposed).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start hosting online sessions:', error);

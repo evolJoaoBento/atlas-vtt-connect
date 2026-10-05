@@ -22,7 +22,7 @@ type GmUiAtlas = Pick<AtlasExtension, 'ui' | 'presentation' | 'views'>;
 export interface GmUiOptions {
   /** The presented scene online play already reads (`sessionDeps`), so the panel shows the same presentation. */
   presented: PresentedSceneSource;
-  /** Opens "Join online session…" (joining comes with plan B12); without it the panel offers no join. */
+  /** Opens "Join online session…"; without it the panel offers no join. */
   joinSession?: () => void;
 }
 
