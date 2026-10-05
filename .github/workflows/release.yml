@@ -30,4 +30,4 @@ jobs:
         run: |
           flags=""
           case "$TAG" in *-*) flags="--prerelease";; esac
-          gh release create "$TAG" dist/main.js dist/styles.css manifest.json --title "$TAG" --notes "See the README for what changed." $flags
+          gh release create "$TAG" dist/main.js dist/styles.css manifest.json --title "$TAG" --notes "Release notes to follow: the maintainer replaces this line with what changed." $flags

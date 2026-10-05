@@ -11,11 +11,13 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against API 1.15.0 and still runs on 1.13 and 1.14, where a few details degrade: Follow GM and Fit map also show in other plugins' remote views (and do nothing there), Fit map leaves no margin, and the Online scene's status bar has no Shared with me button (use the command instead). Without the API, Connect shows a notice and stays off.
+- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against the API build's 1.15.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). Without the API, or with another major version, Connect shows a notice and stays off.
 - **The Atlas API build.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, version **0.6.0-beta.1**. Pin that version in BRAT: BRAT's "latest" in that repository is the online-play fork, not the API build. You can also build Atlas from the branch `api/extension-api` (see Developing).
 - TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
 ## Install with BRAT
+
+If you use the online play preview (the fork's built-in online play, Atlas VTT 0.5.x or 0.6.1-beta.x from `evolJoaoBento/atlas-vtt`), see [Moving from the online preview](#moving-from-the-online-preview) first.
 
 1. Install the BRAT plugin.
 2. In BRAT, choose "Add beta plugin", enter `evolJoaoBento/atlas-vtt`, and pick version **0.6.0-beta.1** (the Atlas API build; keep it pinned, see above).
@@ -31,6 +33,8 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## Sharing
 
 Commands: **People…**, **Share with…**, **Ask to pull…**, **Shared with me…**, **Undo last merge** and **Forget remembered choice**. Nothing is shared until you share it, and only with the people you pick. Private parts of a note stay private. See [PRIVACY.md](PRIVACY.md).
+
+Pulled notes can hold code that other plugins run, such as Dataview JS, JS Engine or Templater blocks and embedded HTML. If those plugins are installed, the code runs in your Obsidian. Connect tells you when a note holds such code and pulls it without the code unless you choose **Pull as is**. Only do that for people you trust.
 
 ## Hosts it talks to
 
@@ -53,8 +57,14 @@ Until a page is published, the default address serves nothing. To try the page l
 
 ## Moving from the online preview
 
+Connect replaces the online play preview (the fork of Atlas VTT with online play built in) and keeps its data. The API build comes from the same BRAT repository as the preview (`evolJoaoBento/atlas-vtt`, plugin id `atlas-vtt`), so you change the version of the entry you already have rather than adding a new one:
+
+1. In BRAT, find `evolJoaoBento/atlas-vtt` and change its pinned version from the preview's (0.5.x or 0.6.1-beta.x) to **0.6.0-beta.1**, the API build. The lower number is expected: it is a different build, not an older preview. Keep it pinned.
+2. Restart Obsidian, or turn Atlas VTT off and on.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.1**) and enable it.
+
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
-- **Maps you received before.** A map someone shared with you before Connect ran on Atlas VTT with extension API 1.13 (including every map the online preview received) cannot be updated in place.
+- **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.
 - **The next new version of each such map** arrives as a second scene beside your copy, for example "Inn (2)", and a notice says so. Your old copy stays as it was, and you can delete it.
 - **After that,** new versions of the map replace it in place, as the preview did.
 
@@ -64,7 +74,7 @@ What the move leaves behind is described in [PRIVACY.md](PRIVACY.md).
 
 Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an install bug ("Cannot read properties of null (reading 'edgesOut')").
 
-Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. `npm run build` writes `dist/` only. Copy `dist/main.js`, `dist/styles.css` and `manifest.json` by hand into a test vault's `.obsidian/plugins/atlas-vtt-connect/`, never into your main vault. `npm run build:page` builds the join page into `dist-page/`.
+Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. `npm run build` writes `dist/` only, as a development bundle: unminified, with an inline source map. The release builds with `NODE_ENV=production npm run build`, which is minified and has no source map; use that for a copy you hand to others. Copy `dist/main.js`, `dist/styles.css` and `manifest.json` by hand into a test vault's `.obsidian/plugins/atlas-vtt-connect/`, never into your main vault. `npm run build:page` builds the join page into `dist-page/`.
 
 To test against a real Atlas, check out the Atlas branch `api/extension-api` of `evolJoaoBento/atlas-vtt`, build it with `npm run build:ci` (which never copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
 
@@ -82,16 +92,18 @@ To test against a real Atlas, check out the Atlas branch `api/extension-api` of 
 
 ### Releasing
 
-A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.0-beta.1` for a pre-release) triggers `.github/workflows/release.yml`, which checks, builds and attaches `main.js`, `styles.css` and `manifest.json` to a GitHub release, as BRAT expects. Tagging and pushing are manual steps. The release notes are a fixed line; put what changed in the release description by hand.
+A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.0-beta.1` for a pre-release) triggers `.github/workflows/release.yml`, which checks, builds and attaches `main.js`, `styles.css` and `manifest.json` to a GitHub release, as BRAT expects. Tagging and pushing are manual steps. The workflow's release notes are a placeholder line; replace them with what changed by editing the release by hand.
 
 Release checklist, before the first tag:
 
-1. Push the Atlas extension API branch to `evolJoaoBento/atlas-vtt` (branch `api/extension-api`) and check that it is public, as named in this README and in THIRD_PARTY_NOTICES.md. Connect's source for the vendored Atlas code must be reachable (AGPL).
-2. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
-3. The BRAT versions in this README are filled in (Atlas API build 0.6.0-beta.1, Connect 0.1.0-beta.1). The TODO for the first upstream Atlas release with the extension API stays until that release ships.
-4. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.
-5. Enable Pages (source "GitHub Actions") and let `pages.yml` publish the player page, so the default address serves it.
-6. Run the verify block (`npx tsc --noEmit && npm run lint && npx vitest run && npm run build && npm run check:vendor`), then tag and push.
+1. Push Connect's `main` to `evolJoaoBento/atlas-vtt-connect`. Until then the repository is empty: the player page, the source link and the notice links all 404, and Pages cannot deploy.
+2. Push the Atlas extension API branch to `evolJoaoBento/atlas-vtt` (branch `api/extension-api`) and check that it is public, as named in this README and in THIRD_PARTY_NOTICES.md. Connect's source for the vendored Atlas code must be reachable (AGPL).
+3. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
+4. The BRAT versions in this README are filled in (Atlas API build 0.6.0-beta.1, Connect 0.1.0-beta.1). The TODO for the first upstream Atlas release with the extension API stays until that release ships.
+5. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.
+6. Enable Pages in the repository's settings (source "GitHub Actions"), run or wait for `pages.yml`, and check that it goes green and that the default address serves the player page.
+7. Run the verify block (`npx tsc --noEmit && npm run lint && npx vitest run && npm run build && npm run check:vendor && npm run build:page`), then tag and push the tag.
+8. Replace the release's placeholder notes with what changed.
 
 ## Licence
 

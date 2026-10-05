@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['online-client/**', 'src/app/**', 'vendor/atlas/**', 'vite/**', 'vite.page.config.mts', 'package-lock.json']
+    paths: ['online-client/**', 'src/app/**', 'vendor/atlas/**', 'vite/**', 'vite.page.config.mts', 'package.json', 'package-lock.json', 'scripts/**', 'tsconfig.json']
 permissions:
   contents: read
   pages: write
