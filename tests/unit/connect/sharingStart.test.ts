@@ -5,6 +5,7 @@ import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessi
 import { OnlineJoinService } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from '../../../src/app/online/OnlineSessionService';
 import { resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
+import { shareSessionStore, type ShareSession } from '../../../src/app/online/sharing/shareSessionStore';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { connected, HOSTING } from './hostingFixtures';
 
@@ -64,6 +65,19 @@ describe('sharing, through startConnect', () => {
     expect(new Set(connect.commands.keys()).size).toBe(connect.commands.size);
     expect([...connect.commands.keys()]).toEqual(expect.arrayContaining(SHARE_COMMANDS));
     expect(connect.extensions).toHaveLength(1);
+  });
+
+  it('ends the share session when Atlas goes, so nothing asks to pull over a node that is gone', async () => {
+    const { atlas } = connected(['scenes', 'bundles', 'rules', 'settings', 'storage']);
+    await vi.advanceTimersByTimeAsync(0);
+    const node = {} as ShareSession['node'];
+    shareSessionStore.setState({
+      session: { role: 'player', tableId: 'T'.repeat(43), self: 'ana', node },
+      people: [{ personId: 'gm', name: 'GM' }],
+      pushes: [{ from: 'gm', item: 'i'.repeat(22), kind: 'note', title: 'Cave', at: 1 }],
+    });
+    atlas.unload();
+    expect(shareSessionStore.getState()).toEqual({ session: null, people: [], pushes: [] });
   });
 
   it('starts for joined sessions where this Atlas cannot host, and gives hosting its hooks where it can', async () => {

@@ -1,4 +1,4 @@
-// Modified from Atlas VTT tests/mocks/obsidian.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc.
+// Modified from Atlas VTT tests/mocks/obsidian.ts at 6c939e6 (AGPL-3.0-only); changes: type casts so it compiles under strict tsc; `Component.registerEvent` takes the event off its emitter on unload, as Obsidian's does.
 /** Obsidian's key scope: handlers by modifiers and key; the most recently pushed scope is asked first. */
 export class Scope {
   keys: Array<{ modifiers: string[]; key: string; func: (event: KeyboardEvent) => unknown }> = [];

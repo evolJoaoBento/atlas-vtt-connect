@@ -18,6 +18,14 @@ export interface FakeSavedMap {
 
 type AddInput = Parameters<ScenesApi['addToCollection']>[0];
 
+/** The vault `addToCollection` writes into: the in-memory app's files (text, as its `createBinary` keeps them) and folders. */
+export interface FakeSceneVault {
+  files: Map<string, string>;
+  folders: Set<string>;
+}
+
+const parentOf = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+
 const deepFreeze = <T>(value: T): T => {
   if (typeof value === 'object' && value !== null) for (const member of Object.values(value)) deepFreeze(member);
   return Object.freeze(value);
@@ -49,15 +57,19 @@ function plainJson(value: unknown): Json {
 export class FakeScenes {
   private readonly records = new Map<string, FakeSceneRecord>();
   private readonly maps = new Map<string, FakeSavedMap>();
-  /** The fake's vault: what `addToCollection` wrote, by path. */
-  readonly files = new Map<string, ArrayBuffer | string>();
+  /** The vault's files, by path: the in-memory app's when one is given, else the fake's own. */
+  readonly files: Map<string, string>;
+  private readonly folders: Set<string>;
   readonly collections = new Set<string>();
   private lock: Promise<unknown> = Promise.resolve();
   private nextId = 1;
   /** Set by a test: the next `addToCollection` fails after its writes, as a full index would. */
   failNextAdd: Error | null = null;
 
-  constructor(private readonly changed: () => void) {}
+  constructor(private readonly changed: () => void, vault?: FakeSceneVault) {
+    this.files = vault?.files ?? new Map();
+    this.folders = vault?.folders ?? new Set();
+  }
 
   /** The GM adds a scene to a collection. */
   addScene(scene: { id?: string; name: string; collectionId?: string; mapPath: string | null; data?: FakeSceneRecord['data'] }): string {
@@ -165,18 +177,25 @@ export class FakeScenes {
     }
     const created = !this.collections.has(collectionId);
     const written: string[] = [];
+    const madeFolders: string[] = [];
+    const write = (path: string, text: string): void => {
+      for (let parent = parentOf(path); parent && !this.folders.has(parent); parent = parentOf(parent)) {
+        this.folders.add(parent);
+        madeFolders.push(parent);
+      }
+      this.files.set(path, text);
+      written.push(path);
+    };
     try {
       for (const image of input.images) {
         const target = `${input.folder}/${image.path}`;
         if (this.files.has(target)) throw new Error(`[Atlas API] There is already a file at ${target}.`);
-        this.files.set(target, image.data);
-        written.push(target);
+        write(target, new TextDecoder().decode(image.data));
       }
       const taken = new Set([...this.files.keys(), ...[...this.records.values()].flatMap((record) => (record.mapPath ? [record.mapPath] : []))].map((path) => path.toLowerCase()));
       let mapPath = `${input.folder}/${input.name}.atlasmap`;
       for (let n = 2; taken.has(mapPath.toLowerCase()); n++) mapPath = `${input.folder}/${input.name} (${n}).atlasmap`;
-      this.files.set(mapPath, JSON.stringify({ state: { ...input.map, mapPath } }));
-      written.push(mapPath);
+      write(mapPath, JSON.stringify({ state: { ...input.map, mapPath } }));
       if (this.failNextAdd) {
         const error = this.failNextAdd;
         this.failNextAdd = null;
@@ -189,6 +208,7 @@ export class FakeScenes {
       return { sceneId, mapPath };
     } catch (error) {
       for (const path of written) this.files.delete(path);
+      for (const folder of madeFolders) this.folders.delete(folder);
       if (created) this.collections.delete(collectionId);
       throw error;
     }

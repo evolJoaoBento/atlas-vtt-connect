@@ -5,7 +5,7 @@ import { FakeLasers } from './fakeLasers';
 import { FakeLighting } from './fakeLighting';
 import { FakePresentation } from './fakePresentation';
 import { FakeRules } from './fakeRules';
-import { FakeScenes } from './fakeScenes';
+import { FakeScenes, type FakeSceneVault } from './fakeScenes';
 import { FakeTokens } from './fakeTokens';
 import { FakeUi } from './fakeUi';
 import { FakeViews, type Own } from './fakeViews';
@@ -92,7 +92,8 @@ export class FakeAtlas implements AtlasApi {
   /** The note properties exports and installs strip. */
   readonly bundles: FakeBundles;
 
-  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
+  /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
+  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault } = {}) {
     this.version = options.version ?? '1.0.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
@@ -110,7 +111,7 @@ export class FakeAtlas implements AtlasApi {
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
     this.ui = this.capabilities.has('ui') ? new FakeUi(this.views) : undefined;
-    this.scenes = new FakeScenes(() => this.emit('scenes-changed'));
+    this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault);
     this.bundles = new FakeBundles();
   }
 

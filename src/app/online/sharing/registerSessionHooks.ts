@@ -64,7 +64,13 @@ function registerTransport(plugin: Pick<SharingScope, 'register'>, { joins, peop
 
   const link = new PlayerShareLink({ catalogue, onPush });
   joins.useShare(link);
-  plugin.register(() => joins.useShare(null));
+  plugin.register(() => {
+    joins.useShare(null);
+    // Sharing stops before the join service leaves its session (an Atlas reload or disable): the share session
+    // goes with it, so nothing offers Ask to pull or a push prompt over a node that is gone.
+    link.deactivate();
+    reset();
+  });
   const presentForPlayer = (): void => {
     const identity = joins.identity;
     if (!identity) return;

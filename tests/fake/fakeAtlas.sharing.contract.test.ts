@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SavedMapInput } from '@atlas-vtt/api-types';
+import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { connectingPlugin, FakeAtlas } from './FakeAtlas';
 
 const MAP = 'atlas-vtt/collections/source/scenes/Cave.atlasmap';
@@ -80,6 +81,24 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
     await expect(extension.scenes.addToCollection({ ...base, collection: { id: 'nope' } })).rejects.toThrow(/no collection/);
     await expect(extension.scenes.addToCollection({ ...base, collection: { name: 'bad/name' } })).rejects.toThrow(/cannot contain/);
     expect(atlas.scenes.files.size).toBe(0);
+  });
+
+  it('C-scenes-2: addToCollection writes into the vault, keeps its files, numbers a taken map name and never takes a path an index record names', async () => {
+    const vault = createInMemoryApp({ files: { 'atlas-vtt/collections/source/scenes/Cave.atlasmap': 'theirs' } });
+    const atlas = new FakeAtlas({ capabilities: ['scenes'], vault });
+    atlas.scenes.addScene({ name: 'Ghost', collectionId: 'source', mapPath: 'atlas-vtt/collections/source/scenes/Cave (2).atlasmap' });
+    const { scenes } = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [{ path: 'bg.webp', data: new TextEncoder().encode('png').buffer as ArrayBuffer }] };
+    const added = await scenes.addToCollection(input);
+    expect(added.mapPath).toBe('atlas-vtt/collections/source/scenes/Cave (3).atlasmap');
+    expect(vault.files.get('atlas-vtt/collections/source/scenes/Cave.atlasmap')).toBe('theirs');
+    expect(vault.files.get('atlas-vtt/collections/source/scenes/bg.webp')).toBe('png');
+    expect(vault.folders.has('atlas-vtt/collections/source/scenes')).toBe(true);
+    await expect(scenes.addToCollection(input)).rejects.toThrow(/already a file/);
+    atlas.scenes.failNextAdd = new Error('index full');
+    await expect(scenes.addToCollection({ ...input, folder: 'atlas-vtt/collections/source/new', images: [] })).rejects.toThrow('index full');
+    expect(vault.folders.has('atlas-vtt/collections/source/new')).toBe(false);
+    expect([...vault.files.keys()].some((path) => path.includes('/new/'))).toBe(false);
   });
 
   it('C-scenes-3: readMap returns the saved map with its size, a frozen copy without anything private, or null for a missing file', async () => {
