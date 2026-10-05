@@ -1,0 +1,74 @@
+// The update choice and the merge page. Imported by styles/main.scss.
+@use '../../../../../../styles/atlas-mixins' as *;
+
+// The modal element carries the native modal's classes itself (`ATLAS_NATIVE_MODAL_CLASSES`).
+.atlas-native-modal.atlas-merge-modal {
+  width: min(960px, 92vw);
+}
+
+.atlas-merge,
+.atlas-merge-choice,
+.atlas-merge__chunks,
+.atlas-merge__conflict,
+.atlas-merge__taken,
+.atlas-merge__result {
+  @include atlas-flex-col($spacing-s);
+}
+
+.atlas-merge-choice__title {
+  margin: 0;
+  font-size: $font-ui-medium;
+}
+
+.atlas-merge-choice__help {
+  @include atlas-help-text;
+  margin: 0;
+}
+
+.atlas-merge__choices,
+.atlas-merge__edited,
+.atlas-merge__default {
+  @include atlas-flex-row($spacing-s);
+}
+
+.atlas-merge-choice__actions {
+  flex-wrap: wrap;
+}
+
+.atlas-merge__sides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $spacing-s;
+}
+
+.atlas-merge__side {
+  @include atlas-flex-col($spacing-xs);
+}
+
+.atlas-merge__conflict {
+  @include atlas-inset-surface;
+  padding: $spacing-s;
+  border-radius: $radius-xl;
+}
+
+.atlas-merge__lines {
+  margin: 0;
+  padding: $spacing-s;
+  border-radius: $radius-l;
+  background: var(--background-secondary);
+  white-space: pre-wrap;
+  font-size: $font-ui-smaller;
+}
+
+.atlas-merge__label {
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+  font-weight: $font-weight-semibold;
+}
+
+.atlas-merge__result textarea {
+  @include atlas-text-input;
+  min-height: 160px;
+  font-family: var(--font-monospace);
+  font-size: $font-ui-smaller;
+}

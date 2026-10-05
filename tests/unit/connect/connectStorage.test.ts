@@ -7,7 +7,7 @@ describe('connectStorage', () => {
     const atlas = new FakeAtlas({ capabilities: ['storage'] });
     const paths = await connectStorage(atlas, atlas.connect(connectingPlugin('atlas-vtt-connect')));
     const root = 'atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing';
-    expect(paths).toEqual({ root, people: `${root}/people.json`, items: `${root}/items.json`, pulled: `${root}/pulled.json`, history: `${root}/history` });
+    expect(paths).toEqual({ root, people: `${root}/people.json`, items: `${root}/items.json`, pulled: `${root}/pulled.json`, bases: `${root}/bases`, history: `${root}/history` });
   });
 
   it('is null on an Atlas without the storage capability', async () => {

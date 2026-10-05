@@ -4,11 +4,13 @@ export interface SharingPaths {
   people: string;
   items: string;
   pulled: string;
+  /** The last pulled text of each pulled note, the base of its next merge. */
+  bases: string;
   history: string;
 }
 
 /** The sharing data paths under `storageFolder`, e.g. `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect`. */
 export function sharingPaths(storageFolder: string): SharingPaths {
   const root = `${storageFolder}/sharing`;
-  return { root, people: `${root}/people.json`, items: `${root}/items.json`, pulled: `${root}/pulled.json`, history: `${root}/history` };
+  return { root, people: `${root}/people.json`, items: `${root}/items.json`, pulled: `${root}/pulled.json`, bases: `${root}/bases`, history: `${root}/history` };
 }

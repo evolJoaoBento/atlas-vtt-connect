@@ -1,0 +1,57 @@
+// The Shared with me dialog. Imported by styles/main.scss.
+@use '../../../../../../styles/atlas-mixins' as *;
+
+.atlas-shared {
+  @include atlas-flex-col($spacing-m);
+}
+
+.atlas-shared__person,
+.atlas-shared__item {
+  @include atlas-flex-col($spacing-s);
+}
+
+.atlas-shared__items,
+.atlas-shared__linked {
+  @include atlas-flex-col($spacing-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-shared__row {
+  @include atlas-flex-row($spacing-s);
+}
+
+.atlas-shared__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.atlas-shared__heading {
+  margin: 0;
+  font-size: $font-ui-smaller;
+  font-weight: $font-weight-semibold;
+  color: var(--text-muted);
+}
+
+.atlas-shared__kind,
+.atlas-shared__state {
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-shared__state--new,
+.atlas-shared__state--updated {
+  color: var(--text-accent);
+}
+
+.atlas-shared__help {
+  @include atlas-help-text;
+  margin: 0;
+}
+
+.atlas-shared__problem {
+  margin: 0;
+  color: var(--text-error);
+  font-size: $font-ui-smaller;
+}

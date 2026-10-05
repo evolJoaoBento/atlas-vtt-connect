@@ -9,24 +9,53 @@ import type { VaultChange } from './model/mapShareRenames';
 
 export type VaultChangeHandler = (change: VaultChange) => void;
 
+/** One change to one handler: a handler that throws is logged, and the changes after it still arrive. */
+function deliver(handler: VaultChangeHandler, change: VaultChange): void {
+  try {
+    handler(change);
+  } catch (error) {
+    console.error('[Atlas VTT Connect] Could not follow a vault change:', error);
+  }
+}
+
 export class VaultChanges {
   private waiting: VaultChange[] = [];
   private handler: VaultChangeHandler | null = null;
 
   /** A change in the vault: to the bound handler, or kept for the next one. */
   push(change: VaultChange): void {
-    if (this.handler) this.handler(change);
+    if (this.handler) deliver(this.handler, change);
     else this.waiting.push(change);
   }
 
   /** Binds `handler`: it gets what waited first, then every change until the returned function unbinds it. */
   attach(handler: VaultChangeHandler): () => void {
     this.handler = handler;
-    for (const change of this.waiting.splice(0)) handler(change);
+    for (const change of this.waiting.splice(0)) deliver(handler, change);
     return () => {
       if (this.handler === handler) this.handler = null;
     };
   }
+}
+
+/**
+ * The handlers of one binding (the share commands, the pulled files) as the one handler `VaultChanges` takes:
+ * each change reaches every handler, in the order they were added, so the changes that waited reach them all.
+ */
+export class VaultChangeFanOut {
+  private readonly handlers: VaultChangeHandler[] = [];
+
+  attach(handler: VaultChangeHandler): () => void {
+    this.handlers.push(handler);
+    return () => {
+      const at = this.handlers.indexOf(handler);
+      if (at >= 0) this.handlers.splice(at, 1);
+    };
+  }
+
+  readonly dispatch = (change: VaultChange): void => {
+    for (const handler of [...this.handlers]) deliver(handler, change);
+  };
 }
 
 /** The plugin's `VaultChanges`, fed by the vault's rename and delete events from now until the plugin unloads. */

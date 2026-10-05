@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'obsidian';
 import AtlasVttConnectPlugin from '../../../main';
 import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';
+import { VaultChangeFanOut } from '../../../src/app/online/sharing/vaultChanges';
 import { fakeEvents, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
 
 /** An app whose vault and metadata cache events are counted, with no Atlas installed. */
@@ -49,5 +50,24 @@ describe('what sharing hears for the plugin\'s lifetime', () => {
     expect(heard).toHaveLength(3);
     vaultChanges.attach((change) => heard.push(change));
     expect(heard.at(-1)).toEqual({ removed: 'E.md' });
+  });
+
+  it('a handler that throws on one change still gets the rest, waiting or new, and so does every handler of the binding', () => {
+    const { app, vault } = appWithEvents();
+    const { vaultChanges } = sharingLifetime({ app, registerEvent: () => undefined });
+    vault.fire('delete', { path: 'A.md' });
+    vault.fire('delete', { path: 'B.md' });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fanOut = new VaultChangeFanOut();
+    const heard: unknown[] = [];
+    const others: unknown[] = [];
+    fanOut.attach((change) => { if ('removed' in change && change.removed === 'A.md') throw new Error('no'); heard.push(change); });
+    fanOut.attach((change) => others.push(change));
+    vaultChanges.attach(fanOut.dispatch);
+    vault.fire('delete', { path: 'C.md' });
+    expect(heard).toEqual([{ removed: 'B.md' }, { removed: 'C.md' }]);
+    expect(others).toEqual([{ removed: 'A.md' }, { removed: 'B.md' }, { removed: 'C.md' }]);
+    expect(logged).toHaveBeenCalledTimes(1);
+    logged.mockRestore();
   });
 });

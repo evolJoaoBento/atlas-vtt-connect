@@ -2,8 +2,10 @@ import type { Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 import type { OnlineJoinService } from '../app/online/obsidian/OnlineJoinService';
 import type { OnlineSessionService } from '../app/online/OnlineSessionService';
+import { MergeHistory } from '../app/online/sharing/merge/MergeHistory';
 import { ShareItems } from '../app/online/sharing/model/ShareItems';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
+import { PulledItems } from '../app/online/sharing/receive/PulledItems';
 import { registerSharing } from '../app/online/sharing/registerSharing';
 import type { SharingLifetime } from '../app/online/sharing/sharingLifetime';
 import { need } from './capabilities';
@@ -41,6 +43,8 @@ export async function startConnectSharing(plugin: Plugin, api: AtlasApi, atlas: 
     joins: start.joins,
     people: PeopleBook.forApp(plugin.app, paths),
     items: ShareItems.forApp(plugin.app, paths),
+    pulled: PulledItems.forApp(plugin.app, paths),
+    history: new MergeHistory(plugin.app.vault.adapter, paths.history),
     sessions,
     settings: {
       ownTableId: () => start.settings.get().table?.id ?? null,

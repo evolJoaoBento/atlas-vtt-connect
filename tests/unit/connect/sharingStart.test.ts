@@ -5,14 +5,16 @@ import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessi
 import { OnlineJoinService } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from '../../../src/app/online/OnlineSessionService';
 import { resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
+import { PulledItems } from '../../../src/app/online/sharing/receive/PulledItems';
 import { registerSharing, type SharingServices } from '../../../src/app/online/sharing/registerSharing';
 import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';
 import { shareSessionStore, type ShareSession } from '../../../src/app/online/sharing/shareSessionStore';
 import { FakeAtlas } from '../../fake/FakeAtlas';
+import { PATHS } from '../online/sharing/sharingPathsFixture';
 import { connected, HOSTING, hostPlugin } from './hostingFixtures';
 
 const SHARING: AtlasCapability[] = [...HOSTING, 'scenes', 'bundles'];
-const SHARE_COMMANDS = ['people', 'share-with', 'part-private', 'part-only', 'part-except', 'part-everyone', 'ask-to-pull'];
+const SHARE_COMMANDS = ['people', 'share-with', 'part-private', 'part-only', 'part-except', 'part-everyone', 'ask-to-pull', 'shared-with-me', 'undo-shared-merge', 'forget-shared-choice'];
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => {
@@ -119,6 +121,26 @@ describe('sharing, through startConnect', () => {
     expect((again.scenes.record(sceneId)!.data.extensions!['atlas-vtt-connect'] as { notes: string[] }).notes).toEqual(['Archive/Keep.md']);
   });
 
+  it('pulled files and map shares both follow what changed in the vault while Atlas was away', async () => {
+    const { atlas, connect, fire, vaultEvents } = connected(SHARING);
+    await vi.advanceTimersByTimeAsync(0);
+    const pulled = PulledItems.forApp(connect.plugin.app, PATHS);
+    pulled.put({ tableId: 'T'.repeat(43), from: 'gm', item: 'p'.repeat(22), kind: 'note', path: 'Shared/GM/Cave.md', version: 'v', pulledAt: 1 });
+    pulled.put({ tableId: 'T'.repeat(43), from: 'gm', item: 'q'.repeat(22), kind: 'note', path: 'Shared/GM/Gone.md', version: 'v', pulledAt: 1 });
+    atlas.unload();
+    vaultEvents.fire('rename', { path: 'Notes/Cave.md' }, 'Shared/GM/Cave.md');
+    vaultEvents.fire('delete', { path: 'Shared/GM/Gone.md' });
+    const again = new FakeAtlas({ version: '1.8.0', capabilities: SHARING });
+    const share = { item: 'i'.repeat(22), everyone: true, people: [], except: [], mode: 'full', notes: ['Shared/GM/Cave.md'] };
+    const sceneId = again.scenes.addScene({ name: 'Inn', mapPath: 'Inn.atlasmap', data: { extensions: { 'atlas-vtt-connect': share } } });
+    expect(pulled.byPath('Notes/Cave.md')).toBeNull();
+    fire('atlas-vtt:api-ready', again);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pulled.byPath('Notes/Cave.md')?.item).toBe('p'.repeat(22));
+    expect(pulled.get('T'.repeat(43), 'gm', 'q'.repeat(22))?.path).toBe('');
+    expect((again.scenes.record(sceneId)!.data.extensions!['atlas-vtt-connect'] as { notes: string[] }).notes).toEqual(['Notes/Cave.md']);
+  });
+
   it('takes off what it registered when registering fails partway, so the next binding does not add it twice', () => {
     const connect = hostPlugin(connected([]).connect.plugin.app);
     const atlas = new FakeAtlas({ capabilities: ['scenes', 'rules', 'settings'] });
@@ -128,6 +150,8 @@ describe('sharing, through startConnect', () => {
       joins: { identity: null, onIdentity: () => () => undefined, useShare: () => undefined },
       people: { ready: async () => undefined, subscribe: () => () => undefined, flush: () => undefined },
       items: { ready: async () => undefined },
+      pulled: { ready: async () => undefined },
+      history: {},
       sessions: { useSharingHooks: () => { throw new Error('hooks failed'); } },
       settings: { ownTableId: () => null, shareableProperties: () => [] },
       lifetime: sharingLifetime(connect.plugin),
