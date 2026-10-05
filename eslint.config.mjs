@@ -12,7 +12,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 const SCRIPT_FILES = ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"];
 
 export default defineConfig([
-  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "online-client/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.mts", "*.config.ts"]),
+  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
   ...obsidianmd.configs.recommended,
   {
     files: SCRIPT_FILES,
@@ -47,6 +47,18 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    // The join page's DOM code (`online-client/`) also runs inside Obsidian (the Canvas scene tab): it is linted in
+    // place. It is written for a plain web page, which has no `createEl`, so only Obsidian's DOM rules are off.
+    files: ["online-client/**"],
+    rules: { "obsidianmd/prefer-create-el": "off" },
+  },
+  {
+    // The page's own entry, its saved-images panel and the shim that gives a plain page Obsidian's globals run only in
+    // a browser, where `localStorage` and `globalThis` are the right names.
+    files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts"],
+    rules: { "no-restricted-globals": "off", "obsidianmd/no-global-this": "off" },
   },
   {
     files: SCRIPT_FILES,

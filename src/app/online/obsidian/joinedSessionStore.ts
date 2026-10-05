@@ -1,9 +1,9 @@
-/** The session this Atlas joined, as the Join dialog follows it; written by `OnlineJoinService`. */
+/** The session this Obsidian joined, as the Join dialog follows it; written by `OnlineJoinService`. */
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { PlayerSessionState } from '../PlayerSession';
 
 export interface JoinedSessionState {
-  /** The joined session as the player has it; null while Atlas joins none. */
+  /** The joined session as the player has it; null while this device joins none. */
   session: PlayerSessionState | null;
 }
 

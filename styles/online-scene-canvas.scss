@@ -37,7 +37,7 @@
   }
   .top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
   .top-notes:not(:has(> :not([hidden]))) { display: none; }
-  .dice-toast, .dice-throws { pointer-events: auto; }
+  .dice-toast { pointer-events: auto; }
   .move-notice {
     margin: 0;
     padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
@@ -227,40 +227,6 @@
     border-radius: 16px; box-shadow: var(--shadow);
   }
   .dice-toast .dice-entry { padding: 4px; border: 0; }
-
-  /* The player's own roll, thrown as Atlas's 3D dice at the top of the map (`dice3d/throwPanel.mts`). */
-  .dice-throws { display: contents; }
-  .dice-throws:empty { display: none; }
-  .dice-throw {
-    pointer-events: auto; width: min(21rem, calc(100vw - 32px)); display: grid; gap: var(--inset); padding: var(--inset);
-    background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius);
-    box-shadow: var(--shadow); cursor: pointer; touch-action: manipulation; animation: atlas-connect-dice-throw-in 0.3s ease-out both;
-  }
-  .dice-throw.is-leaving { opacity: 0; transform: translateY(-14px) scale(0.96); transition: opacity 0.43s, transform 0.43s; }
-  .dice-throw.is-crit-success { border-color: #2f9e44; box-shadow: var(--shadow), 0 0 24px rgba(47, 158, 68, 0.45); }
-  .dice-throw.is-crit-fail { border-color: #e03131; box-shadow: var(--shadow), 0 0 24px rgba(224, 49, 49, 0.45); }
-  .dice-throw-header { display: flex; align-items: center; gap: var(--inset); }
-  .dice-throw-label { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dice-throw-close { width: 32px; height: 32px; margin: 0; font-size: 18px; border-top-right-radius: var(--inset-radius); }
-  .dice-throw-stage { position: relative; height: min(13rem, 40vh); overflow: hidden; border-radius: 12px; }
-  /* A phone on its side: a lower stage, and the throw beside the notice and toast rather than under them, clear of the toolbar. */
-  @media (max-height: 500px) {
-    /* What the top bar, the panel's own parts and the toolbar leave of the height, at most 22vh. */
-    .dice-throw-stage { height: max(3.5rem, min(22vh, calc(100vh - 292px))); }
-    .dice-throw-slot, .dice-throw-slot.has-breakdown { min-height: 2.6rem; }
-  }
-  @media (max-height: 500px) and (min-width: 560px) {
-    .top-stack { flex-direction: row; align-items: flex-start; }
-  }
-  /* Atlas draws in the canvas's bottom-left corner and lets it only grow (`DiceRenderer.setView`): the stage clips the rest. */
-  .dice-throw-stage canvas { position: absolute; bottom: 0; left: 0; display: block; max-width: none; }
-  .dice-throw-slot { margin: 0; min-height: 3.2rem; display: grid; justify-items: center; align-content: center; gap: 2px; }
-  .dice-throw-slot.has-breakdown { min-height: 4.25rem; }
-  .dice-throw-formula { color: var(--muted); }
-  .dice-throw-total { font-size: 32px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-  .dice-throw-breakdown { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-  @keyframes atlas-connect-dice-throw-in { from { opacity: 0; transform: translateY(-28px) scale(0.92); } }
-  @media (prefers-reduced-motion: reduce) { .dice-throw, .dice-throw.is-leaving { animation: none; transition: none; transform: none; } }
 
   /* The Dice log button sits beside Menu. */
   .icon-button + .icon-button { margin-left: 0; }

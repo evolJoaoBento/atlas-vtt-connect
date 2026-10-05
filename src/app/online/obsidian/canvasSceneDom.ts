@@ -1,6 +1,6 @@
 /**
  * The Canvas 2D scene tab's elements: the map, the top bar (session, connection, Reconnect, the dice log button),
- * the Follow GM and Fit map buttons, the notes and 3D throws, the dice tray, the toolbar and the dice log. They
+ * the Follow GM and Fit map buttons, the notes, the dice tray, the toolbar and the dice log. They
  * are the page's (`online-client/index.html`) without the name form, the players menu and the image settings,
  * which the join dialog and Obsidian's own settings replace. The class names are the page's, scoped by
  * `styles/online-scene-canvas.scss`.
@@ -18,7 +18,6 @@ export interface SceneDom {
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
   diceToast: HTMLButtonElement;
-  diceThrows: HTMLElement;
   diceTray: HTMLElement;
   toolbar: HTMLElement;
   diceLog: HTMLElement;
@@ -33,7 +32,7 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const bar = root.createEl('header', { cls: 'top-bar' });
   const sessionName = bar.createSpan({ cls: 'session-name' });
   const connection = bar.createSpan({ cls: 'connection', attr: { role: 'status' } });
-  const message = bar.createSpan({ cls: 'connection' });
+  const message = bar.createSpan({ cls: 'connection scene-message' });
   const reconnect = bar.createEl('button', { cls: 'secondary', text: 'Reconnect', attr: { type: 'button' } });
   reconnect.hidden = true;
   const diceLogButton = bar.createEl('button', {
@@ -49,7 +48,6 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   moveNotice.hidden = true;
   const diceToast = notes.createEl('button', { cls: 'dice-toast', attr: { type: 'button', 'aria-live': 'polite' } });
   diceToast.hidden = true;
-  const diceThrows = stack.createDiv({ cls: 'dice-throws' });
   const diceTray = root.createDiv({ cls: 'dice-tray', attr: { role: 'group', 'aria-label': 'Dice tray' } });
   diceTray.hidden = true;
   const toolbar = root.createEl('nav', { cls: 'toolbar', attr: { 'aria-label': 'Tools' } });
@@ -62,6 +60,6 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
-    diceToast, diceThrows, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList,
+    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList,
   };
 }
