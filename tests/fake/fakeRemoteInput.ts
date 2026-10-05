@@ -37,6 +37,8 @@ export function checkedScene(scene: unknown): RemoteSceneInput | null {
 function isMeasurement(value: unknown): boolean {
   return isObject(value) && MODES.includes(value.mode) && UNITS.includes(value.unitType) && DIAGONALS.includes(value.diagonalRule)
     && isFiniteNumber(value.unitDistance) && value.unitDistance > 0 && isFiniteNumber(value.coneAngle) && value.coneAngle >= 1 && value.coneAngle <= 360
+    // API 1.14.0: optional, above 0 when given.
+    && (value.ruleDistance === undefined || (isFiniteNumber(value.ruleDistance) && value.ruleDistance > 0))
     && Array.isArray(value.rangeBands) && value.rangeBands.every((band) => isObject(band) && isText(band.name) && isFiniteNumber(band.maxSquares));
 }
 
@@ -44,7 +46,7 @@ export function checkedPlayer(state: unknown): RemotePlayerState {
   if (!isObject(state) || !isObject(state.tokenUi) || !isObject(state.initiative)) fail('setPlayer', 'the state must be a RemotePlayerState');
   const { movableTokenIds, measurement, tokenUi, initiative } = state;
   if (!Array.isArray(movableTokenIds) || !movableTokenIds.every(isText)) fail('setPlayer', '"movableTokenIds" must be a list of token ids');
-  if (!isMeasurement(measurement)) fail('setPlayer', '"measurement" must be MeasurementSettings');
+  if (!isMeasurement(measurement)) fail('setPlayer', '"measurement" must be MeasurementSettings with a distance above 0 and a cone of 1 to 360 degrees');
   if (!Array.isArray(tokenUi.conditions) || !tokenUi.conditions.every((c) => isObject(c) && isText(c.id) && isText(c.name))) fail('setPlayer', '"tokenUi.conditions" must be condition definitions');
   const resources = tokenUi.resources;
   if (!isObject(resources) || !Object.values(resources).every((list) => Array.isArray(list) && list.every((d) => isObject(d) && isText(d.key) && typeof d.visibleToPlayers === 'boolean'))) {
@@ -54,7 +56,9 @@ export function checkedPlayer(state: unknown): RemotePlayerState {
   if (!isObject(initiative.health) || !Object.values(initiative.health).every((h) => isObject(h) && isFiniteNumber(h.value) && isFiniteNumber(h.max))) {
     fail('setPlayer', '"initiative.health" values must be { value, max } numbers');
   }
-  return structuredClone(state) as unknown as RemotePlayerState;
+  const copy = structuredClone(state) as unknown as RemotePlayerState;
+  // As Atlas 1.14.0: an extension written before `ruleDistance` measures squares like cells.
+  return { ...copy, measurement: { ...copy.measurement, ruleDistance: copy.measurement.ruleDistance ?? copy.measurement.unitDistance } };
 }
 
 export function checkedStatus(status: unknown): RemoteStatus {

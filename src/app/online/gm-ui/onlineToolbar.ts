@@ -2,7 +2,10 @@ import type { PanelHandle, ToolbarItem } from '@atlas-vtt/api-types';
 import type { OnlineSessionState } from '../onlineSessionStore';
 import { ONLINE_SESSION_LABEL } from '../ui/onlineCopy';
 
-/** Where the item sits among Atlas's own, which have 45 to 100. */
+/**
+ * Where the item sits among extensions' items, which sit together after Atlas's dice button (API 1.14.0): higher sits
+ * further left. Atlas before 0.6 placed it among its own tools, which have 45 to 100.
+ */
 export const TOOLBAR_PRIORITY = 60;
 
 export interface ToolbarEnv {

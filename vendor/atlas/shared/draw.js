@@ -3,8 +3,8 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { L as LASER_FADE_TIME } from "./laserPointerSettings-BMmA428j.js";
 import { i } from "./laserPointerSettings-BMmA428j.js";
-import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-C7uijKH9.js";
-import { R, T, c, a, r, s, t, b, d } from "./measurementFormat-C7uijKH9.js";
+import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-DLGvLcYl.js";
+import { R, T, c, a, r, s, t, b, d } from "./measurementFormat-DLGvLcYl.js";
 const MEASURE_SHADOW = 0;
 const MEASURE_PATH_STROKES = [
   { width: 6, alpha: 0.3, shadow: true },

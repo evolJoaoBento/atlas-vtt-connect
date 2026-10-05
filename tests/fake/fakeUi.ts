@@ -88,13 +88,18 @@ export class FakeUi {
     return this.versions;
   }
 
-  /** The toolbar items the bar draws in the view, with `isActive` and `badge` read now. */
+  /**
+   * The extensions' toolbar items the bar draws in the view, left to right, with `isActive` and `badge` read now. As
+   * Atlas 1.14.0 (`useExtensionToolbarItems`): highest priority first, registration order breaking ties.
+   */
   drawToolbar(viewId: ViewId): DrawnToolbarItem[] {
     const ctx = this.ctxOf(viewId);
     if (!this.views.isOpen(viewId)) return [];
     return this.specs<ToolbarItem>('toolbar')
       .filter((item) => (item.views ?? ['map']).includes(ctx.kind))
-      .map((item) => ({
+      .map((item, index) => ({ item, index, priority: typeof item.priority === 'number' && Number.isFinite(item.priority) ? item.priority : 50 }))
+      .sort((a, b) => b.priority - a.priority || a.index - b.index)
+      .map(({ item }) => ({
         id: item.id, icon: item.icon, label: item.label, priority: item.priority ?? 50,
         active: item.isActive ? guarded('isActive', () => item.isActive!(ctx), false) : false,
         badge: item.badge ? drawableBadge(guarded('badge', () => item.badge!(ctx), null)) : null,

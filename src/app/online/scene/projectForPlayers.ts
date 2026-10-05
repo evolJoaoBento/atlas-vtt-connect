@@ -135,7 +135,10 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
   };
 }
 
-/** The settings Atlas's ruler and measure tool use for this map, field by field. */
+/**
+ * The settings Atlas's ruler and measure tool use for this map, field by field. A scene's own distance per cell
+ * (`unitDistanceOverride`) is in `unitDistance`; the collection's stays as `ruleDistance`.
+ */
 function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number): PlayerMeasurement {
   const settings = resolveMeasurementSettings(collection ?? undefined, grid);
   // `mapConeAngle` gives only valid angles; one the page would refuse (from a share's raw grid defaults) opens a quarter circle.
@@ -146,6 +149,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     mode: oneOf(PLAYER_MEASUREMENT_MODES, settings.mode, 'metric'),
     unitType: oneOf(PLAYER_UNIT_TYPES, settings.unitType, 'feet'),
     unitDistance: finiteOr(settings.unitDistance, 5, SCENE_RANGES.unitDistance),
+    ruleDistance: finiteOr(settings.ruleDistance, 5, SCENE_RANGES.unitDistance),
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
     snapToGrid: grid?.snapToGrid ?? true,
     coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,

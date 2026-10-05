@@ -118,15 +118,24 @@ describe('toRemoteScene', () => {
   it("takes the GM's measurement for the ruler, snapping included", () => {
     const scene: PlayerScene = playerScene({
       measurement: {
-        mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating',
+        mode: 'abstract', unitType: 'custom', unitDistance: 1, ruleDistance: 1, diagonalRule: 'alternating',
         rangeBands: [{ name: 'Close', maxSquares: 2 }], snapToGrid: false, coneAngle: 53.13,
       },
     });
     expect(remotePlayerState(scene, []).measurement).toEqual({
-      mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
+      mode: 'abstract', unitType: 'custom', unitDistance: 1, ruleDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
     });
     expect(input(scene).grid).toMatchObject({ snapToGrid: false, measurementType: 'abstract' });
     expect(input(scene).grid).not.toHaveProperty('unitType');
+  });
+
+  it("gives the remote view a scene's own distance per cell and the collection's rules square", () => {
+    const scene = playerScene({ measurement: { ...playerScene().measurement, unitDistance: 10, ruleDistance: 5 } });
+    expect(remotePlayerState(scene, []).measurement).toMatchObject({ unitDistance: 10, ruleDistance: 5 });
+    expect(input(scene).grid).toMatchObject({ unitDistance: 10 });
+    // A rules square Atlas would refuse is left out; Atlas then takes the distance per cell.
+    const zero = playerScene({ measurement: { ...playerScene().measurement, ruleDistance: 0 } });
+    expect(remotePlayerState(zero, []).measurement).not.toHaveProperty('ruleDistance');
   });
 
   it('shows counters and clocks by their value and timers by their remaining time, all to players', () => {

@@ -24,7 +24,7 @@ function sceneFromRolls(rolls) {
       const tens = Math.floor(roll.value % 100 / 10);
       const units = roll.value % 10;
       plan.push({ sides: 10, role: "tens" }, { sides: 10, role: "units" });
-      faces.push(tens + 1, units === 0 ? 10 : units);
+      faces.push(tens === 0 ? 10 : tens, units === 0 ? 10 : units);
       continue;
     }
     const mimic = MIMIC[roll.max];

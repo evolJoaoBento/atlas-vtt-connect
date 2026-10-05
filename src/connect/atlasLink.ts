@@ -2,7 +2,11 @@ import { Notice, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 
 const SUPPORTED_MAJOR = 1;
-/** The first API minor with everything Connect uses (`replaceMap`, the `readMap` pins, `maxDice`). */
+/**
+ * The first API minor with everything Connect uses (`replaceMap`, the `readMap` pins, `maxDice`). 1.14.0 adds only what
+ * degrades on 1.13: a scene's own distance per cell (absent there, so the collection's applies) and `ruleDistance`
+ * (Connect sends it; 1.13 ignores the extra field).
+ */
 const MINIMUM_MINOR = 13;
 
 /** How long after layout ready Atlas gets to publish its API before Connect says it is missing (Atlas publishes it after its own start-up work). */

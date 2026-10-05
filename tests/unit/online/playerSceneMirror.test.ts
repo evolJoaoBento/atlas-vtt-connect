@@ -35,6 +35,10 @@ describe('PlayerSceneMirror', () => {
     const { snapToGrid: _snap, coneAngle: _cone, ...noSnap } = measurement;
     mirror.receive({ v: 1, type: 'scene-patch', seq: 2, set: { measurement: { ...noSnap, unitDistance: 10 } as never }, upsert: {}, remove: {} });
     expect(mirror.scene?.measurement).toEqual({ ...measurement, unitDistance: 10 });
+    // A GM before extension API 1.14.0 sends no rules square: it measured squares like cells.
+    const { ruleDistance: _rule, ...noRule } = measurement;
+    mirror.receive({ v: 1, type: 'scene-patch', seq: 3, set: { measurement: { ...noRule, unitDistance: 10 } as never }, upsert: {}, remove: {} });
+    expect(mirror.scene?.measurement).toEqual({ ...measurement, unitDistance: 10, ruleDistance: 10 });
   });
 
   it('waits for the drawing parts too', () => {

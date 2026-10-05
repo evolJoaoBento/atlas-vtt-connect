@@ -362,9 +362,11 @@ describe('OnlineSessionService', () => {
     svc.stop();
   });
 
-  it("sends the measurement of the presented map's collection", async () => {
+  it("sends the measurement of the presented map's collection, at the scene's own distance per cell", async () => {
     const presented = presenter();
-    const { view, tavern } = viewWithViewport(presented, null, { ...emptySceneState(), mapPath: 'maps/tavern.atlasmap' });
+    // The scene measures at its own distance per cell (API 1.14.0): players get it, with the collection's as the rules square.
+    const state = emptySceneState();
+    const { view, tavern } = viewWithViewport(presented, null, { ...state, grid: { ...state.grid!, unitDistanceOverride: 3 }, mapPath: 'maps/tavern.atlasmap' });
     presented.present(view, tavern);
     const network = new MemoryNetwork();
     const host = network.host('gm-id');
@@ -391,7 +393,7 @@ describe('OnlineSessionService', () => {
     link.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     answers[0]!(true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot') as Extract<ControlMessage, { type: 'scene-snapshot' }>;
-    expect(snapshot.scene.measurement).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'euclidean', rangeBands: [], snapToGrid: true, coneAngle: 53.13,
+    expect(snapshot.scene.measurement).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 3, ruleDistance: 1.5, diagonalRule: 'euclidean', rangeBands: [], snapToGrid: true, coneAngle: 53.13,
       snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
     });
     expect(asked).toContain('maps/tavern.atlasmap');

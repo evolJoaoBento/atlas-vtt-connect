@@ -165,6 +165,10 @@ describe('scene value bounds', () => {
     const withMeasurement = (overrides: object): unknown => ({ ...body, measurement: { ...body.measurement, ...overrides } });
     expect(valid(snapshot(withMeasurement({ unitDistance: 1_000_000 })))).toBe(true);
     expect(valid(snapshot(withMeasurement({ unitDistance: -1 })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ ruleDistance: -1 })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ ruleDistance: '5' })))).toBe(false);
+    const { ruleDistance: _rule, ...noRule } = body.measurement;
+    expect(valid(snapshot({ ...body, measurement: noRule }))).toBe(true);
     expect(valid(snapshot(withMeasurement({ unitType: 'furlongs' })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ diagonalRule: 'taxicab' })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ rangeBands: [{ name: 'Near', maxSquares: 0 }] })))).toBe(false);

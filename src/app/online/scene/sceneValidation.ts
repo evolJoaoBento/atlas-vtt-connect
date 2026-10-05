@@ -192,6 +192,8 @@ function isPlayerMeasurement(value: unknown): boolean {
     // An older GM sends no snap flag and no cone angle; the mirror fills them in.
     && (!Object.hasOwn(value, 'snapToGrid') || isBoolean(value.snapToGrid))
     && (!Object.hasOwn(value, 'coneAngle') || isConeAngle(value.coneAngle))
+    // A GM before extension API 1.14.0 sends no rules square; the mirror fills in the distance per cell.
+    && (!Object.hasOwn(value, 'ruleDistance') || inRange(SCENE_RANGES.unitDistance)(value.ruleDistance))
     // An older GM sends no snap grid; the players then snap to the grid they see.
     && optional(nullable(isSnapGrid))(value.snapGrid);
 }

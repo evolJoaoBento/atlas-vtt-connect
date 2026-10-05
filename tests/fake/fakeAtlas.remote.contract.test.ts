@@ -75,6 +75,9 @@ describe('FakeAtlas follows the remote view contract cases', () => {
       measurement: { mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 },
       tokenUi: { conditions: [], resources: {} }, initiative: { rules: null, health: {} },
     });
+    // API 1.14.0: a measurement without a rules square takes the distance per cell; one not above 0 is refused.
+    expect(handle.player?.measurement.ruleDistance).toBe(5);
+    expect(() => view.setPlayer({ ...handle.player!, measurement: { ...handle.player!.measurement, ruleDistance: 0 } })).toThrow(/"measurement" must be/);
     const drops = vi.fn();
     view.onTokenDrop(drops);
     handle.drop('theirs', { x: 400, y: 400 });

@@ -165,22 +165,31 @@ const DEFAULT_CONE_ANGLE = 90;
 function isValidConeAngle(angle) {
   return typeof angle === "number" && angle > 0 && angle <= 360;
 }
+function sceneUnitDistance(grid) {
+  const distance = grid == null ? void 0 : grid.unitDistanceOverride;
+  return typeof distance === "number" && Number.isFinite(distance) && distance > 0 ? distance : void 0;
+}
 function resolveMeasurementSettings(collection, grid) {
-  if (collection) {
-    return {
-      mode: collection.measurementMode,
-      unitType: collection.unitType,
-      unitDistance: collection.unitDistance,
-      diagonalRule: collection.diagonalRule ?? "equidistant",
-      rangeBands: collection.abstractRangeBands ?? [],
-      coneAngle: collection.coneAngle ?? DEFAULT_CONE_ANGLE
-    };
-  }
+  const rules = collection ? collectionMeasurement(collection) : gridMeasurement(grid);
+  const override = rules.mode === "abstract" ? void 0 : sceneUnitDistance(grid);
+  return { ...rules, unitDistance: override ?? rules.ruleDistance };
+}
+function collectionMeasurement(collection) {
+  return {
+    mode: collection.measurementMode,
+    unitType: collection.unitType,
+    ruleDistance: collection.unitDistance,
+    diagonalRule: collection.diagonalRule ?? "equidistant",
+    rangeBands: collection.abstractRangeBands ?? [],
+    coneAngle: collection.coneAngle ?? DEFAULT_CONE_ANGLE
+  };
+}
+function gridMeasurement(grid) {
   return {
     // Older maps may store 'daggerheart' or nothing; both measure in range bands.
     mode: (grid == null ? void 0 : grid.measurementType) === "units" ? "metric" : "abstract",
     unitType: (grid == null ? void 0 : grid.unitType) ?? "feet",
-    unitDistance: (grid == null ? void 0 : grid.unitDistance) ?? 5,
+    ruleDistance: (grid == null ? void 0 : grid.unitDistance) ?? 5,
     diagonalRule: "equidistant",
     rangeBands: [],
     coneAngle: DEFAULT_CONE_ANGLE
@@ -216,7 +225,8 @@ export {
   rangeBandName as B,
   resolveMeasurementSettings as C,
   DEFAULT_CONE_ANGLE as D,
-  unitLabelFor as E,
+  sceneUnitDistance as E,
+  unitLabelFor as F,
   NAMEPLATE_HEIGHT as N,
   RESIZE_HANDLE_SIZE as R,
   TOKEN_SIZE_OPTIONS as T,

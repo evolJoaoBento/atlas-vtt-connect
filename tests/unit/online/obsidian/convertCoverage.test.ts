@@ -158,6 +158,11 @@ const GRID_CHECKS: Checks<keyof GridState> = {
   },
   unitDistance: (t) => expect(t.noCollection.player.measurement.unitDistance).toBe(1.5),
   measurementType: (t) => expect(t.noCollection.player.measurement.mode).toBe('metric'),
+  // The scene's distance per cell for the ruler; the collection's stays the rules square.
+  unitDistanceOverride: (t) => {
+    expect(t.ownDistance.player.measurement).toMatchObject({ unitDistance: 3, ruleDistance: 2 });
+    expect(gridOf(t.ownDistance)?.unitDistance).toBe(3);
+  },
 };
 
 const MEASUREMENT_CHECKS: Checks<keyof CollectionGridDefaults> = {

@@ -156,6 +156,8 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   unitType: SENT,
   unitDistance: SENT,
   measurementType: SENT,
+  // A scene's own distance per cell, with or without a collection: it is the measurement's `unitDistance` (metric only).
+  unitDistanceOverride: SENT,
 };
 
 /** Every field of a `SceneSnapshot`, the one view of a scene the API gives. */

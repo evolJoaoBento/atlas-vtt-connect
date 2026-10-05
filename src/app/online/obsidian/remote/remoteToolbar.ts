@@ -10,7 +10,7 @@ export const FOLLOW_GM_LABEL = 'Follow GM';
 export const FIT_MAP_LABEL = 'Fit map';
 export const FOLLOW_GM_ITEM = 'online-scene-follow-gm';
 export const FIT_MAP_ITEM = 'online-scene-fit-map';
-/** Among Atlas's own view tools (45 to 100). */
+/** Among extensions' items, which sit together after Atlas's dice button: higher sits further left, so Follow GM comes first. */
 const PRIORITY = { follow: 60, fit: 59 } as const;
 
 export interface RemoteToolbarControls {

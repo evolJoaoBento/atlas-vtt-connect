@@ -81,7 +81,7 @@ export function playerScene(overrides: Partial<PlayerScene> = {}): PlayerScene {
     },
     widgets: [{ id: 'w1', type: 'counter', label: 'Torches', icon: 'flame', value: 3 }],
     initiative: { round: 1, active: true, entries: [{ id: 'e1', tokenId: 't1', initiative: 15, name: null, hp: null, isActive: true }] },
-    measurement: { mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90 },
+    measurement: { mode: 'metric', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90 },
     ...overrides,
   };
 }

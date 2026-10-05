@@ -5,8 +5,9 @@
  * has no other real dice. A d13 still rolls, it just gets no stage: a die with
  * thirteen faces would be a lie.
  *
- * Justified exception: **d100** is two d10s, tens and units, with the printed
- * rule `00 + 0 = 100`.
+ * Justified exception: **d100** is two d10s, tens and units. Both read their
+ * own digit with the 10 as 0, so the tens die shows the tens digit itself, and
+ * the printed rule `00 + 0 = 100` holds.
  *
  * Second justified exception: **d2 and d3** have no body either, and the usual
  * table rule says how to roll them on a d6 whose faces are grouped: for a d2,

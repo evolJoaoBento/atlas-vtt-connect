@@ -11,7 +11,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.13.0. Without the API, Connect shows a notice and stays off.
+- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.14.0 (Atlas 0.6.1-beta.0 with the API branch) and still runs on 1.13. Without the API, Connect shows a notice and stays off.
 - TODO (fill in once upstream ships it): the first Atlas release that includes the extension API.
 - The Atlas extension API build is the repository `evolJoaoBento/atlas-vtt`, branch `api/extension-api`. Once that branch is pushed and public, build Atlas from it (see Developing). Until then nobody but the maintainer can get a working Atlas for Connect.
 

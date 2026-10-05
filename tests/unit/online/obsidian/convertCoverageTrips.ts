@@ -76,7 +76,7 @@ interface Variant {
   rules?: InitiativeRules; active?: boolean; sitsOut?: boolean;
 }
 export interface Trip { input: RemoteSceneInput; player: RemotePlayerState; sent: PlayerScene }
-export type TripName = 'full' | 'noCollection' | 'disabledGrid' | 'hiddenGrid' | 'closedTracker' | 'renamedHp' | 'staticHp' | 'sidesFight' | 'sidesBefore' | 'sitsOut';
+export type TripName = 'full' | 'noCollection' | 'disabledGrid' | 'hiddenGrid' | 'closedTracker' | 'renamedHp' | 'staticHp' | 'sidesFight' | 'sidesBefore' | 'sitsOut' | 'ownDistance';
 export type Trips = Record<TripName, Trip>;
 
 function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true, definitions = DEFINITIONS, sides, rules, active = true, sitsOut }: Variant = {}): Trip {
@@ -111,4 +111,6 @@ export const TRIPS: Trips = {
   sidesFight: trip({ sides: 'players' }),
   sidesBefore: trip({ rules: SIDES, active: false }),
   sitsOut: trip({ sitsOut: true }),
+  // A scene measured at its own distance per cell, in a metric collection (range bands ignore it).
+  ownDistance: trip({ collection: { ...COLLECTION, measurementMode: 'metric' }, grid: { ...GM_GRID, unitDistanceOverride: 3 } }),
 };

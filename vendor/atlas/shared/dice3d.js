@@ -1947,7 +1947,7 @@ function rollBreakdown(result, scene) {
   const values = result.rolls.map((roll) => roll.value);
   const diceTotal = result.total - result.modifiers;
   if (((_a = scene.plan[0]) == null ? void 0 : _a.role) === "tens") {
-    return `Tens ${(scene.faces[0] - 1) * 10}, units ${scene.faces[1] % 10}${suffix}`;
+    return `Tens ${scene.faces[0] % 10 * 10}, units ${scene.faces[1] % 10}${suffix}`;
   }
   if (values.length > 6) return `${values.length} dice, ${diceTotal}${suffix}`;
   if (scene.plan.some((die) => die.fold !== void 0)) {

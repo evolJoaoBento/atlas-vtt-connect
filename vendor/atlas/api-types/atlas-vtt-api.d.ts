@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.13.0";
+export declare const API_VERSION = "1.14.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -425,6 +425,12 @@ export declare interface GridState {
     mapScale?: number;
     unitType?: 'feet' | 'yards' | 'meters' | 'units';
     unitDistance?: number;
+    /**
+     * Game units one cell of this scene spans, in place of its collection's (a map drawn at
+     * another scale than the rest). Unset follows the collection. `unitDistance` is no override:
+     * new scenes are written with a copy of the collection's distance, which then goes stale.
+     */
+    unitDistanceOverride?: number;
     lineType?: 'solid' | 'dashed' | 'dotted';
     lineWidth?: number;
     measurementType?: 'units' | 'abstract';
@@ -666,6 +672,8 @@ export declare interface MapRules {
      * The measure tool's settings, with the cone angle the GM measures with (`mapConeAngle`).
      * Outside a collection these are the defaults; the map's own grid units then decide.
      * Combine with `resolveMeasurementSettings(null, snapshot.grid)` from `@atlas-vtt/shared/grid` and this `coneAngle`.
+     * These are the collection's: a scene that sets its own distance per cell (`GridState.unitDistanceOverride`) measures
+     * with `resolveMeasurementSettings(gridDefaults, snapshot.grid)`, which keeps the collection's as `ruleDistance`.
      */
     readonly measurement: MeasurementSettings;
     readonly resources: readonly ResourceDefinition[];
@@ -679,7 +687,13 @@ declare type MeasurementMode = 'metric' | 'abstract';
 export declare interface MeasurementSettings {
     mode: MeasurementMode;
     unitType: GridUnitType;
+    /** Game units one cell of this map spans: the scene's own distance per cell where it sets one. */
     unitDistance: number;
+    /**
+     * Game units one rules square spans: the collection's distance per cell, whatever the scene
+     * sets. Distances written in squares (presets, statblocks) are converted with this one.
+     */
+    ruleDistance: number;
     diagonalRule: DiagonalRule;
     rangeBands: readonly RangeBand[];
     /** Full opening of the cone measurement in degrees. */
@@ -868,9 +882,17 @@ export declare interface RemoteLaser {
     dt?: ReadonlyArray<number>;
 }
 
+/**
+ * `MeasurementSettings` as a remote view takes them. `ruleDistance` came with 1.14.0: left out, it is `unitDistance`
+ * (they differ only on a scene that sets its own distance per cell).
+ */
+export declare type RemoteMeasurementInput = Omit<MeasurementSettings, 'ruleDistance'> & {
+    ruleDistance?: number;
+};
+
 export declare interface RemotePlayerState {
     movableTokenIds: readonly string[];
-    measurement: MeasurementSettings;
+    measurement: RemoteMeasurementInput;
     /**
      * Stand-ins the GM's projection decided on; players never receive the GM's definitions. Decided per token: a resource
      * definition with `visibleToPlayers: false` draws no bar on that token; it still counts for its downed look (`defeatedWhenSpent`).
@@ -1367,7 +1389,10 @@ export declare interface ToolbarItem {
     icon: string;
     label: string;
     shortcut?: string;
-    /** Where it sits among Atlas's own items, which have 45–100; lower priorities move into "More tools" first. Default 50. */
+    /**
+     * Its place among extensions' items, which sit together after Atlas's dice button: a higher priority sits further
+     * left. The bar moves items into "More tools" from its right end, so lower priorities move there first. Default 50.
+     */
     priority?: number;
     /** Default ['map']. */
     views?: ReadonlyArray<'map' | 'remote'>;

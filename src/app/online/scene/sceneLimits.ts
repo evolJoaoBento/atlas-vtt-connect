@@ -4,12 +4,16 @@ import type { PlayerMeasurement } from './sceneTypes';
 /** Atlas's cone of a collection without a cone angle (`DEFAULT_CONE_ANGLE`; a test keeps them equal), here since the wire format imports nothing. */
 export const PLAYER_DEFAULT_CONE_ANGLE = 90;
 
-/** A GM from before the page's tools sent no measurement, no snap flag or no cone angle: Atlas's defaults. */
+/**
+ * A GM from before the page's tools sent no measurement, no snap flag or no cone angle: Atlas's defaults. One from
+ * before `ruleDistance` measured squares like cells, so it is the distance per cell (as Atlas's remote view fills it).
+ */
 export function withMeasurementDefaults(measurement: Partial<PlayerMeasurement> | undefined): PlayerMeasurement {
-  return {
+  const filled: Omit<PlayerMeasurement, 'ruleDistance'> & Partial<Pick<PlayerMeasurement, 'ruleDistance'>> = {
     mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true,
     coneAngle: PLAYER_DEFAULT_CONE_ANGLE, ...measurement,
   };
+  return { ...filled, ruleDistance: measurement?.ruleDistance ?? filled.unitDistance };
 }
 
 /** Bounds both sides hold scene data to; the projection clips to them so its output always validates. */

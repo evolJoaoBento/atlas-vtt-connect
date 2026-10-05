@@ -192,6 +192,7 @@ describe('coverage of grid and scene fields', () => {
       cellNumberOpacity: set({ cellNumberOpacity: 0.2 }), snapToGrid: set({ snapToGrid: false }), scale: set({ scale: 2 }),
       mapScale: set({ mapScale: 2 }), unitType: set({ unitType: 'meters' }), unitDistance: set({ unitDistance: 10 }),
       measurementType: set({ measurementType: 'abstract' }), autoDetect: set({ autoDetect: true }),
+      unitDistanceOverride: set({ unitDistanceOverride: 10 }),
     };
     expectCoverage(GRID_FIELD_COVERAGE, variants, GRID, (grid) => project(sceneState({ grid })));
   });

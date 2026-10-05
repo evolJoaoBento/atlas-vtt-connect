@@ -8,7 +8,7 @@
  * converted object back while the received record, its image and where this view holds it stay the same.
  */
 import type {
-  DrawingStroke, FogOperation, GridState, InitiativeState, MeasurementSettings, RemotePlayerState, RemoteSceneInput, TextElement, TokenEntity,
+  DrawingStroke, FogOperation, GridState, InitiativeState, RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput, TextElement, TokenEntity,
 } from '@atlas-vtt/api-types';
 import { setOwn } from '../../scene/sceneDiff';
 import { withMeasurementDefaults } from '../../scene/sceneLimits';
@@ -62,11 +62,14 @@ class Kept<T> {
 }
 
 /** The GM's measurement as Atlas's settings, for the drag ruler and the measure tool. */
-export function atlasMeasurement(measurement: PlayerMeasurement): MeasurementSettings {
+export function atlasMeasurement(measurement: PlayerMeasurement): RemoteMeasurementInput {
   return {
     mode: measurement.mode,
     unitType: measurement.unitType,
     unitDistance: measurement.unitDistance,
+    // Atlas before API 1.14.0 checks only the fields it knows, so the extra one is harmless there. Atlas refuses one
+    // that is not above 0; left out, it takes the distance per cell.
+    ...(measurement.ruleDistance > 0 ? { ruleDistance: measurement.ruleDistance } : {}),
     diagonalRule: measurement.diagonalRule,
     rangeBands: measurement.rangeBands.map((band) => ({ name: band.name, maxSquares: band.maxSquares })),
     coneAngle: measurement.coneAngle,

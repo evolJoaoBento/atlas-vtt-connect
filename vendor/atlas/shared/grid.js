@@ -1,5 +1,5 @@
-import { h as hexOriginCenter, e as axialToPixel, g as hexCircumradius, i as isHexGridType, j as hexCellExtent, k as pixelToAxial, t as tokenDiameterInCells, l as hexOrientationForGridType, m as createHexLayout } from "./measurementFormat-C7uijKH9.js";
-import { D, n, o, q, u, f, v, w, x, y, z, p, A, B, C, E } from "./measurementFormat-C7uijKH9.js";
+import { h as hexOriginCenter, e as axialToPixel, g as hexCircumradius, i as isHexGridType, j as hexCellExtent, k as pixelToAxial, t as tokenDiameterInCells, l as hexOrientationForGridType, m as createHexLayout } from "./measurementFormat-DLGvLcYl.js";
+import { D, n, o, q, u, f, v, w, x, y, z, p, A, B, C, E, F } from "./measurementFormat-DLGvLcYl.js";
 function isCellNumberFormat(value) {
   return value === "column-row" || value === "sequential" || value === "letter-number";
 }
@@ -208,8 +208,9 @@ export {
   B as rangeBandName,
   resizedTokenCenter,
   C as resolveMeasurementSettings,
+  E as sceneUnitDistance,
   snapTokenCenter,
   squareLattice,
   tokenCenterShift,
-  E as unitLabelFor
+  F as unitLabelFor
 };

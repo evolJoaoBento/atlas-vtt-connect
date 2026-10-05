@@ -220,8 +220,13 @@ export interface PlayerSnapGrid {
 export interface PlayerMeasurement {
   mode: typeof PLAYER_MEASUREMENT_MODES[number];
   unitType: typeof PLAYER_UNIT_TYPES[number];
-  /** Units per cell. */
+  /** Units per cell of this map: the scene's own distance per cell where it sets one (`GridState.unitDistanceOverride`). */
   unitDistance: number;
+  /**
+   * Units per rules square: the collection's distance per cell, whatever the scene sets (`MeasurementSettings.ruleDistance`).
+   * Absent from a GM before Atlas extension API 1.14.0; the mirror fills in `unitDistance`.
+   */
+  ruleDistance: number;
   diagonalRule: typeof PLAYER_DIAGONAL_RULES[number];
   rangeBands: PlayerRangeBand[];
   /** The GM's snap-to-grid: the drag ruler snaps to cell centres only when it is on. */

@@ -248,7 +248,7 @@ describe('projectForPlayers', () => {
   it("sends the measurement of the map's collection, or else of its grid", () => {
     const grid = { ...gmState().grid!, unitType: 'meters' as const, unitDistance: 1.5, measurementType: 'units' as const };
     expect(projectForPlayers(gmState({ grid }), context()).measurement).toEqual({
-      mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90,
+      mode: 'metric', unitType: 'meters', unitDistance: 1.5, ruleDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90,
       snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
     });
     expect(projectForPlayers(gmState({ grid: { ...grid, snapToGrid: false } }), context()).measurement.snapToGrid).toBe(false);
@@ -257,10 +257,22 @@ describe('projectForPlayers', () => {
       abstractRangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(300), maxSquares: Number.NaN }],
     };
     expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement).toEqual({
-      mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'alternating', snapToGrid: true, coneAngle: 90,
+      mode: 'abstract', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'alternating', snapToGrid: true, coneAngle: 90,
       snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
       rangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(128), maxSquares: 1 }],
     });
+  });
+
+  it("sends a scene's own distance per cell, keeping the collection's as the rules square", () => {
+    const collectionGrid = { unitType: 'feet' as const, unitDistance: 5, measurementMode: 'metric' as const };
+    const grid = { ...gmState().grid!, unitDistanceOverride: 10 };
+    expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement).toMatchObject({ unitDistance: 10, ruleDistance: 5 });
+    // Without a collection the map's grid units are the rules square.
+    const own = { ...grid, unitType: 'feet' as const, unitDistance: 5, measurementType: 'units' as const };
+    expect(projectForPlayers(gmState({ grid: own }), context()).measurement).toMatchObject({ unitDistance: 10, ruleDistance: 5 });
+    // Range bands have no distance per cell: Atlas ignores the override there.
+    const abstract = { ...collectionGrid, measurementMode: 'abstract' as const };
+    expect(projectForPlayers(gmState({ grid }), context({ collectionGrid: abstract })).measurement).toMatchObject({ unitDistance: 5, ruleDistance: 5 });
   });
 
   it("sends the collection's cone angle, and a quarter circle for one players would refuse", () => {

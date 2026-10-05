@@ -3,8 +3,11 @@
  * read into a collection's game units.
  */
 import type { MeasurementSettings } from './measurementFormat';
-/** What a collection measures in: its unit, and how many of it one grid cell spans. */
-export type GameUnit = Pick<MeasurementSettings, 'unitType' | 'unitDistance'>;
+/**
+ * What a collection measures in: its unit, and how many of it one rules square spans. That is the
+ * collection's distance per cell, never a scene's own (`MeasurementSettings.ruleDistance`).
+ */
+export type GameUnit = Pick<MeasurementSettings, 'unitType' | 'ruleDistance'>;
 /** The units a written distance may name. */
 export type StatedUnit = 'feet' | 'yards' | 'meters' | 'miles' | 'kilometers' | 'squares';
 export interface StatedDistance {
@@ -23,8 +26,8 @@ export interface StatedDistance {
 export declare function readDistance(text: string, locale?: string): StatedDistance | null;
 /**
  * A written distance in the collection's game units. A bare number and a distance in the
- * collection's own unit are taken as they are; squares count what a grid cell spans; other real
+ * collection's own unit are taken as they are; squares count what a rules square spans; other real
  * units are converted, and where the collection has no real unit, a rules square (5 feet) is one
- * of its grid cells.
+ * of its squares.
  */
 export declare function toGameUnits(distance: Pick<StatedDistance, 'value' | 'unit'>, unit: GameUnit): number;

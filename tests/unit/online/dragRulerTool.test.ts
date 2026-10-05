@@ -68,4 +68,16 @@ describe('DragRulerTool', () => {
     ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
     expect(ruler.overlay()?.points).toEqual([{ x: 140, y: 140 }, { x: 210, y: 70 }]);
   });
+
+  it("labels distances with a scene's own distance per cell, not the collection's rules square", () => {
+    const scene = playerScene();
+    const label = (measurement: Partial<typeof scene.measurement>): string | undefined => {
+      const ruler = new DragRulerTool(() => {});
+      ruler.begin({ x: 105, y: 105 }, toolGridOf({ ...scene, measurement: { ...scene.measurement, ...measurement } }), 'mouse', 1);
+      ruler.update({ x: 245, y: 105 }, { x: 245, y: 105 });
+      return ruler.overlay()?.label;
+    };
+    expect(label({})).toBe('10ft');
+    expect(label({ unitDistance: 10, ruleDistance: 5 })).toBe('20ft');
+  });
 });

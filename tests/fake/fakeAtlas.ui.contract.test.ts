@@ -121,6 +121,15 @@ describe('FakeAtlas follows the ui contract cases', () => {
     expect(ui.drawToolbar('player')).toEqual([]);
   });
 
+  it('draws extension items highest priority first, registration order breaking ties (API 1.14.0)', () => {
+    const { ui, ext } = setup();
+    ext.ui.addToolbarItem({ id: 'low', icon: 'x', label: 'Low', priority: 10, onClick: noop });
+    ext.ui.addToolbarItem({ id: 'plain', icon: 'x', label: 'Plain', onClick: noop });
+    ext.ui.addToolbarItem({ id: 'high', icon: 'x', label: 'High', priority: 90, onClick: noop });
+    ext.ui.addToolbarItem({ id: 'plain2', icon: 'x', label: 'Plain 2', priority: 50, onClick: noop });
+    expect(ui.drawToolbar('v1').map((drawn) => drawn.id)).toEqual(['high', 'plain', 'plain2', 'low']);
+  });
+
   it('a provider or callback that throws is skipped, not fatal', () => {
     const { ui, ext } = setup();
     const error = vi.spyOn(console, 'error').mockImplementation(noop);

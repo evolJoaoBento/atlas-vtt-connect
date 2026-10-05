@@ -48,5 +48,5 @@ const files = hashTree(vendor);
 const report = readFileSync(path.join(vendor, 'api-types/atlas-vtt-api.d.ts'), 'utf8');
 const apiVersion = report.match(/export declare const API_VERSION = "([^"]+)";/)?.[1] ?? fail('No API_VERSION in the report.');
 const contractCases = [...new Set(contractCaseIds())].sort();
-writeFileSync(path.join(vendor, 'SOURCE.json'), JSON.stringify({ repository: 'ByteMirror/atlas-vtt', branch: 'api/extension-api', commit: head, apiVersion, contractCases, files }, null, 2) + '\n');
+writeFileSync(path.join(vendor, 'SOURCE.json'), JSON.stringify({ repository: 'evolJoaoBento/atlas-vtt', branch: 'api/extension-api', commit: head, apiVersion, contractCases, files }, null, 2) + '\n');
 console.log(`Vendored Atlas ${head.slice(0, 7)} (API ${apiVersion}): ${Object.keys(files).length} files, ${contractCases.length} contract cases.`);
