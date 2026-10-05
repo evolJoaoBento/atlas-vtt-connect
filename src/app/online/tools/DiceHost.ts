@@ -72,14 +72,15 @@ export class DiceHost implements SessionHandler {
   }
 
   /**
-   * The map players have: the live scene's, or while the GM holds the scene (looks at another tab of the
-   * view, whose store then holds that tab's map) the presented tab's, which is what players still see.
+   * The map players have: the live scene's, or the presented tab's when the GM holds the scene (looks at another tab of the
+   * view, whose store then holds that tab's map) or the store has no snapshot: what players still see.
    */
   private playersMapPath(): string | null {
     const { presented } = this.options;
     const scene = presented.current();
     if (!scene) return null;
-    return (presented.isHeld() ? scene.info.mapPath : scene.snapshot()?.mapPath) || null;
+    const live = presented.isHeld() ? null : scene.snapshot()?.mapPath;
+    return live || scene.info.mapPath || null;
   }
 
   /** Drops the windows of players who left the session: a reconnect must not reset one. */

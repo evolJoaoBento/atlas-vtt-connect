@@ -270,4 +270,15 @@ describe('DiceHost', () => {
     expect(w.logged[0]?.rolls.map((die) => die.exploded === true)).toEqual([false, true]);
     w.finish();
   });
+
+  it("takes the presented tab's rules when the live scene has no snapshot to read", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    const scene = w.presented.current()!;
+    vi.spyOn(w.presented, 'current').mockReturnValue({ ...scene, snapshot: () => null });
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.atlas.dice.rolledFor).toEqual([TAVERN_MAP]);
+    w.finish();
+  });
 });
