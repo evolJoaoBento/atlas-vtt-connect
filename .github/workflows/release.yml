@@ -7,6 +7,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ github.ref_name }}
@@ -22,6 +23,8 @@ jobs:
       - run: npx vitest run
       - name: Manifest version matches the tag
         run: test "$(node -p "require('./manifest.json').version")" = "$TAG"
+      - name: versions.json lists the version
+        run: node -e "const m=require('./manifest.json');if(require('./versions.json')[m.version]!==m.minAppVersion)process.exit(1)"
       - run: NODE_ENV=production npm run build
       - name: Publish
         run: |

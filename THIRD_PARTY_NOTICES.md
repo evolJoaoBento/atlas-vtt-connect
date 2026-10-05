@@ -6,14 +6,14 @@ Atlas VTT Connect is licensed under the [GNU Affero General Public License v3.0]
 
 Atlas VTT, © Fabian Urbanek, is licensed under AGPL-3.0-only. Source: <https://github.com/ByteMirror/atlas-vtt>. Connect contains code from it, in three forms:
 
-- **Vendored shared modules and types** in `vendor/atlas/`: Atlas's extension API types and its shared grid, drawing, rules and dice modules, built from Atlas at the commit and API version recorded in `vendor/atlas/SOURCE.json`. `npm run check:vendor` verifies them.
-- **Copied helpers.** Each file starts with a "Copied from Atlas VTT" or "Modified from Atlas VTT" header naming the Atlas file, the commit and what changed: `src/app/utils/mapStrings.ts`, `timerWidget.ts`, `counterWidget.ts` and `widgetActivation.ts`; `src/app/ui/nativeModal.ts`, `dialogShell.ts` and `confirmDialog.ts`; `src/app/types/widgetTypes.ts`, `widgetIcons.ts` and `initiativeTypes.ts` (defaults only); `src/app/plugin/vaultFolders.ts`; `src/app/packages/components/toolbar/toolbarFit.ts`; `src/app/imageProcessing/imageDimensions.ts`; and the styles in `styles/` that say so in their first line.
+- **Vendored shared modules and types** in `vendor/atlas/`: Atlas's extension API types and its shared grid, drawing, rules and dice modules, built from Atlas at the commit and API version recorded in `vendor/atlas/SOURCE.json`. The source of that Atlas build is the corresponding source for this code. TODO(user): name the public repository and branch of the Atlas extension API build. `npm run check:vendor` verifies them.
+- **Copied helpers.** Each file starts with a "Copied from Atlas VTT" or "Modified from Atlas VTT" header naming the Atlas file, the commit and what changed: `src/app/utils/mapStrings.ts`, `timerWidget.ts`, `counterWidget.ts` and `widgetActivation.ts`; `src/app/ui/nativeModal.ts`, `dialogShell.ts` and `confirmDialog.ts`; `src/app/types/widgetTypes.ts`, `widgetIcons.ts` and `initiativeDefaults.ts` (defaults only, from Atlas's `initiativeTypes.ts`); `src/app/plugin/vaultFolders.ts`; `src/app/packages/components/toolbar/toolbarFit.ts`; `src/app/imageProcessing/imageDimensions.ts`; and the styles in `styles/` that say so in their first line.
 - **Online play and sharing code** that began in a fork of Atlas VTT and was rebuilt to run on Atlas's extension API.
 
 ## Assets
 
 - The widget icons (`src/app/types/widgetIcons.ts`) come from [game-icons.net](https://game-icons.net) by Lorc, Delapouite, Skoll, sbed, Carl Olsen and Caro Asercion, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The black background was removed and the glyphs recoloured.
-- The dice artwork on the join page (`src/app/assets/dice-icons/`: d4, d6, d8, d10, d12, d20) is built from the game-icons.net icons d4, d10 and d12 by Skoll and dice-six-faces-six, dice-eight-faces-eight and dice-twenty-faces-twenty by Delapouite, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), redrawn as pencil sketches by the Atlas VTT author.
+- The dice artwork (the join page's `src/app/assets/dice-icons/` files d4, d6, d8, d10, d12 and d20, and the same images inside `main.js` through `vendor/atlas/shared/diceDisplay.js`) is built from the game-icons.net icons d4, d10 and d12 by Skoll and dice-six-faces-six, dice-eight-faces-eight and dice-twenty-faces-twenty by Delapouite, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), redrawn as pencil sketches.
 - The 3D dice code and face artwork in `vendor/atlas/shared/dice3d.js` are original works by the Atlas VTT author, covered by Atlas's AGPL-3.0-only licence.
 - Map icons are [Lucide](https://lucide.dev) markup (ISC), taken from Atlas's shared drawing module.
 - Connect ships none of Atlas's starter class tokens (icons by [Sketch Studio](https://www.fiverr.com/sketchstudioart), CC BY 4.0), sounds or fonts. If a later version vendors any of them, this file must credit them first.
@@ -24,7 +24,7 @@ Connect does not run or bundle a STUN server. While a session runs it contacts t
 
 ## Bundled packages
 
-Connect bundles the following open-source packages in `main.js` and in the join page.
+Connect bundles the following open-source packages. PeerJS and its dependencies are in both `main.js` and the join page. three.js is only in the join page's lazy dice chunk. React, React DOM, scheduler, zustand and lucide-react are only in `main.js`.
 
 ### peerjs@1.5.5
 

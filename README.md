@@ -11,8 +11,9 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.13.0. Without the API, Connect shows a notice and stays off.
+- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.13.0. Without the API, Connect shows a notice and stays off.
 - TODO (fill in once upstream ships it): the first Atlas release that includes the extension API.
+- TODO(user): name the public repository and branch of the Atlas extension API build. Until then the API branch is not public, and nobody but the maintainer can get a working Atlas for Connect.
 
 ## Install with BRAT
 
@@ -25,7 +26,7 @@ TODO (fill in when the first release is published): the release version to pick 
 ## Hosting and joining
 
 - **Host.** Open a map in Atlas, present it, then run **Online session** from the command palette or the Atlas toolbar. Start the session, copy the join link and send it to your players. Players open it in a browser, or paste it into **Join online session…** in Obsidian.
-- **Settings.** Settings, Online play: the signalling server, relay (TURN) servers, the player page, whether to keep images, and the table key.
+- **Settings.** Settings, Atlas VTT Connect: Signaling server (and My own server), Relay (TURN) servers, Player page, Shared note properties, Keep online images on this device and Log online play events.
 - **Players** can move the tokens you assign under **Controlled by**, point with a laser and roll dice.
 
 ## Sharing
@@ -66,7 +67,7 @@ Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an
 
 Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. `npm run build` writes `dist/` only. Copy `dist/main.js`, `dist/styles.css` and `manifest.json` by hand into a test vault's `.obsidian/plugins/atlas-vtt-connect/`, never into your main vault. `npm run build:page` builds the join page into `dist-page/`.
 
-To test against a real Atlas, check out the Atlas branch `api/extension-api`, build it with `npm run build:ci` (not `npm run build`, which copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
+To test against a real Atlas, check out the Atlas branch `api/extension-api`, build it with `npm run build:ci` (which never copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
 
 ### Syncing the vendored Atlas
 
@@ -81,7 +82,16 @@ To test against a real Atlas, check out the Atlas branch `api/extension-api`, bu
 
 ### Releasing
 
-A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.0-beta.1` for a pre-release) triggers `.github/workflows/release.yml`, which checks, builds and attaches `main.js`, `styles.css` and `manifest.json` to a GitHub release, as BRAT expects. Tagging and pushing are manual steps.
+A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.0-beta.1` for a pre-release) triggers `.github/workflows/release.yml`, which checks, builds and attaches `main.js`, `styles.css` and `manifest.json` to a GitHub release, as BRAT expects. Tagging and pushing are manual steps. The release notes are a fixed line; put what changed in the release description by hand.
+
+Release checklist, before the first tag:
+
+1. Publish the Atlas extension API branch somewhere public, and fill the TODO(user) in this README and in THIRD_PARTY_NOTICES.md with its repository and branch. Connect's source for the vendored Atlas code must be reachable (AGPL).
+2. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
+3. Fill the version TODOs in this README: the first Atlas release with the extension API, and the release version to pick in BRAT. Remove the lines when done.
+4. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.
+5. Enable Pages (source "GitHub Actions") and let `pages.yml` publish the player page, so the default address serves it.
+6. Run the verify block (`npx tsc --noEmit && npm run lint && npx vitest run && npm run build && npm run check:vendor`), then tag and push.
 
 ## Licence
 

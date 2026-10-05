@@ -1,5 +1,8 @@
 // Compares Connect's test files with the online play preview's, per area, after Appendix B of the plan.
 // Each area must satisfy connect = fork - moved + rewritten-as-new; it fails when connect < fork - moved.
+// Seven of the moved files only moved their Atlas part (onlinePlayerDrag, onlineSceneStatus, onlineSceneRoll, onlineOwnRolls,
+// onlineDiceUi, onlineSceneResources, onlineSceneInitiative) and Connect keeps the rest, so counting them as moved makes the
+// floor lenient. Today every Connect-side part exists, so no gap is hidden.
 // Usage: node scripts/test-inventory.mjs --atlas <Atlas checkout> [--ref merge/upstream-beta]
 import { execFileSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -25,6 +28,8 @@ export const MOVED = [
   'obsidian/onlineDiceUi.test.tsx',
   'obsidian/onlineSceneResources.test.ts',
   'obsidian/onlineSceneInitiative.test.ts',
+  // Atlas's dice tray in the remote view (A31); C-remote-5 and remoteViews.test.tsx cover it, and Connect's sceneTabs and remoteSceneClient tests cover maxDice and the modifier.
+  'obsidian/onlineDiceTrayWiring.test.tsx',
 ];
 
 const isTest = (path) => /\.test\.tsx?$/.test(path);
