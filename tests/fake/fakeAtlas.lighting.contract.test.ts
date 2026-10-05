@@ -5,7 +5,7 @@ import { connectingPlugin, FakeAtlas } from './FakeAtlas';
 const READY: PlayerVisibility = {
   status: 'ready',
   tokens: { hero: 'seen', goblin: 'sensed' },
-  darkness: { cellSize: 350, cols: 2, rows: 2, shown: Uint8Array.of(1, 0, 0, 1) },
+  darkness: { cellSize: 512, cols: 2, rows: 2, shown: Uint8Array.of(1, 0, 0, 1) },
   showsExplored: false,
 };
 

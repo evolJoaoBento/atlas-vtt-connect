@@ -62,14 +62,17 @@ describe('live lighting of a presentation', () => {
 
   it('counts only a cell marked 1 as shown, and darkens what lies past the grid Atlas measured', () => {
     const shown = Uint8Array.of(1, 2, 255, 1);
-    const frame = new LiveLighting(testLighting({ status: 'ready', tokens: {}, darkness: { cellSize: 400, cols: 2, rows: 2, shown }, showsExplored: false }).api, 'v1', () => undefined)
-      .frame({ width: 1200, height: 800 })!;
+    const frame = new LiveLighting(testLighting({ status: 'ready', tokens: {}, darkness: { cellSize: 512, cols: 2, rows: 2, shown }, showsExplored: false }).api, 'v1', () => undefined)
+      .frame({ width: 1200, height: 1000 })!;
     expect(insideByNonzero(ring(frame), { x: 200, y: 200 })).toBe(false);
     expect(insideByNonzero(ring(frame), { x: 600, y: 200 })).toBe(true);
     expect(insideByNonzero(ring(frame), { x: 200, y: 600 })).toBe(true);
     expect(insideByNonzero(ring(frame), { x: 600, y: 600 })).toBe(false);
-    // The map is wider than the grid: the third column is dark.
-    expect(insideByNonzero(ring(frame), { x: 1000, y: 200 })).toBe(true);
+    // The map is wider than the grid: the third column is dark, and so is what lies there.
+    expect(insideByNonzero(ring(frame), { x: 1100, y: 200 })).toBe(true);
+    expect(frame.shows({ x: 100, y: 100, width: 20, height: 20 })).toBe(true);
+    expect(frame.shows({ x: 1050, y: 100, width: 20, height: 20 })).toBe(false);
+    expect(frame.shows({ x: 500, y: 100, width: 20, height: 20 })).toBe(false);
   });
 
   it('stays closed while sight is pending, opens once it is ready, and closes again when it goes', () => {

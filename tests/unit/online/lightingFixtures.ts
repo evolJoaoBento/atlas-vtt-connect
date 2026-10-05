@@ -19,14 +19,24 @@ import { emptySceneState, presenter, sceneView, type SceneView, type ViewState }
 import { fakeAssetIds, snapshotOf } from './sceneFixtures';
 
 export const MAP: MapSize = { width: 1000, height: 800 };
-/** The cells of a test's answer, in world pixels: 20 by 16 over `MAP`. */
-export const CELL = 50;
+/**
+ * The cell size Atlas answers for `map` (`darknessCellSize`): from 8 px, doubled until the long side holds at most
+ * `maxCellsPerSide` cells (default 384), so always 8 times a power of two.
+ */
+export function atlasCellSize(map: MapSize, maxCellsPerSide = 384): number {
+  let cellSize = 8;
+  while (Math.ceil(Math.max(map.width, map.height) / cellSize) > maxCellsPerSide) cellSize *= 2;
+  return cellSize;
+}
 
 export const UNLIT: PlayerVisibility = { status: 'unlit' };
 export const PENDING: PlayerVisibility = { status: 'pending' };
 
-/** A ready answer: how the window perceives each token, and the cells it shows where `shown(x, y)` holds at their centre. */
-export function ready(tokens: Record<string, Perception>, shown: (x: number, y: number) => boolean, map: MapSize = MAP, cellSize = CELL): PlayerVisibility {
+/**
+ * A ready answer: how the window perceives each token, and the cells it shows where `shown(x, y)` holds at their
+ * centre, on Atlas's own grid: `cellSize` world pixels from the top-left, `ceil(map / cellSize)` cells each way.
+ */
+export function ready(tokens: Record<string, Perception>, shown: (x: number, y: number) => boolean, map: MapSize = MAP, cellSize = atlasCellSize(map)): PlayerVisibility {
   const cols = Math.ceil(map.width / cellSize);
   const rows = Math.ceil(map.height / cellSize);
   const cells = new Uint8Array(cols * rows);
@@ -91,13 +101,12 @@ export function frameOf(state: SceneSnapshot, visibility: PlayerVisibility): Lig
 
 const RULES: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 
-/** The projection as the broadcaster makes it: texts and drawings are checked against the fog with the darkness of `lighting`. */
+/** The projection as the broadcaster makes it: texts and drawings are checked against the GM's fog and the raster of `lighting`. */
 export function project(state: SceneSnapshot, lighting: LightingFrame | null): PlayerScene {
   const memo = createProjectionMemo();
   const coverage = FogCoverage.fromPlayerFog(projectFog(state.objects.fog, memo));
   return projectForPlayers(state, {
-    sceneId: 'scene-1', rules: RULES, coverage, darkCoverage: coverage.covering(lighting?.darkness.covered ?? []),
-    lighting, assets: fakeAssetIds(), mapSize: state.mapSize,
+    sceneId: 'scene-1', rules: RULES, coverage, lighting, assets: fakeAssetIds(), mapSize: state.mapSize,
   }, memo);
 }
 

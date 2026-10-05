@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Character, DrawingStroke, SceneSnapshot, TextElement } from '@atlas-vtt/api-types';
-import { DARKNESS_FOG_ID, darknessOf } from '../../../src/app/online/scene/darknessFog';
+import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
-import { closedFrame, type LightingFrame } from '../../../src/app/online/scene/lightingFrame';
+import { closedFrame, rasterFrame, type LightingFrame } from '../../../src/app/online/scene/lightingFrame';
 import type { ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
 
@@ -48,11 +48,17 @@ function context(lighting?: LightingFrame): ProjectionContext {
   return { sceneId: 's', rules: RULES, coverage: FogCoverage.EMPTY, assets: fakeAssetIds(), mapSize: MAP, ...(lighting && { lighting }) };
 }
 
-/** The left half of the map is dark; every token is seen. */
-function halfDark(): LightingFrame {
-  const darkness = darknessOf({ cols: 2, rows: 1, cellSize: 500, map: MAP, dark: Uint8Array.of(1, 0) });
-  return { seen: () => true, darkness };
+/** A frame of Atlas's raster `dark` (1 = not shown) on `cellSize` cells over `map`; every token is seen. */
+function rasterOf(map: { width: number; height: number }, cellSize: number, dark: (col: number, row: number) => boolean): LightingFrame {
+  const cols = Math.ceil(map.width / cellSize);
+  const rows = Math.ceil(map.height / cellSize);
+  const cells = new Uint8Array(cols * rows);
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) cells[row * cols + col] = dark(col, row) ? 1 : 0;
+  return { seen: () => true, ...rasterFrame({ cols, rows, cellSize, map, dark: cells }) };
 }
+
+/** The left half of the map (x < 512) is dark, on Atlas's 8·2^k cells. */
+const halfDark = (): LightingFrame => rasterOf(MAP, 512, (col) => col === 0);
 
 function expectClosed(scene: ReturnType<typeof projectForPlayers>): void {
   expect(scene.tokens).toEqual({});
@@ -69,10 +75,8 @@ describe('a lit scene fails closed', () => {
     expectClosed(projectForPlayers(snapshot(true), context()));
   });
 
-  it('sends only the dark map for a closed frame, with or without a darkness coverage from the caller', () => {
-    const frame = closedFrame(MAP);
-    expectClosed(projectForPlayers(snapshot(true), context(frame)));
-    expectClosed(projectForPlayers(snapshot(true), { ...context(frame), darkCoverage: FogCoverage.EMPTY }));
+  it('sends only the dark map for a closed frame', () => {
+    expectClosed(projectForPlayers(snapshot(true), context(closedFrame(MAP))));
   });
 
   it('treats a frame flagged closed as closed even where the scene is not saved lit', () => {
@@ -106,16 +110,30 @@ describe('texts and drawings of a lit scene with an open frame', () => {
     expect(Object.keys(scene.drawings)).not.toContain('edge');
   });
 
-  it('leaves out the same with a coverage the caller built from the darkness', () => {
-    const frame = halfDark();
-    const darkCoverage = FogCoverage.EMPTY.covering(frame.darkness.covered);
-    const scene = projectForPlayers(snapshot(true), { ...context(frame), darkCoverage });
-    expect(Object.keys(scene.texts).sort()).toEqual(['far', 'lit']);
-    expect(Object.keys(scene.drawings)).toEqual(['lit']);
+  it('on a map not 8-aligned, leaves out every dark text and drawing at or across the right and bottom edges', () => {
+    const map = { width: 1003, height: 797 };
+    const state = snapshot(true);
+    const edges = {
+      ...state, mapSize: map,
+      objects: {
+        ...state.objects,
+        texts: { r: text('r', 1003, 400), b: text('b', 500, 797), rin: text('rin', 990, 400), last: { ...text('last', 1001.5, 400), width: 1, height: 1 } },
+        drawings: { r: stroke('r', [{ x: 995, y: 300 }, { x: 1010, y: 310 }]), b: stroke('b', [{ x: 400, y: 790 }, { x: 420, y: 805 }]) },
+      },
+    };
+    const allDark = rasterOf(map, 8, () => true);
+    const scene = projectForPlayers(edges, { ...context(allDark), mapSize: map });
+    expect(scene.texts).toEqual({});
+    expect(scene.drawings).toEqual({});
+    // Every cell shown but the partial last column and row: what touches them stays hidden too.
+    const lastDark = rasterOf(map, 8, (col, row) => col === Math.ceil(1003 / 8) - 1 || row === Math.ceil(797 / 8) - 1);
+    const partly = projectForPlayers(edges, { ...context(lastDark), mapSize: map });
+    expect(partly.texts).toEqual({});
+    expect(partly.drawings).toEqual({});
   });
 
   it('leaves out a text or drawing wholly outside the map, though nothing is dark', () => {
-    const lit: LightingFrame = { seen: () => true, darkness: darknessOf({ cols: 1, rows: 1, cellSize: 1000, map: MAP, dark: Uint8Array.of(0) }) };
+    const lit = rasterOf(MAP, 8, () => false);
     const state = snapshot(true);
     const outside = { ...state, objects: { ...state.objects, texts: { out: text('out', 1200, 200) }, drawings: { out: stroke('out', [{ x: 1200, y: 600 }, { x: 1250, y: 610 }]) } } };
     const scene = projectForPlayers(outside, context(lit));

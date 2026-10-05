@@ -76,31 +76,21 @@ export interface ShownScene {
   readonly unsubscribe: () => void;
 }
 
-/** What players cannot see under the fog, and under the fog and a lit scene's darkness. */
+/** What players cannot see under the fog; a lit scene's texts and drawings are checked by the raster itself (`LightingFrame.shows`). */
 export interface FogCoverages {
   coverage: FogCoverage;
-  /** The fog and the darkness together; `coverage` itself without darkness. */
-  darkCoverage: FogCoverage;
   /** The GM's fog and the darkness have more operations than the limit, so some would not be sent. */
   truncated: boolean;
 }
 
-/** Coverage rasterised from the fog players receive, and with the darkness over it, each rebuilt only when what it is made of changes. */
+/** Coverage rasterised from the fog players receive, rebuilt only when the fog changes; a new darkness never replays it. */
 export class FogCoverageCache {
   private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage } | null = null;
-  private entry: { darkness: Darkness; coverages: FogCoverages } | null = null;
 
-  /** A new darkness never replays the fog: it is painted over the fog's cells (`FogCoverage.covering`). */
   get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): FogCoverages {
-    const fogChanged = this.fog?.fog !== fog;
-    if (!this.fog || fogChanged) this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)) };
-    if (!this.entry || fogChanged || this.entry.darkness !== darkness) {
-      const { coverage } = this.fog;
-      const darkCoverage = coverage.covering(darkness.covered);
-      const truncated = Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
-      this.entry = { darkness, coverages: { coverage, darkCoverage, truncated } };
-    }
-    return this.entry.coverages;
+    if (!this.fog || this.fog.fog !== fog) this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)) };
+    const truncated = Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
+    return { coverage: this.fog.coverage, truncated };
   }
 }
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DARKNESS_FOG_ID, DARKNESS_ORDER, NO_DARKNESS, darknessOf } from '../../../src/app/online/scene/darknessFog';
 import type { DarknessGrid as DarknessRaster } from '../../../src/app/online/scene/lightingFrame';
-import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerFogOp, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { isFogRecords } from '../../../src/app/online/scene/sceneValidation';
@@ -84,11 +83,12 @@ describe('darkness as fog', () => {
 
   it('covers for the GM exactly the dark cells, as rectangles', () => {
     const grid = randomRaster(30, 20, 7);
-    const coverage = FogCoverage.fromPlayerFog({}, darknessOf(grid).covered);
+    const { covered } = darknessOf(grid);
+    // Ruling L-POS: the rectangles only describe the dark area; checked here by the cells' centres.
+    const inside = (x: number, y: number): boolean => covered.some((rect) => x > rect.x && x < rect.x + rect.width && y > rect.y && y < rect.y + rect.height);
     for (let row = 0; row < grid.rows; row++) {
       for (let col = 0; col < grid.cols; col++) {
-        const cell = { x: col * 8, y: row * 8, width: 8, height: 8 };
-        expect(coverage.isCovered(cell), `${col},${row}`).toBe(grid.dark[row * grid.cols + col] === 1);
+        expect(inside(col * 8 + 4, row * 8 + 4), `${col},${row}`).toBe(grid.dark[row * grid.cols + col] === 1);
       }
     }
   });

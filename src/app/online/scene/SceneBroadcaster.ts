@@ -269,7 +269,6 @@ export class SceneBroadcaster implements SessionHandler {
       sceneId: live.sceneId,
       rules: this.rules,
       coverage: fog.coverage,
-      darkCoverage: fog.darkCoverage,
       lighting,
       assets: this.options.assets,
       ...sceneContext(snapshot, this.options),

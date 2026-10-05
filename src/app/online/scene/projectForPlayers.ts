@@ -37,12 +37,6 @@ export interface ProjectionContext {
    * but the dark map (no token, text or drawing), whatever the caller does.
    */
   lighting?: LightingFrame | null;
-  /**
-   * The fog with the darkness of `lighting` over it, which texts and drawings are checked
-   * against; unset, `coverage` with the darkness of `lighting` painted over it. Tokens are not: the window shows a token by its perception
-   * alone, and one it sees is never wholly dark (a darkness that lags would drop it).
-   */
-  darkCoverage?: FogCoverage;
   assets: AssetIds;
   mapSize: MapSize;
   /** The grid defaults of the map's collection, which decide the measurement; without them the map's grid does. */
@@ -97,26 +91,11 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
 }
 
 /**
- * What texts and drawings of a lit scene are checked against: the fog with the darkness over it. The darkness is
- * clipped to the map and a coverage grid answers false outside it, so an item wholly outside the map (or on a map
- * of unknown size) counts as hidden, and any other is checked by the part of it inside the map, the only part the
- * darkness can cover: an item whose estimated size pokes past the edge of a lit map is still sent, a dark one is not.
+ * What texts and drawings of a lit scene are checked against (ruling L-POS): sent only where the raster proves the
+ * window shows every cell of their in-map part (`LightingFrame.shows`), and the GM's fog still hides them on top.
  */
 function darkCovers(context: ProjectionContext, lighting: LightingFrame): Covers {
-  const dark = context.darkCoverage ?? context.coverage.covering(lighting.darkness.covered);
-  const { width, height } = context.mapSize;
-  return {
-    isCovered: (bounds) => {
-      const right = bounds.x + Math.max(0, bounds.width);
-      const bottom = bounds.y + Math.max(0, bounds.height);
-      if (!(width > 0 && height > 0 && [bounds.x, bounds.y, right, bottom].every(Number.isFinite))) return true;
-      // One that only touches the map from outside has no part inside it: the clip would be empty, which no grid covers.
-      if (right <= 0 || bottom <= 0 || bounds.x >= width || bounds.y >= height) return true;
-      const x = Math.max(bounds.x, 0);
-      const y = Math.max(bounds.y, 0);
-      return dark.isCovered({ x, y, width: Math.min(right, width) - x, height: Math.min(bottom, height) - y });
-    },
-  };
+  return { isCovered: (bounds) => !lighting.shows(bounds) || context.coverage.isCovered(bounds) };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {

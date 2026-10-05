@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FogOperation } from '@atlas-vtt/api-types';
 import type { Darkness } from '../../../src/app/online/scene/darknessFog';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
-import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
+import { createProjectionMemo } from '../../../src/app/online/scene/projectRecords';
 import { FogCoverageCache } from '../../../src/app/online/scene/sceneSources';
 
 // The fork's second case counted the draws of Atlas's own fog renderer: it belongs with Atlas's renderer.
@@ -20,22 +20,15 @@ function heavyFog(count: number): Record<string, FogOperation> {
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('a darkness change costs the same however much fog the GM painted', () => {
-  it('on the GM: the fog is rasterised once, then each darkness is painted over its cells', () => {
+  it('on the GM: the fog is rasterised once, however often the darkness changes', () => {
     const fog = heavyFog(300);
     const replays = vi.spyOn(FogCoverage, 'fromPlayerFog');
     const cache = new FogCoverageCache();
     const memo = createProjectionMemo();
     const darkness = (x: number): Darkness => ({ fog: {}, covered: [{ x, y: 0, width: 100, height: 800 }] });
-    for (const x of [500, 600, 700]) cache.get(fog, memo, darkness(x));
+    const coverages = [500, 600, 700].map((x) => cache.get(fog, memo, darkness(x)).coverage);
     expect(replays).toHaveBeenCalledTimes(1);
-    // The darkness painted over the cells covers what painting it after the operations covers.
-    const covered = cache.get(fog, memo, darkness(700)).darkCoverage;
-    const replayed = FogCoverage.fromPlayerFog(projectFog(fog, memo), darkness(700).covered);
-    for (let x = 0; x < 3200; x += 8) {
-      for (let y = 0; y < 800; y += 8) {
-        const cell = { x, y, width: 8, height: 8 };
-        if (covered.isCovered(cell) !== replayed.isCovered(cell)) throw new Error(`differs at ${x},${y}`);
-      }
-    }
+    // Ruling L-POS: the darkness is never painted into the fog's coverage; texts and drawings read the raster itself.
+    expect(new Set(coverages).size).toBe(1);
   });
 });

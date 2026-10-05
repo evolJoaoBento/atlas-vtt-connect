@@ -33,13 +33,9 @@ export class FogCoverage {
     readonly cellSize: number,
   ) {}
 
-  /**
-   * From exactly the fog players receive, so what the GM withholds matches what players can see.
-   * `covered`: what covers the fog's area after every operation, as rectangles (a lit scene's darkness).
-   */
-  static fromPlayerFog(fog: Readonly<Record<string, PlayerFogOp>>, covered: readonly WorldBounds[] = []): FogCoverage {
-    const shapes = sortedByOrder(fog, (op) => op.order).map(([, op]) => shapeOfPlayerOp(op));
-    return FogCoverage.fromShapes([...shapes, ...covered.map((rect): FogShape => ({ type: 'rectangle', erase: false, ...rect }))]);
+  /** From exactly the fog players receive, so what the GM withholds matches what players can see. */
+  static fromPlayerFog(fog: Readonly<Record<string, PlayerFogOp>>): FogCoverage {
+    return FogCoverage.fromShapes(sortedByOrder(fog, (op) => op.order).map(([, op]) => shapeOfPlayerOp(op)));
   }
 
   private static fromShapes(shapes: readonly FogShape[]): FogCoverage {
@@ -56,54 +52,6 @@ export class FogCoverage {
     const coverage = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize);
     for (const shape of shapes) coverage.apply(shape);
     return coverage;
-  }
-
-  /**
-   * This coverage with `rects` painted over it after every operation (a lit scene's darkness),
-   * without replaying the operations: their cells are copied. Where the area grows so far that the
-   * cells must double, a coarse cell is fogged only when every cell it holds was.
-   */
-  covering(rects: readonly WorldBounds[]): FogCoverage {
-    const painted = rects.filter((rect) => [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite) && rect.width > 0 && rect.height > 0);
-    if (painted.length === 0) return this;
-    let left = Math.min(...painted.map((rect) => rect.x));
-    let top = Math.min(...painted.map((rect) => rect.y));
-    let right = Math.max(...painted.map((rect) => rect.x + rect.width));
-    let bottom = Math.max(...painted.map((rect) => rect.y + rect.height));
-    if (this.cells.length > 0) {
-      left = Math.min(left, this.originX);
-      top = Math.min(top, this.originY);
-      right = Math.max(right, this.originX + this.cols * this.cellSize);
-      bottom = Math.max(bottom, this.originY + this.rows * this.cellSize);
-    }
-    let cellSize = this.cells.length > 0 ? this.cellSize : FOG_CELL_SIZE;
-    while (((right - left) / cellSize + 2) * ((bottom - top) / cellSize + 2) > MAX_FOG_CELLS) cellSize *= 2;
-    const originX = Math.floor(left / cellSize) * cellSize;
-    const originY = Math.floor(top / cellSize) * cellSize;
-    const cols = Math.ceil((right - originX) / cellSize) + 1;
-    const rows = Math.ceil((bottom - originY) / cellSize) + 1;
-    const result = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize);
-    if (this.cells.length > 0) result.copyFogged(this);
-    for (const rect of painted) fillRect(result.grid, rect.x, rect.y, rect.width, rect.height, FOGGED);
-    return result;
-  }
-
-  /** Fogs each cell whose whole area `source` fogs; both grids' origins lie on their cells, and these cells are a power of two of its. */
-  private copyFogged(source: FogCoverage): void {
-    const factor = this.cellSize / source.cellSize;
-    for (let row = 0; row < this.rows; row++) {
-      const sourceRow = (this.originY + row * this.cellSize - source.originY) / source.cellSize;
-      if (sourceRow < 0 || sourceRow + factor > source.rows) continue;
-      for (let col = 0; col < this.cols; col++) {
-        const sourceCol = (this.originX + col * this.cellSize - source.originX) / source.cellSize;
-        if (sourceCol < 0 || sourceCol + factor > source.cols) continue;
-        let fogged = true;
-        for (let r = sourceRow; fogged && r < sourceRow + factor; r++) {
-          for (let c = sourceCol; fogged && c < sourceCol + factor; c++) fogged = source.cells[r * source.cols + c] === FOGGED;
-        }
-        if (fogged) this.cells[row * this.cols + col] = FOGGED;
-      }
-    }
   }
 
   /** True when every cell under `bounds` is fogged; anything reaching outside the fogged area is not covered. */

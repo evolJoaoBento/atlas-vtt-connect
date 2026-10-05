@@ -18,7 +18,10 @@ export const DARKNESS_ORDER = Number.MAX_SAFE_INTEGER;
 export interface Darkness {
   /** The darkness's fog operation, by id; empty when nothing is dark. */
   fog: Readonly<Record<string, PlayerFogOp>>;
-  /** The dark area as rectangles, for the GM's coverage of what players cannot see (`FogCoverage`). */
+  /**
+   * The dark area as rectangles, clipped to the map: a description only. Nothing is checked against it; texts and
+   * drawings are checked cell by cell against the raster (`LightingFrame.shows`, ruling L-POS).
+   */
   covered: readonly WorldBounds[];
 }
 
