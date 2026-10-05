@@ -42,7 +42,7 @@ export function obsidianLocalStore(app: App): KeyValueStore {
       try {
         app.saveLocalStorage(key, value);
       } catch (error) {
-        console.error('[Atlas online] Could not keep the device key:', error);
+        console.error('[Atlas VTT Connect] Could not keep the device key:', error);
       }
     },
   };

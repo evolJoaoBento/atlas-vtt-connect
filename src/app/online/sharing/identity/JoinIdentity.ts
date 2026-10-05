@@ -40,7 +40,7 @@ export class JoinIdentity {
       const keys = await this.keys.forTable(tableId);
       this.device = await makeDeviceProof(this.crypto, keys, tableId, this.target.hostId, this.nonce);
     } catch (error) {
-      console.error('[Atlas online] Could not prove this device; joining without sharing:', error);
+      console.error('[Atlas VTT Connect] Could not prove this device; joining without sharing:', error);
     }
   }
 

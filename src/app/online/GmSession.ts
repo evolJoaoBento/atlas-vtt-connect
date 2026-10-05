@@ -226,7 +226,7 @@ export class GmSession {
   private logRejected(state: LinkState, reason: string): void {
     if (state.warned) return;
     state.warned = true;
-    console.warn(`[Atlas online] Rejected a message from a player connection: ${reason}. Later ones from it are not logged.`);
+    console.warn(`[Atlas VTT Connect] Rejected a message from a player connection: ${reason}. Later ones from it are not logged.`);
   }
 
   private refuse(link: PeerLink | null, reason: DenyReason): void {

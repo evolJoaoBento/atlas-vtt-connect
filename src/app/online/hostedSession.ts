@@ -103,7 +103,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   try {
     identity = env.people ? await env.loadTable() : null;
   } catch (error) {
-    console.error('[Atlas online] Could not prepare the table key; hosting without sharing:', error);
+    console.error('[Atlas VTT Connect] Could not prepare the table key; hosting without sharing:', error);
   }
   if (!env.isCurrent()) {
     host.close();

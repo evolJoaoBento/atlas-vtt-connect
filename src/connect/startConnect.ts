@@ -22,9 +22,10 @@ function canHost(api: AtlasApi, atlas: AtlasExtension): boolean {
 }
 
 /** Hosting online sessions: the session service, its commands, the status bar item and the presentation target. */
-async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension, options: ConnectOptions): Promise<Disposer> {
+async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension, options: ConnectOptions, gone: () => boolean): Promise<Disposer> {
   const paths = await connectStorage(api, atlas);
-  if (!paths) return () => undefined;
+  // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
+  if (!paths || gone()) return () => undefined;
   const people = PeopleBook.forApp(plugin.app, paths);
   const service = new OnlineSessionService(plugin.app, options.settings, { ...sessionDeps(atlas), people, ...options.hosting });
   return registerOnline(plugin, service, { presentation: atlas.presentation });
@@ -40,7 +41,7 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
     else stops.push(stop);
   };
   if (canHost(api, atlas)) {
-    startHosting(plugin, api, atlas, options).then(keep, (error: unknown) => {
+    startHosting(plugin, api, atlas, options, () => disposed).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start hosting online sessions:', error);
     });
   }

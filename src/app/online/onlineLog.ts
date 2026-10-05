@@ -21,7 +21,7 @@ export function createOnlineLog(isEnabled: () => boolean, write: LogWriter = (..
   return {
     isEnabled,
     event: (name, details = {}) => {
-      if (isEnabled()) write('[Atlas online]', name, details);
+      if (isEnabled()) write('[Atlas VTT Connect]', name, details);
     },
   };
 }

@@ -123,7 +123,7 @@ export class AssetRegistry implements AssetIds {
 
   private enqueue(path: string): void {
     this.queue.add(path);
-    if (!this.hashing) this.hashQueued().catch((error: unknown) => console.error('[Atlas online] Hashing images failed', error));
+    if (!this.hashing) this.hashQueued().catch((error: unknown) => console.error('[Atlas VTT Connect] Hashing images failed', error));
   }
 
   private async hashQueued(): Promise<void> {
@@ -174,7 +174,7 @@ export class AssetRegistry implements AssetIds {
       try {
         listener();
       } catch (error) {
-        console.error('[Atlas online] A change listener failed', error);
+        console.error('[Atlas VTT Connect] A change listener failed', error);
       }
     }
   }

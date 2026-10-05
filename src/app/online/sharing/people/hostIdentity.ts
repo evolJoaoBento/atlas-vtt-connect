@@ -92,7 +92,7 @@ export class HostIdentity {
     try {
       identity = await desk.identify(player, device);
     } catch (error) {
-      console.error('[Atlas online] Could not check a join request:', error);
+      console.error('[Atlas VTT Connect] Could not check a join request:', error);
     } finally {
       this.identifying.delete(playerId);
     }
@@ -121,11 +121,11 @@ export class HostIdentity {
     this.admitting.add(playerId);
     void this.admitIdentified(session, desk, playerId, linkTo)
       .catch(async (error: unknown) => {
-        console.error('[Atlas online] Could not admit a player:', error);
+        console.error('[Atlas VTT Connect] Could not admit a player:', error);
         await this.askAgain(session, desk, playerId);
       })
       .catch((error: unknown) => {
-        console.error('[Atlas online] Could not ask about a player again; denied:', error);
+        console.error('[Atlas VTT Connect] Could not ask about a player again; denied:', error);
         this.deny(playerId);
       })
       .finally(() => this.admitting.delete(playerId));

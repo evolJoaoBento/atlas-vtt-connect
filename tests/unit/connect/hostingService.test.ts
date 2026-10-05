@@ -17,6 +17,7 @@ const HOSTING: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings'
 /** Connect's plugin as hosting uses it: commands, status bar items, and what it registered for its own unload. */
 function hostPlugin(app: Plugin['app']) {
   const commands = new Map<string, Command>();
+  let added = 0;
   const statusBar = document.createElement('div');
   const cleanups: Array<() => void> = [];
   const plugin = {
@@ -24,7 +25,7 @@ function hostPlugin(app: Plugin['app']) {
     manifest: { id: 'atlas-vtt-connect' },
     register: (cleanup: () => void) => { cleanups.push(cleanup); },
     registerEvent: () => undefined,
-    addCommand: (command: Command) => { commands.set(command.id, command); return command; },
+    addCommand: (command: Command) => { added++; commands.set(command.id, command); return command; },
     removeCommand: (id: string) => { commands.delete(id); },
     addStatusBarItem: () => statusBar.createDiv(),
   } as unknown as Plugin;
@@ -32,6 +33,8 @@ function hostPlugin(app: Plugin['app']) {
     plugin,
     commands,
     statusBar,
+    /** How many times a command was added, removed ones included. */
+    added: () => added,
     /** Runs a palette command, as Obsidian does: a `checkCallback` is asked first. */
     run(id: string): boolean {
       const command = commands.get(id);
@@ -48,13 +51,23 @@ function hostPlugin(app: Plugin['app']) {
   };
 }
 
+/** An Atlas whose storage folder answers only once `gate` resolves, as a slow vault adapter would. */
+function slowFolder(atlas: FakeAtlas, gate: Promise<void>): void {
+  const connect = atlas.connect.bind(atlas);
+  vi.spyOn(atlas, 'connect').mockImplementation((plugin) => {
+    const extension = connect(plugin);
+    return { ...extension, storage: { folder: () => gate.then(() => extension.storage.folder()) } } as typeof extension;
+  });
+}
+
 /** Atlas with these capabilities, Connect linked to it, and an in-memory host every session uses. */
-function connected(capabilities: AtlasCapability[] = HOSTING) {
+function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>) {
   const workspace = fakeWorkspaceApp();
   const { app } = workspace;
   Object.assign(app, { vault: Object.assign(createInMemoryApp().app.vault, { getName: () => 'Vault' }) });
   const connect = hostPlugin(app);
   const atlas = new FakeAtlas({ version: '1.6.0', capabilities, trigger: workspace.fire });
+  if (gate) slowFolder(atlas, gate);
   workspace.plugins['atlas-vtt'] = { api: atlas };
   const network = new MemoryNetwork();
   const memoryHost = network.host('gm-id');
@@ -140,12 +153,33 @@ describe('hosting through the Atlas API', () => {
     expect(connect.statusBar.children).toHaveLength(0);
   });
 
-  it('registers nothing when Atlas unloads before hosting support has started', async () => {
-    const { atlas, connect } = connected();
+  it('adds no command or status bar item when Atlas unloads while its storage folder is still being asked for', async () => {
+    let answer: () => void = () => undefined;
+    const { atlas, connect } = connected(HOSTING, new Promise<void>((resolve) => { answer = resolve; }));
     atlas.unload();
+    answer();
     await vi.advanceTimersByTimeAsync(0);
-    expect(connect.commands.size).toBe(0);
+    expect(connect.added()).toBe(0);
     expect(connect.statusBar.children).toHaveLength(0);
+  });
+
+  it('keeps the newer setup when Atlas reloads while the first one still waits for its storage folder', async () => {
+    let answer: () => void = () => undefined;
+    const { atlas, connect, fire } = connected(HOSTING, new Promise<void>((resolve) => { answer = resolve; }));
+    atlas.unload();
+    const again = new FakeAtlas({ version: '1.6.0', capabilities: HOSTING });
+    fire('atlas-vtt:api-ready', again);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(connect.added()).toBe(3);
+    answer(); // the first setup's folder arrives last
+    await vi.advanceTimersByTimeAsync(0);
+    expect(connect.added()).toBe(3);
+    expect([...connect.commands.keys()]).toEqual(['online-session', 'start-online-session', 'stop-online-session']);
+    expect(connect.statusBar.children).toHaveLength(1);
+    expect(connect.run('start-online-session')).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onlineSessionStore.getState().status).toBe('hosting');
+    expect(again.presentation.targets).toHaveLength(1);
   });
 
   it('binds again when Atlas comes back, with one set of commands and one status bar item', async () => {

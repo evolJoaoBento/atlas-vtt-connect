@@ -220,4 +220,24 @@ describe('FakeAtlas follows the views, rules and presentation cases', () => {
     atlas.views.close('v1');
     expect(await presentation.present('v1')).toBe(false);
   });
+
+  it('present waits for a loading tab and then presents it, as Atlas does: no hold, no resume', async () => {
+    const { atlas, extension } = connected();
+    atlas.views.open('v1', [{ tabId: 'a', mapPath: MAP, name: 'A' }, { tabId: 'b', mapPath: 'maps/b.atlasmap', name: 'B' }]);
+    atlas.views.setSnapshot('v1', loaded());
+    const seen: string[] = [];
+    extension.presentation.subscribe({
+      presented: (scene, resumed) => seen.push(`presented:${scene.tabId}:${resumed}`),
+      held: (scene) => seen.push(`held:${scene.tabId}`),
+    });
+    const presenting = extension.presentation.present('v1', 'b');
+    atlas.views.update('v1', { mapPath: 'maps/b.atlasmap', loaded: false });
+    expect(seen).toEqual([]);
+    atlas.views.update('v1', { loaded: true });
+    expect(await presenting).toBe(true);
+    expect(seen).toEqual(['presented:b:false']);
+    const gone = extension.presentation.present('v1', 'a');
+    atlas.views.close('v1');
+    expect(await gone).toBe(false);
+  });
 });
