@@ -3,7 +3,7 @@ import { sceneWorldBounds } from '../../../src/app/online/preview/previewLayout'
 import { MAX_GRID_HEXES, fogShapes, gridLines } from '../../../src/app/online/preview/previewShapes';
 import { initiativeLines, playerLines, widgetLines } from '../../../src/app/online/preview/sceneSummary';
 import type { PlayerGrid } from '../../../src/app/online/scene/sceneTypes';
-import { fogRect, playerScene, playerToken } from './sceneFixtures';
+import { fogRect, playerScene } from './sceneFixtures';
 
 const square: PlayerGrid = {
   type: 'square', size: 100, offsetX: 0, offsetY: 0, color: null, opacity: 0.5,

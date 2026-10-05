@@ -112,12 +112,13 @@ export function startMigration(app: App, api: AtlasApi, atlas: AtlasExtension, s
 }
 
 /**
- * `ready` resolves once a run lets hosting and sharing start. Until then the command "Bring over the online preview's
- * data again" runs the steps not done yet; `stop` takes it off (the binding ended).
+ * `ready` resolves true once a run lets hosting and sharing start, and false when the binding ends first (`stop`), so
+ * nothing waits on it for good. Until then the command "Bring over the online preview's data again" runs the steps not
+ * done yet; `stop` takes it off.
  */
-export function migrationGate(plugin: Plugin, run: () => Promise<boolean>): { ready: Promise<void>; stop: Disposer } {
-  let open: () => void = () => undefined;
-  const ready = new Promise<void>((resolve) => { open = resolve; });
+export function migrationGate(plugin: Plugin, run: () => Promise<boolean>): { ready: Promise<boolean>; stop: Disposer } {
+  let settle: (ok: boolean) => void = () => undefined;
+  const ready = new Promise<boolean>((resolve) => { settle = resolve; });
   let stopped = false;
   let offered = false;
   const attempt = async (): Promise<void> => {
@@ -126,7 +127,7 @@ export function migrationGate(plugin: Plugin, run: () => Promise<boolean>): { re
     if (ok) {
       if (offered) plugin.removeCommand(RETRY_COMMAND.id);
       offered = false;
-      open();
+      settle(true);
     } else if (!offered) {
       offered = true;
       plugin.addCommand({ ...RETRY_COMMAND, callback: () => { void attempt(); } });
@@ -138,6 +139,7 @@ export function migrationGate(plugin: Plugin, run: () => Promise<boolean>): { re
     stop: () => {
       stopped = true;
       if (offered) plugin.removeCommand(RETRY_COMMAND.id);
+      settle(false);
     },
   };
 }

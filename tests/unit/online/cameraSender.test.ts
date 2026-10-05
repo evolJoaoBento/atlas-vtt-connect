@@ -7,7 +7,7 @@ import { CameraSender } from '../../../src/app/online/scene/CameraSender';
 import { CAMERA_INTERVAL_MS, type SceneCamera } from '../../../src/app/online/scene/sceneCamera';
 import { SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, FakeViewport, presenter, viewWithViewport, type ViewState as CameraSceneState } from './presentedFixtures';

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeControl } from '../../../src/app/online/protocol';
 import { createJoinSession, type SceneImageLoader } from '../../../src/app/online/preview/joinSession';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { sceneBody, sceneWithImages } from './sceneFixtures';
 

@@ -8,7 +8,7 @@ import { checkTableProof, makeDeviceProof } from '../../../../src/app/online/sha
 import { personKey } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { parsePeopleData } from '../../../../src/app/online/sharing/people/peopleTypes';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { memorySettings } from '../../connect/memorySettings';
 import { presenter } from '../presentedFixtures';

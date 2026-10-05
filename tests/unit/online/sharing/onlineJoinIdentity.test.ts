@@ -9,7 +9,7 @@ import { DeviceKeys, memoryKeyValueStore } from '../../../../src/app/online/shar
 import { checkDeviceProof, makeTableProof, type TableBinding } from '../../../../src/app/online/sharing/identity/proofs';
 import { hostedTable, tableReissuer } from '../../../../src/app/online/sharing/identity/reissue';
 import { RECONNECT_DELAYS_MS } from '../../../../src/app/online/PlayerSession';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../../src/app/online/transport/types';
 import { nodeHash } from '../assetFixtures';
 import { nodeIdentityCrypto as crypto, testTable } from './sharingFixtures';

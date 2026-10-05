@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { Command, Plugin } from 'obsidian';
 import type { AtlasCapability } from '@atlas-vtt/api-types';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { AtlasLink } from '../../../src/connect/atlasLink';
 import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';

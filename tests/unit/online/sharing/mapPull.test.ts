@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { MapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
 import { pullMap, SHARED_COLLECTION, type MapPullDeps } from '../../../../src/app/online/sharing/receive/mapPull';
 import { PulledItems } from '../../../../src/app/online/sharing/receive/PulledItems';

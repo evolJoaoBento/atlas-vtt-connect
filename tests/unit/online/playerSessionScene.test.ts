@@ -4,7 +4,7 @@ import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { RESYNC_MIN_INTERVAL_MS } from '../../../src/app/online/scene/PlayerSceneMirror';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import { playerScene, playerToken, sceneBody } from './sceneFixtures';
 
 interface Harness {

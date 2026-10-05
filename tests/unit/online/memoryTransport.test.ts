@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MemoryLink, MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryLink, MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 
 describe('MemoryTransport', () => {

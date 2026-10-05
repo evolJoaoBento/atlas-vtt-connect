@@ -6,7 +6,7 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink, ClientTransport } from '../../../src/app/online/transport/types';
 import type { ResourceDefinition } from '@atlas-vtt/api-types';
 import { presenter, sceneView, type ViewState } from './presentedFixtures';

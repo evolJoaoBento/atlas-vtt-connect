@@ -5,7 +5,7 @@ import { DEVICE_KEYS_STORAGE, memoryKeyValueStore } from '../../../src/app/onlin
 import { LEFTOVER_NOTICE, MIGRATED_NOTICE } from '../../../src/connect/migrateFromFork';
 import { FORK_DEVICE_KEYS_STORAGE, IMAGES_COPIED_KEY, type ImageCacheDeps } from '../../../src/connect/migrateLocalStores';
 import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
-import { failureNotice, RETRY_COMMAND, startMigration, type MigrationStart } from '../../../src/connect/startMigration';
+import { failureNotice, migrationGate, RETRY_COMMAND, startMigration, type MigrationStart } from '../../../src/connect/startMigration';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeDataPlugin } from './fakeDataPlugin';
 import { connected, HOSTING } from './hostingFixtures';
@@ -205,5 +205,17 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(await startMigration(connect.plugin.app, new FakeAtlas({ capabilities: [] }), new FakeAtlas({ capabilities: [] }).connect(connect.plugin), store, { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 })).toBe(true);
     expect(notices).toEqual([]);
     error.mockRestore();
+  });
+});
+
+describe('the migration gate', () => {
+  it('settles ready (false) when the binding ends before a run let hosting start (final review M12)', async () => {
+    const plugin = { addCommand: vi.fn(), removeCommand: vi.fn() } as never;
+    const gate = migrationGate(plugin, () => new Promise<boolean>(() => undefined));
+    gate.stop();
+    await expect(gate.ready).resolves.toBe(false);
+    const done = migrationGate(plugin, async () => true);
+    await expect(done.ready).resolves.toBe(true);
+    done.stop();
   });
 });

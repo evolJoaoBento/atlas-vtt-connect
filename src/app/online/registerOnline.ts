@@ -20,6 +20,29 @@ function statusText(state: OnlineSessionState): string {
   return `Online · ${connected} ${connected === 1 ? 'player' : 'players'}${waiting ? ` · ${waiting} waiting` : ''}`;
 }
 
+interface StatusItem {
+  item: HTMLElement;
+  /** What a click does for the current binding; nothing between bindings. */
+  open: () => void;
+}
+
+/**
+ * One status bar item per plugin, kept across bindings: Obsidian frees an item only when the plugin unloads, so a new
+ * one per Atlas reload would pile up (final review M13). Between bindings it is hidden and does nothing.
+ */
+const statusItems = new WeakMap<Plugin, StatusItem>();
+
+function statusItemOf(plugin: Plugin): StatusItem {
+  const known = statusItems.get(plugin);
+  if (known) return known;
+  const item = plugin.addStatusBarItem();
+  item.addClass('mod-clickable');
+  const status: StatusItem = { item, open: () => undefined };
+  item.addEventListener('click', () => status.open());
+  statusItems.set(plugin, status);
+  return status;
+}
+
 /**
  * The commands, the status bar item and the presentation target, for as long as Atlas is connected. The
  * returned disposer stops the session and removes them all; Connect binds again when Atlas comes back.
@@ -48,9 +71,10 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
     },
   });
 
-  const item = plugin.addStatusBarItem();
-  item.addClass('mod-clickable');
-  item.addEventListener('click', () => openOnlineSession(plugin.app, options.gmUi));
+  const status = statusItemOf(plugin);
+  const { item } = status;
+  const open = (): void => openOnlineSession(plugin.app, options.gmUi);
+  status.open = open;
   let stopTarget: Disposer | null = null;
   const render = (): void => {
     const state = onlineSessionStore.getState();
@@ -71,7 +95,11 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
     service.release();
     stopTarget?.();
     stopTarget = null;
-    item.remove();
+    // A newer binding may own the item already; only this binding's own state is taken down.
+    if (status.open === open) {
+      status.open = () => undefined;
+      item.toggle(false);
+    }
     for (const id of commands) plugin.removeCommand(id);
   };
 }

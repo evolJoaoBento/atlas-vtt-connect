@@ -10,7 +10,7 @@ import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
-import { MemoryNetwork, type MemoryLink } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork, type MemoryLink } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { presenter, sceneView, type ViewState } from './presentedFixtures';
 import { createDefaultInitiativeState } from './sceneFixtures';
@@ -95,7 +95,7 @@ function world(files: MemoryImageFiles, tokens = objects(TAVERN)) {
   broadcaster.start();
   server.start();
 
-  const { view, store, tabs, tavern, dungeon } = sceneView(presented, sceneState('maps/tavern.png', tokens), { mapSize: { width: 2000, height: 1500 } });
+  const { view, store, tavern } = sceneView(presented, sceneState('maps/tavern.png', tokens), { mapSize: { width: 2000, height: 1500 } });
 
   /** Every asset text message, either way, and every binary byte that reached a player. */
   const assetText: string[] = [];

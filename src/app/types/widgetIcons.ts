@@ -1,12 +1,9 @@
-// Copied from Atlas VTT src/app/types/widgetIcons.ts at ad4bea2 (AGPL-3.0-only).
+// Modified from Atlas VTT src/app/types/widgetIcons.ts at ad4bea2 (AGPL-3.0-only); changes: keeps only the icon paths and names (`WidgetIcon`); dropped WIDGET_ICON_VIEW_BOX, WIDGET_ICONS, DEFAULT_WIDGET_ICON, resolveWidgetIcon and isWidgetIcon, which Connect does not use.
 /**
  * Widget icon set: silhouettes from game-icons.net (CC BY 3.0, see README credits).
  * Stored as path data on a 512×512 canvas so they render inline and inherit
  * `currentColor` from the widget.
  */
-/** All widget icon paths are drawn in this coordinate space. */
-export const WIDGET_ICON_VIEW_BOX = '0 0 512 512';
-
 export const WIDGET_ICON_PATHS = {
   'heart':
     'M480.25 156.355c0 161.24-224.25 324.43-224.25 324.43S31.75 317.595 31.75 156.355c0-91.41 70.63-125.13 107.77-125.13 77.65 0 116.48 65.72 116.48 65.72s38.83-65.73 116.48-65.73c37.14.01 107.77 33.72 107.77 125.14z',
@@ -168,20 +165,3 @@ export const WIDGET_ICON_PATHS = {
 } as const;
 
 export type WidgetIcon = keyof typeof WIDGET_ICON_PATHS;
-
-export const WIDGET_ICONS = Object.keys(WIDGET_ICON_PATHS) as WidgetIcon[];
-
-export const DEFAULT_WIDGET_ICON: WidgetIcon = 'star';
-
-/** Maps any stored icon name (including pre-icon-set legacy values) to a known icon. */
-export function resolveWidgetIcon(icon: string | undefined): WidgetIcon {
-  if (icon === 'timer') return 'hourglass';
-  if (icon === 'book') return 'spellbook';
-  if (icon === 'hand') return 'strength';
-  return isWidgetIcon(icon) ? icon : DEFAULT_WIDGET_ICON;
-}
-
-/** Whether `name` names an icon of the set; a name the object prototype has (`constructor`, `__proto__`) is none. */
-export function isWidgetIcon(name: unknown): name is WidgetIcon {
-  return typeof name === 'string' && Object.hasOwn(WIDGET_ICON_PATHS, name);
-}

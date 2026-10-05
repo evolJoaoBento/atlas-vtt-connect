@@ -5,7 +5,7 @@ import { PlayerSession } from '../../../../src/app/online/PlayerSession';
 import type { TableProof } from '../../../../src/app/online/protocol';
 import { GmShareHost } from '../../../../src/app/online/sharing/transport/GmShareHost';
 import { PlayerShareLink } from '../../../../src/app/online/sharing/transport/PlayerShareLink';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import { nodeHash } from '../assetFixtures';
 import { noteCatalogue, TABLE_ID, testPerson } from './sharingFixtures';
 

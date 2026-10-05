@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const ROOT = process.cwd();
 const PROBE = path.resolve(ROOT, 'tests/unit/online/__coverage_probe__.ts');
 const PROBE_SOURCE = [
-  "import { OBJECT_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type Coverage, type KeysOfUnion } from '../../../src/app/online/coverage';",
+  "import { OBJECT_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type Coverage, type KeysOfUnion } from './coverage';",
   "import type { Character, SceneSnapshot, TextElement, Token } from '@atlas-vtt/api-types';",
   "", // keeps the probe's line numbers
   'export const complete: Record<keyof TextElement, Coverage> = TEXT_FIELD_COVERAGE;',

@@ -9,7 +9,7 @@ import { AssetLoader } from '../src/app/online/assets/AssetLoader';
 import { openIndexedDbImageStore } from '../src/app/online/assets/indexedDbImageStore';
 import { randomId } from '../src/app/online/ids';
 import { parseJoinFragment } from '../src/app/online/joinLink';
-import { pageKey, readKept } from '../src/app/online/page/pageStorage';
+import { keptPlayerKey, pageKey, readKept } from '../src/app/online/page/pageStorage';
 import { createOnlineLog } from '../src/app/online/onlineLog';
 import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
 import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
@@ -156,6 +156,15 @@ function stored(name: string, fallback: () => string): string {
   }
 }
 
+/** This GM session's player key; only the newest sessions keep theirs (`keptPlayerKey`). */
+function playerKeyFor(hostId: string): string {
+  try {
+    return keptPlayerKey(localStorage, hostId, randomId);
+  } catch {
+    return randomId();
+  }
+}
+
 function show(view: PageScreen): void {
   screen.hidden = view.kind === 'table';
   table.hidden = view.kind !== 'table';
@@ -236,7 +245,7 @@ if (!target) {
       hostId: target.hostId,
       name,
       // One key per GM session, so different GMs cannot recognise or pose as the same player.
-      playerKey: stored(`player-key:${target.hostId}`, () => randomId()),
+      playerKey: playerKeyFor(target.hostId),
       clientVersion: VERSION,
       transport: createPeerClient(target.server),
       onChange: render,

@@ -7,7 +7,7 @@ import { joinedSessionStore } from '../../../../src/app/online/obsidian/joinedSe
 import { OnlineJoinService, type OnlineSceneSink } from '../../../../src/app/online/obsidian/OnlineJoinService';
 import { DEFAULT_ONLINE_SETTINGS, type OnlineSettings } from '../../../../src/app/online/onlineSettings';
 import { RECONNECT_GIVE_UP_MS, type PlayerSessionState } from '../../../../src/app/online/PlayerSession';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../../src/app/online/transport/types';
 import { MemoryStore, nodeHash } from '../assetFixtures';
 

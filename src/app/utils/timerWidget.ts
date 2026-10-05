@@ -1,5 +1,4 @@
-// Copied from Atlas VTT src/app/utils/timerWidget.ts at c1d4d15 (AGPL-3.0-only).
-export const DEFAULT_TIMER_COLOR = '#4caf50';
+// Modified from Atlas VTT src/app/utils/timerWidget.ts at c1d4d15 (AGPL-3.0-only); changes: dropped DEFAULT_TIMER_COLOR, which Connect does not use.
 
 /** Formats seconds as MM:SS, or H:MM:SS from an hour up. */
 export function formatTimerTime(totalSeconds: number): string {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmSession, SESSION_LIMITS, type Admission, type SessionPlayer } from '../../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage, type DeviceProof, type TableProof } from '../../../../src/app/online/protocol';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 
 const DEVICE: DeviceProof = { table: 'T'.repeat(43), key: 'K'.repeat(120), nonce: 'N'.repeat(22), sig: 'S'.repeat(86) };
 const TABLE: TableProof = { id: 'T'.repeat(43), key: 'G'.repeat(120), personId: 'ana_1', gmName: 'Morgan', sig: 'S'.repeat(86) };

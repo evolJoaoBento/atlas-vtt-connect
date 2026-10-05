@@ -13,7 +13,7 @@ describe('hosting through the Atlas API', () => {
 
   // Review Focus 1
   it('hosts the presented scene for players and stops when Atlas unloads', async () => {
-    const { atlas, connect, join } = connected();
+    const { atlas, connect, join, fire } = connected();
     await vi.advanceTimersByTimeAsync(0);
     expect(connect.run('start-online-session')).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
@@ -29,11 +29,19 @@ describe('hosting through the Atlas API', () => {
 
     atlas.unload(); // startConnect's disposer runs, through AtlasLink on api-unload
     expect(onlineSessionStore.getState().status).toBe('idle');
-    expect(connect.statusBar.children).toHaveLength(0);
+    // One item per plugin (final review M13): hidden between bindings, reused by the next.
+    expect(connect.statusBar.children).toHaveLength(1);
+    expect((connect.statusBar.children[0] as HTMLElement).style.display).toBe('none');
     expect([...connect.commands.keys()]).toEqual([]);
     expect(atlas.presentation.targets).toEqual([]);
     expect(atlas.listenerCount()).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
+    fire('atlas-vtt:api-ready', new FakeAtlas({ capabilities: HOSTING }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(connect.statusBar.children).toHaveLength(1);
+    expect(connect.run('start-online-session')).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((connect.statusBar.children[0] as HTMLElement).style.display).toBe('');
   });
 
   it('holds a presentation target only while hosting', async () => {

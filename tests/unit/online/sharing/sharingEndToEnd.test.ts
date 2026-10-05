@@ -13,7 +13,7 @@ import { SharedWithMe } from '../../../../src/app/online/sharing/receive/SharedW
 import { GmShareHost } from '../../../../src/app/online/sharing/transport/GmShareHost';
 import { PlayerShareLink } from '../../../../src/app/online/sharing/transport/PlayerShareLink';
 import type { ShareNode } from '../../../../src/app/online/sharing/transport/ShareNode';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import { createInMemoryApp, type InMemoryApp } from '../../../mocks/inMemoryVault';
 import { nodeHash } from '../assetFixtures';
 import { noteCatalogue, TABLE_ID, testPerson } from './sharingFixtures';

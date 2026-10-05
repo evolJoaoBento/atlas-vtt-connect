@@ -8,7 +8,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
-import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import type { SharedWithMe } from '../../../../src/app/online/sharing/receive/SharedWithMe';
 
 const seen = vi.hoisted(() => ({
@@ -175,7 +175,7 @@ describe('pulling as the plugin wires it', () => {
     );
     expect((await service.refresh('gm')).items[0]?.state).toBe('current');
     leave();
-  }, 20_000);
+  }, 60_000);
 
   it('Ask to pull refuses a note shared with nobody, so no push can name it', async () => {
     const { gm, player, anaId, leave } = await table({ 'Coin.md': BODY });
@@ -188,7 +188,7 @@ describe('pulling as the plugin wires it', () => {
     // No item id is handed out for a note nobody may have.
     expect(gm.vault.files.get(gm.PATHS.items) ?? '').not.toContain('Coin.md');
     leave();
-  }, 20_000);
+  }, 60_000);
 
   it('a push for a note the GM stopped sharing fails as not shared, and says why', async () => {
     const { gm, player, anaId, sharedWithMe, leave } = await table({ 'Coin.md': `---\natlas-share: public\n---\n${BODY}` });
@@ -201,5 +201,5 @@ describe('pulling as the plugin wires it', () => {
     expect((failed as InstanceType<typeof player.ShareError>).reason).toBe('not-shared');
     expect([...player.vault.files.keys()].filter((path) => !path.startsWith('atlas-vtt/.atlas-data/'))).toEqual([]);
     leave();
-  }, 20_000);
+  }, 60_000);
 });

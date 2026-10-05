@@ -24,3 +24,42 @@ export function readKept(storage: Pick<Storage, 'getItem' | 'setItem'>, name: st
   }
   return fork;
 }
+
+/** How many GM sessions' player keys the page keeps; older ones are removed (final review M9). */
+export const KEPT_PLAYER_KEYS = 20;
+const PLAYER_KEY = 'player-key:';
+const PLAYER_KEY_ORDER = pageKey('player-key-order');
+
+type KeyStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>;
+
+/** Host ids with a kept player key, oldest first: the recorded order, then any key kept before it was recorded. */
+function playerKeyHosts(storage: KeyStorage): string[] {
+  let order: unknown;
+  try {
+    order = JSON.parse(storage.getItem(PLAYER_KEY_ORDER) ?? '[]');
+  } catch {
+    order = [];
+  }
+  const recorded = Array.isArray(order) ? order.filter((host): host is string => typeof host === 'string') : [];
+  const unrecorded: string[] = [];
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index);
+    const host = key?.startsWith(pageKey(PLAYER_KEY)) ? key.slice(pageKey(PLAYER_KEY).length) : null;
+    if (host !== null && !recorded.includes(host)) unrecorded.push(host);
+  }
+  return [...unrecorded, ...recorded];
+}
+
+/**
+ * The player key for one GM session (`hostId`), made with `make` the first time, as `readKept` reads it. Only the
+ * newest `limit` sessions keep theirs, so keys do not pile up on the shared github.io origin. Can throw: storage may.
+ */
+export function keptPlayerKey(storage: KeyStorage, hostId: string, make: () => string, limit = KEPT_PLAYER_KEYS): string {
+  const value = readKept(storage, `${PLAYER_KEY}${hostId}`) ?? make();
+  storage.setItem(pageKey(`${PLAYER_KEY}${hostId}`), value);
+  const hosts = [...playerKeyHosts(storage).filter((host) => host !== hostId), hostId];
+  const dropped = hosts.splice(0, Math.max(0, hosts.length - limit));
+  for (const host of dropped) storage.removeItem(pageKey(`${PLAYER_KEY}${host}`));
+  storage.setItem(PLAYER_KEY_ORDER, JSON.stringify(hosts));
+  return value;
+}

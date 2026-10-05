@@ -88,7 +88,8 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   keep(joining.stop);
   let sessions: Promise<OnlineSessionService | null> = Promise.resolve(null);
   if (canHost(api, atlas)) {
-    const hosting = migration.ready.then(() => startHosting(plugin, api, atlas, options, gone));
+    // A binding that ended before the migration let it start never starts (`ready` is false).
+    const hosting = migration.ready.then((ok) => (ok ? startHosting(plugin, api, atlas, options, gone) : { service: null, stop: () => undefined }));
     sessions = hosting.then((started) => {
       keep(started.stop);
       return started.service;
@@ -101,7 +102,7 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   options.sharing?.(sharing);
   if (sharing) {
     const start = { joins: joining.service, sessions, settings: options.settings, lifetime: options.lifetime, gone };
-    migration.ready.then(() => startConnectSharing(plugin, api, atlas, start)).then(keep, (error: unknown) => {
+    migration.ready.then((ok) => (ok ? startConnectSharing(plugin, api, atlas, start) : () => undefined)).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start sharing notes and maps:', error);
     });
   }

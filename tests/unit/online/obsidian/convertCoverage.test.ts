@@ -10,7 +10,7 @@ import {
   DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, INITIATIVE_RULES_COVERAGE,
   MEASUREMENT_FIELD_COVERAGE, OBJECT_COVERAGE, RESOURCE_DEFINITION_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE,
   type Coverage, type CoverageTable, type KeysOfUnion,
-} from '../../../../src/app/online/coverage';
+} from '../coverage';
 import { IMAGES, line, sign, TRIPS, type Trip, type Trips } from './convertCoverageTrips';
 
 type Check = (trips: Trips) => void;

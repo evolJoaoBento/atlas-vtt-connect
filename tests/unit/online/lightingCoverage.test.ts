@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { PlayerVisibility, SceneLighting, SceneSnapshot } from '@atlas-vtt/api-types';
-import { SCENE_FIELD_COVERAGE, SCENE_LIGHTING_COVERAGE, TOKEN_FIELD_COVERAGE, type CoverageTable } from '../../../src/app/online/coverage';
+import { SCENE_FIELD_COVERAGE, SCENE_LIGHTING_COVERAGE, TOKEN_FIELD_COVERAGE, type CoverageTable } from './coverage';
 import { sameSlice, sliceOf } from '../../../src/app/online/scene/sceneSources';
 import { character, PENDING, projectLit, ready, scene, UNLIT } from './lightingFixtures';
 

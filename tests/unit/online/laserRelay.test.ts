@@ -16,7 +16,7 @@ describe('LaserRelay', () => {
     w.present();
     const heard: PlayerLaser[] = [];
     const a = await w.join('A');
-    const b = await w.join('B', { onLaser: (laser) => heard.push(laser) });
+    await w.join('B', { onLaser: (laser) => heard.push(laser) });
     expect(a.session.sendLaser([{ x: 10, y: 20 }], false)).toBe(true);
     expect(heard).toEqual([{ from: a.playerId, sceneId: w.sceneId(), points: [{ x: 10, y: 20 }], lifted: false, color: LASER_COLOR_SWATCHES[1].value }]);
     expect(w.lasersOf(a)).toEqual([]);

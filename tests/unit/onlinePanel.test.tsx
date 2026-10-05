@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TOKENS_UNAVAILABLE_NOTICE } from '../../src/app/online/control/TokenControlHost';
 import { joinedSessionStore } from '../../src/app/online/obsidian/joinedSessionStore';

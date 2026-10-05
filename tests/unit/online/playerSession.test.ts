@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession, RECONNECT_GIVE_UP_MS, type PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 
 function setup() {

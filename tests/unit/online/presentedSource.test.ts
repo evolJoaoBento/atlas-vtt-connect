@@ -5,7 +5,7 @@ import { decodeControl, encodeControl, type ControlMessage } from '../../../src/
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { LIT_SCENE_NEEDS_UPDATE_NOTICE } from '../../../src/app/online/scene/sceneLighting';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { LiveScene } from '../../../src/app/online/atlas/presentedSource';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, presenter, sceneView, type ViewState } from './presentedFixtures';

@@ -5,7 +5,7 @@
  */
 import { isDieType, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
 import { entryRolls } from '../page/diceLogModel';
-import { DICE_LIMITS, isDiceModifier, type DiceLogEntry } from '../tools/toolMessages';
+import { DICE_LIMITS, type DiceLogEntry } from '../tools/toolMessages';
 
 export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult[] {
   return entries.map(diceLogResult);
@@ -24,25 +24,6 @@ export function diceLogResult(entry: DiceLogEntry): DiceRollResult {
     ...(entry.unlisted !== undefined && { unlistedDice: entry.unlisted }),
     rolledBy: entry.name,
   };
-}
-
-/**
- * The dice and modifier a logged roll used, to send it again; null when the tray cannot roll it
- * (another die, too many dice, a subtracted die, dice left unlisted). Dice an explosion rolled are
- * not the roll's own: the rules roll them again.
- */
-export function rollOfResult(result: DiceRollResult): { dice: DiceSelection; modifier: number } | null {
-  if (result.unlistedDice) return null;
-  const dice: DiceSelection = {};
-  let count = 0;
-  for (const roll of result.rolls) {
-    if (roll.exploded) continue;
-    if (!isDieType(roll.die) || roll.negative) return null;
-    dice[roll.die] = (dice[roll.die] ?? 0) + 1;
-    count++;
-  }
-  if (count === 0 || count > DICE_LIMITS.dicePerRoll || !isDiceModifier(result.modifiers)) return null;
-  return { dice, modifier: result.modifiers };
 }
 
 /** The tray's picks as a roll's dice: Atlas's tray dice with a count above zero; null when empty or above the GM's limit. */

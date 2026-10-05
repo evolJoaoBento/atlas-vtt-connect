@@ -43,37 +43,3 @@ export function keepProperties(lines: readonly string[], keep: readonly string[]
   }
   return blocks.flatMap(withoutComments);
 }
-
-/**
- * `source` without its `atlas-share` property, for a note that leaves the vault in a collection bundle:
- * who a note is shared with in online sessions belongs to this vault's table, and on someone else's
- * vault the property would share the note with their players. The property's key is matched
- * case-insensitively, whatever its quotes, and it takes its continuation lines (an indented value or list)
- * with it. Everything else stays byte for byte, line endings and byte order mark included;
- * `source` itself comes back when it holds no such property.
- */
-export function withoutShareProperty(source: string): string {
-  const lines = source.split('\n');
-  const first = lines[0]?.replace(/^\uFEFF/, '');
-  if (first?.trimEnd() !== '---') return source;
-  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === '---');
-  if (end < 0) return source;
-  const kept: string[] = [];
-  let dropping = false;
-  let dropped = false;
-  for (const [index, line] of lines.entries()) {
-    if (index === 0 || index >= end) {
-      kept.push(line);
-      continue;
-    }
-    const key = TOP_LEVEL_KEY.exec(line)?.[1];
-    if (key !== undefined) {
-      dropping = key.replace(/^["']|["']$/g, '').trim().toLowerCase() === SHARE_PROPERTY;
-    } else if (/^\S/.test(line) && !/^-(\s|$)/.test(line)) {
-      dropping = false; // a comment or a line we cannot read at the top level
-    }
-    if (dropping) dropped = true;
-    else kept.push(line);
-  }
-  return dropped ? kept.join('\n') : source;
-}

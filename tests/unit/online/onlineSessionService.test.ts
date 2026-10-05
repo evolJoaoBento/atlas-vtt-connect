@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { diceHostPart, tokenControlPart } from '../../../src/app/online/atlas/toolParts';
 import { OnlineSessionService, type Deps } from '../../../src/app/online/OnlineSessionService';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import { DEFAULT_ONLINE_SETTINGS } from '../../../src/app/online/onlineSettings';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { decodeAsset, encodeAsset } from '../../../src/app/online/assets/assetProtocol';

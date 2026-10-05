@@ -1,6 +1,6 @@
 import { normalizePath } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
-import { mapStrings } from '../../src/app/utils/mapStrings';
+import { mapStrings } from './mapStrings';
 import { checkedSceneFields, isPlainRelative, withImagePaths } from './fakeMapFields';
 import { savedMapText } from './fakeSavedMap';
 

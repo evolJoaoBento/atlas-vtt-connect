@@ -10,7 +10,7 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
 import { MAP_SIZE_POLL_MS } from '../../../src/app/online/scene/sceneTicks';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { fingerprintOf, memoryImageFiles, nodeHash, type MemoryImageFiles } from './assetFixtures';
 import { presenter, sceneView, type Presenter, type SceneView, type ViewState } from './presentedFixtures';

@@ -32,6 +32,14 @@ export const MOVED = [
   'obsidian/onlineDiceTrayWiring.test.tsx',
 ];
 
+/**
+ * Checks that run only beside an Atlas checkout (`ATLAS_SRC`) and so are skipped in CI, where there is none: the guard
+ * against upstream dice drift reads Atlas's source at the vendored commit (final review M21).
+ */
+export const NEEDS_ATLAS_SOURCE = [
+  "throwPlan.test.ts: keeps upstream's seeded streams, clock and panel times",
+];
+
 const isTest = (path) => /\.test\.tsx?$/.test(path);
 /** The area of a file: its first folder under the root, or `(root)`. */
 export const areaOf = (path) => (path.includes('/') ? path.split('/')[0] : '(root)');
@@ -89,6 +97,8 @@ function main(argv) {
   for (const file of MOVED.filter((name) => fork.includes(name))) console.log(`  ${file}`);
   console.log('\nFork files with no same-named Connect file that are not marked moved (renamed or rewritten, check by hand):');
   for (const file of absent.filter((name) => !MOVED.includes(name))) console.log(`  ${file}`);
+  console.log('\nSkipped without an Atlas checkout (always in CI; run locally with ATLAS_SRC):');
+  for (const check of NEEDS_ATLAS_SOURCE) console.log(`  ${check}`);
   return rows.every((row) => row.ok) ? 0 : 1;
 }
 

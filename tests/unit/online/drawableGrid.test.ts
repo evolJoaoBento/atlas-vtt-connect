@@ -4,7 +4,7 @@ import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { UNDRAWABLE_GRID_WARNING } from '../../../src/app/online/playerSessionScene';
 import { drawableGridFilter, GRID_DRAW_LIMITS, isDrawableGrid } from '../../../src/app/online/scene/drawableGrid';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import { playerScene, sceneBody } from './sceneFixtures';
 
 // The player-side analog of the final API review's C1: a grid drawers would loop over without end never reaches the

@@ -1,6 +1,6 @@
 import { normalizePath } from 'obsidian';
 import type { LightSource, LightZone, NotePin, SavedMapInput, TokenSettings, WallSegment } from '@atlas-vtt/api-types';
-import { mapStrings } from '../../src/app/utils/mapStrings';
+import { mapStrings } from './mapStrings';
 
 /**
  * The optional fields of a saved map beyond its scene (API 1.13.0), as Atlas's `src/api/savedMapFields.ts` at

@@ -111,7 +111,7 @@ describe('FakeAtlas follows the ui contract cases', () => {
   });
 
   it('draws the toolbar with isActive and badge read now, and skips player views', () => {
-    const { atlas, ui, ext } = setup();
+    const { ui, ext } = setup();
     let on = false;
     ext.ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', priority: 60, onClick: noop, isActive: () => on, badge: () => (on ? 3 : null) });
     expect(ui.drawToolbar('v1')).toEqual([{ id: 't', icon: 'x', label: 'T', priority: 60, active: false, badge: null }]);

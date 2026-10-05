@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayerSession, RECONNECT_DELAYS_MS } from '../../../src/app/online/PlayerSession';
 import { encodeControl } from '../../../src/app/online/protocol';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 
 const admitted = encodeControl({ v: 1, type: 'admitted', playerId: 'p1', session: { title: 'Table' } });

@@ -10,7 +10,7 @@ import { TokenControlHost } from '../../../src/app/online/control/TokenControlHo
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession, type PlayerSessionOptions } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
-import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
+import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';

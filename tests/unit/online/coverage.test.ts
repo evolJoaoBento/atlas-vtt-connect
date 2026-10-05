@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, INITIATIVE_RULES_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
   OBJECT_COVERAGE, RESOURCE_DEFINITION_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type CoverageTable, type KeysOfUnion,
-} from '../../../src/app/online/coverage';
+} from './coverage';
 import { createProjectionMemo, projectDrawings, projectFog, projectTexts } from '../../../src/app/online/scene/projectRecords';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import type { AnyWidget, Character, CollectionGridDefaults, DrawingStroke, FogBrushStroke, FogOperation, FogRectangleFill, GridState, InitiativeEntry, InitiativeRules, InitiativeState, ResourceDefinition, SceneSnapshot, TextElement } from '@atlas-vtt/api-types';

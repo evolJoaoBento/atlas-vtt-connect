@@ -56,4 +56,17 @@ describe('main.ts wiring', () => {
     await plugin.onload();
     expect((plugin as unknown as { commands: Record<string, { name: string }> }).commands['new-table-key']?.name).toBe('New table key…');
   });
+
+  it('saves a setting written during teardown, after the cleanups Obsidian runs past onunload (final review M11)', async () => {
+    const plugin = loadedPlugin();
+    const saved: unknown[] = [];
+    Object.assign(plugin, { saveData: async (data: unknown) => { saved.push(data); } });
+    await plugin.onload();
+    plugin.onunload();
+    // A session stopping in a register() cleanup writes a setting after onunload ran.
+    plugin.settings.set({ playerName: 'Late' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(JSON.stringify(saved.at(-1))).toContain('Late');
+  });
 });

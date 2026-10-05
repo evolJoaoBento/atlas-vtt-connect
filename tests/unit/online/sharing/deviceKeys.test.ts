@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEVICE_KEYS_STORAGE, DeviceKeys, memoryKeyValueStore } from '../../../../src/app/online/sharing/identity/deviceKeys';
 import { ensureTableIdentity } from '../../../../src/app/online/sharing/identity/tableKey';
-import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings } from '../../../../src/app/online/onlineSettings';
+import { resolveOnlineSettings } from '../../../../src/app/online/onlineSettings';
 import { memorySettings } from '../../connect/memorySettings';
 import { nodeIdentityCrypto as crypto } from './sharingFixtures';
 

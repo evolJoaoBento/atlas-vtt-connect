@@ -33,10 +33,14 @@ export default class AtlasVttConnectPlugin extends Plugin {
     new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, {
       settings: this.settings, migration: this.settings, playerKeys: this.playerKeys, lifetime, sharing: (available) => { this.canShare = available; },
     })).start();
-    // Further services are added task by task (plan B4 onwards).
   }
 
+  /**
+   * Obsidian runs this before the `register()` cleanups, which stop the sessions (`AtlasLink`). The second flush
+   * runs once those are done, so a setting written during teardown is saved too, not left to the debounce timer.
+   */
   onunload(): void {
     void this.settings.flush();
+    queueMicrotask(() => { void this.settings.flush(); });
   }
 }

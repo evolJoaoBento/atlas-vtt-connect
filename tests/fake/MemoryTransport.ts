@@ -1,4 +1,4 @@
-import type { Channel, ClientTransport, HostTransport, PeerLink, TransportError, Unsubscribe } from './types';
+import type { Channel, ClientTransport, HostTransport, PeerLink, TransportError, Unsubscribe } from '../../src/app/online/transport/types';
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 

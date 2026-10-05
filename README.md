@@ -88,7 +88,7 @@ To test against a real Atlas, check out the Atlas branch `api/extension-api` of 
 
 ### Test inventory
 
-`npm run inventory -- --atlas <Atlas checkout>` compares the test files per area with the online play preview's, and exits 1 when an area has fewer files than it should.
+`npm run inventory -- --atlas <Atlas checkout>` compares the test files per area with the online play preview's, and exits 1 when an area has fewer files than it should. It also lists the checks that run only beside an Atlas checkout: `throwPlan.test.ts`'s guard against upstream dice drift reads Atlas's source at the vendored commit (`ATLAS_SRC`, by default `../atlas-vtt-upstream-wt`), so CI, which has no checkout, always skips it. Run it locally after each re-vendor.
 
 ### Releasing
 
