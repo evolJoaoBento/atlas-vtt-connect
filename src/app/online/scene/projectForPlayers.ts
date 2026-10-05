@@ -10,12 +10,12 @@ import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, is
 import type { Character, CollectionGridDefaults, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
 import type { AssetIds } from './sceneContracts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
-import type { FogCoverage } from './FogCoverage';
+import type { FogCoverage, Shows } from './FogCoverage';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
-import { projectDrawings, projectFog, projectRecord, projectTexts, type Covers, type ProjectionMemo } from './projectRecords';
+import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES,
@@ -29,7 +29,11 @@ export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objec
 export interface ProjectionContext {
   sceneId: string;
   rules: PlayerViewRules;
-  /** The GM's fog players receive; rebuilt by the caller only when the fog operations change. */
+  /**
+   * The GM's fog players receive; rebuilt by the caller only when the fog operations change. On a fogged scene a token,
+   * text or drawing is sent only where it proves every cell its in-map part touches revealed (ruling F-POS,
+   * `FogCoverage.reveals`), so nothing is sent while the map's size is unknown.
+   */
   coverage: FogCoverage;
   /**
    * With dynamic lighting on and the scene lit: which tokens the player window shows and the
@@ -68,7 +72,8 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const lit = state.lighting?.enabled === true;
   const closed = context.lighting?.closed === true || (lit && !context.lighting);
   const lighting = closed ? closedFrame(context.mapSize) : context.lighting?.open === true ? null : context.lighting ?? null;
-  const hidden: Covers = lighting ? darkCovers(context, lighting) : context.coverage;
+  const fogShows = context.coverage.within(context.mapSize);
+  const visible: Shows = lighting ? darkCovers(fogShows, lighting) : fogShows;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
   const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
@@ -82,8 +87,8 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
-    texts: closed ? {} : projectTexts(objects?.texts, hidden),
-    drawings: closed ? {} : projectDrawings(objects?.drawings, hidden, memo),
+    texts: closed ? {} : projectTexts(objects?.texts, visible),
+    drawings: closed ? {} : projectDrawings(objects?.drawings, visible, memo),
     widgets: projectWidgets(state, context.rules),
     initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
@@ -91,11 +96,11 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
 }
 
 /**
- * What texts and drawings of a lit scene are checked against (ruling L-POS): sent only where the raster proves the
- * window shows every cell of their in-map part (`LightingFrame.shows`), and the GM's fog still hides them on top.
+ * What texts and drawings of a lit scene are checked against: sent only where the raster proves the window shows
+ * every cell of their in-map part (`LightingFrame.shows`, ruling L-POS) and the fog proves every cell revealed (F-POS).
  */
-function darkCovers(context: ProjectionContext, lighting: LightingFrame): Covers {
-  return { isCovered: (bounds) => !lighting.shows(bounds) || context.coverage.isCovered(bounds) };
+function darkCovers(fog: Shows, lighting: LightingFrame): Shows {
+  return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds) };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {
@@ -180,15 +185,17 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // Coverage sees what the GM draws (raw values); the wire gets clamped values.
-  if (context.coverage.isCovered(tokenBounds({ x, y, size }, cellSize))) return null;
+  // The token as the GM draws it (raw values) and as players do (the wire's clamped ones) must both be revealed (F-POS).
+  const revealed = (at: { x: number; y: number; size: number }): boolean => context.coverage.reveals(tokenBounds(at, cellSize), context.mapSize);
+  const wire = { x: finiteOr(x, 0, SCENE_RANGES.coordinate), y: finiteOr(y, 0, SCENE_RANGES.coordinate), size: finiteOr(size, 1, SCENE_RANGES.tokenSize) };
+  if (!revealed({ x, y, size }) || !revealed(wire)) return null;
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
   return {
-    x: finiteOr(x, 0, SCENE_RANGES.coordinate),
-    y: finiteOr(y, 0, SCENE_RANGES.coordinate),
-    size: finiteOr(size, 1, SCENE_RANGES.tokenSize),
+    x: wire.x,
+    y: wire.y,
+    size: wire.size,
     rotation: finiteOr(token.rotation, 0),
     layer: finiteOr(token.layer, 0),
     image: context.assets.idFor(token.imagePath),

@@ -136,7 +136,11 @@ describe('token moves on the GM side', () => {
   });
 
   it("clamps to the scene's content without a map size", async () => {
-    const w = controlWorld({ scene: { mapSize: { width: 0, height: 0 } } });
+    // Without fog, and the goblin it hid left out: on a fogged map of unknown size players are sent nothing (F-POS).
+    const { goblin: _goblin, ...party } = partyTokens();
+    const state = partyState(party);
+    state.objects = { ...state.objects, fog: {} };
+    const w = controlWorld({ scene: { state, mapSize: { width: 0, height: 0 } } });
     const a = await withHero(w);
     // hero (140, 140) and ally (280, 140) are what players see: 105..315 × 105..175, one cell around it.
     a.move('hero', 5000, 5000);

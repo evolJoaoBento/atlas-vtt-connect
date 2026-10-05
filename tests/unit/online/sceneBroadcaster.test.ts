@@ -66,8 +66,9 @@ type FakeView = SceneView<SceneState>;
 /** The presenter of the harness `setup` made last: its fake Atlas holds the views. */
 let presenting: Presenter;
 
-function fakeView(state: SceneState): FakeView {
-  return sceneView(presenting, state);
+/** `mapSize`: on a fogged scene only what lies on a map of known size can be proven revealed (ruling F-POS). */
+function fakeView(state: SceneState, mapSize?: { width: number; height: number }): FakeView {
+  return sceneView(presenting, state, mapSize ? { mapSize } : {});
 }
 
 function moveToken(store: StoreApi<SceneState>, id: string, x: number): void {
@@ -592,7 +593,7 @@ describe('SceneBroadcaster', () => {
       const h = setup();
       const fog = tooMuchFog();
       const small = Object.fromEntries(Object.entries(fog).filter(([id]) => id !== 'cover'));
-      const { view, store, tavern } = fakeView(sceneState({ hero: character('hero', 600) }, small));
+      const { view, store, tavern } = fakeView(sceneState({ hero: character('hero', 600) }, small), { width: 2000, height: 1500 });
       h.presented.present(view, tavern);
       const player = await join(h);
       expect(player.scene?.tokens.hero).toBeDefined();

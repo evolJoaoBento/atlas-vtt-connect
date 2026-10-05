@@ -141,9 +141,9 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     assets: { idFor: (path) => (path ? context.images.fingerprints.get(path) ?? null : null) },
     collectionGrid: context.collectionGrid, coneAngle: context.coneAngle, initiativeRules: context.initiativeRules,
   }, memo);
-  // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
+  // Pins players cannot see (GM-only, or not proven revealed by the fog: ruling F-POS) and pins whose note is not ticked are left out.
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
-    if (pin.gmOnly || coverage.isCovered({ x: pin.x, y: pin.y, width: 1, height: 1 })) return [];
+    if (pin.gmOnly || !coverage.reveals({ x: pin.x, y: pin.y, width: 1, height: 1 }, context.images.size)) return [];
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
     return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];

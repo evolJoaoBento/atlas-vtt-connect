@@ -12,6 +12,8 @@ import { projectInitiative, projectWidgets } from '../../../src/app/online/scene
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 const ALL_OFF: PlayerViewRules = { showGrid: false, showTokenNameplates: false, showWidgets: false, showInitiative: false };
 
+/** The map the fog is checked within (ruling F-POS: parts outside the map prove nothing). */
+const MAP = { width: 2000, height: 2000 };
 const fogBlock = (x: number, y: number, width: number, height: number): FogCoverage => coverageOfFog({
   f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x, y, width, height },
 });
@@ -83,23 +85,23 @@ describe('fog projection', () => {
 });
 
 describe('text and drawing projection', () => {
-  it('drops texts completely under fog and keeps those peeking out', () => {
-    const coverage = fogBlock(0, 0, 1000, 1000);
-    const texts = projectTexts({ hidden: text(), peeking: text({ x: 990 }) }, coverage);
-    expect(Object.keys(texts)).toEqual(['peeking']);
+  it('drops texts any part of which may be under fog, also those peeking out of it, and keeps those wholly revealed (F-POS)', () => {
+    const coverage = fogBlock(0, 0, 1000, 1000).within(MAP);
+    const texts = projectTexts({ hidden: text(), peeking: text({ x: 990 }), clear: text({ x: 1500 }) }, coverage);
+    expect(Object.keys(texts)).toEqual(['clear']);
   });
 
   it('fills in values older map files lack', () => {
     const messy = { ...text(), fontSize: undefined, align: 'justify', opacity: '0.5', text: 42 } as unknown as TextElement;
-    expect(projectTexts({ messy }, FogCoverage.EMPTY).messy).toMatchObject({ fontSize: 16, align: 'center', opacity: 0.5, text: '' });
+    expect(projectTexts({ messy }, FogCoverage.EMPTY.within(MAP)).messy).toMatchObject({ fontSize: 16, align: 'center', opacity: 0.5, text: '' });
   });
 
   it('simplifies drawings and drops those completely under fog', () => {
     const memo = createProjectionMemo();
-    const clear = projectDrawings({ d: stroke() }, FogCoverage.EMPTY, memo);
+    const clear = projectDrawings({ d: stroke() }, FogCoverage.EMPTY.within(MAP), memo);
     expect(clear.d).toEqual({ type: 'pen', order: 3, points: [{ x: 500, y: 500 }, { x: 520, y: 500 }], color: '#ff0000', width: 4, opacity: 1, icon: null });
-    expect(projectDrawings({ d: stroke() }, fogBlock(0, 0, 1000, 1000), memo)).toEqual({});
-    const icon = projectDrawings({ i: stroke({ type: 'icon', icon: 'skull', points: [{ x: 5, y: 5 }] }) }, FogCoverage.EMPTY, memo);
+    expect(projectDrawings({ d: stroke() }, fogBlock(0, 0, 1000, 1000).within(MAP), memo)).toEqual({});
+    const icon = projectDrawings({ i: stroke({ type: 'icon', icon: 'skull', points: [{ x: 5, y: 5 }] }) }, FogCoverage.EMPTY.within(MAP), memo);
     expect(icon.i?.icon).toBe('skull');
   });
 });
@@ -189,9 +191,9 @@ describe('initiative projection', () => {
 describe('wire ranges', () => {
   it('projects out-of-range values to ones the player validator accepts', () => {
     const wild = text({ x: 1e12, y: -1e12, fontSize: 5000, width: 1e9, height: 1e9, padding: 1e9, borderRadius: 1e9, scale: 1e6 });
-    const texts = projectTexts({ wild }, FogCoverage.EMPTY);
+    const texts = projectTexts({ wild }, FogCoverage.EMPTY.within(MAP));
     const drawings = projectDrawings(
-      { d: stroke({ width: 1e9, points: [{ x: 1e12, y: 0 }, { x: 5, y: -1e12 }] }) }, FogCoverage.EMPTY, createProjectionMemo(),
+      { d: stroke({ width: 1e9, points: [{ x: 1e12, y: 0 }, { x: 5, y: -1e12 }] }) }, FogCoverage.EMPTY.within(MAP), createProjectionMemo(),
     );
     const big: FogOperation = { id: 'r', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 1e12, y: 0, width: 1e9 * 1e9, height: 5, offsetX: 1e12 };
     const brush: FogOperation = {

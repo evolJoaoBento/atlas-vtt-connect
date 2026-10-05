@@ -146,7 +146,7 @@ describe('coverage of text, drawing and fog fields', () => {
       padding: set({ padding: 6 }), borderRadius: set({ borderRadius: 4 }), opacity: set({ opacity: 0.5 }), width: set({ width: 200 }),
       height: set({ height: 60 }), align: set({ align: 'right' }), bold: set({ bold: true }), italic: set({ italic: true }), scale: set({ scale: 2 }),
     };
-    expectCoverage(TEXT_FIELD_COVERAGE, variants, TEXT, (text) => projectTexts({ [text.id]: text }, coverageOfFog({})));
+    expectCoverage(TEXT_FIELD_COVERAGE, variants, TEXT, (text) => projectTexts({ [text.id]: text }, coverageOfFog({}).within({ width: 1000, height: 1000 })));
   });
 
   it('sends every drawing field marked sent', () => {
@@ -157,7 +157,7 @@ describe('coverage of text, drawing and fog fields', () => {
       type: set({ type: 'pen' }), points: set({ points: [{ x: 20, y: 20 }] }), icon: set({ icon: 'skull' }),
     };
     expectCoverage(DRAWING_FIELD_COVERAGE, variants, DRAWING, (drawing) =>
-      projectDrawings({ [drawing.id]: drawing }, coverageOfFog({}), createProjectionMemo()));
+      projectDrawings({ [drawing.id]: drawing }, coverageOfFog({}).within({ width: 1000, height: 1000 }), createProjectionMemo()));
   });
 
   it('sends every fog field marked sent', () => {

@@ -3,6 +3,7 @@ import type { Character, FogOperation, GridState, ResourceDefinition, SceneSnaps
 import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
 import { isDrawingRecords, isFogRecords, isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
+import { SCENE_RANGES } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import type { ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
@@ -83,12 +84,13 @@ describe('projectForPlayers', () => {
     expect(projectForPlayers(withTokens({ rock: white }), context()).tokens.rock?.ring).toBe('#ffffff');
   });
 
-  it('drops a token completely under fog and sends one half under it', () => {
+  it('drops a token completely under fog and one half under it, and sends one wholly revealed (F-POS)', () => {
     const coverage = fogOver(0, 0, 500, 500);
     const hiddenByFog = hero({ id: 'a', x: 200, y: 200 });
     const halfUnder = hero({ id: 'b', x: 500, y: 200 });
-    const scene = projectForPlayers(withTokens({ a: hiddenByFog, b: halfUnder }), context({ coverage }));
-    expect(Object.keys(scene.tokens)).toEqual(['b']);
+    const clear = hero({ id: 'c', x: 700, y: 200 });
+    const scene = projectForPlayers(withTokens({ a: hiddenByFog, b: halfUnder, c: clear }), context({ coverage }));
+    expect(Object.keys(scene.tokens)).toEqual(['c']);
   });
 
   it('gives each image one asset id and the map its size', () => {
@@ -290,13 +292,15 @@ describe('projectForPlayers out-of-range numbers', () => {
     expect(isDrawingRecords(drawings)).toBe(true);
   });
 
-  it('decides coverage on the raw position, not the clamped one', () => {
+  it('on a fogged map hides a token off the map, by its raw position and its clamped one (F-POS)', () => {
     const far = hero({ id: 'far', x: 1e12, y: 5 });
     const covered = coverageOfFog({
       f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 0, y: 0, width: 500, height: 500 } satisfies FogOperation,
     });
-    // Clamped x (1e7) is still far from the fog, and so is the raw x: kept either way.
-    expect(Object.keys(projectForPlayers(withTokens({ far }), context({ coverage: covered })).tokens)).toEqual(['far']);
+    // Neither the raw x nor the clamped one (1e7) lies on the map: nothing proves it revealed.
+    expect(Object.keys(projectForPlayers(withTokens({ far }), context({ coverage: covered })).tokens)).toEqual([]);
+    // Without fog nothing can hide it: it is sent, at the clamped position.
+    expect(projectForPlayers(withTokens({ far }), context()).tokens.far?.x).toBe(SCENE_RANGES.coordinate[1]);
   });
 });
 

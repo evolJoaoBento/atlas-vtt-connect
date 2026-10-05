@@ -166,8 +166,8 @@ describe('scene sync end to end', () => {
     w.expectInSync('move', early, late);
     expect(early.scene!.tokens.hero?.x).toBe(300);
 
-    // Erasing the fog over the goblin shows it, the text and the drawing.
-    addFog(w.store, 'e1', { type: 'rectangle', timestamp: 3, isErasing: true, x: 950, y: 950, width: 200, height: 200 });
+    // Erasing the fog over the goblin shows it, the text and the drawing: each lies wholly in the erased cells (F-POS).
+    addFog(w.store, 'e1', { type: 'rectangle', timestamp: 3, isErasing: true, x: 944, y: 944, width: 216, height: 216 });
     await w.tick();
     w.expectInSync('erase', early, late);
     expect(Object.keys(early.scene!.tokens).sort()).toEqual(['goblin', 'hero']);

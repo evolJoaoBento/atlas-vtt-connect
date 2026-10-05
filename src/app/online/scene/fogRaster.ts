@@ -1,7 +1,8 @@
 /**
- * Pure rasterising of one fog operation onto a coarse cell grid. Conservative
- * by construction: paint fogs only cells the shape covers whole, erase clears
- * every cell it touches.
+ * Pure rasterising of one fog operation onto a coarse cell grid, conservative by construction in one of two ways.
+ * `hide` (where fog surely lies): paint fogs only cells the shape covers whole, erase clears every cell it touches.
+ * `reveal` (where nothing can be fogged, ruling F-POS): paint fogs every cell it touches, erase clears only cells it
+ * covers whole, so a cell left clear is proven revealed.
  */
 import { insideSpans } from '@atlas-vtt/shared/draw';
 import type { ScenePoint } from './sceneTypes';
@@ -9,6 +10,12 @@ import { distanceSqToSegment, simplifyPoints } from './simplifyPoints';
 
 export const FOGGED = 1;
 export const CLEAR = 0;
+
+/** Which way a raster errs: `hide` toward clear cells, `reveal` toward fogged ones. */
+export type RasterMode = 'hide' | 'reveal';
+
+/** Whether a shape changes only the cells it covers whole (else every cell it touches). */
+const coversWhole = (value: number, mode: RasterMode): boolean => (value === FOGGED) === (mode === 'hide');
 
 /** A bitmap of cells at `originX`, `originY`, each `cellSize` world pixels square. */
 export interface CellGrid {
@@ -38,15 +45,15 @@ function forCells(g: CellGrid, c0: number, c1: number, r0: number, r1: number, v
   }
 }
 
-/** Paint fogs the cells the rectangle covers whole; erase clears every cell it overlaps. */
-export function fillRect(g: CellGrid, x: number, y: number, width: number, height: number, value: number): void {
+/** `hide`: paint fogs the cells the rectangle covers whole, erase clears every cell it overlaps; `reveal` the other way round. */
+export function fillRect(g: CellGrid, x: number, y: number, width: number, height: number, value: number, mode: RasterMode = 'hide'): void {
   const left = Math.min(x, x + width);
   const right = Math.max(x, x + width);
   const top = Math.min(y, y + height);
   const bottom = Math.max(y, y + height);
   if (![left, right, top, bottom].every(Number.isFinite)) return;
   const size = g.cellSize;
-  const whole = value === FOGGED;
+  const whole = coversWhole(value, mode);
   const c0 = whole ? Math.ceil((left - g.originX) / size) : colOf(g, left);
   const c1 = whole ? Math.floor((right - g.originX) / size) - 1 : Math.ceil((right - g.originX) / size) - 1;
   const r0 = whole ? Math.ceil((top - g.originY) / size) : rowOf(g, top);
@@ -55,11 +62,11 @@ export function fillRect(g: CellGrid, x: number, y: number, width: number, heigh
 }
 
 /**
- * Round-capped segments: paint fogs a cell whose four corners lie within the
- * radius of one segment; erase clears a cell whose centre lies within the
- * radius plus half a cell diagonal of any segment.
+ * Round-capped segments. A whole cover changes a cell whose four corners lie within the radius of one segment; a
+ * touch changes a cell whose centre lies within the radius plus half a cell diagonal of any segment. `hide`: paint
+ * covers whole, erase touches; `reveal` the other way round.
  */
-export function fillBrush(g: CellGrid, rawPoints: ScenePoint[], brushRadius: number, value: number): void {
+export function fillBrush(g: CellGrid, rawPoints: ScenePoint[], brushRadius: number, value: number, mode: RasterMode = 'hide'): void {
   if (!(brushRadius > 0)) return;
   // Simplifying moves the stroke by at most `tolerance`; paint gives that back and erase adds it, so the result stays conservative.
   // The tolerance grows with the radius, which keeps the segments (each scanning about its own reach) proportional to the area painted.
@@ -69,7 +76,8 @@ export function fillBrush(g: CellGrid, rawPoints: ScenePoint[], brushRadius: num
   if (!first) return;
   const size = g.cellSize;
   const slack = points.length < rawPoints.length ? tolerance : 0;
-  const radius = value === FOGGED ? brushRadius - slack : brushRadius + slack;
+  const whole = coversWhole(value, mode);
+  const radius = whole ? brushRadius - slack : brushRadius + slack;
   const radiusSq = radius * radius;
   const reach = radius + (size * Math.SQRT2) / 2;
   const reachSq = reach * reach;
@@ -78,7 +86,7 @@ export function fillBrush(g: CellGrid, rawPoints: ScenePoint[], brushRadius: num
     : points.slice(1).map((point, index): [ScenePoint, ScenePoint] => [points[index]!, point]);
   for (const [a, b] of segments) {
     // A capsule is convex: when it holds the bitmap's corners it holds every cell, so a huge brush costs O(1) per segment.
-    if (value === FOGGED ? capsuleHoldsBitmap(g, a, b, radiusSq, 0) : capsuleHoldsBitmap(g, a, b, reachSq, size / 2)) {
+    if (whole ? capsuleHoldsBitmap(g, a, b, radiusSq, 0) : capsuleHoldsBitmap(g, a, b, reachSq, size / 2)) {
       g.cells.fill(value);
       return;
     }
@@ -89,10 +97,10 @@ export function fillBrush(g: CellGrid, rawPoints: ScenePoint[], brushRadius: num
       const span = segmentXSpan(a, b, rowTop - reach, rowTop + size + reach);
       if (!span) continue;
       forCells(g, colOf(g, span[0] - reach), colOf(g, span[1] + reach), row, row, (index, left, top) => {
-        if (value === FOGGED) {
-          if (cellInsideCapsule(left, top, size, a, b, radiusSq)) g.cells[index] = FOGGED;
+        if (whole) {
+          if (cellInsideCapsule(left, top, size, a, b, radiusSq)) g.cells[index] = value;
         } else if (distanceSqToSegment({ x: left + size / 2, y: top + size / 2 }, a, b) <= reachSq) {
-          g.cells[index] = CLEAR;
+          g.cells[index] = value;
         }
       });
     }
@@ -110,13 +118,13 @@ function capsuleHoldsBitmap(g: CellGrid, a: ScenePoint, b: ScenePoint, radiusSq:
 }
 
 /**
- * Cells whose centre lies inside the polygon (nonzero winding, as the canvas
- * fills it). Cells an edge crosses are never fogged by paint and always
- * cleared by erase.
+ * Cells whose centre lies inside the polygon (nonzero winding, as the canvas fills it). A whole cover leaves out the
+ * cells an edge crosses, a touch adds them: `hide` paint covers whole and erase touches, `reveal` the other way round.
  */
-export function fillLasso(g: CellGrid, points: ScenePoint[], value: number): void {
+export function fillLasso(g: CellGrid, points: ScenePoint[], value: number, mode: RasterMode = 'hide'): void {
   if (points.length < 3) return;
   const size = g.cellSize;
+  const whole = coversWhole(value, mode);
   const crossed = new Set<number>();
   let top = Infinity;
   let bottom = -Infinity;
@@ -144,11 +152,11 @@ export function fillLasso(g: CellGrid, points: ScenePoint[], value: number): voi
       const c1 = Math.min(g.cols - 1, Math.floor((to - g.originX) / size - 0.5));
       for (let col = c0; col <= c1; col++) {
         const index = row * g.cols + col;
-        if (value === CLEAR || !crossed.has(index)) g.cells[index] = value;
+        if (!whole || !crossed.has(index)) g.cells[index] = value;
       }
     }
   }
-  if (value === CLEAR) for (const index of crossed) g.cells[index] = CLEAR;
+  if (!whole) for (const index of crossed) g.cells[index] = value;
 }
 
 /** The x range of segment ab where its y lies within [low, high]; null when it never does. */

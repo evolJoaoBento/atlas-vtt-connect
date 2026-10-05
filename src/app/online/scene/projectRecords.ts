@@ -5,10 +5,7 @@
  */
 import type { DrawingStroke, FogOperation, TextElement } from '@atlas-vtt/api-types';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, positiveOrNull, textOr, textOrNull, unitOr } from './coerce';
-import type { FogCoverage } from './FogCoverage';
-
-/** What a text or drawing is checked against: whether an area is hidden from players. */
-export type Covers = Pick<FogCoverage, 'isCovered'>;
+import type { Shows } from './FogCoverage';
 import { DEFAULT_FONT_SIZE, drawingBounds, textBounds } from './objectBounds';
 import {
   PLAYER_DRAWING_TYPES, PLAYER_TEXT_ALIGNS, type PlayerDrawing, type PlayerFogOp, type PlayerText,
@@ -100,11 +97,19 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
   return projectRecord(fog, (op) => memoized(memo.fog, op, projectFogOp));
 }
 
-/** A text players may see; null when it is completely under fog or has no position. */
-export function projectText(text: TextElement, coverage: Covers): PlayerText | null {
+/**
+ * A text players may see: only when `visible` shows every part of it, as the GM draws it and as players would
+ * (the wire's clamped size can be larger); null otherwise or without a position.
+ */
+export function projectText(text: TextElement, visible: Shows): PlayerText | null {
   const x = finiteOrNull(text.x, SCENE_RANGES.coordinate);
   const y = finiteOrNull(text.y, SCENE_RANGES.coordinate);
-  if (x === null || y === null || coverage.isCovered(textBounds(text))) return null;
+  if (x === null || y === null || !visible.shows(textBounds(text))) return null;
+  const sent = textOnWire(text, x, y);
+  return visible.shows(textBounds(sent as unknown as TextElement)) ? sent : null;
+}
+
+function textOnWire(text: TextElement, x: number, y: number): PlayerText {
   return {
     x,
     y,
@@ -126,8 +131,8 @@ export function projectText(text: TextElement, coverage: Covers): PlayerText | n
   };
 }
 
-export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: Covers): Record<string, PlayerText> {
-  return projectRecord(texts, (text) => projectText(text, coverage));
+export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, visible: Shows): Record<string, PlayerText> {
+  return projectRecord(texts, (text) => projectText(text, visible));
 }
 
 /** A drawing's shape with its points simplified; null without points. Fog is checked by the caller. */
@@ -148,11 +153,12 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
 
 export function projectDrawings(
   drawings: Readonly<Record<string, DrawingStroke>> | undefined,
-  coverage: Covers,
+  visible: Shows,
   memo: ProjectionMemo,
 ): Record<string, PlayerDrawing> {
+  // The drawing as players draw it (its simplified points, its clamped width) must be shown whole.
   return projectRecord(drawings, (stroke) => {
     const drawing = memoized(memo.drawings, stroke, projectDrawingShape);
-    return drawing && !coverage.isCovered(drawingBounds(drawing)) ? drawing : null;
+    return drawing && visible.shows(drawingBounds(drawing)) ? drawing : null;
   });
 }
