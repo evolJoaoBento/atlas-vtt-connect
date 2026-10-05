@@ -1,0 +1,30 @@
+name: Release
+on:
+  push:
+    tags: ['[0-9]+.[0-9]+.[0-9]+', '[0-9]+.[0-9]+.[0-9]+-*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run check:vendor
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npx vitest run
+      - name: Manifest version matches the tag
+        run: test "$(node -p "require('./manifest.json').version")" = "$TAG"
+      - run: NODE_ENV=production npm run build
+      - name: Publish
+        run: |
+          flags=""
+          case "$TAG" in *-*) flags="--prerelease";; esac
+          gh release create "$TAG" dist/main.js dist/styles.css manifest.json --title "$TAG" --notes "See the README for what changed." $flags

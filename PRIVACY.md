@@ -1,5 +1,107 @@
-# Privacy
+# Privacy and network use
+
+Atlas VTT Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It does nothing on the network until you start an online session, join one, or share or pull something. This file says what then leaves your computer, who receives it, and what stays in your vault.
+
+- No accounts, no telemetry, no analytics, no ads.
+- No code is downloaded or executed from the internet, and the plugin does not update itself.
+- Connect does not read or write files outside your vault. What it keeps on the device is in Obsidian's own storage and settings (see [What stays on your device](#what-stays-on-your-device)).
+
+## Hosts Connect talks to
+
+While a session you started runs, or while you join one:
+
+- **A signalling server.** The PeerJS cloud at `0.peerjs.com`, unless you set your own under Settings, Online play. It sees IP addresses and connection ids, and no game data.
+- **A STUN server.** `stun.l.google.com:19302`, to find your public address. It sees IP addresses, and no game data.
+- **Relay (TURN) servers**, only the ones you add. A relay forwards traffic that is still encrypted between you and a player.
+- **Your players, directly.** Data between you and your players is encrypted end to end.
+
+Stopping the session, or closing Obsidian, ends all of it.
+
+The join link you share carries your signalling and relay settings, including any relay username and password you set, so players' browsers can use them.
+
+Players open the join page from `evoljoaobento.github.io/atlas-vtt-connect` (GitHub Pages) by default. Their browsers load it from there, so GitHub sees their IP address like for any web page. Connect itself never contacts that address; it only builds links to it. You can change the address under **Player page** in Settings, Online play, and host the page yourself. Browsers give every site under `evoljoaobento.github.io` the same storage, so the join page should stay the only site published there, or move to its own address.
+
+## What players receive
+
+The players you let in receive the scene you present, filtered on your computer before it is sent, with file paths replaced by fingerprints of the files' contents (which only tell whether two images are the same file). They also receive the map and token images of that scene, as the original files, and no other file from your vault.
+
+What players never receive:
+
+- Anything under fog of war that is not revealed: a token, text, drawing or pin is sent only if every fog cell it touches is revealed. A partly covered cell counts as fogged, and the parts of a shape outside the map never make it visible.
+- With dynamic lighting on, anything the lighting hides from your players' tokens: tokens, texts and drawings in the dark are never sent. If Connect cannot tell what is lit (the map is still loading, or Atlas cannot compute it yet), players get nothing for lit areas.
+- Walls, lights, light zones and how tokens see. Which side a combatant is on is sent, but not why.
+- Resource names and numbers. Players see a bar for each resource your collection shows to players, with a fill rounded to hundredths, and the HP bar in the initiative list.
+- Hidden tokens and GM-only pins.
+
+The map image is sent whole, so the parts of the picture under fog of war are visible to anyone who inspects the page. Tokens, texts, drawings and pins under fog are not.
+
+Players also receive:
+
+- the initiative list as your player window shows it: for a collection that fights by sides, the combatants under their side and no initiative numbers, and a number only where the window shows one. A creature is marked as downed when a resource that defeats it is spent, even one you keep from players;
+- where your view of the presented scene is (its centre and how much of the map it shows), so their view can follow yours. Nothing about your view is sent while you look at another scene;
+- where your laser pointer is, while you point on the presented scene;
+- your game system's cone angle with your measurement settings;
+- the ids of their own tokens, and nothing else about them.
+
+Players can move the tokens you assign to them under **Controlled by**. For each move their page sends Connect only the token and the spot where they let go, and Connect asks Atlas to apply it with the same checks as a GM drag. Players cannot send anything else that changes your scene. Assignments are kept only while the session runs.
+
+### Dice and lasers
+
+While a session runs, players receive every dice roll Atlas makes: the formula, each die (and whether it was rolled for an exploding die or subtracts), the total, whether it was a critical success or failure by your collection's dice rules, and who rolled it. That is the player's name, or a statblock token's name only when players can see that token with its name on the presented scene, or "GM". Only the player who made a roll receives it marked as their own. Players' rolls use your collection's dice rules. The join page keeps the player's **Roll display** choice in that browser.
+
+Players' measurements and drag rulers stay on their device. Their lasers and dice rolls go to you and to the other players in the session. Lasers are not stored. Players' rolls show in your dice log for as long as the map stays open, and are not saved into your map files.
+
+## Joining a session from Obsidian
+
+When you join with Connect (**Join online session…**), it connects to the signalling and relay servers the join link names, the STUN server, and directly to the GM, only while the dialog waits for the GM and while the scene is open. The GM receives the name you enter, that you joined from Obsidian, and the same things a web player sends. Nothing you receive is written into your vault unless you pull it (see below): the scene is kept in memory only. Connect remembers the last name you joined with in its settings.
+
+## Device keys and table keys
+
+When you and others play from Obsidian, Connect identifies each of you with a key that stays on your device. Joining sends a signature made with it, never the key.
+
+- **The GM's table key** is kept in Connect's settings file, `.obsidian/plugins/atlas-vtt-connect/data.json`, so it travels with the vault: anyone who can read the vault, or a copy or sync of it, can act as that table. Using one vault on several machines keeps it one table. After moving from the online play preview, the key is also still in Atlas's settings (see below).
+- **A player's device key** is kept in Obsidian's local storage on this device, one per table, never in the vault. Obsidian keeps local storage per vault on each device, so a second vault or device is a new device to the GM, who can link it to the person.
+- **The people list** (names, device ids, when they were last seen) is kept in `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing/people.json`: the GM's for everyone admitted, a player's for the people they met.
+
+## Sharing notes and maps
+
+Nothing is shared until you share it, and only with the people you pick. What leaves your computer is decided on your computer, before anything is sent:
+
+- Private parts (`%%[!private]%%` … `%%[!end]%%`), parts meant for other people (`%%[!only|…]%%`, `%%[!except|…]%%`), and `%% comments %%` are removed. Comments are removed everywhere, including inside code, and an unclosed `%%` removes the rest of the note.
+- Parts meant only for you arrive marked, so if you share the note on, they stay with you and the sender. Such a part arrives wrapped in `%%[!only|…]%%`, naming the sender and the people at your table it was also meant for, as person ids your Connect turns into the names in your people list; anyone it does not know is left out.
+- Text that cannot be read fails closed: a tag Connect cannot read hides what it marks from everyone, a tag that is never closed hides the rest of the note, an `atlas-share` entry it cannot read is kept back rather than sent, and a name after `except` that is not in your people list hides that part from everyone. A tag written inside code or a link is not used, and keeps the rest of the note back. A `%%[!end]%%` that closes nothing stops the note from being shared at all until you fix it.
+- Properties are removed except those listed under **Shared note properties**, and the `atlas-share` property itself is never sent. Links to notes the person does not get become plain text.
+- File paths never leave your computer. Shared items get random ids, and a map's paths are cleared or replaced by references.
+- A player-safe map holds what online players see. A map saved with dynamic lighting on is never shared player-safe; share it Full or switch its lighting off. Pins under fog of war, GM-only pins and pins whose note you did not tick are left out, as are tokens, texts and drawings under fog. A full map holds the whole map as a co-GM would see it, including hidden tokens, GM-only pins, walls, lights, light zones and the camera, so Connect asks you to confirm it.
+- Sharing settings are not part of collection bundles: exporting a collection leaves them out (a scene's share and the `atlas-share` property of every exported note) and importing one drops them, including any legacy sharing data of the online play preview. The rest of an exported note is not filtered: a bundle is your own release.
+
+Items go only to someone who pulls them, during a session, over the same encrypted connection as the game.
+
+**The GM sees relayed items in clear.** Items between two players pass through the GM's Obsidian. It forwards them piece by piece and stores none of them: it writes nothing to its vault and keeps no record once the transfer ends. But each connection is encrypted separately, so the GM's Connect handles those items in clear while it forwards them, and the GM could read anything players share with each other. There is no end-to-end encryption between players.
+
+What you pull is written into your vault: notes into `Shared/<person>/`, maps and their images into the **Shared with me** collection. Connect also keeps, in `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing/` (which Obsidian does not index), the last pulled version of each note, its merge history and a list of what you pulled from whom. Removing a person from your people list does not delete what you already pulled.
+
+## What stays on your device
+
+- **In your vault:** your notes and maps as usual, the people list and sharing records above, and what you pull.
+- **In Connect's settings file:** `.obsidian/plugins/atlas-vtt-connect/data.json` holds your online settings, including your table key and any relay username and password.
+- **In Obsidian's storage on this device, outside the vault:** the device keys, and, with **Keep online images on this device** on (the default), the images you received, up to 500 MB. Switching it off deletes them. These are shared by all vaults on the device.
+- **In the player's browser, on the join page:** with **Keep images on this device** on (the default), the images it received, up to 500 MB, until the player switches it off or chooses **Clear saved images**. With it off, images are kept only while the page is open. The page also keeps the player's display choices (roll display, laser colour).
 
 ## Moving from the online play preview
 
 Atlas VTT Connect copies the preview's online settings, including your table key, from `atlas-vtt/.atlas-data/settings.json` into its own settings. It never edits Atlas's settings file, so the old copy of the key stays there until you remove the `online` entry from that file by hand while Obsidian is closed. Both copies are in your vault; nothing is sent anywhere.
+
+Atlas VTT Connect copies, and never removes, what the preview kept:
+
+- the folder `atlas-vtt/.atlas-data/sharing`, with your people list, your share and pull records, and the last pulled text and merge history of notes others shared with you;
+- the preview's device keys, in Obsidian's local storage;
+- the preview's kept session images (its image database on this device).
+
+The folder stays in your vault until you delete it; the notice shown after the move names it. Delete it once you've checked your people and shares. The device keys and images stay in Obsidian's storage on this device; Connect never removes them, and turning off "Keep images" clears only Connect's images.
+
+Atlas VTT Connect sends none of this anywhere. A sync tool you use may copy these files, including Connect's own settings file in the vault's configuration folder, which holds your table key.
+
+## Clipboard
+
+The clipboard is written only when you choose a copy action, for example copying a join link.

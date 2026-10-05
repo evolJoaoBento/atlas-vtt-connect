@@ -12,7 +12,8 @@
     "test": "vitest",
     "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json",
     "check:vendor": "node scripts/check-vendor.mjs",
-    "sync:atlas": "node scripts/sync-atlas.mjs"
+    "sync:atlas": "node scripts/sync-atlas.mjs",
+    "inventory": "node scripts/test-inventory.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.503.0",

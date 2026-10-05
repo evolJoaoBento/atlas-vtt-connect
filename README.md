@@ -6,11 +6,50 @@ Atlas VTT Connect is an Obsidian plugin that adds online play and sharing to [At
 - an Obsidian player tab;
 - note and map sharing.
 
-It works on top of an unmodified Atlas VTT, through Atlas's extension API.
+Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It works on top of Atlas VTT through Atlas's extension API and changes nothing in Atlas.
 
-**Status:** being built. The implementation plan is in [docs/plans/2026-10-04-extension-api-and-connect.md](docs/plans/2026-10-04-extension-api-and-connect.md).
+## What you need
 
-Licence: AGPL-3.0-only. Connect contains code from Atlas VTT.
+- Obsidian 1.8.7 or newer, on desktop.
+- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.13.0. Without the API, Connect shows a notice and stays off.
+- TODO (fill in once upstream ships it): the first Atlas release that includes the extension API.
+
+## Install with BRAT
+
+1. Install the BRAT plugin and Atlas VTT (a build with the extension API, see above).
+2. In BRAT, choose "Add beta plugin" and enter `evolJoaoBento/atlas-vtt-connect`.
+3. Enable Atlas VTT Connect in Settings, Community plugins.
+
+TODO (fill in when the first release is published): the release version to pick in BRAT.
+
+## Hosting and joining
+
+- **Host.** Open a map in Atlas, present it, then run **Online session** from the command palette or the Atlas toolbar. Start the session, copy the join link and send it to your players. Players open it in a browser, or paste it into **Join online session…** in Obsidian.
+- **Settings.** Settings, Online play: the signalling server, relay (TURN) servers, the player page, whether to keep images, and the table key.
+- **Players** can move the tokens you assign under **Controlled by**, point with a laser and roll dice.
+
+## Sharing
+
+Commands: **People…**, **Share with…**, **Ask to pull…**, **Shared with me…**, **Undo last merge** and **Forget remembered choice**. Nothing is shared until you share it, and only with the people you pick. Private parts of a note stay private. See [PRIVACY.md](PRIVACY.md).
+
+## Hosts it talks to
+
+- PeerJS cloud signalling, `0.peerjs.com`, unless you set a custom server.
+- The STUN server `stun.l.google.com:19302`.
+- The player page at `evoljoaobento.github.io/atlas-vtt-connect`.
+- Any TURN servers you add.
+
+Details of what is sent to whom are in [PRIVACY.md](PRIVACY.md).
+
+## The player page
+
+By default the join link points at `https://evoljoaobento.github.io/atlas-vtt-connect/`. To host your own:
+
+1. Fork the repository and push it.
+2. In the repository's Settings, Pages, set the source to **GitHub Actions**. The workflow `.github/workflows/pages.yml` then publishes the page when you push to `main`.
+3. Set **Player page** in Connect's settings to your page's address.
+
+Until a page is published, the default address serves nothing. To try the page locally, run `npm run build:page`, then `npx vite preview -c vite.page.config.mts`, and paste the address it prints into **Player page**.
 
 ## Moving from the online preview
 
@@ -19,15 +58,31 @@ Connect takes over the online preview's settings, people and shares on its first
 - **The next new version of each such map** arrives as a second scene beside your copy, for example "Inn (2)", and a notice says so. Your old copy stays as it was, and you can delete it.
 - **After that,** new versions of the map replace it in place, as the preview did.
 
-## Development
+What the move leaves behind is described in [PRIVACY.md](PRIVACY.md).
+
+## Developing
 
 Install with `npx npm@10.9.2 ci`. The npm 10.0.0 shipped on some machines has an install bug ("Cannot read properties of null (reading 'edgesOut')").
 
-Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. The build writes `dist/` only; copy `dist/main.js`, `dist/styles.css` and `manifest.json` into a test vault's `.obsidian/plugins/atlas-vtt-connect/` by hand, never into your main vault.
+Then run `npx tsc --noEmit`, `npm run lint`, `npx vitest run` and `npm run build`. `npm run build` writes `dist/` only. Copy `dist/main.js`, `dist/styles.css` and `manifest.json` by hand into a test vault's `.obsidian/plugins/atlas-vtt-connect/`, never into your main vault. `npm run build:page` builds the join page into `dist-page/`.
+
+To test against a real Atlas, check out the Atlas branch `api/extension-api`, build it with `npm run build:ci` (not `npm run build`, which copies into a vault), and copy its `main.js`, `styles.css` and `manifest.json` into the test vault's `.obsidian/plugins/atlas-vtt/` the same way.
 
 ### Syncing the vendored Atlas
 
-`vendor/atlas` holds Atlas's extension API types and shared modules, recorded in `vendor/atlas/SOURCE.json`. `npm run check:vendor` verifies it offline. A sync replaces the whole directory. Two modes:
+`vendor/atlas` holds Atlas's extension API types and shared modules, recorded in `vendor/atlas/SOURCE.json`. `npm run check:vendor` verifies it offline. To re-vendor, run `npm run sync:atlas -- --atlas <dir> --commit <sha>`. A sync replaces the whole directory. Two modes:
 
 - **Git mode** (default): `npm run sync:atlas -- --atlas <Atlas checkout> --commit <sha>`. The checkout must be at `<sha>` with no tracked changes; the script runs `npm run build:packages` there.
 - **Exported tree**: `npm run sync:atlas -- --source <dir> --commit <full sha>`. Use this when the checkout is busy or on another branch. Export the tag (`git archive <tag> | tar -x -C <dir>`), link or install `node_modules`, run `npm run build:packages` in `<dir>`, then sync. `<dir>` needs `dist-packages`, `api-report` and `tests/api`; the script reads the contract case ids from those files and does not use git.
+
+### Test inventory
+
+`npm run inventory -- --atlas <Atlas checkout>` compares the test files per area with the online play preview's, and exits 1 when an area has fewer files than it should.
+
+### Releasing
+
+A tag that matches the version in `manifest.json` (for example `0.1.0`, or `0.1.0-beta.1` for a pre-release) triggers `.github/workflows/release.yml`, which checks, builds and attaches `main.js`, `styles.css` and `manifest.json` to a GitHub release, as BRAT expects. Tagging and pushing are manual steps.
+
+## Licence
+
+AGPL-3.0-only, see [LICENSE](LICENSE). Connect contains code from Atlas VTT (AGPL-3.0-only, © Fabian Urbanek) and open-source packages; credits and licence texts are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
