@@ -44,7 +44,7 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService & Pick<Onli
   const env = { service, summaries, presentation, views, ...(options.joinSession ? { joinSession: options.joinSession } : {}) };
   const panel: PanelHandle = ui.addPanel({ id: 'online', title: ONLINE_SESSION_LABEL, mount: (container, ctx) => mountPanel(env, container, ctx) });
   const stops: Disposer[] = [
-    ui.addToolbarItem(onlineToolbarItem({ panel, session: () => onlineSessionStore.getState(), seen, invalidate })),
+    ui.addToolbarItem(onlineToolbarItem({ panel, session: () => onlineSessionStore.getState(), seen })),
     ui.addPaletteSection(onlinePaletteSection({ service, panel, presentation, views, seen })),
     ui.addViewMenuItems((ctx) => {
       seen(ctx);
