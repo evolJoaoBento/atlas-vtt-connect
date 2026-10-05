@@ -4,7 +4,7 @@
  * Atlas's hint for the one chosen, as a row of three toggle buttons. It decides how the player's
  * own rolls show; everyone's rolls stay in the dice log either way.
  */
-import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS, type DiceDisplay } from '../src/app/dice3d/diceDisplay';
+import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS, type DiceDisplay } from '@atlas-vtt/shared/diceDisplay';
 
 export const ROLL_DISPLAY_LABEL = 'Roll display';
 

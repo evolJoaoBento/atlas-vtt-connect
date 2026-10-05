@@ -4,7 +4,7 @@
  * nothing is kept. Storage can throw (private windows) or hold anything: only a known option is
  * taken. Shared with the web page.
  */
-import { isDiceDisplay, type DiceDisplay } from '../../dice3d/diceDisplay';
+import { isDiceDisplay, type DiceDisplay } from '@atlas-vtt/shared/diceDisplay';
 import { pageKey, readKept } from './pageStorage';
 
 export const DICE_DISPLAY_KEY = pageKey('dice-display');

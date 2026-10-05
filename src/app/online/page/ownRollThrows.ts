@@ -6,9 +6,7 @@
  * first throw (`load`); if it fails to arrive (offline, a page left open across an update) the
  * toast shows the roll and the next roll tries again. Shared with the web page; imports no three.js.
  */
-import { throwStyle, type DiceDisplay, type ThrowStyle } from '../../dice3d/diceDisplay';
-import type { DiceScene } from '../../dice3d/diceScene';
-import { diceSceneToShow } from '../../dice3d/rollPresentation';
+import { diceSceneToShow, throwStyle, type DiceDisplay, type DiceScene, type ThrowStyle } from '@atlas-vtt/shared/diceDisplay';
 import type { DiceRollResult } from '@atlas-vtt/shared/rules';
 import { diceLogResult } from '../obsidian/onlineDice';
 import type { DiceLogEntry } from '../tools/toolMessages';
