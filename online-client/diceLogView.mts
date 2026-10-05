@@ -22,6 +22,8 @@ export interface DiceLogViewOptions {
   toast: HTMLButtonElement;
   /** The player's own new roll: true when it is thrown as dice instead of toasted. */
   onOwnRoll?: PlayerDiceLogOptions['onOwnRoll'];
+  /** Whether this log's surface has the keyboard: inside Obsidian other panes' Escape must not close it. The page always does. */
+  active?: () => boolean;
 }
 
 function text(className: string, content: string): HTMLSpanElement {
@@ -66,7 +68,7 @@ export class DiceLogView {
     options.toast.addEventListener('click', () => this.setOpen(true), { signal });
     // An open log takes Escape first: closing it is all Escape does then.
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !this.log.isOpen) return;
+      if (event.key !== 'Escape' || !this.log.isOpen || this.options.active?.() === false) return;
       event.stopImmediatePropagation();
       this.close();
     }, { capture: true, signal });

@@ -82,7 +82,7 @@ export class OnlineJoinService {
   /** One key per GM host for this plugin's lifetime, so the GM recognises a reconnect. */
   readonly playerKeyFor = keyPerHost();
 
-  constructor(app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
+  constructor(private readonly app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
     this.createClient = deps.createClient ?? createPeerClient;
     this.openStore = deps.openStore ?? openIndexedDbImageStore;
     this.decode = deps.decode ?? decodeToObjectUrls;
@@ -215,6 +215,8 @@ export class OnlineJoinService {
     this.leave();
     this.releaseCache();
     this.stopSettings();
+    // A disposed service must not be found by `forApp` (Atlas was disabled or reloaded).
+    if (OnlineJoinService.instances.get(this.app) === this) OnlineJoinService.instances.delete(this.app);
   }
 
   /** Sharing's handler for the assets channel of every join from now on (`registerSharing`). */

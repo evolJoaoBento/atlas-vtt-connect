@@ -36,6 +36,8 @@ describe('joining from Obsidian, through startConnect', () => {
     expect(OnlineJoinService.forApp(connect.plugin.app)).toBeInstanceOf(OnlineJoinService);
     atlas.unload();
     expect(dispose).toHaveBeenCalledOnce();
+    // A disposed service is not found any more.
+    expect(OnlineJoinService.forApp(connect.plugin.app)).toBeUndefined();
   });
 
   it('refuses to join while hosting, with the fork\'s reason', async () => {

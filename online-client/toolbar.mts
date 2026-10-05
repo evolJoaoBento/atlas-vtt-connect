@@ -20,6 +20,8 @@ export interface PageToolbarOptions {
   onShape(shape: MeasureChoice): void;
   onLaserColor(color: string): void;
   onDice(): void;
+  /** Whether this toolbar's surface has the keyboard: inside Obsidian other panes' Escape must not close its menus. The page always does. */
+  active?: () => boolean;
   /** Tests pass their own; the page measures rendered widths and reads the bar's style. */
   measure?: (element: HTMLElement) => number;
   layout?: () => ToolbarFitLayout;
@@ -253,7 +255,7 @@ export class PageToolbar {
     const { root } = this.options;
     // An open menu takes Escape first: closing it is all Escape does then.
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !this.anyMenuOpen()) return;
+      if (event.key !== 'Escape' || !this.anyMenuOpen() || this.options.active?.() === false) return;
       event.stopImmediatePropagation();
       this.closeMenus();
     }, { capture: true, signal });

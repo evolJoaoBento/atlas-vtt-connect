@@ -17,7 +17,7 @@ export class CanvasSceneView extends ItemView {
   private closed = false;
 
   /** `drawing` replaces the canvas, frames and 3D dice; Obsidian opens the view with none. */
-  constructor(leaf: WorkspaceLeaf, private readonly drawing: Partial<Omit<CanvasSceneOptions, 'dom' | 'service' | 'closeTab'>> = {}) {
+  constructor(leaf: WorkspaceLeaf, private readonly drawing: Partial<Omit<CanvasSceneOptions, 'dom' | 'service' | 'closeTab' | 'active'>> = {}) {
     super(leaf);
     // Opening a file, a dropped file or back/forward history would replace this tab and leave the session.
     this.navigation = false;
@@ -92,7 +92,11 @@ export class CanvasSceneView extends ItemView {
       this.leaf.detach();
       return;
     }
-    const scene = new CanvasScene({ ...this.drawing, dom: buildSceneDom(this.contentEl), service, closeTab: () => this.leaf.detach() });
+    const scene = new CanvasScene({
+      ...this.drawing, dom: buildSceneDom(this.contentEl), service, closeTab: () => this.leaf.detach(),
+      // Keys belong to the tab only while it is the active view: Escape in another pane is not ours.
+      active: () => this.app.workspace.getActiveViewOfType(CanvasSceneView) === this,
+    });
     if (!scene.attach()) {
       scene.dispose();
       this.contentEl.empty();

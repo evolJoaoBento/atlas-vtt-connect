@@ -40,6 +40,8 @@ export interface CanvasSceneOptions {
   loadThrows?: () => Promise<DiceThrowModule>;
   /** How the player's own rolls show: Atlas's default (3D dice) unless a test says otherwise. */
   display?: () => DiceDisplay;
+  /** Whether this tab has the keyboard: Escape in another pane must not close its tray, menus or dice log. */
+  active?: () => boolean;
 }
 
 /** The lazy entry of the join page's 3D dice (three.js and Atlas's dice), loaded on the first own roll. */
@@ -73,6 +75,7 @@ export class CanvasScene implements OnlineSceneSink {
         ...(options.frames ? { frames: options.frames } : {}),
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),
         ...(options.now ? { now: options.now } : {}),
+        ...(options.active ? { active: options.active } : {}),
       })
       : null;
     this.tray = new DiceTrayView({
@@ -90,6 +93,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.log = new DiceLogView({
       panel: dom.diceLog, list: dom.diceLogList, empty: dom.diceLogEmpty, closeButton: dom.diceLogClose,
       toggleButton: dom.diceLogButton, toast: dom.diceToast,
+      ...(options.active ? { active: options.active } : {}),
     });
     this.toolbar = new PageToolbar({
       root: dom.toolbar,
@@ -97,6 +101,7 @@ export class CanvasScene implements OnlineSceneSink {
       onShape: (shape) => this.map?.selectShape(shape),
       onLaserColor: (color) => this.map?.selectLaserColor(color),
       onDice: () => this.setDiceOpen(!this.tray.isOpen),
+      ...(options.active ? { active: options.active } : {}),
     });
     this.controls = {
       followGm: () => this.map?.followGm(),
@@ -108,7 +113,7 @@ export class CanvasScene implements OnlineSceneSink {
     dom.reconnect.addEventListener('click', () => this.controls.reconnect(), { signal });
     // An open tray takes Escape first, before the map returns to Move.
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !this.tray.isOpen) return;
+      if (event.key !== 'Escape' || !this.tray.isOpen || options.active?.() === false) return;
       event.stopImmediatePropagation();
       this.setDiceOpen(false);
     }, { capture: true, signal });
@@ -189,6 +194,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.detachSession = null;
     this.listeners.abort();
     this.log.dispose();
+    this.toolbar.dispose();
     this.map?.dispose();
   }
 

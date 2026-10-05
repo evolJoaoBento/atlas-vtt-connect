@@ -33,9 +33,11 @@ afterEach(() => {
 /** A workspace whose layout becomes ready when `ready()` runs (or at once, as for a started Obsidian). */
 function workspace(layoutReady = true) {
   const leaves: FakeLeaf[] = [];
+  const focus: { view: unknown } = { view: null };
   const pending: Array<() => void> = [];
   return {
-    leaves, pending,
+    leaves, pending, focus,
+    getActiveViewOfType: (): unknown => focus.view,
     revealLeaf: vi.fn(),
     getLeavesOfType: (type: string): FakeLeaf[] => (type === ONLINE_SCENE_VIEW_TYPE ? leaves : []),
     onLayoutReady: (callback: () => void): void => { if (layoutReady) callback(); else pending.push(callback); },
@@ -191,5 +193,46 @@ describe('CanvasSceneView', () => {
     expect(button.hidden).toBe(false);
     button.click();
     expect(w.reconnect).toHaveBeenCalledOnce();
+  });
+
+  it('frees every document and window listener it added when the tab closes', async () => {
+    const added: Array<{ target: string; signal: AbortSignal | undefined }> = [];
+    for (const [name, target] of [['document', document], ['window', window]] as const) {
+      const original = target.addEventListener.bind(target) as (...args: unknown[]) => void;
+      vi.spyOn(target, 'addEventListener').mockImplementation(((type: string, listener: unknown, options?: AddEventListenerOptions | boolean) => {
+        added.push({ target: name, signal: typeof options === 'object' ? options.signal : undefined });
+        original(type, listener, options);
+      }) as never);
+    }
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    expect(added.length).toBeGreaterThan(0);
+    expect(added.filter((entry) => entry.signal === undefined)).toEqual([]);
+    expect(added.some((entry) => entry.signal?.aborted)).toBe(false);
+    await view.onClose();
+    expect(added.every((entry) => entry.signal?.aborted === true)).toBe(true);
+  });
+
+  it("does not take Escape from another pane: the dice log stays open and the key goes on, until this tab is active", async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const later = vi.fn();
+    document.addEventListener('keydown', later);
+    const log = view.contentEl.querySelector<HTMLElement>('.dice-log')!;
+    view.contentEl.querySelector<HTMLButtonElement>('.icon-button')!.click();
+    expect(log.hidden).toBe(false);
+    // Another pane has the keyboard.
+    w.ws.focus.view = null;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(later).toHaveBeenCalledOnce();
+    expect(log.hidden).toBe(false);
+    // This tab has it: Escape closes the log and goes no further.
+    w.ws.focus.view = view;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(log.hidden).toBe(true);
+    expect(later).toHaveBeenCalledOnce();
+    document.removeEventListener('keydown', later);
   });
 });

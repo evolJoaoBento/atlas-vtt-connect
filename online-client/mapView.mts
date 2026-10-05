@@ -55,6 +55,8 @@ export interface MapViewOptions {
   frames?: { request(draw: () => void): number; cancel(handle: number): void };
   isHidden?: () => boolean;
   now?: () => number;
+  /** Whether this map's surface has the keyboard; the page always does (Obsidian passes whether its tab is active). */
+  active?: () => boolean;
 }
 
 export class MapView {
@@ -269,6 +271,7 @@ export class MapView {
     const { signal } = this.listeners;
     bindMapInput({
       canvas, input: this.input, tools: this.tools, signal,
+      ...(this.options.active ? { active: this.options.active } : {}),
       onHover: (point) => {
         this.hover = point;
         this.updateCursor();
