@@ -7,6 +7,7 @@ import { AtlasLink } from './src/connect/atlasLink';
 import { ConnectSettingsStore } from './src/connect/settingsStore';
 import { UPDATE_ATLAS_TO_SHARE } from './src/connect/connectSharing';
 import { ConnectSettingTab } from './src/connect/settingTab';
+import { sharingLifetime } from './src/app/online/sharing/sharingLifetime';
 import { startConnect } from './src/connect/startConnect';
 
 export default class AtlasVttConnectPlugin extends Plugin {
@@ -23,8 +24,10 @@ export default class AtlasVttConnectPlugin extends Plugin {
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.
     this.registerView(ONLINE_SCENE_VIEW_TYPE, (leaf) => new CanvasSceneView(leaf));
     this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings, () => (this.canShare === false ? UPDATE_ATLAS_TO_SHARE : null)));
+    // Heard from load on, before Atlas is bound: what the metadata cache parsed, and the vault's renames and deletions.
+    const lifetime = sharingLifetime(this);
     new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, {
-      settings: this.settings, playerKeys: this.playerKeys, sharing: (available) => { this.canShare = available; },
+      settings: this.settings, playerKeys: this.playerKeys, lifetime, sharing: (available) => { this.canShare = available; },
     })).start();
     // Further services are added task by task (plan B4 onwards).
   }

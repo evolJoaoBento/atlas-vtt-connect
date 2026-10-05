@@ -1,4 +1,6 @@
-import type { Json, SavedMapInput, SceneRecord, ScenesApi } from '@atlas-vtt/api-types';
+import type { Json, SceneRecord, ScenesApi } from '@atlas-vtt/api-types';
+import { importScene, type AddInput, type ImportTarget } from './fakeSceneImport';
+import { mapFileText, savedMapInput, type FakeMapState } from './fakeSavedMap';
 
 /** A scene record as Atlas's asset index keeps it: extension data under `data.extensions`, and the fork's legacy `data.sharing`. */
 export interface FakeSceneRecord {
@@ -9,33 +11,18 @@ export interface FakeSceneRecord {
   data: { extensions?: Record<string, Json>; sharing?: unknown; [key: string]: unknown };
 }
 
-/** A saved map as a test gives it: what `readMap` returns, plus (`saved`) anything private a real file also holds (pins, notes). */
-export interface FakeSavedMap {
-  map: SavedMapInput;
-  mapSize: { width: number; height: number };
-  saved: Record<string, unknown>;
-}
-
-type AddInput = Parameters<ScenesApi['addToCollection']>[0];
-
 /** The vault `addToCollection` writes into: the in-memory app's files (text, as its `createBinary` keeps them) and folders. */
 export interface FakeSceneVault {
   files: Map<string, string>;
   folders: Set<string>;
 }
 
-const parentOf = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+const LEGACY_SHARING_EXTENSION_ID = 'atlas-vtt-connect';
 
 const deepFreeze = <T>(value: T): T => {
   if (typeof value === 'object' && value !== null) for (const member of Object.values(value)) deepFreeze(member);
   return Object.freeze(value);
 };
-
-/** Whether `path` is a plain relative path: no empty, `.` or `..` segment, no leading slash or backslash (as Atlas checks). */
-const isPlainRelative = (path: unknown): path is string => typeof path === 'string' && path.length > 0 && !path.includes('\\') && !path.startsWith('/')
-  && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
-
-const COLLECTIONS = 'atlas-vtt/collections';
 
 /** `value` as plain JSON, or a clear error, as Atlas's `setData`. */
 function plainJson(value: unknown): Json {
@@ -49,34 +36,45 @@ function plainJson(value: unknown): Json {
   return JSON.parse(text) as Json;
 }
 
+/** A record as the index loads it: the fork's `data.sharing` moves into Connect's extension data once (`legacySceneData.ts`). */
+function loadedData(data: FakeSceneRecord['data']): FakeSceneRecord['data'] {
+  const { sharing, extensions: previous, ...plain } = structuredClone(data);
+  const extensions: Record<string, Json> = { ...(previous ?? {}) };
+  if (!(LEGACY_SHARING_EXTENSION_ID in extensions) && sharing !== undefined) extensions[LEGACY_SHARING_EXTENSION_ID] = sharing as Json;
+  return Object.keys(extensions).length > 0 ? { ...plain, extensions } : plain;
+}
+
 /**
- * Atlas's scene records and saved maps (Appendix A, C-scenes-1..4): extension data per extension id, `readMap` from
- * the maps a test sets, and `addToCollection` writing into the fake's vault (`files`) under one lock, leaving nothing
- * behind when it fails. Every change to a record's name, map or collection, an add and a removal fire 'scenes-changed'.
+ * Atlas's scene records and saved maps (Appendix A, C-scenes-1..4): extension data per extension id (a legacy
+ * `data.sharing` moved into Connect's as the index loads), `readMap` from the map files in the vault (`fakeSavedMap`),
+ * and `addToCollection` as Atlas's `sceneImport` (`fakeSceneImport`) under one lock. Every change to a record's name,
+ * map or collection, an add and a removal fire 'scenes-changed'.
  */
 export class FakeScenes {
   private readonly records = new Map<string, FakeSceneRecord>();
-  private readonly maps = new Map<string, FakeSavedMap>();
   /** The vault's files, by path: the in-memory app's when one is given, else the fake's own. */
   readonly files: Map<string, string>;
-  private readonly folders: Set<string>;
-  readonly collections = new Set<string>();
+  readonly folders: Set<string>;
+  /** Collection id → name. */
+  readonly collections = new Map<string, string>();
+  /** The natural size of a background image, by its vault path (Atlas reads the image header); 0 x 0 otherwise. */
+  private readonly imageSizes = new Map<string, { width: number; height: number }>();
   private lock: Promise<unknown> = Promise.resolve();
   private nextId = 1;
-  /** Set by a test: the next `addToCollection` fails after its writes, as a full index would. */
-  failNextAdd: Error | null = null;
+  /** Set by a test: the next `addToCollection` fails after its writes, or (`after: 'record'`) once its record was added. */
+  failNextAdd: { error: Error; after: 'writes' | 'record' } | null = null;
 
   constructor(private readonly changed: () => void, vault?: FakeSceneVault) {
     this.files = vault?.files ?? new Map();
     this.folders = vault?.folders ?? new Set();
   }
 
-  /** The GM adds a scene to a collection. */
+  /** The GM adds a scene to a collection (or the index loads it). */
   addScene(scene: { id?: string; name: string; collectionId?: string; mapPath: string | null; data?: FakeSceneRecord['data'] }): string {
     const id = scene.id ?? `scene-${this.nextId++}`;
     const collectionId = scene.collectionId ?? 'source';
-    this.collections.add(collectionId);
-    this.records.set(id, { id, name: scene.name, collectionId, mapPath: scene.mapPath, data: structuredClone(scene.data ?? {}) });
+    if (!this.collections.has(collectionId)) this.collections.set(collectionId, collectionId);
+    this.records.set(id, { id, name: scene.name, collectionId, mapPath: scene.mapPath, data: loadedData(scene.data ?? {}) });
     this.changed();
     return id;
   }
@@ -99,9 +97,13 @@ export class FakeScenes {
     if (this.records.delete(sceneId)) this.changed();
   }
 
-  /** The saved map at `path`, as its file holds it; `saved` is what else the file holds, which `readMap` never hands out. */
-  setMap(path: string, map: SavedMapInput, options: { mapSize?: { width: number; height: number }; saved?: Record<string, unknown> } = {}): void {
-    this.maps.set(path, structuredClone({ map, mapSize: options.mapSize ?? { width: 0, height: 0 }, saved: options.saved ?? {} }));
+  /**
+   * Writes the map file at `path` with `state`; `saved` is what else the file holds (pins, notes, logs), which
+   * `readMap` never hands out; `mapSize` is the natural size of its background image.
+   */
+  setMap(path: string, state: FakeMapState, options: { mapSize?: { width: number; height: number }; saved?: Record<string, unknown> } = {}): void {
+    this.files.set(path, mapFileText(state, options.saved));
+    if (options.mapSize && state.background) this.imageSizes.set(state.background, options.mapSize);
   }
 
   /** The record as the index holds it (a copy). */
@@ -144,17 +146,13 @@ export class FakeScenes {
       },
       readMap: async (mapPath: string) => {
         if (typeof mapPath !== 'string' || !mapPath.endsWith('.atlasmap')) throw new Error('[Atlas API] readMap needs the path of an .atlasmap file.');
-        const stored = this.maps.get(mapPath);
-        if (!stored) return null;
-        const { map } = stored;
+        const text = this.files.get(mapPath);
+        if (text === undefined) return null;
         // Only the fields of `SavedMapInput`: pins, walls, lights, notes and logs stay behind.
-        const { tokens, texts, drawings, fog } = map.objects;
-        return deepFreeze(structuredClone({
-          background: map.background, grid: map.grid, objects: { tokens, texts, drawings, fog }, widgets: map.widgets, initiative: map.initiative,
-          ...(map.lighting ? { lighting: map.lighting } : {}), mapSize: stored.mapSize,
-        }));
+        const map = savedMapInput(text);
+        return deepFreeze({ ...map, mapSize: (map.background ? this.imageSizes.get(map.background) : undefined) ?? { width: 0, height: 0 } });
       },
-      addToCollection: (input: AddInput) => this.exclusive(() => this.add(input)),
+      addToCollection: (input: AddInput) => this.exclusive(async () => importScene(this.importTarget(), input)),
     });
   }
 
@@ -165,52 +163,24 @@ export class FakeScenes {
     return result;
   }
 
-  private async add(input: AddInput): Promise<{ sceneId: string; mapPath: string }> {
-    const collectionId = 'id' in input.collection ? input.collection.id : input.collection.name.trim();
-    if ('id' in input.collection && !this.collections.has(collectionId)) throw new Error(`[Atlas API] There is no collection with the id "${collectionId}".`);
-    if (collectionId.includes('/')) throw new Error('[Atlas API] The collection name cannot be used: it cannot contain "/".');
-    if (!isPlainRelative(input.folder) || !input.folder.startsWith(`${COLLECTIONS}/${collectionId}/`)) {
-      throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${COLLECTIONS}/${collectionId}.`);
-    }
-    for (const image of input.images) {
-      if (!isPlainRelative(image.path)) throw new Error(`[Atlas API] The image path "${image.path}" must stay inside the folder.`);
-    }
-    const created = !this.collections.has(collectionId);
-    const written: string[] = [];
-    const madeFolders: string[] = [];
-    const write = (path: string, text: string): void => {
-      for (let parent = parentOf(path); parent && !this.folders.has(parent); parent = parentOf(parent)) {
-        this.folders.add(parent);
-        madeFolders.push(parent);
-      }
-      this.files.set(path, text);
-      written.push(path);
-    };
-    try {
-      for (const image of input.images) {
-        const target = `${input.folder}/${image.path}`;
-        if (this.files.has(target)) throw new Error(`[Atlas API] There is already a file at ${target}.`);
-        write(target, new TextDecoder().decode(image.data));
-      }
-      const taken = new Set([...this.files.keys(), ...[...this.records.values()].flatMap((record) => (record.mapPath ? [record.mapPath] : []))].map((path) => path.toLowerCase()));
-      let mapPath = `${input.folder}/${input.name}.atlasmap`;
-      for (let n = 2; taken.has(mapPath.toLowerCase()); n++) mapPath = `${input.folder}/${input.name} (${n}).atlasmap`;
-      write(mapPath, JSON.stringify({ state: { ...input.map, mapPath } }));
-      if (this.failNextAdd) {
-        const error = this.failNextAdd;
+  private importTarget(): ImportTarget {
+    return {
+      files: this.files,
+      folders: this.folders,
+      collections: this.collections,
+      scenes: () => new Map([...this.records].map(([id, record]) => [id, record.mapPath])),
+      addRecord: (name, collectionId, mapPath) => {
+        const id = `scene-${this.nextId++}`;
+        this.records.set(id, { id, name, collectionId, mapPath, data: {} });
+        this.changed();
+        return id;
+      },
+      removeRecord: (sceneId) => this.removeScene(sceneId),
+      takeFailure: () => {
+        const failure = this.failNextAdd;
         this.failNextAdd = null;
-        throw error;
-      }
-      this.collections.add(collectionId);
-      const sceneId = `scene-${this.nextId++}`;
-      this.records.set(sceneId, { id: sceneId, name: input.name, collectionId, mapPath, data: {} });
-      this.changed();
-      return { sceneId, mapPath };
-    } catch (error) {
-      for (const path of written) this.files.delete(path);
-      for (const folder of madeFolders) this.folders.delete(folder);
-      if (created) this.collections.delete(collectionId);
-      throw error;
-    }
+        return failure;
+      },
+    };
   }
 }

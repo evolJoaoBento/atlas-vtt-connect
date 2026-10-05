@@ -24,6 +24,11 @@ export class FakeBundles {
     return Object.fromEntries(Object.entries(frontmatter).filter(([key]) => !strip.has(key.toLowerCase())));
   }
 
+  /** A note's frontmatter as a bundle install writes it into this vault: the same keys are stripped as on export. */
+  installNote(frontmatter: Record<string, unknown>): Record<string, unknown> {
+    return this.exportNote(frontmatter);
+  }
+
   /** Atlas starts again: live registrations are gone, what the settings remember stays. */
   restart(): void {
     this.live.clear();

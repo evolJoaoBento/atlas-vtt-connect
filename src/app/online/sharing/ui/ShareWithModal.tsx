@@ -13,7 +13,7 @@ import { randomId } from '../../ids';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf } from '../people/peopleTypes';
 import { placeholderKey } from '../people/placeholderTypes';
-import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMap } from '../model/buildMapPayload';
+import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMapOrError, UNREADABLE_MAP } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
 import { partProblemsInNote, unknownNamesIn, unlinkedExceptNames } from '../model/noteFilter';
@@ -32,6 +32,7 @@ const FULL_CONFIRM = {
   confirmLabel: 'Share full map',
 };
 export const REMOVED_PERSON_LABEL = 'Removed or unknown person';
+export const MAP_UNREADABLE_TEXT = "This map couldn't be read.";
 export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
 
 export interface ShareWithDeps {
@@ -134,7 +135,12 @@ class ShareWithModal extends Modal {
 
   private async renderMap(known: ShareRow[]): Promise<void> {
     const scene = await this.deps.scenes.findByMap(this.file.path);
-    const source = scene ? await readSharedMap(this.deps.scenes, this.file.path) : null;
+    const source = scene ? await readSharedMapOrError(this.deps.scenes, this.file.path) : null;
+    if (source === UNREADABLE_MAP) {
+      new Notice(MAP_UNREADABLE_TEXT);
+      this.close();
+      return;
+    }
     if (!scene || !source) {
       new Notice('This map has no scene in a collection, so it cannot be shared.');
       this.close();

@@ -61,11 +61,20 @@ const UNLIT = { enabled: false, ambient: 1 } as const;
  * a shared map has none of them, and its initiative list counts as closed.
  */
 export async function readSharedMap(scenes: Pick<ScenesApi, 'readMap'>, mapPath: string): Promise<SharedMapSource | null> {
+  const read = await readSharedMapOrError(scenes, mapPath);
+  return read === UNREADABLE_MAP ? null : read;
+}
+
+/** Atlas could not read the map file (it exists): a share of it is refused, and the dialog says why. */
+export const UNREADABLE_MAP = 'unreadable';
+
+/** As `readSharedMap`, telling a file Atlas could not read (`UNREADABLE_MAP`) from one that is not there (null). */
+export async function readSharedMapOrError(scenes: Pick<ScenesApi, 'readMap'>, mapPath: string): Promise<SharedMapSource | typeof UNREADABLE_MAP | null> {
   let saved: Awaited<ReturnType<ScenesApi['readMap']>>;
   try {
     saved = await scenes.readMap(mapPath);
   } catch {
-    return null;
+    return UNREADABLE_MAP;
   }
   if (!saved) return null;
   const { tokens, texts, drawings, fog } = saved.objects;

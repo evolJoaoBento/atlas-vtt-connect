@@ -17,7 +17,7 @@ export interface SharingScope {
   registerMarkdownPostProcessor(processor: MarkdownPostProcessor): void;
 }
 
-export type ScopePlugin = Pick<Plugin, 'app' | 'addCommand' | 'removeCommand' | 'registerEvent' | 'registerEditorExtension' | 'registerMarkdownPostProcessor'>;
+export type ScopePlugin = Pick<Plugin, 'app' | 'addCommand' | 'removeCommand' | 'registerEditorExtension' | 'registerMarkdownPostProcessor'>;
 
 /** The plugin's one editor extension list and post-processor, which scopes add to. */
 interface DisplayHost {

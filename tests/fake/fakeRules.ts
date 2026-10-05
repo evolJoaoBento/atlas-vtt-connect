@@ -1,5 +1,5 @@
 import type { CollectionGridDefaults, ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition, RulesApi } from '@atlas-vtt/api-types';
-import { DEFAULT_CONE_ANGLE, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
+import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { DEFAULT_DICE_RULES, DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 
 /** One collection as its settings screen saves it; unset parts are Atlas's defaults. */
@@ -46,10 +46,12 @@ export class FakeRules {
     const entry = mapPath === null ? undefined : [...this.collections].find(([, collection]) => collection.maps.includes(mapPath));
     const [collectionId, collection] = entry ?? [null, undefined];
     const gridDefaults = collection?.gridDefaults ?? null;
+    // As Atlas's `mapConeAngle`: an angle no cone can open with (one edited by hand) gives a quarter circle.
+    const coneAngle = gridDefaults?.coneAngle ?? collection?.systemConeAngle ?? DEFAULT_CONE_ANGLE;
     return deepFreeze(structuredClone({
       collectionId,
       gridDefaults,
-      measurement: { ...resolveMeasurementSettings(gridDefaults ?? undefined, null), coneAngle: gridDefaults?.coneAngle ?? collection?.systemConeAngle ?? DEFAULT_CONE_ANGLE },
+      measurement: { ...resolveMeasurementSettings(gridDefaults ?? undefined, null), coneAngle: isValidConeAngle(coneAngle) ? coneAngle : DEFAULT_CONE_ANGLE },
       resources: collection?.resources ?? [],
       conditions: collection?.conditions ?? [],
       initiative: collection?.initiative ?? DEFAULT_INITIATIVE_RULES,

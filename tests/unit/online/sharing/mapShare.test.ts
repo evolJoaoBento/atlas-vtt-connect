@@ -44,6 +44,9 @@ describe('map shares on scene records', () => {
     expect(atlas.scenes.record('s1')!.data).not.toHaveProperty('extensions');
   });
 
+  // This checks only the fake's model of it. The fork's copy/move behaviour is Atlas's now and is tested there (at
+  // api-pr-11-end): tests/unit/bundleExtensionData.test.ts (dropped from records, installs and record files; kept with
+  // the original and a moved scene) and tests/unit/assetService.legacySceneData.test.ts (the legacy data.sharing move).
   it('is dropped from copies and exports, and so is a legacy data.sharing', async () => {
     const { atlas, scenes } = scenesWith({ sharing: share });
     await writeMapShare(scenes, 's1', share);

@@ -6,7 +6,9 @@ import { openJoinSessionModal } from '../app/online/obsidian/ui/JoinSessionModal
 import { OnlineSessionService, type Deps } from '../app/online/OnlineSessionService';
 import { registerGmUi } from '../app/online/gm-ui/registerGmUi';
 import { registerOnline } from '../app/online/registerOnline';
+import { SHARE_PROPERTY } from '../app/online/sharing/model/shareRule';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
+import type { SharingLifetime } from '../app/online/sharing/sharingLifetime';
 import { need } from './capabilities';
 import { canShare, startConnectSharing } from './connectSharing';
 import { connectStorage } from './connectStorage';
@@ -19,6 +21,8 @@ export interface ConnectOptions {
   hosting?: Partial<Deps>;
   /** The plugin's player key per GM host, so an Atlas reload keeps them; the join service makes its own without. */
   playerKeys?: (hostId: string) => string;
+  /** What sharing hears for the plugin's lifetime (`sharingLifetime`, made in `onload`). */
+  lifetime: SharingLifetime;
   /** Told whether the bound Atlas can share notes and maps (the settings tab says so when it cannot); null once it is gone. */
   sharing?: (available: boolean | null) => void;
 }
@@ -66,6 +70,10 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
     if (disposed) stop();
     else stops.push(stop);
   };
+  // Sharing never travels in bundles: as soon as this Atlas can strip note properties, `atlas-share` is stripped from
+  // exports and installs, whatever else Connect can start. Atlas remembers the key, so it stays stripped while Connect
+  // is not loaded; the disposer would make Atlas forget it, so it is never called (ruling I5).
+  need(api, atlas, 'bundles')?.stripNoteProperties([SHARE_PROPERTY]);
   // Joining needs no Atlas map and no capability, so it starts for every Atlas Connect binds to.
   const joining = startJoining(plugin, atlas, api, options.settings, options.playerKeys);
   keep(joining.stop);
@@ -83,7 +91,7 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   const sharing = canShare(api, atlas);
   options.sharing?.(sharing);
   if (sharing) {
-    startConnectSharing(plugin, api, atlas, { joins: joining.service, sessions, settings: options.settings, gone }).then(keep, (error: unknown) => {
+    startConnectSharing(plugin, api, atlas, { joins: joining.service, sessions, settings: options.settings, lifetime: options.lifetime, gone }).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start sharing notes and maps:', error);
     });
   }

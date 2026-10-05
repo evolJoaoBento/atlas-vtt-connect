@@ -207,8 +207,7 @@ describe('meeting a placeholder', () => {
     if ('refused' in result) throw new Error('refused');
     expect(people.get(people.list()[0]!.tableId, result.admission.personId)?.name).toBe('Dave (2)');
     expect(people.placeholders().map((placeholder) => placeholder.name)).toEqual(['Dave']);
-    // The name still stands for the placeholder, not for the new person: nothing that names Dave reaches them.
-    expect(people.unlinkedKey(placeholderKey(named(people, 'Dave').id))).toBe(true);
+    expect(ruleReaches(parseShareRule(['Dave']), { tableId: people.list()[0]!.tableId, personId: result.admission.personId }, people)).toBe(false);
   });
 
   it('refuses to link when the placeholder is gone or the device already belongs to someone', async () => {
@@ -254,6 +253,7 @@ describe('meeting a placeholder', () => {
     expect(linked.formerNames).toEqual(expect.arrayContaining(['Dave', 'Dave (2)']));
     expect(people.placeholders()).toEqual([]);
     for (const name of ['David', 'Dave', 'Dave (2)']) expect(people.byName(name)?.personId).toBe('dave1');
+    expect(isPerson(linked, { tableId: U, personId: 'dave1' })).toBe(true);
     expect(people.linkPlaceholder(personKey(U, 'dave1'), 'x'.repeat(22))).toBe('Pick another person.');
   });
 });

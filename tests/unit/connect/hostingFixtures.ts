@@ -4,6 +4,7 @@ import type { AtlasCapability } from '@atlas-vtt/api-types';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { AtlasLink } from '../../../src/connect/atlasLink';
+import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';
 import { startConnect } from '../../../src/connect/startConnect';
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeEvents, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
@@ -83,9 +84,12 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
   const requests: Array<(allow: boolean) => void> = [];
   /** What each binding said about sharing (`ConnectOptions.sharing`). */
   const sharing: Array<boolean | null> = [];
+  // As main.ts does in onload: heard for the plugin's lifetime.
+  const lifetime = sharingLifetime(connect.plugin);
   new AtlasLink(connect.plugin, (extension, api) => startConnect(connect.plugin, extension, api, {
     settings: memorySettings(),
     sharing: (available) => { sharing.push(available); },
+    lifetime,
     ...(playerKeys ? { playerKeys } : {}),
     hosting: {
       createHost: async () => memoryHost,

@@ -12,6 +12,7 @@ import type { SharingScope } from './sharingScope';
 import { shareSessionStore } from './shareSessionStore';
 import { openPeopleModal } from './people/ui/PeopleModal';
 import { openShareWithModal } from './ui/ShareWithModal';
+import type { VaultChanges } from './vaultChanges';
 
 export interface ShareCommandServices {
   people: PeopleBook;
@@ -22,6 +23,8 @@ export interface ShareCommandServices {
   ownTableId: () => string | null;
   /** What the metadata cache parsed, so a note's sections are used only for the text they came from. */
   sections: SectionTrust;
+  /** The vault's renames and deletions, heard for the plugin's lifetime. */
+  vaultChanges: Pick<VaultChanges, 'attach'>;
 }
 
 /** Notes and maps are what can be shared. */
@@ -29,7 +32,7 @@ export const shareable = (file: TAbstractFile | null): file is TFile =>
   file instanceof TFile && (file.extension === 'md' || file.extension === 'atlasmap');
 
 /** Registers the sending commands; returns the catalogue of what this Atlas shares, which sessions answer from. */
-export function registerShareCommands(plugin: SharingScope, { people, items, atlas, ownTableId, sections }: ShareCommandServices): SenderCatalogue {
+export function registerShareCommands(plugin: SharingScope, { people, items, atlas, ownTableId, sections, vaultChanges }: ShareCommandServices): SenderCatalogue {
   plugin.addCommand({
     id: 'people', name: 'People…',
     callback: () => openPeopleModal(plugin.app, people, ownTableId()),
@@ -60,13 +63,11 @@ export function registerShareCommands(plugin: SharingScope, { people, items, atl
   const follow = (change: VaultChange): void => {
     following = following.then(() => followVaultChange(atlas.scenes, change)).catch((error: unknown) => console.error('[Atlas VTT Connect] Could not update a map share after a vault change:', error));
   };
-  plugin.registerEvent(plugin.app.vault.on('rename', (file, oldPath) => {
-    items.renamed(oldPath, file.path);
-    follow({ rename: [oldPath, file.path] });
-  }));
-  plugin.registerEvent(plugin.app.vault.on('delete', (file) => {
-    items.deleted(file.path);
-    follow({ removed: file.path });
+  // The changes are heard for the plugin's lifetime: those made while Atlas was away come first (`VaultChanges`).
+  plugin.register(vaultChanges.attach((change) => {
+    if ('rename' in change) items.renamed(change.rename[0], change.rename[1]);
+    else items.deleted(change.removed);
+    follow(change);
   }));
   return catalogue;
 }

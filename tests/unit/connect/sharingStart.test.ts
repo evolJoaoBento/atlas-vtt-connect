@@ -5,9 +5,11 @@ import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessi
 import { OnlineJoinService } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from '../../../src/app/online/OnlineSessionService';
 import { resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
+import { registerSharing, type SharingServices } from '../../../src/app/online/sharing/registerSharing';
+import { sharingLifetime } from '../../../src/app/online/sharing/sharingLifetime';
 import { shareSessionStore, type ShareSession } from '../../../src/app/online/sharing/shareSessionStore';
 import { FakeAtlas } from '../../fake/FakeAtlas';
-import { connected, HOSTING } from './hostingFixtures';
+import { connected, HOSTING, hostPlugin } from './hostingFixtures';
 
 const SHARING: AtlasCapability[] = [...HOSTING, 'scenes', 'bundles'];
 const SHARE_COMMANDS = ['people', 'share-with', 'part-private', 'part-only', 'part-except', 'part-everyone', 'ask-to-pull'];
@@ -94,5 +96,44 @@ describe('sharing, through startConnect', () => {
     expect(hooks).toHaveBeenCalledWith(expect.objectContaining({ started: expect.any(Function) }));
     hosting.atlas.unload();
     expect(hooks).toHaveBeenLastCalledWith(null);
+  });
+
+  it('strips atlas-share at once when Atlas has bundles, before the storage folder answers and without hosting', () => {
+    const { atlas } = connected(['bundles']);
+    expect(atlas.bundles.stripped().has('atlas-share')).toBe(true);
+    const slow = connected(SHARING, new Promise<void>(() => undefined));
+    expect(slow.atlas.bundles.stripped().has('atlas-share')).toBe(true);
+  });
+
+  it('follows a ticked note deleted while Atlas was away once Atlas is back, so a new file at its path is not shared', async () => {
+    const { atlas, fire, vaultEvents } = connected(SHARING);
+    await vi.advanceTimersByTimeAsync(0);
+    atlas.unload();
+    vaultEvents.fire('delete', { path: 'Notes/Inn.md' });
+    vaultEvents.fire('rename', { path: 'Archive/Keep.md' }, 'Notes/Keep.md');
+    const again = new FakeAtlas({ version: '1.8.0', capabilities: SHARING });
+    const share = { item: 'i'.repeat(22), everyone: true, people: [], except: [], mode: 'full', notes: ['Notes/Inn.md', 'Notes/Keep.md'] };
+    const sceneId = again.scenes.addScene({ name: 'Inn', mapPath: 'Inn.atlasmap', data: { extensions: { 'atlas-vtt-connect': share } } });
+    fire('atlas-vtt:api-ready', again);
+    await vi.advanceTimersByTimeAsync(0);
+    expect((again.scenes.record(sceneId)!.data.extensions!['atlas-vtt-connect'] as { notes: string[] }).notes).toEqual(['Archive/Keep.md']);
+  });
+
+  it('takes off what it registered when registering fails partway, so the next binding does not add it twice', () => {
+    const connect = hostPlugin(connected([]).connect.plugin.app);
+    const atlas = new FakeAtlas({ capabilities: ['scenes', 'rules', 'settings'] });
+    const extension = atlas.connect(connect.plugin);
+    const services = {
+      atlas: { scenes: extension.scenes, rules: extension.rules, playerView: () => extension.settings.get('playerView') },
+      joins: { identity: null, onIdentity: () => () => undefined, useShare: () => undefined },
+      people: { ready: async () => undefined, subscribe: () => () => undefined, flush: () => undefined },
+      items: { ready: async () => undefined },
+      sessions: { useSharingHooks: () => { throw new Error('hooks failed'); } },
+      settings: { ownTableId: () => null, shareableProperties: () => [] },
+      lifetime: sharingLifetime(connect.plugin),
+    } as unknown as SharingServices;
+    expect(() => registerSharing(connect.plugin, services)).toThrow('hooks failed');
+    expect(connect.commands.size).toBe(0);
+    expect(connect.added()).toBeGreaterThan(0);
   });
 });

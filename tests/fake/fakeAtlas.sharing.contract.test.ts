@@ -52,69 +52,117 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
     expect(atlas.scenes.exported(legacy)!.data).toEqual({ tags: ['t'] });
   });
 
-  it('C-scenes-2: addToCollection writes into the vault and adds the record, one at a time, and leaves nothing behind on failure', async () => {
-    const { atlas, extension } = connected();
+  // C-scenes-2 and C-scenes-3 follow Atlas's own cases (tests/api/scenes.test.ts at api-pr-11-end), over a vault.
+  function inVault() {
+    const vault = createInMemoryApp();
+    const atlas = new FakeAtlas({ capabilities: ['scenes'], vault });
+    atlas.scenes.addScene({ name: 'Cave', collectionId: 'source', mapPath: MAP });
+    atlas.scenes.setMap(MAP, emptyMap({ background: 'atlas-vtt/assets/bg.png' }), {
+      mapSize: { width: 320, height: 200 },
+      saved: { diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask', objects: { pins: { p1: { id: 'p1', notePath: 'DM/Secret.md' } }, walls: { w: { id: 'w' } } } },
+    });
+    return { atlas, vault, scenes: atlas.connect(connectingPlugin('ext')).scenes };
+  }
+
+  it('C-scenes-2: addToCollection leaves nothing behind on failure and runs one at a time', async () => {
+    const { atlas, vault, scenes } = inVault();
     const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: 'atlas-vtt/collections/Shared with me/Cave', map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
-    atlas.scenes.failNextAdd = new Error('index full');
-    await expect(extension.scenes.addToCollection(input)).rejects.toThrow('index full');
-    expect([...atlas.scenes.files.keys()]).toEqual([]);
-    expect(atlas.scenes.collections.has('Shared with me')).toBe(false);
-    expect((await extension.scenes.list()).map((scene) => scene.name)).toEqual(['Cave']);
-    const [a, b] = await Promise.all([extension.scenes.addToCollection(input), extension.scenes.addToCollection({ ...input, name: 'Cave 2', folder: `${input.folder} 2` })]);
+    atlas.scenes.failNextAdd = { error: new Error('index full'), after: 'writes' };
+    await expect(scenes.addToCollection(input)).rejects.toThrow('index full');
+    expect(vault.files.has('atlas-vtt/collections/Shared with me/Cave/bg.webp')).toBe(false);
+    expect(vault.files.has('atlas-vtt/collections/Shared with me/Cave/Cave.atlasmap')).toBe(false);
+    expect(vault.folders.has('atlas-vtt/collections/Shared with me')).toBe(false);
+    expect([...atlas.scenes.collections.keys()]).not.toContain('Shared with me');
+    expect((await scenes.list()).map((scene) => scene.name)).toEqual(['Cave']);
+    const [a, b] = await Promise.all([scenes.addToCollection(input), scenes.addToCollection({ ...input, name: 'Cave 2', folder: `${input.folder} 2` })]);
     expect(a.sceneId).not.toBe(b.sceneId);
-    expect(a.mapPath).toBe('atlas-vtt/collections/Shared with me/Cave/Cave.atlasmap');
-    expect(atlas.scenes.files.has('atlas-vtt/collections/Shared with me/Cave/bg.webp')).toBe(true);
-    expect(await extension.scenes.findByMap(a.mapPath)).toMatchObject({ id: a.sceneId, collectionId: 'Shared with me' });
-    // A taken map name is numbered, never replaced.
-    const again = await extension.scenes.addToCollection({ ...input, images: [] });
+    expect([...atlas.scenes.collections.keys()].filter((id) => id === 'Shared with me')).toHaveLength(1);
+    expect(JSON.parse(vault.files.get(a.mapPath)!).state).toMatchObject({ mapPath: a.mapPath, background: `${input.folder}/bg.webp` });
+    expect(await scenes.findByMap(a.mapPath)).toMatchObject({ id: a.sceneId, collectionId: 'Shared with me', mapPath: a.mapPath });
+    // A name differing only by case finds the same collection.
+    const again = await scenes.addToCollection({ ...input, collection: { name: 'shared WITH me' }, images: [] });
     expect(again.mapPath).toBe('atlas-vtt/collections/Shared with me/Cave/Cave (2).atlasmap');
+    expect([...atlas.scenes.collections.keys()].filter((id) => id.toLowerCase() === 'shared with me')).toHaveLength(1);
   });
 
   it('C-scenes-2: addToCollection refuses paths that leave the folder, and writes nothing', async () => {
-    const { atlas, extension } = connected();
-    const base = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/Cave', map: emptyMap(), images: [] };
+    const { vault, scenes } = inVault();
+    const folder = 'atlas-vtt/collections/source/Cave';
+    const base = { collection: { id: 'source' }, name: 'Cave', folder, map: emptyMap(), images: [] };
     for (const path of ['../escape.webp', '/abs.webp', 'a/../../b.webp', 'a\\b.webp', '', 'a//b.webp']) {
-      await expect(extension.scenes.addToCollection({ ...base, images: [{ path, data: new ArrayBuffer(1) }] })).rejects.toThrow();
+      await expect(scenes.addToCollection({ ...base, images: [{ path, data: new ArrayBuffer(1) }] })).rejects.toThrow();
     }
-    await expect(extension.scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/other/Cave' })).rejects.toThrow(/inside the collection/);
-    await expect(extension.scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/source/../x' })).rejects.toThrow();
-    await expect(extension.scenes.addToCollection({ ...base, collection: { id: 'nope' } })).rejects.toThrow(/no collection/);
-    await expect(extension.scenes.addToCollection({ ...base, collection: { name: 'bad/name' } })).rejects.toThrow(/cannot contain/);
-    expect(atlas.scenes.files.size).toBe(0);
+    await expect(scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/other/Cave' })).rejects.toThrow(/inside the collection/);
+    await expect(scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/source/../x' })).rejects.toThrow();
+    await expect(scenes.addToCollection({ ...base, collection: { id: 'nope' } })).rejects.toThrow(/no collection/);
+    await expect(scenes.addToCollection({ ...base, collection: { name: 'bad/name' } })).rejects.toThrow(/cannot contain/);
+    expect(vault.folders.has(folder)).toBe(false);
+    expect([...vault.files.keys()].some((path) => path.includes('escape') || path.includes('abs.webp'))).toBe(false);
   });
 
-  it('C-scenes-2: addToCollection writes into the vault, keeps its files, numbers a taken map name and never takes a path an index record names', async () => {
-    const vault = createInMemoryApp({ files: { 'atlas-vtt/collections/source/scenes/Cave.atlasmap': 'theirs' } });
-    const atlas = new FakeAtlas({ capabilities: ['scenes'], vault });
-    atlas.scenes.addScene({ name: 'Ghost', collectionId: 'source', mapPath: 'atlas-vtt/collections/source/scenes/Cave (2).atlasmap' });
-    const { scenes } = atlas.connect(connectingPlugin('atlas-vtt-connect'));
-    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [{ path: 'bg.webp', data: new TextEncoder().encode('png').buffer as ArrayBuffer }] };
+  it('C-scenes-2: addToCollection into an existing collection keeps it, numbers a taken map name and does not touch existing files', async () => {
+    const { atlas, vault, scenes } = inVault();
+    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [] };
+    const before = vault.files.get(MAP);
     const added = await scenes.addToCollection(input);
-    expect(added.mapPath).toBe('atlas-vtt/collections/source/scenes/Cave (3).atlasmap');
-    expect(vault.files.get('atlas-vtt/collections/source/scenes/Cave.atlasmap')).toBe('theirs');
-    expect(vault.files.get('atlas-vtt/collections/source/scenes/bg.webp')).toBe('png');
-    expect(vault.folders.has('atlas-vtt/collections/source/scenes')).toBe(true);
-    await expect(scenes.addToCollection(input)).rejects.toThrow(/already a file/);
-    atlas.scenes.failNextAdd = new Error('index full');
-    await expect(scenes.addToCollection({ ...input, folder: 'atlas-vtt/collections/source/new', images: [] })).rejects.toThrow('index full');
-    expect(vault.folders.has('atlas-vtt/collections/source/new')).toBe(false);
-    expect([...vault.files.keys()].some((path) => path.includes('/new/'))).toBe(false);
+    expect(added.mapPath).toBe('atlas-vtt/collections/source/scenes/Cave (2).atlasmap');
+    expect(vault.files.get(MAP)).toBe(before);
+    await expect(scenes.addToCollection({ ...input, images: [{ path: '../scenes/Cave.atlasmap', data: new ArrayBuffer(1) }] })).rejects.toThrow();
+    atlas.scenes.failNextAdd = { error: new Error('nope'), after: 'writes' };
+    await expect(scenes.addToCollection(input)).rejects.toThrow('nope');
+    expect(vault.files.get(MAP)).toBe(before);
+    expect(vault.files.has(added.mapPath)).toBe(true);
+    expect(vault.files.has('atlas-vtt/collections/source/scenes/Cave (3).atlasmap')).toBe(false);
+    expect(vault.folders.has('atlas-vtt/collections/source')).toBe(true);
+    // The map file is what Atlas's own save writes, under the name's folder-safe stem.
+    expect(JSON.parse(vault.files.get(added.mapPath)!)).toMatchObject({ version: 4, state: { schema: 'atlas-vtt', version: 4, name: 'Cave', objects: { pins: {}, walls: {}, lights: {} }, camera: { x: 0, y: 0, scale: 1 } } });
+    expect((await scenes.addToCollection({ ...input, name: 'A/B: c' })).mapPath).toBe('atlas-vtt/collections/source/scenes/A-B- c.atlasmap');
   });
 
-  it('C-scenes-3: readMap returns the saved map with its size, a frozen copy without anything private, or null for a missing file', async () => {
-    const { atlas, extension } = connected();
-    atlas.scenes.setMap(MAP, emptyMap({ background: 'atlas-vtt/assets/bg.png' }), { mapSize: { width: 320, height: 200 }, saved: { dmNotePath: 'DM/Secret.md', pins: { p: { notePath: 'DM/Secret.md' } } } });
-    const map = (await extension.scenes.readMap(MAP))!;
-    expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'mapSize', 'objects', 'widgets']);
+  it('C-scenes-2: a failed addToCollection removes only the record it added, and never takes a path an index record names', async () => {
+    const { atlas, vault, scenes } = inVault();
+    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [] };
+    const ghostPath = 'atlas-vtt/collections/source/scenes/Cave (2).atlasmap';
+    const ghost = atlas.scenes.addScene({ name: 'Ghost', collectionId: 'source', mapPath: ghostPath });
+    atlas.scenes.failNextAdd = { error: new Error('index not saved'), after: 'record' };
+    await expect(scenes.addToCollection(input)).rejects.toThrow('index not saved');
+    expect(atlas.scenes.record(ghost)).not.toBeNull();
+    expect((await scenes.list()).map((scene) => scene.name).sort()).toEqual(['Cave', 'Ghost']);
+    expect(vault.files.has(ghostPath)).toBe(false);
+    expect(vault.files.has('atlas-vtt/collections/source/scenes/Cave (3).atlasmap')).toBe(false);
+    atlas.scenes.failNextAdd = { error: new Error('again'), after: 'writes' };
+    await expect(scenes.addToCollection(input)).rejects.toThrow('again');
+    expect(atlas.scenes.record(ghost)).not.toBeNull();
+  });
+
+  it('C-scenes-3: readMap returns the migrated map with its size, or null for a missing file', async () => {
+    const { scenes } = inVault();
+    const map = await scenes.readMap(MAP);
+    expect(map?.objects.tokens).toEqual({});
+    expect(map?.background).toBe('atlas-vtt/assets/bg.png');
+    expect(map?.mapSize).toEqual({ width: 320, height: 200 });
+    expect(await scenes.readMap('nope.atlasmap')).toBeNull();
+    await expect(scenes.readMap('atlas-vtt/assets/bg.png')).rejects.toThrow(/\.atlasmap/);
+  });
+
+  it('C-scenes-3: readMap copies nothing private, hands out a frozen copy and sizes a map without a background 0 x 0', async () => {
+    const { atlas, scenes } = inVault();
+    const map = (await scenes.readMap(MAP))!;
+    expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'lighting', 'mapSize', 'objects', 'widgets']);
     expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
-    expect(map.mapSize).toEqual({ width: 320, height: 200 });
     expect(JSON.stringify(map)).not.toContain('Secret');
     expect(Object.isFrozen(map)).toBe(true);
     expect(Object.isFrozen(map.objects)).toBe(true);
-    expect(await extension.scenes.readMap('nope.atlasmap')).toBeNull();
-    await expect(extension.scenes.readMap('atlas-vtt/assets/bg.png')).rejects.toThrow(/\.atlasmap/);
+    const plain = 'atlas-vtt/collections/source/scenes/Plain.atlasmap';
+    atlas.scenes.setMap(plain, { background: null, grid: null, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} } });
+    const read = (await scenes.readMap(plain))!;
+    expect(read.mapSize).toEqual({ width: 0, height: 0 });
+    // An older file without widgets, initiative or lighting gets Atlas's defaults, lighting off.
+    expect(read.widgets).toEqual({ settings: { widgets: {}, globalVisible: true, position: 'top', scale: 1 }, values: {} });
+    expect(read.initiative).toEqual({ entries: [], currentIndex: -1, round: 0, isActive: false, config: { autoSort: true } });
+    expect(read.lighting).toEqual({ enabled: false, ambient: 0.1 });
     atlas.scenes.setMap('lit.atlasmap', emptyMap({ lighting: { enabled: true, ambient: 0 } }));
-    expect((await extension.scenes.readMap('lit.atlasmap'))!.lighting).toEqual({ enabled: true, ambient: 0 });
+    expect((await scenes.readMap('lit.atlasmap'))!.lighting).toEqual({ enabled: true, ambient: 0 });
   });
 
   it('C-scenes-4: scenes-changed fires when scene records are added, renamed, moved or removed, and not for anything else, until stopped', () => {
@@ -191,5 +239,27 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
     expect(atlas.bundles.stripped().has('old-key')).toBe(true);
     atlas.connect(connectingPlugin('atlas-vtt-connect')).bundles.forgetNoteProperties();
     expect([...atlas.bundles.stripped()]).toEqual(['x']);
+  });
+});
+
+describe('FakeAtlas follows what Atlas does around those cases', () => {
+  it('moves a legacy data.sharing into Connect\'s extension data as the index loads, and it never travels', async () => {
+    const atlas = new FakeAtlas({ capabilities: ['scenes'] });
+    const id = atlas.scenes.addScene({ name: 'Old', mapPath: 'old.atlasmap', data: { sharing: { item: 'x' }, tags: ['t'] } });
+    expect(await atlas.connect(connectingPlugin('atlas-vtt-connect')).scenes.getData(id)).toEqual({ item: 'x' });
+    expect(atlas.scenes.record(id)!.data).toEqual({ tags: ['t'], extensions: { 'atlas-vtt-connect': { item: 'x' } } });
+    expect(atlas.scenes.exported(id)!.data).toEqual({ tags: ['t'] });
+  });
+
+  it('strips the registered note properties from installs as from exports', () => {
+    const atlas = new FakeAtlas({ capabilities: ['bundles'] });
+    atlas.connect(connectingPlugin('atlas-vtt-connect')).bundles.stripNoteProperties(['atlas-share']);
+    expect(atlas.bundles.installNote({ 'Atlas-Share': ['Ana'], tags: ['x'] })).toEqual({ tags: ['x'] });
+  });
+
+  it('gives a quarter circle for a stored cone angle no cone can open with, as mapConeAngle does', () => {
+    const atlas = new FakeAtlas({ capabilities: ['rules'] });
+    atlas.rules.saveCollection('c', { maps: ['m.atlasmap'], gridDefaults: { unitType: 'feet', unitDistance: 5, measurementMode: 'metric', coneAngle: 500 } });
+    expect(atlas.connect(connectingPlugin('atlas-vtt-connect')).rules.forMap('m.atlasmap').measurement.coneAngle).toBe(90);
   });
 });
