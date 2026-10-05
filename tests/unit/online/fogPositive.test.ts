@@ -81,6 +81,26 @@ describe('fog positive check (F-POS)', () => {
     expect(sharedPins(fog, [[400, 350]])).toEqual([]);
   });
 
+  it('hides a token whose drawn footprint is wholly fogged, though its raw footprint reaches a revealed cell', () => {
+    // 30,000 px map, fogged but for its top-left corner. A size-1000 token at the centre covers the corner as the GM
+    // holds it (70,000 px wide), but players draw it as size 100 (7,000 px), wholly under fog.
+    const big = { width: 30_000, height: 30_000 };
+    const fog = fogOf(rect(0, 0, 30_000, 30_000), rect(0, 0, 1_000, 1_000, true));
+    const scene = (tokenSize: number, gridSize: number, at = 15_000): SceneSnapshot => {
+      const base = snapshotOf({ mapSize: big, grid: { enabled: true, size: gridSize, type: 'square', offsetX: 0, offsetY: 0 } as never });
+      return { ...base, objects: { ...base.objects, fog, tokens: { huge: token('huge', at, at, tokenSize) } } };
+    };
+    const sent = (snapshot: SceneSnapshot) => projectForPlayers(snapshot, { sceneId: 's', rules: RULES, coverage: coverageOfFog(fog), assets: fakeAssetIds(), mapSize: big }).tokens;
+    expect(sent(scene(1_000, 70))).toEqual({});
+    // The same for a cell players draw smaller: a 24,000 px grid is sent as 10,000.
+    expect(sent(scene(1, 24_000, 12_500))).toEqual({});
+    // Its raw footprint does reach the revealed corner: only the drawn one hides it.
+    expect(coverageOfFog(fog).revealsSome(tokenBounds({ x: 15_000, y: 15_000, size: 1_000 }, 70), big)).toBe(true);
+    expect(coverageOfFog(fog).revealsSome(tokenBounds({ x: 12_500, y: 12_500, size: 1 }, 24_000), big)).toBe(true);
+    // A token whose drawn footprint reaches the corner is sent.
+    expect(Object.keys(sent({ ...scene(1, 70), objects: { ...scene(1, 70).objects, tokens: { near: token('near', 500, 500, 1) } } }))).toEqual(['near']);
+  });
+
   it('hides a token only in the edge strip, and one straddling the map edge and the strip', () => {
     const fog = fogOf(rect(0, 0, 700, 700), rect(400, 200, 300, 300, true));
     // Revealed up to 696; 696–704 is the partial edge cell, still fogged, and past 700 is off the map.

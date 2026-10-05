@@ -179,17 +179,19 @@ export function snapGridOfState(grid: GridState | null): PlayerSnapGrid | null {
 }
 
 function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: number): PlayerToken | null {
+  // The cell players draw a token's size with: the wire's grid size and map cell size, both clamped to this range.
+  const wireCell = positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize);
   // Any truthy value hides, as in the local window (`playerSafeFrame`, `PlayerInitiativePanel`).
   if (token.isHidden) return null;
   const x = finiteOrNull(token.x);
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // Some cell of the token, as the GM draws it (raw values) and as players do (the wire's clamped ones), must be proven
-  // revealed (F-POS): the player window draws a token whose part shows, so a half-fogged token is sent.
-  const revealed = (at: { x: number; y: number; size: number }): boolean => context.coverage.revealsSome(tokenBounds(at, cellSize), context.mapSize);
+  // Some cell of the token, as the GM draws it (raw values) and as players do (the wire's clamped position, size and
+  // cell), must be proven revealed (F-POS): the player window draws a token whose part shows, so a half-fogged token is sent.
+  const revealed = (at: { x: number; y: number; size: number }, cell: number): boolean => context.coverage.revealsSome(tokenBounds(at, cell), context.mapSize);
   const wire = { x: finiteOr(x, 0, SCENE_RANGES.coordinate), y: finiteOr(y, 0, SCENE_RANGES.coordinate), size: finiteOr(size, 1, SCENE_RANGES.tokenSize) };
-  if (!revealed({ x, y, size }) || !revealed(wire)) return null;
+  if (!revealed({ x, y, size }, cellSize) || !revealed(wire, wireCell)) return null;
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
