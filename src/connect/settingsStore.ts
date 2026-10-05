@@ -2,6 +2,7 @@ import type { Plugin } from 'obsidian';
 import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, validStoredTable, type OnlineSettings, type StoredTable } from '../app/online/onlineSettings';
 import type { KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 import { FORK_TABLE_KEY_STORAGE } from './migrateLocalStores';
+import { readTableMarks, retired, storedTableMarks, type TableMarks } from './tableMarks';
 
 /**
  * Where the GM's table key lives: Obsidian's local storage, which Obsidian keeps per vault on each device. Never in
@@ -28,6 +29,9 @@ interface StoredData {
   forkSteps?: ForkStep[];
   /** The settings changed in Connect while the settings step is not done: they stay over the fork's, across restarts. */
   forkOwnKeys?: Array<keyof OnlineSettings>;
+  /** Table key marks (`tableMarks.ts`): ids only. */
+  forkTableKeyTaken?: string;
+  retiredTableIds?: string[];
 }
 
 /** The player page the fork shipped before Connect had its own; also matched without the trailing slash. */
@@ -69,6 +73,7 @@ export class ConnectSettingsStore {
    */
   private fileTable: StoredTable | null = null;
   private notKeptShown = false;
+  private marks: TableMarks = { forkTableKeyTaken: null, retiredTableIds: [] };
 
   private constructor(
     private readonly plugin: DataPlugin, private readonly local: KeyValueStore, private online: OnlineSettings,
@@ -92,17 +97,21 @@ export class ConnectSettingsStore {
     const data = typeof stored === 'object' && stored !== null ? stored as Partial<Record<keyof StoredData, unknown>> : {};
     const online = resolveOnlineSettings(data.online);
     online.playerPageUrl = movedPlayerPage(online.playerPageUrl);
-    const synced = online.table;
-    const kept = validStoredTable(local.get(TABLE_KEY_STORAGE));
+    const marks = readTableMarks(data);
+    // A retired table's key is never taken, from any source: the device then makes its own.
+    const usable = (table: StoredTable | null): StoredTable | null => (table && !marks.retiredTableIds.includes(table.id) ? table : null);
+    const synced = usable(online.table);
+    const kept = usable(validStoredTable(local.get(TABLE_KEY_STORAGE)));
     online.table = kept ?? synced;
     const store = new ConnectSettingsStore(plugin, local, online, data.migratedFromFork === 1, listOf(data.forkSteps, isForkStep), listOf(data.forkOwnKeys, isSettingKey), notify);
+    store.marks = marks;
     store.fileTable = synced;
     const inFile = typeof data.online === 'object' && data.online !== null && 'table' in data.online;
     if (!kept && synced) {
       store.tableKept = store.keepTable(synced);
       store.keyMoved = store.tableKept;
     }
-    const fork = kept || synced ? null : validStoredTable(local.get(FORK_TABLE_KEY_STORAGE));
+    const fork = kept || synced ? null : usable(validStoredTable(local.get(FORK_TABLE_KEY_STORAGE)));
     if (fork) {
       store.online.table = fork;
       store.tableKept = store.keepTable(fork);
@@ -126,6 +135,17 @@ export class ConnectSettingsStore {
   }
 
   /**
+   * Whether this device may take the preview's settings-file key `table`: no device took one before (the synced
+   * `forkTableKeyTaken`) and its table was not retired. Taking it marks it taken, saved at once.
+   */
+  takeForkFileTable(table: StoredTable): boolean {
+    if (this.marks.forkTableKeyTaken !== null || this.marks.retiredTableIds.includes(table.id)) return false;
+    this.marks = { ...this.marks, forkTableKeyTaken: table.id };
+    this.saveNow();
+    return true;
+  }
+
+  /**
    * Puts `table` in place of the current key (New table key): true once local storage holds it. False when local
    * storage refuses it: the current key then stays, in memory and in local storage, and nothing else changes.
    */
@@ -138,7 +158,10 @@ export class ConnectSettingsStore {
       return false;
     }
     this.tableKept = true;
+    // The old table is never taken again, by any device (the mark syncs; the key does not).
+    if (previous) this.marks = { ...this.marks, retiredTableIds: retired(this.marks.retiredTableIds, previous.id) };
     this.set({ table });
+    this.saveNow();
     return true;
   }
 
@@ -244,6 +267,7 @@ export class ConnectSettingsStore {
       ...(this.migrated ? { migratedFromFork: 1 as const } : {}),
       ...(this.steps.size > 0 ? { forkSteps: [...this.steps] } : {}),
       ...(this.changed.size > 0 ? { forkOwnKeys: [...this.changed] } : {}),
+      ...storedTableMarks(this.marks),
     };
     try {
       this.unsaved = true;

@@ -1,7 +1,8 @@
 /**
  * The settings step of the migration from the fork: the preview's `online` settings, table key included, come from
  * Atlas's settings file, which Connect only reads (Atlas rewrites it on a debounce). They are merged field by field:
- * a setting changed in Connect since it loaded wins, and the table key comes from the preview whenever Connect has none.
+ * a setting changed in Connect since it loaded wins, and the table key comes from the preview while Connect has none
+ * here, on the first device only (`forkTableKeyTaken`), never for a retired table.
  */
 import type { DataAdapter } from 'obsidian';
 import { isRecord, resolveOnlineSettings, type OnlineSettings } from '../app/online/onlineSettings';
@@ -12,7 +13,7 @@ export const FORK_SETTINGS_FILE = 'atlas-vtt/.atlas-data/settings.json';
 /** Longer than Atlas's 500 ms save debounce and its write: a file caught mid-rewrite is whole again by then. */
 const REREAD_DELAY_MS = 1500;
 
-export type ForkSettingsStore = Pick<ConnectSettingsStore, 'get' | 'set' | 'changedSinceLoad' | 'forkStepDone' | 'markForkStep' | 'markKeyMoved'>;
+export type ForkSettingsStore = Pick<ConnectSettingsStore, 'get' | 'set' | 'changedSinceLoad' | 'forkStepDone' | 'markForkStep' | 'markKeyMoved' | 'takeForkFileTable'>;
 
 export interface ForkSettingsDeps {
   adapter: Pick<DataAdapter, 'exists' | 'read'>;
@@ -43,12 +44,16 @@ async function readForkSettings(deps: ForkSettingsDeps): Promise<unknown> {
   return null;
 }
 
-/** The preview's settings under what Connect changed since loading; the table key from the preview when Connect has none. */
+/**
+ * The preview's settings under what Connect changed since loading. The table key comes from the preview only when
+ * Connect has none here and this is the first device to take it (`takeForkFileTable`), and its table was not retired.
+ */
 function merged(fork: OnlineSettings, settings: ForkSettingsStore): OnlineSettings {
   const current = settings.get();
   const result: OnlineSettings = { ...fork, playerPageUrl: movedPlayerPage(fork.playerPageUrl) };
   const own = Object.fromEntries([...settings.changedSinceLoad].map((key) => [key, current[key]])) as Partial<OnlineSettings>;
-  return { ...result, ...own, table: current.table ?? fork.table };
+  const table = current.table ?? (fork.table && settings.takeForkFileTable(fork.table) ? fork.table : null);
+  return { ...result, ...own, table };
 }
 
 /** `skipped` once done before, `none` when the preview kept no settings, `copied` when they were merged in. */
