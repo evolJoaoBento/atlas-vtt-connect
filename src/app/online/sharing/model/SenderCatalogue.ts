@@ -12,7 +12,7 @@ import type { MapSize } from '../../scene/sceneTypes';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf, personKey } from '../people/peopleTypes';
 import { isPerson, partAllows, type Recipient } from './audience';
-import { fullPayload, hashMapImages, playerSafePayload, type MapImages } from './buildMapPayload';
+import { fullPayload, hashMapImages, playerSafePayload, playerSafeRefusal, type MapImages } from './buildMapPayload';
 import { accessFor, type Access, type AccessSources, type MapAccess } from './catalogueAccess';
 import type { MapShareMode } from './mapShare';
 import { previewAsPlaceholder, type PreviewPeople } from './placeholderPreview';
@@ -96,7 +96,7 @@ export class SenderCatalogue {
     for (const map of access.maps) {
       if (items.length >= MAX_CATALOGUE_ITEMS) break;
       const built = await this.mapPayload(map);
-      // A share the sender refuses (a lit map shared player-safe) is not offered.
+      // A share the sender refuses (a player-safe share `playerSafeRefusal` refuses) is not offered.
       if (!built) continue;
       const { version, bytes } = built;
       items.push({
@@ -174,9 +174,9 @@ export class SenderCatalogue {
     return { kind: 'note', bytes, version: await this.hash(bytes) };
   }
 
-  /** Null when the share is refused: a lit map shared player-safe. */
+  /** Null when the share is refused: a player-safe share of a map `playerSafeRefusal` refuses. */
   private async mapPayload(map: MapAccess): Promise<{ payload: SharePayload; images: MapImages; version: string; bytes: ArrayBuffer } | null> {
-    if (map.entry.share.mode !== 'full' && map.source.lit) return null;
+    if (map.entry.share.mode !== 'full' && playerSafeRefusal(map.source) !== null) return null;
     const images = await hashMapImages(map.source.map, this.sources.images, this.hash, this.dimensions);
     const linked = new Set(map.linked);
     const context = {

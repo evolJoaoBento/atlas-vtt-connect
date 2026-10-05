@@ -30,7 +30,7 @@ interface ShareWithFormProps {
     mode: MapShareMode;
     notes: ReadonlyArray<{ path: string; label: string; private: boolean; hidden?: boolean }>;
     ticked: string[];
-    /** Why the map cannot be shared player-safe (a lit map); only Full is offered then. */
+    /** Why the map cannot be shared player-safe (`playerSafeRefusal`); only Full is offered then. */
     playerSafeRefused?: string;
   } | null;
   /** The note as one person gets it; null for maps. */
@@ -43,6 +43,9 @@ interface ShareWithFormProps {
   onSave: (result: ShareFormResult) => void;
   onCancel: () => void;
 }
+
+/** A ticked note goes whole, as the fork's did: the fog over its pin or token holds back the pin, not the note. */
+export const TICKED_NOTES_HINT = 'A ticked note is sent whole, even when its pin or token is under fog.';
 
 const toggled = (list: readonly string[], key: string): string[] => (list.includes(key) ? list.filter((item) => item !== key) : [...list, key]);
 const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': 'Player-safe', full: 'Full' };
@@ -89,6 +92,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
           </div>
           {refused && <p className="atlas-share__warning" role="note">{refused}</p>}
           {offered.length > 0 && <h3 className="atlas-share__heading">Linked notes</h3>}
+          {offered.length > 0 && mode === 'player-safe' && <p className="atlas-share__hint">{TICKED_NOTES_HINT}</p>}
           <ul className="atlas-share__people">
             {offered.map((note) => (
               <li key={note.path} className="atlas-share__note">

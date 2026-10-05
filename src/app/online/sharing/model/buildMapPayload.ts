@@ -9,10 +9,10 @@ import type { ImageFiles } from '../../scene/AssetRegistry';
 import { FogCoverage } from '../../scene/FogCoverage';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
 import { projectForPlayers, type ProjectionInput } from '../../scene/projectForPlayers';
-import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
+import { createProjectionMemo, fogTruncated, projectFog, type ProjectionMemo } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
-import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
+import { clippedPinText, IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
 import { pinFootprint } from './pinFootprint';
 import { readablePins, type SharedMapFile } from './sharedMapFile';
 
@@ -21,8 +21,11 @@ export interface SharedMapSource {
   map: SharedMapFile;
   state: ProjectionInput;
   extra: Record<string, unknown>;
-  /** The saved scene has dynamic lighting on, whether or not this device has the feature switched on. */
-  lit: boolean;
+  /**
+   * The saved scene has dynamic lighting on, whether or not this device has the feature switched on; null when Atlas
+   * did not say (no `lighting` in what it read), which a player-safe share treats as lit.
+   */
+  lit: boolean | null;
 }
 
 /**
@@ -30,6 +33,15 @@ export interface SharedMapSource {
  * which a share does not work out yet, so it would hold tokens and pins no player token sees.
  */
 export const LIT_MAP_NOT_PLAYER_SAFE = 'This map has dynamic lighting on, so it cannot be shared player-safe yet: the share would hold tokens and pins that no player token sees. Share it Full (as a co-GM sees it), or switch its lighting off first.';
+
+/** Atlas read the map without saying whether its lighting is on: a player-safe share cannot rule lighting out. */
+export const LIGHTING_UNKNOWN_NOT_PLAYER_SAFE = 'Atlas VTT did not say whether this map has dynamic lighting on, so it cannot be shared player-safe. Share it Full (as a co-GM sees it), or update Atlas VTT.';
+
+/**
+ * As live play's `FOG_TRUNCATED_NOTICE`: the map has more fog than players can be sent, or fog the share cannot
+ * carry (`fogTruncated`), so what it hides cannot be proven hidden.
+ */
+export const FOG_TRUNCATED_NOT_PLAYER_SAFE = 'This map has too much fog to share player-safe: the share could hold what the fog hides. Share it Full (as a co-GM sees it), or clear and repaint its fog with fewer strokes.';
 
 export interface MapImages {
   /** Vault path → fingerprint, for the background and token images that could be hashed. */
@@ -101,7 +113,7 @@ export async function readSharedMapOrError(scenes: Pick<ScenesApi, 'readMap'>, m
     ...(saved.initiativeTrackerOpen !== undefined ? { initiativeTrackerOpen: trackerOpen } : {}),
     ...(saved.tokenSettings !== undefined ? { tokenSettings: saved.tokenSettings } : {}),
   };
-  return { map, state, extra, lit: saved.lighting?.enabled === true };
+  return { map, state, extra, lit: saved.lighting === undefined ? null : saved.lighting.enabled === true };
 }
 
 /** The background and token images of a map. */
@@ -132,10 +144,20 @@ export async function hashMapImages(
   return { fingerprints, size };
 }
 
-/** Null for a lit map (`LIT_MAP_NOT_PLAYER_SAFE`): a player-safe share of it is refused. */
+/**
+ * Why a map cannot be shared player-safe, null when it can: it is lit, or its lighting is unknown, or its fog cannot be
+ * sent whole. The share dialog, the catalogue and the payload all ask this, so they refuse the same maps.
+ */
+export function playerSafeRefusal(source: SharedMapSource, memo: ProjectionMemo = createProjectionMemo()): string | null {
+  if (source.lit === true) return LIT_MAP_NOT_PLAYER_SAFE;
+  if (source.lit === null) return LIGHTING_UNKNOWN_NOT_PLAYER_SAFE;
+  return fogTruncated(source.map.objects.fog, memo) ? FOG_TRUNCATED_NOT_PLAYER_SAFE : null;
+}
+
+/** Null for a map `playerSafeRefusal` refuses: a player-safe share of it is never built. */
 export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload | null {
-  if (source.lit) return null;
   const memo = createProjectionMemo();
+  if (playerSafeRefusal(source, memo) !== null) return null;
   const coverage = FogCoverage.fromPlayerFog(projectFog(source.map.objects.fog, memo));
   const scene = projectForPlayers(source.state, {
     sceneId: SHARED_SCENE_ID, rules: context.rules, coverage, mapSize: context.images.size,
@@ -148,7 +170,7 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     if (pin.gmOnly || !coverage.reveals(pinFootprint(pin, source.map.grid), context.images.size)) return [];
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
-    return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];
+    return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: clippedPinText(pin.icon) } : {}), ...(pin.label ? { label: clippedPinText(pin.label) } : {}), ...(pin.hex ? { hex: true } : {}) }];
   });
   const tokenNotes: Record<string, string> = {};
   for (const id of Object.keys(scene.tokens)) {

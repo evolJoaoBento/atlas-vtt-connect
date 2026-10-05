@@ -98,6 +98,22 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
 }
 
 /**
+ * Whether the fog players would get covers less than the GM's: more operations than `SCENE_LIMITS.records`
+ * (`extra` counts the darkness drawn with them), or one that covers but is not sent as it is: its id is refused,
+ * it projects to nothing (an unknown type, points that do not read), or its brush is wider than the wire allows.
+ * What such fog hides cannot be proven hidden, so live play sends a clear and a player-safe share is refused.
+ */
+export function fogTruncated(fog: Readonly<Record<string, FogOperation>> | undefined, memo: ProjectionMemo, extra = 0): boolean {
+  const entries = Object.entries(fog ?? {});
+  if (entries.length + extra > SCENE_LIMITS.records) return true;
+  return entries.some(([id, op]) => {
+    if (typeof op !== 'object' || op === null || Boolean(op.isErasing)) return false;
+    if (!isSceneId(id) || memoized(memo.fog, op, projectFogOp) === null) return true;
+    return op.type === 'brush' && finiteOr(op.brushRadius, 0) > SCENE_RANGES.stroke[1];
+  });
+}
+
+/**
  * A text players may see: only when `visible` shows every part of it, as the GM draws it and as players would
  * (the wire's clamped size can be larger); null otherwise or without a position.
  */

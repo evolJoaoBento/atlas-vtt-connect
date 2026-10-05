@@ -1,7 +1,7 @@
 /** What one recipient may have: the notes whose rule reaches them, the maps shared with them and those maps' ticked notes. */
 import type { PeopleBook } from '../people/PeopleBook';
 import { ruleReaches, type Recipient } from './audience';
-import type { SharedMapSource } from './buildMapPayload';
+import { playerSafeRefusal, type SharedMapSource } from './buildMapPayload';
 import { offeredNotes } from './linkedNotes';
 import { mapShareReaches, type MapShare } from './mapShare';
 import type { ShareRule } from './shareRule';
@@ -44,8 +44,8 @@ export async function accessFor(sources: AccessSources, recipient: Recipient, pe
     if (!mapShareReaches(entry.share, recipient, people)) continue;
     const source = await sources.readMap(entry.mapPath);
     if (!source) continue;
-    // A lit map shared player-safe is refused (`SenderCatalogue`): its ticked notes are not offered either.
-    const refused = entry.share.mode !== 'full' && source.lit;
+    // A player-safe share `playerSafeRefusal` refuses is not offered (`SenderCatalogue`): its ticked notes are not either.
+    const refused = entry.share.mode !== 'full' && playerSafeRefusal(source) !== null;
     const offered = new Set(refused ? [] : offeredNotes(source.map, entry.share.mode).map((note) => note.path));
     const linked = entry.share.notes.filter((path) => {
       const note = offered.has(path) ? sources.note(path) : null;

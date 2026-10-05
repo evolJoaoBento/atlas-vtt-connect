@@ -13,7 +13,7 @@ import { randomId } from '../../ids';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf } from '../people/peopleTypes';
 import { placeholderKey } from '../people/placeholderTypes';
-import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMapOrError, UNREADABLE_MAP } from '../model/buildMapPayload';
+import { playerSafeRefusal, readSharedMapOrError, UNREADABLE_MAP } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
 import { partProblemsInNote, unknownNamesIn, unlinkedExceptNames } from '../model/noteFilter';
@@ -147,6 +147,7 @@ class ShareWithModal extends Modal {
       return;
     }
     const share = await mapShareOf(this.deps.scenes, scene.id);
+    const refused = playerSafeRefusal(source);
     const notes = offeredNotes(source.map, 'full').map((note) => {
       const file = this.app.vault.getAbstractFileByPath(note.path);
       const property: unknown = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter?.[SHARE_PROPERTY] : undefined;
@@ -161,18 +162,18 @@ class ShareWithModal extends Modal {
       <ShareWithForm
         rows={rows}
         initial={{ everyone: share?.everyone ?? false, people: current(share?.people ?? []), except: current(share?.except ?? []) }}
-        map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [], ...(source.lit && { playerSafeRefused: LIT_MAP_NOT_PLAYER_SAFE }) }}
+        map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [], ...(refused !== null && { playerSafeRefused: refused }) }}
         preview={null}
         warnings={unlinkedMapWarnings(share?.except ?? [], people)}
         onCancel={() => this.close()}
-        onSave={(result) => { void this.saveMap(scene.id, share, result, source.lit); }}
+        onSave={(result) => { void this.saveMap(scene.id, share, result, refused); }}
       />,
     );
   }
 
-  private async saveMap(sceneId: string, previous: MapShare | null, result: ShareFormResult, lit: boolean): Promise<void> {
-    if (lit && result.mode === 'player-safe') {
-      new Notice(LIT_MAP_NOT_PLAYER_SAFE);
+  private async saveMap(sceneId: string, previous: MapShare | null, result: ShareFormResult, refused: string | null): Promise<void> {
+    if (refused !== null && result.mode === 'player-safe') {
+      new Notice(refused);
       return;
     }
     if (result.mode === 'full' && previous?.mode !== 'full' && !(await confirmAction(FULL_CONFIRM))) return;

@@ -6,7 +6,7 @@ import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import type { ProjectionContext } from './projectForPlayers';
-import { projectFog, type ProjectionMemo } from './projectRecords';
+import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import type { SceneSession } from './sceneContracts';
 import type { LightingSource } from './sceneLighting';
 import { SCENE_LIMITS } from './sceneLimits';
@@ -85,11 +85,13 @@ export interface FogCoverages {
 
 /** Coverage rasterised from the fog players receive, rebuilt only when the fog changes; a new darkness never replays it. */
 export class FogCoverageCache {
-  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage } | null = null;
+  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage; dropped: boolean } | null = null;
 
   get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): FogCoverages {
-    if (!this.fog || this.fog.fog !== fog) this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)) };
-    const truncated = Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
+    if (!this.fog || this.fog.fog !== fog) {
+      this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)), dropped: fogTruncated(fog, memo) };
+    }
+    const truncated = this.fog.dropped || Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
     return { coverage: this.fog.coverage, truncated };
   }
 }

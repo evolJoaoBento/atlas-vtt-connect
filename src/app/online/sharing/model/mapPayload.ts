@@ -12,6 +12,18 @@ import { isMapFileBody } from './sharedMapFile';
 export const MAP_PAYLOAD_FORMAT = 'atlas-share-map-v1';
 export const IMAGE_REF_PREFIX = 'atlas-share-image:';
 export const NOTE_REF_PREFIX = 'atlas-share-note:';
+/** The longest pin icon and label a receiver takes (UTF-16 units); the sender clips to it (`clippedPinText`). */
+export const PIN_TEXT_LIMIT = 64;
+
+/** `text` cut to `PIN_TEXT_LIMIT` units, never through a character. */
+export function clippedPinText(text: string): string {
+  let clipped = '';
+  for (const character of text) {
+    if (clipped.length + character.length > PIN_TEXT_LIMIT) break;
+    clipped += character;
+  }
+  return clipped;
+}
 
 export interface SharedPin {
   x: number;
@@ -57,8 +69,8 @@ const ids = (value: unknown, valid: (item: unknown) => boolean): value is string
 
 function isPin(value: unknown): value is SharedPin {
   if (!isRecord(value) || !Number.isFinite(value.x) || !Number.isFinite(value.y) || !isItemId(value.note)) return false;
-  return (value.icon === undefined || (typeof value.icon === 'string' && value.icon.length <= 64))
-    && (value.label === undefined || (typeof value.label === 'string' && value.label.length <= 64))
+  return (value.icon === undefined || (typeof value.icon === 'string' && value.icon.length <= PIN_TEXT_LIMIT))
+    && (value.label === undefined || (typeof value.label === 'string' && value.label.length <= PIN_TEXT_LIMIT))
     && (value.hex === undefined || value.hex === true);
 }
 
