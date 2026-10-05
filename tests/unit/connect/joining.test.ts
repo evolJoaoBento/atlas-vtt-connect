@@ -81,7 +81,7 @@ describe('joining from Obsidian, through startConnect', () => {
     const first = OnlineJoinService.forApp(connect.plugin.app)!;
     const key = first.playerKeyFor('gm-a');
     atlas.unload();
-    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.6.0', capabilities: [] }));
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.13.0', capabilities: [] }));
     await vi.advanceTimersByTimeAsync(0);
     const again = OnlineJoinService.forApp(connect.plugin.app)!;
     expect(again).not.toBe(first);

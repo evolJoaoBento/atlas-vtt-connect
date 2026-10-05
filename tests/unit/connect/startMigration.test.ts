@@ -58,7 +58,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(LEFTOVER_NOTICE).toContain('atlas-vtt/.atlas-data/sharing');
     // An Atlas reload binds again: nothing runs twice.
     atlas.unload();
-    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.8.0', capabilities: WITH_SHARING }));
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.13.0', capabilities: WITH_SHARING }));
     await vi.advanceTimersByTimeAsync(0);
     expect(notices).toHaveLength(1);
     expect(connect.commands.has('start-online-session')).toBe(true);
@@ -138,7 +138,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
     const { connect } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { table: TABLE } }) } });
     Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
-    const atlas = new FakeAtlas({ version: '1.6.0', capabilities: [] });
+    const atlas = new FakeAtlas({ version: '1.13.0', capabilities: [] });
     const extension = atlas.connect(connect.plugin);
     const notices: string[] = [];
     const start: MigrationStart = { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 };
@@ -181,7 +181,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const { connect } = connected([], undefined, undefined, {});
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
     Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
-    const atlas = new FakeAtlas({ version: '1.8.0', capabilities: ['storage'] });
+    const atlas = new FakeAtlas({ version: '1.13.0', capabilities: ['storage'] });
     expect(await startMigration(connect.plugin.app, atlas, atlas.connect(connect.plugin), store, { notify: () => undefined, images: { exists, open: async () => null } })).toBe(true);
     expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS });
     await vi.advanceTimersByTimeAsync(0);

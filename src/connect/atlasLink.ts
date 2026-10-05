@@ -2,6 +2,11 @@ import { Notice, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 
 const SUPPORTED_MAJOR = 1;
+/** The first API minor with everything Connect uses (`replaceMap`, the `readMap` pins, `maxDice`). */
+const MINIMUM_MINOR = 13;
+
+export const MISSING_ATLAS_NOTICE = 'Install or enable Atlas VTT.';
+export const NO_API_NOTICE = `This Atlas VTT has no extension API (${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer) yet.`;
 
 function isAtlasApi(value: unknown): value is AtlasApi {
   const api = value as Partial<AtlasApi> | null;
@@ -38,17 +43,18 @@ export class AtlasLink {
     workspace.onLayoutReady(() => {
       if (this.extension || this.atlasSeen || this.warnedMissing) return;
       this.warnedMissing = true;
-      this.notify('Atlas VTT Connect needs Atlas VTT. Install or enable it, then reload.');
+      // Atlas loaded but offering no API (an Atlas without the extension API) is not the same as Atlas missing or disabled.
+      this.notify(this.plugin.app.plugins?.plugins['atlas-vtt'] ? NO_API_NOTICE : MISSING_ATLAS_NOTICE);
     });
   }
 
   private attach(value: unknown): void {
     if (!isAtlasApi(value)) return;
-    const major = Number(value.version.split('.')[0]);
+    const [major, minor] = value.version.split('.').map(Number);
     this.atlasSeen = true;
     this.detach();
-    if (major !== SUPPORTED_MAJOR) {
-      if (!this.warnedVersion) this.notify(`Atlas VTT Connect needs Atlas VTT with extension API ${SUPPORTED_MAJOR}.x (found ${value.version}).`);
+    if (major !== SUPPORTED_MAJOR || !((minor ?? 0) >= MINIMUM_MINOR)) {
+      if (!this.warnedVersion) this.notify(major === SUPPORTED_MAJOR ? NO_API_NOTICE : `Atlas VTT Connect needs Atlas VTT with extension API ${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer (found ${value.version}).`);
       this.warnedVersion = true;
       return;
     }

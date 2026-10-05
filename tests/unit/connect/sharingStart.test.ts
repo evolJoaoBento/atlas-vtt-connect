@@ -63,7 +63,7 @@ describe('sharing, through startConnect', () => {
     expect([...connect.commands.keys()]).toEqual([]);
     expect(workspace.count('file-menu')).toBe(0);
     expect(workspace.count('editor-menu')).toBe(0);
-    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.8.0', capabilities: SHARING }));
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.13.0', capabilities: SHARING }));
     await vi.advanceTimersByTimeAsync(0);
     expect(counts()).toEqual(first);
     expect(new Set(connect.commands.keys()).size).toBe(connect.commands.size);
@@ -113,7 +113,7 @@ describe('sharing, through startConnect', () => {
     atlas.unload();
     vaultEvents.fire('delete', { path: 'Notes/Inn.md' });
     vaultEvents.fire('rename', { path: 'Archive/Keep.md' }, 'Notes/Keep.md');
-    const again = new FakeAtlas({ version: '1.8.0', capabilities: SHARING });
+    const again = new FakeAtlas({ version: '1.13.0', capabilities: SHARING });
     const share = { item: 'i'.repeat(22), everyone: true, people: [], except: [], mode: 'full', notes: ['Notes/Inn.md', 'Notes/Keep.md'] };
     const sceneId = again.scenes.addScene({ name: 'Inn', mapPath: 'Inn.atlasmap', data: { extensions: { 'atlas-vtt-connect': share } } });
     fire('atlas-vtt:api-ready', again);
@@ -130,7 +130,7 @@ describe('sharing, through startConnect', () => {
     atlas.unload();
     vaultEvents.fire('rename', { path: 'Notes/Cave.md' }, 'Shared/GM/Cave.md');
     vaultEvents.fire('delete', { path: 'Shared/GM/Gone.md' });
-    const again = new FakeAtlas({ version: '1.8.0', capabilities: SHARING });
+    const again = new FakeAtlas({ version: '1.13.0', capabilities: SHARING });
     const share = { item: 'i'.repeat(22), everyone: true, people: [], except: [], mode: 'full', notes: ['Shared/GM/Cave.md'] };
     const sceneId = again.scenes.addScene({ name: 'Inn', mapPath: 'Inn.atlasmap', data: { extensions: { 'atlas-vtt-connect': share } } });
     expect(pulled.byPath('Notes/Cave.md')).toBeNull();

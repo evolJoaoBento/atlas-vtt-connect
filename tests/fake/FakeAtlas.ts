@@ -100,7 +100,7 @@ export class FakeAtlas implements AtlasApi {
   /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
   /** `scenesBefore113`: Atlas's scenes as before API 1.13.0 (no saved map fields, no `replaceMap`). */
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault; scenesBefore113?: boolean } = {}) {
-    this.version = options.version ?? '1.0.0';
+    this.version = options.version ?? '1.13.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
     this.views = new FakeViews({
