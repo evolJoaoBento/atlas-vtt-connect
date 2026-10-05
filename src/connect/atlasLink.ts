@@ -1,20 +1,21 @@
 import { Notice, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 
-const SUPPORTED_MAJOR = 1;
 /**
- * The first API minor with everything Connect uses (`replaceMap`, the `readMap` pins, `maxDice`). 1.14.0 adds only what
- * degrades on 1.13: a scene's own distance per cell (absent there, so the collection's applies) and `ruleDistance`
- * (Connect sends it; 1.13 ignores the extra field).
+ * The API major Connect is written against. Minors are never compared: what Connect uses comes from `has()` and from
+ * checking the members themselves (`need`, `typeof scenes.replaceMap === 'function'`), so an Atlas whose API starts
+ * at 1.0.0 with every capability works, and one without some capabilities runs the features it can.
  */
-const MINIMUM_MINOR = 13;
+const SUPPORTED_MAJOR = 1;
 
 /** How long after layout ready Atlas gets to publish its API before Connect says it is missing (Atlas publishes it after its own start-up work). */
 export const ATLAS_GRACE_MS = 10_000;
 
-export const MISSING_ATLAS_NOTICE = 'Atlas VTT Connect: Install or enable Atlas VTT.';
-export const NO_API_NOTICE = `Atlas VTT Connect: this Atlas VTT has no extension API (${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer) yet.`;
-export const oldApiNotice = (found: string): string => `Atlas VTT Connect needs extension API ${SUPPORTED_MAJOR}.${MINIMUM_MINOR} or newer (found ${found}).`;
+/** Every notice about a missing or wrong Atlas ends here: the README names the Atlas build to install. */
+const SEE_README = "See Connect's README for the Atlas build to install.";
+export const MISSING_ATLAS_NOTICE = `Atlas VTT Connect: Install or enable Atlas VTT. ${SEE_README}`;
+export const NO_API_NOTICE = `Atlas VTT Connect: this Atlas VTT has no extension API yet. ${SEE_README}`;
+export const oldApiNotice = (found: string): string => `Atlas VTT Connect needs extension API ${SUPPORTED_MAJOR}.x (found ${found}). ${SEE_README}`;
 
 function isAtlasApi(value: unknown): value is AtlasApi {
   const api = value as Partial<AtlasApi> | null;
@@ -74,13 +75,13 @@ export class AtlasLink {
 
   private attach(value: unknown): void {
     if (!isAtlasApi(value)) return;
-    const [major, minor] = value.version.split('.').map(Number);
+    const major = Number(value.version.split('.')[0]);
     this.atlasSeen = true;
     this.stopGrace();
     this.missingNotice?.hide();
     this.missingNotice = null;
     this.detach();
-    if (major !== SUPPORTED_MAJOR || !((minor ?? 0) >= MINIMUM_MINOR)) {
+    if (major !== SUPPORTED_MAJOR) {
       if (!this.warnedVersion) this.notify(oldApiNotice(value.version));
       this.warnedVersion = true;
       return;

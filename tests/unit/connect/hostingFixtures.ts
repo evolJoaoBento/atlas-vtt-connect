@@ -68,6 +68,8 @@ function slowFolder(atlas: FakeAtlas, gate: Promise<void>): void {
 export interface ConnectedExtra {
   files?: Record<string, string>;
   options?: Partial<ConnectOptions>;
+  /** The API version Atlas reports; the fake's own by default. */
+  version?: string;
 }
 
 /** Atlas with these capabilities, Connect linked to it, and an in-memory host every session uses. */
@@ -83,7 +85,7 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
     metadataCache: Object.assign(memory.metadataCache, { on: cacheEvents.on, offref: cacheEvents.offref }),
   });
   const connect = hostPlugin(app);
-  const atlas = new FakeAtlas({ capabilities, trigger: workspace.fire });
+  const atlas = new FakeAtlas({ capabilities, trigger: workspace.fire, ...(extra.version ? { version: extra.version } : {}) });
   if (gate) slowFolder(atlas, gate);
   workspace.plugins['atlas-vtt'] = { api: atlas };
   const network = new MemoryNetwork();
