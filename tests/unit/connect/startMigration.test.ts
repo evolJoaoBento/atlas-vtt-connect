@@ -3,7 +3,7 @@ import type { AtlasCapability } from '@atlas-vtt/api-types';
 import { resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
 import { DEVICE_KEYS_STORAGE } from '../../../src/app/online/sharing/identity/deviceKeys';
 import { LEFTOVER_NOTICE, MIGRATED_NOTICE } from '../../../src/connect/migrateFromFork';
-import { FORK_DEVICE_KEYS_STORAGE, type ImageCacheDeps } from '../../../src/connect/migrateLocalStores';
+import { FORK_DEVICE_KEYS_STORAGE, IMAGES_COPIED_KEY, type ImageCacheDeps } from '../../../src/connect/migrateLocalStores';
 import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
 import { failureNotice, RETRY_COMMAND, startMigration, type MigrationStart } from '../../../src/connect/startMigration';
 import { FakeAtlas } from '../../fake/FakeAtlas';
@@ -32,7 +32,10 @@ async function bound(capabilities: AtlasCapability[], files: Record<string, stri
     files,
     options: { migration: store, migrationStart: { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0, ...start } },
   });
-  return { ...fixture, store, notices, answer };
+  // Obsidian's local storage, this vault on this device.
+  const local = new Map<string, unknown>();
+  Object.assign(fixture.connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
+  return { ...fixture, store, notices, answer, local };
 }
 
 const own = (files: Map<string, string>): string[] => [...files.keys()].filter((path) => path.startsWith(`${OWN_SHARING}/`));
@@ -106,6 +109,19 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(failureNotice(new Error('odd'))).toContain('The developer console has the details.');
   });
 
+  it('a setting typed during a stuck settings step survives a restart; the fork settings then come over under it', async () => {
+    const data = fakeDataPlugin(null);
+    const before = await ConnectSettingsStore.load(data);
+    before.set({ playerName: 'Rin' }); // the step was stuck on a half-written file when this was typed
+    await before.flush();
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(data.saved.at(-1))); // Obsidian restarted
+    const { plugin } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { playerName: 'GM', table: TABLE } }) } }).connect;
+    const atlas = new FakeAtlas({ capabilities: [] });
+    await startMigration(plugin.app, atlas, atlas.connect(plugin), store, { notify: () => undefined, images: noImages, rereadDelayMs: 0 });
+    expect(store.get().playerName).toBe('Rin');
+    expect(store.get().table).toEqual(TABLE);
+  });
+
   it('a join that changes a setting while the folder is asked for keeps it, and the fork settings still come over', async () => {
     const forkSettings = { online: { playerName: 'GM', signaling: { mode: 'custom', host: 'peer.example', port: 9000, path: '/', key: 'k', secure: true } } };
     const { store, answer } = await bound(WITH_SCENES, { [FORK_SETTINGS]: JSON.stringify(forkSettings) });
@@ -128,16 +144,16 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const start: MigrationStart = { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 };
     const first = startMigration(connect.plugin.app, atlas, extension, store, start);
     expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS });
-    expect(store.forkStepDone('keys')).toBe(true);
     expect(startMigration(connect.plugin.app, atlas, extension, store, start)).toBe(first);
     expect(await first).toBe(true);
     expect(store.get().table).toEqual(TABLE);
     expect(notices).toEqual([MIGRATED_NOTICE]);
     // No storage, so the folder and the map shares wait for a newer Atlas.
     expect(store.migratedFromFork).toBe(false);
+    // Device keys are merged on every start: a key found later still arrives.
     local.set(FORK_DEVICE_KEYS_STORAGE, { 'table-b': KEYS });
     await startMigration(connect.plugin.app, atlas, extension, store, start);
-    expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS });
+    expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS, 'table-b': KEYS });
     expect(await startMigration(connect.plugin.app, atlas, extension, undefined)).toBe(true);
   });
 
@@ -147,11 +163,43 @@ describe('the fork migration when Connect binds to Atlas', () => {
     off.answer();
     await vi.advanceTimersByTimeAsync(0);
     expect(exists).not.toHaveBeenCalled();
-    expect(off.store.forkStepDone('images')).toBe(true);
+    expect(off.local.get(IMAGES_COPIED_KEY)).toBe(true);
     const on = await bound(WITH_SCENES, {}, { images: { exists, open: async () => null } });
     on.answer();
     await vi.advanceTimersByTimeAsync(0);
     expect(exists).toHaveBeenCalledTimes(1);
-    expect(on.store.forkStepDone('images')).toBe(true);
+    expect(on.local.get(IMAGES_COPIED_KEY)).toBe(true);
+    expect(IMAGES_COPIED_KEY).toBe('atlas-vtt-connect:fork-images-copied');
+    // The mark is this device's: it is not in the vault's settings file.
+    expect(JSON.stringify(on.store.get())).not.toContain('images-copied');
+  });
+
+  it("a vault whose settings were synced from another device still merges this device's keys and copies its images", async () => {
+    const synced = { online: {}, migratedFromFork: 1, forkSteps: ['settings', 'sharing', 'mapShares', 'keys', 'images'] };
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(synced));
+    const exists = vi.fn(async () => false);
+    const { connect } = connected([], undefined, undefined, {});
+    const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
+    Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
+    const atlas = new FakeAtlas({ version: '1.8.0', capabilities: ['storage'] });
+    expect(await startMigration(connect.plugin.app, atlas, atlas.connect(connect.plugin), store, { notify: () => undefined, images: { exists, open: async () => null } })).toBe(true);
+    expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(exists).toHaveBeenCalledTimes(1);
+    expect(local.get(IMAGES_COPIED_KEY)).toBe(true);
+  });
+
+  it('without storage, a settings step that cannot finish says nothing about hosting and offers no command', async () => {
+    const { connect, notices, answer, store } = await bound([], { [FORK_SETTINGS]: '{"online": ' });
+    answer();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(notices).toEqual([]);
+    expect(connect.commands.has(RETRY_COMMAND.id)).toBe(false);
+    expect(store.forkStepDone('settings')).toBe(false);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(connect.plugin.app.vault.adapter.read).mockRejectedValueOnce(new Error('EBUSY'));
+    expect(await startMigration(connect.plugin.app, new FakeAtlas({ capabilities: [] }), new FakeAtlas({ capabilities: [] }).connect(connect.plugin), store, { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 })).toBe(true);
+    expect(notices).toEqual([]);
+    error.mockRestore();
   });
 });

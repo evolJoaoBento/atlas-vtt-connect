@@ -11,7 +11,8 @@ import { obsidianLocalStore } from '../app/online/sharing/identity/deviceKeys';
 import { need } from './capabilities';
 import { migrateFromFork, MIGRATED_NOTICE, type MigrationSettings } from './migrateFromFork';
 import { FORK_SETTINGS_FILE, migrateForkSettings } from './migrateForkSettings';
-import { indexedDbImageCaches, migrateDeviceKeys, migrateImageCache, type ImageCacheDeps } from './migrateLocalStores';
+import { imagesCopied, indexedDbImageCaches, markImagesCopied, migrateDeviceKeys, migrateImageCache, type ImageCacheDeps } from './migrateLocalStores';
+import type { KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 
 export const RETRY_COMMAND = { id: 'bring-over-preview-data', name: "Bring over the online preview's data again" } as const;
 const FAILED = "Atlas VTT Connect couldn't bring over the preview's online play data, so hosting and sharing are off for now.";
@@ -39,27 +40,43 @@ export function failureNotice(error: unknown): string {
 /** One run at a time per store: an Atlas reload or the command while it runs waits for the same run. */
 const running = new WeakMap<MigrationSettings, Promise<boolean>>();
 
-function copyImages(settings: MigrationSettings, images: ImageCacheDeps | undefined): void {
-  if (settings.forkStepDone('images')) return;
+/** The fork's kept images on this device, once per device (the mark is in `local`, this device's storage). */
+function copyImages(settings: MigrationSettings, local: KeyValueStore, images: ImageCacheDeps | undefined): void {
+  if (imagesCopied(local)) return;
   // Read after the settings step: the preview's choice, once it is in.
   if (!settings.get().keepImages) {
-    settings.markForkStep('images');
+    markImagesCopied(local);
     return;
   }
   void migrateImageCache(images ?? indexedDbImageCaches(openIndexedDbImageStore)).then((copied) => {
-    if (copied !== null) settings.markForkStep('images');
+    if (copied !== null) markImagesCopied(local);
   });
+}
+
+/**
+ * An Atlas without storage can neither host nor share, so nothing waits and there is nothing to retry: the settings
+ * come over if they can, and a step that could not finish runs again next start, without a notice.
+ */
+async function migrateSettingsOnly(app: App, settings: MigrationSettings, start: MigrationStart, notify: (message: string) => void): Promise<void> {
+  try {
+    const step = await migrateForkSettings({ adapter: app.vault.adapter, settings, ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }) });
+    if (step.result === 'copied') notify(MIGRATED_NOTICE);
+  } catch (error) {
+    console.error("[Atlas VTT Connect] Could not bring over the preview's online settings; tried again next start:", error);
+  }
 }
 
 /** True when hosting and sharing may start: the settings and the sharing folder are in. */
 async function migrateVault(app: App, api: AtlasApi, atlas: AtlasExtension, settings: MigrationSettings, start: MigrationStart, notify: (message: string) => void): Promise<boolean> {
   const storage = need(api, atlas, 'storage');
+  const local = obsidianLocalStore(app);
+  if (!storage) {
+    await migrateSettingsOnly(app, settings, start, notify);
+    copyImages(settings, local, start.images);
+    return true;
+  }
   try {
-    if (!storage) {
-      // No hosting or sharing to wait for, nowhere for the folder: the settings still come over.
-      const step = await migrateForkSettings({ adapter: app.vault.adapter, settings, ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }) });
-      if (step.result === 'copied') notify(MIGRATED_NOTICE);
-    } else if (!settings.migratedFromFork) {
+    if (!settings.migratedFromFork) {
       await migrateFromFork({
         adapter: app.vault.adapter, settings, storageFolder: await storage.folder(), scenes: need(api, atlas, 'scenes'), notify,
         ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }),
@@ -70,7 +87,7 @@ async function migrateVault(app: App, api: AtlasApi, atlas: AtlasExtension, sett
     notify(failureNotice(error));
     return false;
   }
-  copyImages(settings, start.images);
+  copyImages(settings, local, start.images);
   if (settings.forkStepDone('settings')) return true;
   notify(failureNotice('settings'));
   return false;
@@ -81,11 +98,9 @@ export function startMigration(app: App, api: AtlasApi, atlas: AtlasExtension, s
   if (!settings) return Promise.resolve(true);
   const existing = running.get(settings);
   if (existing) return existing;
-  if (!settings.forkStepDone('keys')) {
-    migrateDeviceKeys(obsidianLocalStore(app));
-    settings.markForkStep('keys');
-  }
-  if (settings.migratedFromFork && settings.forkStepDone('images')) return Promise.resolve(true);
+  // Every start: cheap, safe to repeat, and on this device only.
+  migrateDeviceKeys(obsidianLocalStore(app));
+  if (settings.migratedFromFork && imagesCopied(obsidianLocalStore(app))) return Promise.resolve(true);
   const notify = start.notify ?? ((message: string): void => { new Notice(message); });
   const run = migrateVault(app, api, atlas, settings, start, notify).finally(() => { running.delete(settings); });
   running.set(settings, run);

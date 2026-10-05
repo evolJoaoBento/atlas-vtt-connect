@@ -8,15 +8,22 @@ import { ASSET_LIMITS, isAssetId, isAssetMime, isArrayBuffer } from '../app/onli
 import type { ImageStore } from '../app/online/assets/AssetCache';
 import { IMAGES_DB_NAME } from '../app/online/assets/indexedDbImageStore';
 import { isRecord } from '../app/online/onlineSettings';
-import { FORK_NAME } from '../app/online/page/pageStorage';
+import { FORK_NAME, pageKey } from '../app/online/page/pageStorage';
 import { DEVICE_KEYS_STORAGE, isKeyPairJwk, type KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 
 export const FORK_DEVICE_KEYS_STORAGE = `${FORK_NAME}-device-keys`;
 export const FORK_IMAGES_DB_NAME = `${FORK_NAME}-images`;
+/** Set in Obsidian's local storage (this vault on this device) once the fork's kept images were copied: each device has its own. */
+export const IMAGES_COPIED_KEY = pageKey('fork-images-copied');
+
+export const imagesCopied = (store: KeyValueStore): boolean => store.get(IMAGES_COPIED_KEY) === true;
+export const markImagesCopied = (store: KeyValueStore): void => { store.set(IMAGES_COPIED_KEY, true); };
 
 /**
  * Adds the fork's device key of each table this device has no key for yet, so the GM still knows this device when it
- * joins again; a key Connect made itself wins. Malformed entries are dropped. Returns how many keys were added.
+ * joins again; a key Connect made itself wins. Malformed entries are dropped. Cheap and safe to repeat, so it runs on
+ * every start (no mark: one in the vault's settings would sync to devices whose keys were never merged). Returns how
+ * many keys were added.
  */
 export function migrateDeviceKeys(store: KeyValueStore): number {
   const fork = store.get(FORK_DEVICE_KEYS_STORAGE);

@@ -23,7 +23,7 @@ describe('ConnectSettingsStore', () => {
     expect(store.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
   });
 
-  it('knows which settings changed since loading, and moves the old default page with or without its slash', async () => {
+  it('knows which settings changed while the settings step is not done, and moves the old default page with or without its slash', async () => {
     const store = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerName: 'Stored' } }));
     expect([...store.changedSinceLoad]).toEqual([]);
     store.set({ playerName: 'GM', keepImages: false });
@@ -35,21 +35,39 @@ describe('ConnectSettingsStore', () => {
     expect(FORK_PLAYER_PAGE_URL).toBe('https://evoljoaobento.github.io/atlas-vtt/');
   });
 
-  it("keeps each migration step's mark; the vault's three together mark the migration, the device's stay apart", async () => {
+  it("keeps each vault step's mark, saved at once; the three together mark the migration", async () => {
     vi.useFakeTimers();
-    const plugin = fakeDataPlugin({ online: {}, forkSteps: ['settings', 'nonsense', 'keys'] });
+    // `keys` and `images` were device marks in data.json once: ignored now, as are unknown ones.
+    const plugin = fakeDataPlugin({ online: {}, forkSteps: ['settings', 'nonsense', 'keys', 'images'] });
     const store = await ConnectSettingsStore.load(plugin);
-    expect(['settings', 'sharing', 'mapShares', 'keys', 'images'].map((step) => store.forkStepDone(step as ForkStep))).toEqual([true, false, false, true, false]);
+    expect(['settings', 'sharing', 'mapShares'].map((step) => store.forkStepDone(step as ForkStep))).toEqual([true, false, false]);
     store.markForkStep('sharing');
+    expect(plugin.saved.at(-1)).toMatchObject({ forkSteps: ['settings', 'sharing'] }); // no 500 ms wait
     expect(store.migratedFromFork).toBe(false);
     store.markForkStep('mapShares');
+    await store.flush();
     expect(store.migratedFromFork).toBe(true);
-    expect(store.forkStepDone('images')).toBe(false);
-    vi.advanceTimersByTime(500);
-    expect(plugin.saved.at(-1)).toMatchObject({ migratedFromFork: 1, forkSteps: ['settings', 'keys', 'sharing', 'mapShares'] });
-    // Marked migrated before steps had marks: the vault's steps count as done, the device's do not.
+    expect(plugin.saved.at(-1)).toMatchObject({ migratedFromFork: 1, forkSteps: ['settings', 'sharing', 'mapShares'] });
+    // Marked migrated before steps had marks: every step counts as done.
     const older = await ConnectSettingsStore.load(fakeDataPlugin({ online: {}, migratedFromFork: 1 }));
-    expect([older.forkStepDone('settings'), older.forkStepDone('sharing'), older.forkStepDone('keys')]).toEqual([true, true, false]);
+    expect([older.forkStepDone('settings'), older.forkStepDone('sharing'), older.forkStepDone('mapShares')]).toEqual([true, true, true]);
+  });
+
+  it('keeps the settings changed while the settings step is not done across restarts, and forgets them once it is', async () => {
+    const plugin = fakeDataPlugin(null);
+    const store = await ConnectSettingsStore.load(plugin);
+    store.set({ playerName: 'Rin' });
+    await store.flush();
+    expect(plugin.saved.at(-1)).toMatchObject({ forkOwnKeys: ['playerName'] });
+    const restarted = await ConnectSettingsStore.load(fakeDataPlugin({ ...(plugin.saved.at(-1) as object), forkOwnKeys: ['playerName', 'nope', 7] }));
+    expect([...restarted.changedSinceLoad]).toEqual(['playerName']);
+    restarted.markForkStep('settings');
+    expect([...restarted.changedSinceLoad]).toEqual([]);
+    restarted.set({ logEvents: true });
+    expect([...restarted.changedSinceLoad]).toEqual([]);
+    await restarted.flush();
+    const done = await ConnectSettingsStore.load(fakeDataPlugin({ online: {}, forkSteps: ['settings'], forkOwnKeys: ['playerName'] }));
+    expect([...done.changedSinceLoad]).toEqual([]);
   });
 
   it('keeps one save for a burst of changes and tells listeners until they unsubscribe', async () => {
