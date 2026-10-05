@@ -24,6 +24,8 @@ export interface DiceLogViewOptions {
   onOwnRoll?: PlayerDiceLogOptions['onOwnRoll'];
   /** Whether this log's surface has the keyboard: inside Obsidian other panes' Escape must not close it. The page always does. */
   active?: () => boolean;
+  /** The document whose keys the log takes; the page's by default. */
+  doc?: Document;
 }
 
 function text(className: string, content: string): HTMLSpanElement {
@@ -67,7 +69,7 @@ export class DiceLogView {
     options.closeButton.addEventListener('click', () => this.close(), { signal });
     options.toast.addEventListener('click', () => this.setOpen(true), { signal });
     // An open log takes Escape first: closing it is all Escape does then.
-    document.addEventListener('keydown', (event) => {
+    (options.doc ?? document).addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !this.log.isOpen || this.options.active?.() === false) return;
       event.stopImmediatePropagation();
       this.close();

@@ -2,6 +2,7 @@ import { Plugin } from 'obsidian';
 import './styles/main.scss';
 import { CanvasSceneView } from './src/app/online/obsidian/CanvasSceneView';
 import { ONLINE_SCENE_VIEW_TYPE } from './src/app/online/obsidian/onlineSceneTab';
+import { keyPerHost } from './src/app/online/obsidian/keyPerHost';
 import { AtlasLink } from './src/connect/atlasLink';
 import { ConnectSettingsStore } from './src/connect/settingsStore';
 import { ConnectSettingTab } from './src/connect/settingTab';
@@ -11,12 +12,15 @@ export default class AtlasVttConnectPlugin extends Plugin {
   /** Connect's own settings; narrows the base class's `settings?: unknown`. */
   declare settings: ConnectSettingsStore;
 
+  /** One key per GM host for the plugin's lifetime: a join after an Atlas reload is recognised by the GM. */
+  private readonly playerKeys = keyPerHost();
+
   async onload(): Promise<void> {
     this.settings = await ConnectSettingsStore.load(this);
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.
     this.registerView(ONLINE_SCENE_VIEW_TYPE, (leaf) => new CanvasSceneView(leaf));
     this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings));
-    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, { settings: this.settings })).start();
+    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, { settings: this.settings, playerKeys: this.playerKeys })).start();
     // Further services are added task by task (plan B4 onwards).
   }
 

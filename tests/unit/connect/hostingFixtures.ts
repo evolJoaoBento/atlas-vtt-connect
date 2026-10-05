@@ -59,7 +59,7 @@ function slowFolder(atlas: FakeAtlas, gate: Promise<void>): void {
 }
 
 /** Atlas with these capabilities, Connect linked to it, and an in-memory host every session uses. */
-export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>) {
+export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>, playerKeys?: (hostId: string) => string) {
   const workspace = fakeWorkspaceApp();
   const { app } = workspace;
   Object.assign(app, { vault: Object.assign(createInMemoryApp().app.vault, { getName: () => 'Vault' }) });
@@ -72,6 +72,7 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
   const requests: Array<(allow: boolean) => void> = [];
   new AtlasLink(connect.plugin, (extension, api) => startConnect(connect.plugin, extension, api, {
     settings: memorySettings(),
+    ...(playerKeys ? { playerKeys } : {}),
     hosting: {
       createHost: async () => memoryHost,
       table: async () => null,

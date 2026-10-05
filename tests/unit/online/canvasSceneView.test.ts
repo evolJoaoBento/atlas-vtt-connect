@@ -59,8 +59,7 @@ function world(ws = workspace()) {
   const reconnect = vi.spyOn(service, 'reconnect').mockReturnValue(null);
   const surface = new RecordingSurface();
   const frames = fakeFrames();
-  const throws = { throwRoll: vi.fn(() => true) };
-  const drawing = { surface, frames, isHidden: () => false, loadThrows: async () => throws };
+  const drawing = { surface, frames, isHidden: () => false };
   function open(): { view: CanvasSceneView; leaf: FakeLeaf } {
     const leaf: FakeLeaf = { app, view: null, detach: vi.fn() };
     const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, drawing);
@@ -68,7 +67,7 @@ function world(ws = workspace()) {
     ws.leaves.push(leaf);
     return { view, leaf };
   }
-  return { ws, app, service, attach, leave, sinks, sent, reconnect, surface, frames, throws, open };
+  return { ws, app, service, attach, leave, sinks, sent, reconnect, surface, frames, open };
 }
 
 describe('CanvasSceneView', () => {
@@ -166,7 +165,7 @@ describe('CanvasSceneView', () => {
     expect(view.onlineControls()!.rollDice({ d20: 1 }, 0)).toBe("The GM hasn't let you in yet.");
   });
 
-  it('lists the dice log, throws the own roll as 3D dice and toasts it when it cannot be thrown', async () => {
+  it('lists the dice log and shows the own roll as a result card', async () => {
     const w = world();
     const { view } = w.open();
     await view.onOpen();
@@ -174,12 +173,9 @@ describe('CanvasSceneView', () => {
     sink.session(admitted);
     sink.diceLog([roll]);
     expect(view.contentEl.querySelectorAll('.dice-log-list .dice-entry')).toHaveLength(1);
-    sink.ownRoll(roll);
-    await vi.waitFor(() => expect(w.throws.throwRoll).toHaveBeenCalledOnce());
     expect(view.contentEl.querySelector('.dice-toast')?.hasAttribute('hidden')).toBe(true);
-    w.throws.throwRoll.mockReturnValue(false);
-    sink.ownRoll({ ...roll, id: 'r2' });
-    await vi.waitFor(() => expect(view.contentEl.querySelector('.dice-toast')?.hasAttribute('hidden')).toBe(false));
+    sink.ownRoll(roll);
+    expect(view.contentEl.querySelector('.dice-toast')?.hasAttribute('hidden')).toBe(false);
   });
 
   it('offers Reconnect once the connection was lost', async () => {
@@ -234,5 +230,92 @@ describe('CanvasSceneView', () => {
     expect(log.hidden).toBe(true);
     expect(later).toHaveBeenCalledOnce();
     document.removeEventListener('keydown', later);
+  });
+
+  describe('keys belong to the tab only while it is the active view, in its own window', () => {
+    const escape = (target: EventTarget = document): void => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    };
+    const control = (view: CanvasSceneView, label: string): HTMLButtonElement =>
+      [...view.contentEl.querySelectorAll<HTMLButtonElement>('.tool-button')].find((button) => button.getAttribute('aria-label') === label)!;
+
+    async function opened() {
+      const w = world();
+      const { view } = w.open();
+      await view.onOpen();
+      w.sinks[0]!.session(admitted);
+      w.sinks[0]!.scene(playerScene());
+      return { w, view, active: (on: boolean): void => { w.ws.focus.view = on ? view : null; } };
+    }
+
+    it("leaves a toolbar menu open when Escape is pressed in another pane", async () => {
+      const { view, active } = await opened();
+      view.contentEl.querySelector<HTMLButtonElement>('.tool-chevron')!.click();
+      const flyout = view.contentEl.querySelector<HTMLElement>('.toolbar-menu:not([hidden])');
+      expect(flyout).not.toBeNull();
+      active(false);
+      escape();
+      expect(flyout!.hidden).toBe(false);
+      active(true);
+      escape();
+      expect(flyout!.hidden).toBe(true);
+    });
+
+    it('keeps the laser tool on Escape in another pane, and returns to Move on Escape in the tab', async () => {
+      const { view, active } = await opened();
+      control(view, 'Laser').click();
+      const canvas = view.contentEl.querySelector('canvas')!;
+      expect(canvas.dataset.tool).toBe('laser');
+      active(false);
+      escape();
+      expect(canvas.dataset.tool).toBe('laser');
+      active(true);
+      escape();
+      expect(canvas.dataset.tool).toBe('move');
+    });
+
+    it('keeps the dice tray open on Escape in another pane, and closes it in the tab', async () => {
+      const { view, active } = await opened();
+      control(view, 'Dice').click();
+      const tray = view.contentEl.querySelector<HTMLElement>('.dice-tray')!;
+      expect(tray.hidden).toBe(false);
+      active(false);
+      escape();
+      expect(tray.hidden).toBe(false);
+      active(true);
+      escape();
+      expect(tray.hidden).toBe(true);
+    });
+
+    it("takes Escape from the tab's own document, not the main window's, so a popout works", async () => {
+      const w = world();
+      const { view } = w.open();
+      const popout = document.implementation.createHTMLDocument('popout');
+      view.contentEl = popout.body.createDiv();
+      await view.onOpen();
+      w.ws.focus.view = view;
+      const log = view.contentEl.querySelector<HTMLElement>('.dice-log')!;
+      view.contentEl.querySelector<HTMLButtonElement>('.icon-button')!.click();
+      expect(log.hidden).toBe(false);
+      escape(document);
+      expect(log.hidden).toBe(false);
+      escape(popout);
+      expect(log.hidden).toBe(true);
+    });
+  });
+
+  it('shows a session the GM ended or a kick in its status bar, without Reconnect', async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const text = (selector: string): string | undefined => view.contentEl.querySelector(selector)?.textContent ?? undefined;
+    const reconnect = view.contentEl.querySelector<HTMLButtonElement>('button.secondary')!;
+    w.sinks[0]!.session({ ...admitted, status: 'lost', reason: 'ended' });
+    expect(text('.connection')).toBe('Disconnected');
+    expect(text('.scene-message')).toBe('The session ended.');
+    expect(reconnect.hidden).toBe(true);
+    w.sinks[0]!.session({ ...admitted, status: 'denied', reason: 'kicked' });
+    expect(text('.scene-message')).toBe('The GM removed you from the session.');
+    expect(reconnect.hidden).toBe(true);
   });
 });

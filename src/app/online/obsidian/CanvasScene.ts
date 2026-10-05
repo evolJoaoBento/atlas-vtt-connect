@@ -1,7 +1,7 @@
 /**
  * The Canvas 2D scene tab's wiring, without the Obsidian view around it: the joined session's sink. It draws the
- * presented scene with the join page's own map, tools, dice tray, dice log and 3D throws (`MapView`, `PageToolbar`,
- * `DiceTrayView`, `DiceLogView`, `OwnRollThrows`), sends the player's token drops, laser and rolls, shows the
+ * presented scene with the join page's own map, tools, dice tray and dice log (`MapView`, `PageToolbar`,
+ * `DiceTrayView`, `DiceLogView`), sends the player's token drops, laser and rolls, shows the
  * session's status and offers Follow GM, Fit map and Reconnect. It is Connect's player view on an Atlas without the
  * remote view; it needs nothing of Atlas's map.
  */
@@ -9,9 +9,6 @@ import { DiceLogView } from '../../../../online-client/diceLogView.mts';
 import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
 import { PageToolbar } from '../../../../online-client/toolbar.mts';
-import type { DiceDisplay } from '../../dice3d/diceDisplay';
-import { DEFAULT_PAGE_DICE_DISPLAY } from '../page/diceDisplayStore';
-import { OwnRollThrows, type DiceThrowModule } from '../page/ownRollThrows';
 import type { PlayerSessionState } from '../PlayerSession';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
@@ -36,16 +33,9 @@ export interface CanvasSceneOptions {
   frames?: { request(draw: () => void): number; cancel(handle: number): void };
   isHidden?: () => boolean;
   now?: () => number;
-  /** The 3D dice; loaded with the first own roll. */
-  loadThrows?: () => Promise<DiceThrowModule>;
-  /** How the player's own rolls show: Atlas's default (3D dice) unless a test says otherwise. */
-  display?: () => DiceDisplay;
   /** Whether this tab has the keyboard: Escape in another pane must not close its tray, menus or dice log. */
   active?: () => boolean;
 }
-
-/** The lazy entry of the join page's 3D dice (three.js and Atlas's dice), loaded on the first own roll. */
-const pageThrows = (): Promise<DiceThrowModule> => import('../../../../online-client/dice3d/diceThrows.mts').then((chunk) => chunk.diceThrows);
 
 export class CanvasScene implements OnlineSceneSink {
   readonly controls: OnlineSceneControls;
@@ -53,7 +43,6 @@ export class CanvasScene implements OnlineSceneSink {
   private readonly tray: DiceTrayView;
   private readonly log: DiceLogView;
   private readonly toolbar: PageToolbar;
-  private readonly ownRolls: OwnRollThrows;
   private readonly listeners = new AbortController();
   private state: PlayerSessionState | null = null;
   private shown: PlayerScene | null = null;
@@ -63,6 +52,8 @@ export class CanvasScene implements OnlineSceneSink {
 
   constructor(private readonly options: CanvasSceneOptions) {
     const { dom, service } = options;
+    // The keys of the window this tab is in, which may be a popout.
+    const doc = dom.root.ownerDocument;
     const surface = options.surface === undefined ? createCanvasSurface(dom.canvas) : options.surface;
     this.map = surface
       ? new MapView({
@@ -76,6 +67,7 @@ export class CanvasScene implements OnlineSceneSink {
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),
         ...(options.now ? { now: options.now } : {}),
         ...(options.active ? { active: options.active } : {}),
+        doc,
       })
       : null;
     this.tray = new DiceTrayView({
@@ -83,17 +75,11 @@ export class CanvasScene implements OnlineSceneSink {
       roll: (dice, modifier) => service.sendDiceRoll(dice, modifier),
       onClose: () => this.setDiceOpen(false),
     });
-    this.ownRolls = new OwnRollThrows({
-      container: dom.diceThrows,
-      display: options.display ?? ((): DiceDisplay => DEFAULT_PAGE_DICE_DISPLAY),
-      reducedMotion: () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
-      load: options.loadThrows ?? pageThrows,
-      fallback: (entry) => this.log.log.toastRoll(entry),
-    });
     this.log = new DiceLogView({
       panel: dom.diceLog, list: dom.diceLogList, empty: dom.diceLogEmpty, closeButton: dom.diceLogClose,
       toggleButton: dom.diceLogButton, toast: dom.diceToast,
       ...(options.active ? { active: options.active } : {}),
+      doc,
     });
     this.toolbar = new PageToolbar({
       root: dom.toolbar,
@@ -102,6 +88,7 @@ export class CanvasScene implements OnlineSceneSink {
       onLaserColor: (color) => this.map?.selectLaserColor(color),
       onDice: () => this.setDiceOpen(!this.tray.isOpen),
       ...(options.active ? { active: options.active } : {}),
+      doc,
     });
     this.controls = {
       followGm: () => this.map?.followGm(),
@@ -112,7 +99,7 @@ export class CanvasScene implements OnlineSceneSink {
     const { signal } = this.listeners;
     dom.reconnect.addEventListener('click', () => this.controls.reconnect(), { signal });
     // An open tray takes Escape first, before the map returns to Move.
-    document.addEventListener('keydown', (event) => {
+    doc.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !this.tray.isOpen || options.active?.() === false) return;
       event.stopImmediatePropagation();
       this.setDiceOpen(false);
@@ -164,9 +151,13 @@ export class CanvasScene implements OnlineSceneSink {
     if (live) this.log.log.toastRoll(newest);
   }
 
-  /** The player's own live roll: thrown as 3D dice, or shown as a result card when it cannot be. */
+  /**
+   * The player's own live roll, as a result card. Atlas's API cannot throw a given result as 3D dice (`dice.publish`
+   * only logs and toasts it in the player's own Atlas), and a second three.js would not load beside Atlas's; the
+   * remote view (B15) throws them with Atlas's own dice.
+   */
   ownRoll(entry: DiceLogEntry): void {
-    if (!this.ownRolls.handle(entry)) this.log.log.toastRoll(entry);
+    this.log.log.toastRoll(entry);
   }
 
   laser(laser: PlayerLaser): void {

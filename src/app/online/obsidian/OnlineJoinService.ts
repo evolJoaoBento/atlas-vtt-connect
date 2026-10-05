@@ -45,6 +45,8 @@ export interface OnlineJoinDeps {
   identityCrypto?: IdentityCrypto;
   /** This device's keys per table; Obsidian's local storage unless a test passes its own. */
   deviceKeys?: Pick<DeviceKeys, 'forTable'>;
+  /** One key per GM host, kept by the plugin across Atlas reloads; the service makes its own unless given one. */
+  playerKeyFor?: (hostId: string) => string;
 }
 
 type JoinSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'onChange'>;
@@ -79,10 +81,11 @@ export class OnlineJoinService {
     token: (assetId) => urlsOf(this.joined?.loader.image(assetId) ?? null)?.token ?? null,
   };
 
-  /** One key per GM host for this plugin's lifetime, so the GM recognises a reconnect. */
-  readonly playerKeyFor = keyPerHost();
+  /** One key per GM host, so the GM recognises a reconnect (the plugin's, when it passes one, so an Atlas reload keeps them). */
+  readonly playerKeyFor: (hostId: string) => string;
 
   constructor(private readonly app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
+    this.playerKeyFor = deps.playerKeyFor ?? keyPerHost();
     this.createClient = deps.createClient ?? createPeerClient;
     this.openStore = deps.openStore ?? openIndexedDbImageStore;
     this.decode = deps.decode ?? decodeToObjectUrls;

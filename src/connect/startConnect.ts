@@ -16,6 +16,8 @@ export interface ConnectOptions {
   settings: JoinSettings;
   /** Replaces parts of the hosting deps; tests pass an in-memory host and table. */
   hosting?: Partial<Deps>;
+  /** The plugin's player key per GM host, so an Atlas reload keeps them; the join service makes its own without. */
+  playerKeys?: (hostId: string) => string;
 }
 
 /** Hosting needs the presented scene, the views, the rules, Atlas's settings and a storage folder. */
@@ -53,7 +55,7 @@ export function startConnect(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
     else stops.push(stop);
   };
   // Joining needs no Atlas map and no capability, so it starts for every Atlas Connect binds to.
-  keep(startJoining(plugin, atlas, api, options.settings));
+  keep(startJoining(plugin, atlas, api, options.settings, options.playerKeys));
   if (canHost(api, atlas)) {
     startHosting(plugin, api, atlas, options, () => disposed).then(keep, (error: unknown) => {
       console.error('[Atlas VTT Connect] Could not start hosting online sessions:', error);

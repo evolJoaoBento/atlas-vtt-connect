@@ -39,7 +39,6 @@ async function joinFromObsidian() {
   const app = { workspace, vault } as unknown as App;
   const surface = new RecordingSurface();
   const frames = fakeFrames();
-  const throws = { throwRoll: vi.fn(() => true) };
   const seen = { scenes: [] as Array<PlayerScene | null>, lasers: [] as PlayerLaser[] };
   const decode: ImageDecoder = async () => null;
   const opened: { view: CanvasSceneView | null; leaf: FakeLeaf | null } = { view: null, leaf: null };
@@ -47,7 +46,7 @@ async function joinFromObsidian() {
     createClient: () => w.network.client(), openStore: async () => null, decode, hash: nodeHash, isHosting: () => false,
     openSceneTab: async () => {
       const leaf: FakeLeaf = { app, view: null, detach: vi.fn() };
-      const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, { surface, frames, isHidden: () => false, loadThrows: async () => throws });
+      const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, { surface, frames, isHidden: () => false });
       leaf.view = view;
       leaves.push(leaf);
       opened.view = view;
@@ -87,7 +86,7 @@ async function joinFromObsidian() {
     if (camera?.op !== 'camera') throw new Error('The tab drew nothing');
     return { x: x * camera.scale + camera.offsetX, y: y * camera.scale + camera.offsetY };
   };
-  return { w, service, view, leaf: (): FakeLeaf => opened.leaf!, vault, seen, surface, frames, throws, screenOf, playerId: (): string => service.state?.playerId ?? '' };
+  return { w, service, view, leaf: (): FakeLeaf => opened.leaf!, vault, seen, surface, frames, screenOf, playerId: (): string => service.state?.playerId ?? '' };
 }
 
 beforeEach(() => {
@@ -140,7 +139,7 @@ describe('an Obsidian player end to end', () => {
   });
 
   it("rolls through the GM, into the GM's dice log and the player's", async () => {
-    const { w, service, view, throws } = await joinFromObsidian();
+    const { w, service, view } = await joinFromObsidian();
     expect(view().onlineControls()!.rollDice({ d20: 1 }, 2)).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(w.logged.at(-1)).toMatchObject({ formula: 'd20+2', rolledBy: 'Anna', total: 13 });
@@ -148,14 +147,16 @@ describe('an Obsidian player end to end', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0]!.textContent).toContain('d20+2');
     expect(entries[0]!.textContent).toContain('13');
-    // The player's own roll is thrown as dice, not toasted.
-    await vi.waitFor(() => expect(throws.throwRoll).toHaveBeenCalledOnce());
+    // The player's own roll shows as a result card: no second three.js beside Atlas's.
+    const card = view().contentEl.querySelector('.dice-toast')!;
+    expect(card.hasAttribute('hidden')).toBe(false);
+    expect(card.textContent).toContain('13');
     service.dispose();
     w.finish();
   });
 
   it("points the laser at the GM and sees the GM's", async () => {
-    const { w, service, view, playerId, seen, screenOf } = await joinFromObsidian();
+    const { w, service, view, playerId, seen, screenOf, surface, frames } = await joinFromObsidian();
     const laser = [...view().contentEl.querySelectorAll<HTMLButtonElement>('.tool-button')].find((button) => button.getAttribute('aria-label') === 'Laser')!;
     laser.click();
     const canvas = view().contentEl.querySelector('canvas')!;
@@ -166,9 +167,14 @@ describe('an Obsidian player end to end', () => {
     expect(w.shown().at(-1)).toMatchObject({ from: playerId(), lifted: false });
     pointer(canvas, 'pointerup', at.x + 5, at.y + 5);
     await vi.advanceTimersByTimeAsync(200);
-    w.emitLocal({ kind: 'point', x: 70, y: 80 });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(seen.lasers.at(-1)).toMatchObject({ from: 'gm', points: [{ x: 70, y: 80 }] });
+    // The map draws it: the next frame has a stroke through the GM's last point.
+    const next = surface.calls.length;
+    for (const [x, y] of [[70, 80], [90, 100], [110, 120]] as const) w.emitLocal({ kind: 'point', x, y });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(seen.lasers.flatMap((laser) => laser.points)).toEqual(expect.arrayContaining([{ x: 110, y: 120 }]));
+    frames.run();
+    const strokes = surface.calls.slice(next).flatMap((call) => (call.op === 'paths' ? call.paths.flat() : []));
+    expect(strokes.some((point) => point.x === 110 && point.y === 120)).toBe(true);
     service.dispose();
     w.finish();
   });

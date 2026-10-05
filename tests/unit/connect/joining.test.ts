@@ -2,8 +2,10 @@ import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Modal } from 'obsidian';
 import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessionStore';
+import { keyPerHost } from '../../../src/app/online/obsidian/keyPerHost';
 import { OnlineJoinService } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
+import { FakeAtlas } from '../../fake/FakeAtlas';
 import { connected, HOSTING } from './hostingFixtures';
 
 const LINK = 'https://example.org/join/#id=gm';
@@ -70,5 +72,20 @@ describe('joining from Obsidian, through startConnect', () => {
     act(() => { button.click(); });
     expect(open).toHaveBeenCalledOnce();
     atlas.unload();
+  });
+
+  it('keeps the player key per GM across an Atlas reload, and gives each GM its own', async () => {
+    const keyed = keyPerHost();
+    const { atlas, connect, fire } = connected([], undefined, keyed);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = OnlineJoinService.forApp(connect.plugin.app)!;
+    const key = first.playerKeyFor('gm-a');
+    atlas.unload();
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.6.0', capabilities: [] }));
+    await vi.advanceTimersByTimeAsync(0);
+    const again = OnlineJoinService.forApp(connect.plugin.app)!;
+    expect(again).not.toBe(first);
+    expect(again.playerKeyFor('gm-a')).toBe(key);
+    expect(again.playerKeyFor('gm-b')).not.toBe(key);
   });
 });

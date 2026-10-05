@@ -16,16 +16,18 @@ export interface MapInputOptions {
   tools: PlayerTools;
   signal: AbortSignal;
   /** The mouse moved over the canvas (a point), or left it (null): the grab cursor follows. */
-  onHover(point: ScreenPoint | null): void;
+  onHover: (point: ScreenPoint | null) => void;
   /** Whether this map's surface has the keyboard (Escape, the waypoint key). The page always does. */
   active?: () => boolean;
+  /** The document whose keys these are: the tab's own window in Obsidian, which may be a popout. The page's document by default. */
+  doc?: Document;
 }
 
 function pointerKind(type: string): PointerKind {
   return type === 'touch' || type === 'pen' ? type : 'mouse';
 }
 
-export function bindMapInput({ canvas, input, tools, signal, onHover, active }: MapInputOptions): void {
+export function bindMapInput({ canvas, input, tools, signal, onHover, active, doc = document }: MapInputOptions): void {
   const point = (event: MouseEvent): ScreenPoint => {
     const rect = canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -65,7 +67,7 @@ export function bindMapInput({ canvas, input, tools, signal, onHover, active }: 
     input.doubleClick(point(event));
   }, { signal });
   // Escape ends a drag or a measurement and returns to Move; menus, the tray and panels take it first.
-  document.addEventListener('keydown', (event) => {
+  doc.addEventListener('keydown', (event) => {
     if (active?.() === false) return;
     if (event.key === 'Escape') tools.escape();
     // Atlas's waypoint key: it must not also scroll the page or press a focused button.
