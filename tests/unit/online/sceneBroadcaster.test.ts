@@ -231,6 +231,30 @@ describe('SceneBroadcaster', () => {
     expect(player.scene).toEqual(h.broadcaster.currentProjection());
   });
 
+  it('stops the size poll when presenting stops or the scene is held, and polls only a fogged scene', async () => {
+    const h = setup();
+    const fog = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 1000, y: 1000, width: 100, height: 100 } as FogOperation };
+    await join(h);
+    await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
+    const baseline = vi.getTimerCount();
+    const fogged = fakeView(sceneState({ hero: character('hero', 140) }, fog), { width: 0, height: 0 });
+    h.presented.present(fogged.view, fogged.tavern);
+    expect(vi.getTimerCount()).toBe(baseline + 1);
+    h.presented.clear();
+    expect(vi.getTimerCount()).toBe(baseline);
+    h.presented.present(fogged.view, fogged.tavern);
+    expect(vi.getTimerCount()).toBe(baseline + 1);
+    // Held: the view shows another tab.
+    fogged.tabs.getState().setActiveTab('dungeon');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(baseline);
+    h.presented.clear();
+    // Without fog the size changes nothing sent: no poll.
+    const clear = fakeView(sceneState({ hero: character('hero', 140) }), { width: 0, height: 0 });
+    h.presented.present(clear.view, clear.tavern);
+    expect(vi.getTimerCount()).toBe(baseline);
+  });
+
   it('batches changes into one patch per tick and sends nothing for an empty diff', async () => {
     const h = setup();
     const { view, store, tavern } = fakeView(sceneState({ hero: character('hero', 140) }));

@@ -2,7 +2,6 @@
  * Builds a map's payload on the sender's machine, from the saved map Atlas reads (`scenes.readMap`). Images are
  * hashed first (and the background's size read), so the payload never goes out without its art.
  */
-import { pinSize } from '@atlas-vtt/shared/draw';
 import type { CollectionGridDefaults, InitiativeRules, ScenesApi } from '@atlas-vtt/api-types';
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
@@ -14,6 +13,7 @@ import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
 import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
+import { pinFootprint } from './pinFootprint';
 import { readablePins, type SharedMapFile } from './sharedMapFile';
 
 /** A saved map: its file's map data, the state the projection reads, and the scene settings a full share carries. */
@@ -142,11 +142,10 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     assets: { idFor: (path) => (path ? context.images.fingerprints.get(path) ?? null : null) },
     collectionGrid: context.collectionGrid, coneAngle: context.coneAngle, initiativeRules: context.initiativeRules,
   }, memo);
-  // Pins players cannot see (GM-only, or not every cell of the badge Atlas draws proven revealed: ruling F-POS) and pins
-  // whose note is not ticked are left out.
+  // Pins players cannot see (GM-only, or not every cell of where Atlas draws them proven revealed: ruling F-POS,
+  // `pinFootprint`, a linked hex whole) and pins whose note is not ticked are left out.
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
-    const badge = { x: pin.x - pinSize.badgeRadius, y: pin.y - pinSize.badgeRadius, width: 2 * pinSize.badgeRadius, height: 2 * pinSize.badgeRadius };
-    if (pin.gmOnly || !coverage.reveals(badge, context.images.size)) return [];
+    if (pin.gmOnly || !coverage.reveals(pinFootprint(pin, source.map.grid), context.images.size)) return [];
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
     return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];

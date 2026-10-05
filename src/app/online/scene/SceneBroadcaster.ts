@@ -268,7 +268,8 @@ export class SceneBroadcaster implements SessionHandler {
 
   private project(live: ShownScene, { snapshot, lighting, fog }: Prepared): PlayerScene {
     live.slice = sliceOf(snapshot);
-    if (!(snapshot.mapSize.width > 0 && snapshot.mapSize.height > 0)) this.sizeWait.watch(() => live.scene.snapshot()?.mapSize);
+    // Only fog needs the size (F-POS); without fog nothing it decides waits on it.
+    if (fog.coverage.hasFog && !(snapshot.mapSize.width > 0 && snapshot.mapSize.height > 0)) this.sizeWait.watch(() => live.scene.snapshot()?.mapSize);
     return projectForPlayers(snapshot, {
       sceneId: live.sceneId,
       rules: this.rules,
