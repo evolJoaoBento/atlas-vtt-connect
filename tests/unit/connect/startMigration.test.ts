@@ -14,6 +14,10 @@ const FORK_PEOPLE = 'atlas-vtt/.atlas-data/sharing/people.json';
 const OWN_PEOPLE = 'atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing/people.json';
 const PEOPLE = JSON.stringify({ version: 1, people: [], retiredNames: [], placeholders: [] });
 const WITH_SCENES: AtlasCapability[] = [...HOSTING, 'scenes'];
+const WITH_SHARING: AtlasCapability[] = [...WITH_SCENES, 'bundles'];
+const OWN_SHARING = 'atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/sharing';
+const FORK_ITEMS = 'atlas-vtt/.atlas-data/sharing/items.json';
+const ITEMS = JSON.stringify({ version: 1, notes: {} });
 const KEYS = { publicKey: 'public', privateKey: { kty: 'EC', crv: 'P-256', d: 'd', x: 'x', y: 'y' } };
 const noImages: ImageCacheDeps = { exists: async () => false, open: async () => null };
 
@@ -43,13 +47,13 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(connect.commands.has('start-online-session')).toBe(true);
   });
 
-  it('a failed run keeps hosting off for this binding and says so; the next binding tries again', async () => {
+  it('a failed run keeps hosting and sharing off for this binding and says so; the next binding tries again', async () => {
     const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
     const notices: string[] = [];
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     let answer = (): void => undefined;
-    const { connect, files, atlas, fire } = connected(WITH_SCENES, new Promise<void>((resolve) => { answer = resolve; }), undefined, {
-      files: { [FORK_PEOPLE]: PEOPLE },
+    const { connect, files, atlas, fire } = connected(WITH_SHARING, new Promise<void>((resolve) => { answer = resolve; }), undefined, {
+      files: { [FORK_PEOPLE]: PEOPLE, [FORK_ITEMS]: ITEMS },
       options: { migration: store, migrationStart: { notify: (message) => { notices.push(message); }, images: noImages } },
     });
     vi.mocked(connect.plugin.app.vault.adapter.rename).mockRejectedValueOnce(new Error('Obsidian closed'));
@@ -58,16 +62,33 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(notices).toEqual([MIGRATION_FAILED_NOTICE]);
     expect(error).toHaveBeenCalled();
     expect(connect.commands.has('start-online-session')).toBe(false);
-    expect(files.has(OWN_PEOPLE)).toBe(false);
+    expect(connect.commands.has('shared-with-me')).toBe(false);
+    expect([...files.keys()].filter((path) => path.startsWith(`${OWN_SHARING}/`))).toEqual([]);
     expect(store.migratedFromFork).toBe(false);
     atlas.unload();
-    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.8.0', capabilities: WITH_SCENES }));
+    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.8.0', capabilities: WITH_SHARING }));
     await vi.advanceTimersByTimeAsync(0);
     expect(notices).toEqual([MIGRATION_FAILED_NOTICE, MIGRATED_NOTICE]);
     expect(files.get(OWN_PEOPLE)).toBe(PEOPLE);
+    expect(files.get(`${OWN_SHARING}/items.json`)).toBe(ITEMS);
     expect(connect.commands.has('start-online-session')).toBe(true);
+    expect(connect.commands.has('shared-with-me')).toBe(true);
     expect(store.migratedFromFork).toBe(true);
     error.mockRestore();
+  });
+
+  it('copies the fork settings even when a join changes a setting while the storage folder is asked for', async () => {
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+    let answer = (): void => undefined;
+    connected(WITH_SCENES, new Promise<void>((resolve) => { answer = resolve; }), undefined, {
+      files: { 'atlas-vtt/.atlas-data/settings.json': JSON.stringify({ online: { signaling: { mode: 'custom', host: 'peer.example', port: 9000, path: '/', key: 'k', secure: true } } }) },
+      options: { migration: store, migrationStart: { notify: () => undefined, images: noImages } },
+    });
+    store.set({ playerName: 'Rin' }); // as OnlineJoinService does when a join starts
+    answer();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.get().signaling.host).toBe('peer.example');
+    expect(store.migratedFromFork).toBe(true);
   });
 
   it('copies the device keys before joining starts, and runs one migration at a time', async () => {

@@ -46,9 +46,15 @@ export function startMigration(app: App, api: AtlasApi, atlas: AtlasExtension, s
   const existing = running.get(settings);
   if (existing) return existing;
   const notify = start.notify ?? ((message: string): void => { new Notice(message); });
+  // Read now, before joining starts: a name typed into a join while the folder is asked for must not count as Connect's own settings.
+  const hasOnline = settings.hasOnline;
+  const store: MigrationSettings = {
+    get: () => settings.get(), set: (partial) => settings.set(partial), hasOnline,
+    migratedFromFork: settings.migratedFromFork, markMigrated: () => settings.markMigrated(),
+  };
   migrateDeviceKeys(obsidianLocalStore(app));
   if (settings.get().keepImages) void migrateImageCache(start.images ?? indexedDbImageCaches(openIndexedDbImageStore));
-  const run = migrateVault(app, api, atlas, settings, notify).finally(() => { running.delete(settings); });
+  const run = migrateVault(app, api, atlas, store, notify).finally(() => { running.delete(settings); });
   running.set(settings, run);
   return run;
 }
