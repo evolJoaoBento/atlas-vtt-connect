@@ -28,6 +28,23 @@ describe('online panel', () => {
     expect(document.querySelector('.atlas-connect-panel')).toBeNull();
   });
 
+  it('unmounts when its view closes, and releases what it listened to', async () => {
+    harness.host([anna]);
+    await harness.openPanel();
+    const withPanel = harness.atlas.listenerCount();
+    act(() => { harness.atlas.views.close(harness.scene.view); });
+    expect(document.querySelector('.atlas-connect-panel')).toBeNull();
+    const closedWithPanel = harness.atlas.listenerCount();
+    expect(closedWithPanel).toBeLessThan(withPanel);
+
+    // The same view closing with the panel never opened leaves just as many listeners.
+    harness.gm();
+    harness = gmUiHarness();
+    harness.host([anna]);
+    act(() => { harness.atlas.views.close(harness.scene.view); });
+    expect(closedWithPanel).toBe(harness.atlas.listenerCount());
+  });
+
   it('offers to start a session while not hosting', async () => {
     const panel = within(await harness.openPanel());
     expect(panel.getByText(/Start a session to get a link/)).toBeTruthy();

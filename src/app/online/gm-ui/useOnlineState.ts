@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useReducer, useSyncExternalStore } from 'react';
 import type { ViewId, ViewsApi } from '@atlas-vtt/api-types';
 import type { TokenControl } from '../control/TokenControl';
 import { onlineSessionStore, type OnlineSessionState } from '../onlineSessionStore';
@@ -20,8 +20,9 @@ export function useTokenControlVersion(control: TokenControl | null): void {
   useEffect(() => control?.onChange(() => refresh()), [control]);
 }
 
-/** Renders again whenever the view's store changes what a snapshot holds, which a tab switch does. */
-export function useViewChanges(views: Pick<ViewsApi, 'subscribe'>, viewId: ViewId): void {
-  const [, refresh] = useReducer((version: number) => version + 1, 0);
-  useEffect(() => views.subscribe(viewId, () => refresh()), [views, viewId]);
+/** The tab the view shows; renders again only when it changes, not on every store change (a token drag). */
+export function useActiveTabId(views: Pick<ViewsApi, 'list' | 'subscribe'>, viewId: ViewId): string | null {
+  const subscribe = useCallback((onChange: () => void) => views.subscribe(viewId, onChange), [views, viewId]);
+  const read = useCallback(() => views.list().find((view) => view.viewId === viewId)?.activeTabId ?? null, [views, viewId]);
+  return useSyncExternalStore(subscribe, read);
 }

@@ -20,7 +20,7 @@ export interface DrawnPaletteSection { id: string; title: string; commands: Pale
 
 interface OpenPanel { container: HTMLElement; dispose: Disposer }
 
-const isText = (value: unknown): boolean => typeof value === 'string' && value.trim().length > 0;
+const isText = (value: unknown): boolean => typeof value === 'string' && value !== '';
 const VIEW_KINDS = ['map', 'remote'];
 
 /** Atlas's argument check: `call`'s spec must be an object with these fields (`ui/index.ts`, same messages). */
@@ -36,6 +36,35 @@ function check(call: string, spec: unknown, fields: Record<string, 'text' | 'str
   for (const [field, kind] of Object.entries(optional)) {
     if (record[field] !== undefined && !okay(kind, record[field])) throw new Error(`[Atlas API] ${call}: "${field}" must be ${kinds[kind]} when given.`);
   }
+}
+
+/** A badge worth drawing (Atlas's `drawableBadge`): `true`, a finite number (0 included) or a non-empty string. */
+function drawableBadge(value: unknown): string | number | true | null {
+  if (value === true) return true;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
+/** Menu entries as Atlas draws them: items without a label go, submenus keep their drawable children and go when none is left, `checked` and `disabled` belong to plain items. */
+function drawableMenu(items: unknown): MenuItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item: unknown): MenuItem[] => {
+    if (typeof item !== 'object' || item === null) return [];
+    const { label, icon, onClick, submenu, checked, disabled } = item as MenuItem;
+    if (!isText(label)) return [];
+    if (submenu !== undefined) {
+      const children = drawableMenu(submenu);
+      return children.length > 0 ? [{ label, ...(icon ? { icon } : {}), submenu: children }] : [];
+    }
+    return [{ label, ...(icon ? { icon } : {}), ...(onClick ? { onClick } : {}), ...(checked !== undefined ? { checked } : {}), ...(disabled !== undefined ? { disabled } : {}) }];
+  });
+}
+
+/** Palette commands as Atlas lists them: a malformed command is skipped. */
+function drawableCommands(commands: unknown): PaletteCommand[] {
+  if (!Array.isArray(commands)) return [];
+  return commands.filter((command): command is PaletteCommand => typeof command === 'object' && command !== null
+    && isText((command as PaletteCommand).id) && isText((command as PaletteCommand).label) && typeof (command as PaletteCommand).run === 'function');
 }
 
 /** An extension callback runs guarded: one that throws is logged and ignored. */
@@ -57,7 +86,6 @@ function guarded<T>(what: string, run: () => T, fallback: T): T {
 export class FakeUi {
   private readonly entries = new Set<Entry>();
   private readonly open = new Map<Entry<PanelSpec>, Map<ViewId, OpenPanel>>();
-  private readonly playerViews = new Set<ViewId>();
   private versions = 0;
 
   constructor(private readonly views: FakeViews) {}
@@ -74,21 +102,16 @@ export class FakeUi {
     return this.versions;
   }
 
-  /** The view shows a player's scene: none of the slots draws in it. */
-  markPlayerView(viewId: ViewId): void {
-    this.playerViews.add(viewId);
-  }
-
   /** The toolbar items the bar draws in the view, with `isActive` and `badge` read now. */
   drawToolbar(viewId: ViewId): DrawnToolbarItem[] {
     const ctx = this.ctxOf(viewId);
-    if (ctx.isPlayerView) return [];
+    if (!this.views.isOpen(viewId)) return [];
     return this.specs<ToolbarItem>('toolbar')
       .filter((item) => (item.views ?? ['map']).includes(ctx.kind))
       .map((item) => ({
         id: item.id, icon: item.icon, label: item.label, priority: item.priority ?? 50,
         active: item.isActive ? guarded('isActive', () => item.isActive!(ctx), false) : false,
-        badge: item.badge ? guarded('badge', () => item.badge!(ctx), null) : null,
+        badge: item.badge ? drawableBadge(guarded('badge', () => item.badge!(ctx), null)) : null,
       }));
   }
 
@@ -102,25 +125,25 @@ export class FakeUi {
   /** The palette's sections for the view, each with the commands it offers now. */
   palette(viewId: ViewId): DrawnPaletteSection[] {
     const ctx = this.ctxOf(viewId);
-    if (ctx.isPlayerView) return [];
-    return this.specs<PaletteSection>('palette').map((section) => ({
-      id: section.id, title: section.title, commands: guarded('commands', () => section.commands(ctx), []),
-    }));
+    if (!this.views.isOpen(viewId)) return [];
+    return this.specs<PaletteSection>('palette')
+      .map((section) => ({ id: section.id, title: section.title, commands: drawableCommands(guarded('commands', () => section.commands(ctx), [])) }))
+      .filter((section) => section.commands.length > 0);
   }
 
   /** The "More options" menu's extension items for the view. */
   viewMenu(viewId: ViewId): MenuItem[] {
     const ctx = this.ctxOf(viewId);
-    if (ctx.isPlayerView) return [];
-    return this.specs<MenuProvider<ViewContext>>('viewMenu').flatMap((provider) => guarded('view menu provider', () => provider(ctx), []));
+    if (!this.views.isOpen(viewId)) return [];
+    return this.specs<MenuProvider<ViewContext>>('viewMenu').flatMap((provider) => drawableMenu(guarded('view menu provider', () => provider(ctx), [])));
   }
 
   /** A token's context menu: the extension items, in GM views only. */
   tokenMenu(viewId: ViewId, tokenId: string, tokenKind: TokenMenuContext['tokenKind']): MenuItem[] {
     const ctx = this.ctxOf(viewId);
-    if (ctx.isPlayerView) return [];
+    if (!this.views.isOpen(viewId)) return [];
     const full: TokenMenuContext = { ...ctx, tokenId, tokenKind };
-    return this.specs<MenuProvider<TokenMenuContext>>('tokenMenu').flatMap((provider) => guarded('token menu provider', () => provider(full), []));
+    return this.specs<MenuProvider<TokenMenuContext>>('tokenMenu').flatMap((provider) => drawableMenu(guarded('token menu provider', () => provider(full), [])));
   }
 
   /** The dashboard tiles extensions registered. */
@@ -139,6 +162,12 @@ export class FakeUi {
     const entry = this.entriesOf<PanelSpec>('panel').find((candidate) => candidate.spec.id === id);
     if (!entry) throw new Error(`No panel "${id}".`);
     this.openIn(entry, viewId);
+  }
+
+  /** The panel's own close button (Atlas draws it): closes the panel `id` in the view. */
+  closePanel(id: string, viewId: ViewId): void {
+    const entry = this.entriesOf<PanelSpec>('panel').find((candidate) => candidate.spec.id === id);
+    if (entry) this.closeIn(entry, viewId);
   }
 
   /** The namespace one extension sees; `own` ties its registrations to that extension's connection. */
@@ -228,7 +257,16 @@ export class FakeUi {
     this.open.set(entry, shown);
     const container = document.createElement('div');
     document.body.append(container);
-    const unmount = guarded('panel mount', () => entry.spec.mount(container, ctx), (): void => undefined);
+    let unmount: Disposer;
+    try {
+      unmount = entry.spec.mount(container, ctx);
+    } catch (error) {
+      // Atlas logs a panel that cannot mount and closes it.
+      console.error('[Atlas API] A panel mount threw:', error);
+      container.remove();
+      if (shown.size === 0) this.open.delete(entry);
+      return;
+    }
     // The view closing closes the panel in it, as Atlas's `closeViewPanels`.
     const stopWatching = this.views.watchClose(viewId, () => this.closeIn(entry, viewId));
     shown.set(viewId, { container, dispose: () => { stopWatching?.(); guarded('panel unmount', unmount, undefined); container.remove(); } });
@@ -248,7 +286,7 @@ export class FakeUi {
   }
 
   private ctxOf(viewId: ViewId): ViewContext {
-    return { viewId, kind: 'map', isPlayerView: this.playerViews.has(viewId) };
+    return { viewId, kind: 'map', isPlayerView: false };
   }
 
   private entriesOf<T>(kind: Kind): Array<Entry<T>> {

@@ -1,6 +1,8 @@
 // The online session panel's content. Atlas draws the panel around it (frame, title, close button), so this styles
 // only what Connect renders into it. Spacing follows Atlas's tokens (4, 8, 12 px) and the type is Obsidian's.
 
+@use '../../../../styles/atlas-mixins' as *;
+
 $connect-mark-size: 8px;
 
 .atlas-connect-panel {
@@ -93,6 +95,7 @@ $connect-mark-size: 8px;
   gap: 8px;
   padding: 8px;
   border-radius: var(--radius-m);
+  @include atlas-corner-shape;
   background: var(--background-secondary);
 }
 

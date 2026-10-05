@@ -57,7 +57,6 @@ describe('the GM\'s UI in Atlas\'s slots', () => {
     await vi.advanceTimersByTimeAsync(0);
     atlas.views.open('v1');
     atlas.views.setActive('v1');
-    atlas.ui!.drawToolbar('v1'); // Atlas draws the toolbar of a GM view: Connect now knows it
     connect.run('online-session');
     expect(atlas.ui!.panelContainer('online', 'v1')).not.toBeNull();
     atlas.unload();

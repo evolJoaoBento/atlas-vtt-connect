@@ -112,8 +112,7 @@ describe('FakeAtlas follows the ui contract cases', () => {
     expect(ui.drawToolbar('v1')).toEqual([{ id: 't', icon: 'x', label: 'T', priority: 60, active: false, badge: null }]);
     on = true;
     expect(ui.drawToolbar('v1')[0]).toMatchObject({ active: true, badge: 3 });
-    atlas.views.open('player');
-    ui.markPlayerView('player');
+    // a player window is not one of Atlas's listed map views: no slot draws in it
     expect(ui.drawToolbar('player')).toEqual([]);
   });
 
@@ -190,5 +189,59 @@ describe('FakeAtlas panels', () => {
     handle.open('v1');
     plugin.unload();
     expect(unmounted).toHaveBeenCalledOnce();
+  });
+});
+
+describe('FakeAtlas draws slots as Atlas does', () => {
+  it('accepts a blank but non-empty text, as Atlas does', () => {
+    const { ext } = setup();
+    expect(() => ext.ui.addToolbarItem({ id: ' ', icon: 'x', label: ' ', onClick: noop })).not.toThrow();
+  });
+
+  it('draws nothing in a player window, which is not one of the listed map views', () => {
+    const { ui, ext } = setup();
+    ext.ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: noop });
+    ext.ui.addPaletteSection({ id: 'p', title: 'P', commands: () => [{ id: 'c', icon: 'x', label: 'C', run: noop }] });
+    ext.ui.addViewMenuItems(() => [{ label: 'Item' }]);
+    ext.ui.addTokenMenuItems(() => [{ label: 'Item' }]);
+    expect([ui.drawToolbar('player'), ui.palette('player'), ui.viewMenu('player'), ui.tokenMenu('player', 't', 'token')]).toEqual([[], [], [], []]);
+    expect(ui.drawToolbar('v1')).toHaveLength(1);
+  });
+
+  it('closes a panel whose mount throws', () => {
+    const { ui, ext } = setup();
+    const error = vi.spyOn(console, 'error').mockImplementation(noop);
+    const handle = ext.ui.addPanel({ id: 'p', title: 'P', mount: () => { throw new Error('boom'); } });
+    handle.open('v1');
+    expect(handle.isOpen('v1')).toBe(false);
+    expect(ui.panelContainer('p', 'v1')).toBeNull();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('normalises menu entries, commands and badges', () => {
+    const { ui, ext } = setup();
+    ext.ui.addViewMenuItems(() => [
+      { label: '' }, { label: 'Plain', checked: true, disabled: true },
+      { label: 'Empty', submenu: [] },
+      { label: 'Group', submenu: [{ label: '' }, { label: 'Child' }], checked: true },
+    ] as never);
+    expect(ui.viewMenu('v1')).toEqual([
+      { label: 'Plain', checked: true, disabled: true },
+      { label: 'Group', submenu: [{ label: 'Child' }] },
+    ]);
+    ext.ui.addPaletteSection({ id: 'full', title: 'Full', commands: () => [{ id: 'bad' } as never, { id: 'ok', icon: 'x', label: 'Ok', run: noop }] });
+    ext.ui.addPaletteSection({ id: 'empty', title: 'Empty', commands: () => [] });
+    expect(ui.palette('v1').map((section) => [section.id, section.commands.map((command) => command.id)])).toEqual([['full', ['ok']]]);
+    let badge: unknown = 0;
+    ext.ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: noop, badge: () => badge as never });
+    const drawn = (): unknown => ui.drawToolbar('v1')[0]!.badge;
+    expect(drawn()).toBe(0);
+    for (const nothing of ['', null, Number.NaN, {}, false]) {
+      badge = nothing;
+      expect(drawn()).toBeNull();
+    }
+    badge = true;
+    expect(drawn()).toBe(true);
   });
 });

@@ -33,8 +33,7 @@ describe('"Controlled by" in the token context menu', () => {
 
   it('does not show in a player view, which draws no extension items at all', () => {
     harness.host([anna, ben]);
-    harness.atlas.views.open('player');
-    harness.ui.markPlayerView('player');
+    // a player window is not one of Atlas's listed map views: no slot draws in it
     expect(rightClickLabels('hero', 'character', 'player')).toEqual([]);
   });
 

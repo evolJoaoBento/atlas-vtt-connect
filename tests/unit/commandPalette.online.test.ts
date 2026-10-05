@@ -49,8 +49,7 @@ describe('Online play in the command palette', () => {
   });
 
   it('offers nothing in a player view', () => {
-    harness.atlas.views.open('player');
-    harness.ui.markPlayerView('player');
+    // a player window is not one of Atlas's listed map views: no slot draws in it
     expect(harness.ui.palette('player')).toEqual([]);
   });
 
@@ -80,8 +79,7 @@ describe('Online play in the map\'s More options menu', () => {
   });
 
   it('is empty in a player view', () => {
-    harness.atlas.views.open('player');
-    harness.ui.markPlayerView('player');
+    // a player window is not one of Atlas's listed map views: no slot draws in it
     expect(harness.ui.viewMenu('player')).toEqual([]);
   });
 });
