@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { MapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
 import { CLOSE_TO_UPDATE, pullMap } from '../../../../src/app/online/sharing/receive/mapPull';
+import { PulledItems } from '../../../../src/app/online/sharing/receive/PulledItems';
 import { mapUpdateDialog } from '../../../../src/app/online/sharing/registerReceiving';
 import { mapOpenIn } from '../../../../src/app/online/sharing/registerSharing';
 import { connectingPlugin, FakeAtlas } from '../../../fake/FakeAtlas';
 import { IMAGE, input, MAP_IMAGE, newer, NOTE_ITEM, playerSafe, SCENES, setup } from './mapPullFixture';
 import { mapState } from './receiveFixtures';
 import { TABLE_ID } from './sharingFixtures';
+import { PATHS } from './sharingPathsFixture';
 
 // A re-pull on an Atlas with `scenes.replaceMap` (1.13.0): the received map is replaced in place, as the fork did.
 
@@ -77,16 +79,47 @@ describe('a re-pull where Atlas can replace the received map', () => {
     expect(scenes.addToCollection).toHaveBeenCalledTimes(1);
   });
 
-  it('a received scene Atlas will not let Connect replace (the fork made it) gets the new version as a new scene that later pulls follow', async () => {
-    const { files, atlas, pulled, notify, deps } = await setup();
-    // The fork's preview received this map: its scene record names no extension that added it.
+  it('a scene received before Atlas could replace one (the fork made it) gets the new version as a new scene that later pulls follow, and the honest question', async () => {
+    const { files, atlas, pulled, scenes, confirmUpdate, notify, deps } = await setup();
+    // The fork's preview received this map: Connect did not add its scene, so its record is not marked replaceable.
     const sceneId = atlas.scenes.addScene({ name: 'Inn', collectionId: 'Shared with me', mapPath: MAP });
     atlas.scenes.setMap(MAP, { background: null, grid: null, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} } });
     const record = pulled.put({ tableId: TABLE_ID, from: 'ana', item: ITEM, kind: 'map', path: MAP, version: 'V'.repeat(43), pulledAt: 1, sceneId });
     await pulled.writeBase(record, files.get(MAP)!);
     const outcome = await pullMap(deps({}), newer(playerSafe));
     expect(outcome).toEqual({ kind: 'updated', path: `${SCENES}/Inn (2).atlasmap` });
-    expect(notify).toHaveBeenCalledWith(`The new version of Inn is a new scene, ${SCENES}/Inn (2).atlasmap: Atlas VTT replaces only a scene Atlas VTT Connect added.`);
+    expect(scenes.replaceMap).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(`The new version of Inn is a new scene, ${SCENES}/Inn (2).atlasmap: your copy came in before Atlas VTT could replace a received map.`);
+    expect(pulled.get(TABLE_ID, 'ana', ITEM)).toMatchObject({ path: `${SCENES}/Inn (2).atlasmap`, version: 'W'.repeat(43), replaceable: true });
+    // Changed here, the question says both answers add a scene: Connect knows it cannot replace this copy.
+    files.set(MAP, `${files.get(MAP)!} `);
+    pulled.update(pulled.get(TABLE_ID, 'ana', ITEM)!.key, { path: MAP, sceneId, version: 'V'.repeat(43) });
+    const unmarked = pulled.get(TABLE_ID, 'ana', ITEM)!;
+    const { replaceable: _replaceable, ...plain } = unmarked;
+    pulled.put(plain);
+    await pullMap(deps({}), newer(playerSafe));
+    expect(confirmUpdate).toHaveBeenCalledWith('Inn', false);
+  });
+
+  it('marks the scenes Connect adds where Atlas can replace them, and the mark survives a reload; an older Atlas marks none', async () => {
+    const { app, pulled, deps } = await setup();
+    await pullMap(deps({}), input(playerSafe));
+    expect(pulled.get(TABLE_ID, 'ana', ITEM)).toMatchObject({ replaceable: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const reloaded = PulledItems.create(app.vault.adapter, PATHS);
+    await reloaded.ready();
+    expect(reloaded.get(TABLE_ID, 'ana', ITEM)).toMatchObject({ replaceable: true });
+    const older = await setup({ older: true });
+    await pullMap(older.deps({}), input(playerSafe));
+    expect(older.pulled.get(TABLE_ID, 'ana', ITEM)).not.toHaveProperty('replaceable');
+  });
+
+  it('a marked scene Atlas still refuses (its index forgot who added it) gets the new version as a new scene, and the receiver is told', async () => {
+    const { pulled, scenes, notify, deps } = await setup();
+    await pullMap(deps({}), input(playerSafe));
+    scenes.replaceMap!.mockRejectedValueOnce(new Error('[Atlas API] replaceMap: only a scene this extension added with addToCollection can be replaced.'));
+    expect(await pullMap(deps({}), newer(playerSafe))).toEqual({ kind: 'updated', path: `${SCENES}/Inn (2).atlasmap` });
+    expect(notify).toHaveBeenCalledWith(`The new version of Inn is a new scene, ${SCENES}/Inn (2).atlasmap: Atlas VTT did not replace your copy.`);
     expect(pulled.get(TABLE_ID, 'ana', ITEM)).toMatchObject({ path: `${SCENES}/Inn (2).atlasmap`, version: 'W'.repeat(43) });
   });
 });

@@ -41,13 +41,27 @@ function camera(value: unknown): MapFields['camera'] | undefined {
   return { x: value.x, y: value.y, scale: value.scale };
 }
 
-/** The four token settings Atlas knows, each of the right type; the rest are Atlas's defaults. */
+/** `hidden` with `key` in it or not. */
+function withHidden(hidden: readonly string[], key: string, isHidden: boolean): string[] {
+  if (hidden.includes(key) === isHidden) return [...hidden];
+  return isHidden ? [...hidden, key] : hidden.filter((other) => other !== key);
+}
+
+/**
+ * The four token settings Atlas knows, each of the right type; the rest are Atlas's defaults. A map file's two bar
+ * switches (`showHPBars`, `showStressBars`, which a fork sender's file may hold) become the hidden resources, as
+ * Atlas's `tokenSettingsFromFile` reads them.
+ */
 function tokenSettings(value: unknown): Partial<TokenSettings> | undefined {
   if (!isRecord(value)) return undefined;
-  const { showNameplates, hiddenResources, showInstanceBadges, tokenRingSize } = value;
+  const { showNameplates, showInstanceBadges, tokenRingSize, showHPBars, showStressBars } = value;
+  let hidden = Array.isArray(value.hiddenResources) && value.hiddenResources.every((key) => typeof key === 'string') ? [...value.hiddenResources] as string[] : null;
+  if ('showHPBars' in value || 'showStressBars' in value) {
+    hidden = withHidden(withHidden(hidden ?? [], 'hp', showHPBars === false), 'stress', showStressBars !== true);
+  }
   return {
     ...(typeof showNameplates === 'boolean' ? { showNameplates } : {}),
-    ...(Array.isArray(hiddenResources) && hiddenResources.every((key) => typeof key === 'string') ? { hiddenResources: [...hiddenResources] as string[] } : {}),
+    ...(hidden ? { hiddenResources: hidden } : {}),
     ...(typeof showInstanceBadges === 'boolean' ? { showInstanceBadges } : {}),
     ...(isFiniteNumber(tokenRingSize) && tokenRingSize > 0 ? { tokenRingSize } : {}),
   };

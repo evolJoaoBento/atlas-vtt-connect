@@ -28,6 +28,11 @@ export interface PulledRecord {
   baseKey: string;
   pulledAt: number;
   sceneId?: string;
+  /**
+   * Connect added the map's scene with `addToCollection` on an Atlas that has `replaceMap` (API 1.13.0), so Atlas
+   * lets Connect replace it. A scene the fork's preview made, or one added before, is not.
+   */
+  replaceable?: true;
   /** "Remember for this note". */
   choice?: UpdateChoice;
   conflictDefault?: ConflictDefault;
@@ -60,6 +65,7 @@ function parseRecord(value: unknown): PulledRecord | null {
     path: r.path, version: r.version as string, baseKey: r.baseKey as string,
     pulledAt: typeof r.pulledAt === 'number' ? r.pulledAt : 0,
     ...(typeof r.sceneId === 'string' ? { sceneId: r.sceneId } : {}),
+    ...(r.replaceable === true ? { replaceable: true as const } : {}),
     ...(CHOICES.includes(r.choice as UpdateChoice) ? { choice: r.choice as UpdateChoice } : {}),
     ...(DEFAULTS.includes(r.conflictDefault as ConflictDefault) ? { conflictDefault: r.conflictDefault as ConflictDefault } : {}),
     ...(r.silent === true ? { silent: true } : {}),

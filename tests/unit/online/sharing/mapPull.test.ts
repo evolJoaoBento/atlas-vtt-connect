@@ -287,6 +287,10 @@ describe('a received map is untrusted', () => {
     expect(state.camera).toEqual({ x: 0, y: 0, scale: 1 });
     expect(state.tokenSettings).toMatchObject({ showNameplates: false, tokenRingSize: 2 });
     expect(state.tokenSettings).not.toHaveProperty('extra');
+    // A fork sender's file keeps its bar switches: they become the hidden resources, as Atlas reads a file.
+    const switches = { ...map, tokenSettings: { showHPBars: false, showStressBars: true } };
+    const second = await pullMap(deps({}), { ...input({ format: 'atlas-share-map-v1', mode: 'full', name: 'Inn', map: switches, notes: [], images: [] }), item: { ...input(playerSafe).item, item: 'x'.repeat(22) } });
+    expect(mapState(files.get((second as { path: string }).path)).tokenSettings).toMatchObject({ hiddenResources: ['hp'], showHPBars: false, showStressBars: true });
     expect(state).not.toHaveProperty('initiativeTrackerOpen');
   });
 });

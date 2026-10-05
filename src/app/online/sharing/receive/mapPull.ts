@@ -8,10 +8,10 @@
  *
  * With Atlas's `scenes.replaceMap` (1.13.0), a re-pull replaces the received map in place, as the fork did: unchanged
  * here, or with Take theirs; Keep both adds the new version as a second scene that later pulls do not follow. A scene
- * open in a map view is not replaced: the receiver is told to close it, and the pull stays pending. A scene Atlas will
- * not let Connect replace (the fork's preview made it) gets the new version as a new scene, as on an older Atlas, where
- * the newer version always arrives as a new scene (`installUpdate`): with Take theirs later pulls follow the new one,
- * with Keep both they keep following the first.
+ * open in a map view is not replaced: the receiver is told to close it, and the pull stays pending. Only a scene Connect
+ * added on such an Atlas is replaced (`PulledRecord.replaceable`): one the fork's preview made, or one added before,
+ * gets the new version as a new scene, as on an older Atlas, where the newer version always arrives as a new scene
+ * (`installUpdate`): with Take theirs later pulls follow the new one, with Keep both they keep following the first.
  */
 import type { App, TFile } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
@@ -125,7 +125,16 @@ async function writeBaseOf(pulled: PulledItems, record: PulledRecord, added: Add
 
 /** Why a newer version went to a new scene, told when the receiver was not asked or was told Take theirs replaces. */
 const CANNOT_REPLACE = 'Atlas VTT cannot replace a scene yet.';
-const NOT_CONNECTS = 'Atlas VTT replaces only a scene Atlas VTT Connect added.';
+const OLD_COPY = 'your copy came in before Atlas VTT could replace a received map.';
+const REFUSED = 'Atlas VTT did not replace your copy.';
+
+/** The record of a scene Connect added where Atlas can replace it: `replaceMap` is there and Connect added it there. */
+function replaceable(deps: MapPullDeps, known: PulledRecord): (PulledRecord & { sceneId: string }) | null {
+  return typeof deps.scenes.replaceMap === 'function' && known.replaceable === true && known.sceneId !== undefined ? { ...known, sceneId: known.sceneId } : null;
+}
+
+/** Marks a scene Connect adds now as one Atlas lets it replace (it has `replaceMap`, so it notes Connect as the scene's maker). */
+const addedHere = (deps: MapPullDeps): { replaceable?: true } => (typeof deps.scenes.replaceMap === 'function' ? { replaceable: true } : {});
 /** Told when the received map is open: the pull stays pending until it is closed. */
 export const CLOSE_TO_UPDATE = 'Close the scene to update it.';
 
@@ -137,7 +146,7 @@ async function installUpdate(deps: MapPullDeps, add: () => Promise<Added>, known
   const added = await add();
   if (why) deps.notify?.(`The new version of ${input.item.title} is a new scene, ${added.mapPath}: ${why}`);
   if (!follow) return { kind: 'both', path: added.mapPath };
-  const record = deps.pulled.update(known.key, { path: added.mapPath, sceneId: added.sceneId, version: input.item.version, pulledAt: (deps.now ?? Date.now)() }) ?? known;
+  const record = deps.pulled.update(known.key, { path: added.mapPath, sceneId: added.sceneId, version: input.item.version, pulledAt: (deps.now ?? Date.now)(), ...addedHere(deps) }) ?? known;
   await writeBaseOf(deps.pulled, record, added);
   return { kind: 'updated', path: added.mapPath };
 }
@@ -147,8 +156,8 @@ const isOpenRefusal = (error: unknown): boolean => error instanceof Error && /op
 /**
  * Replaces the received map in place (`replaceMap`), keeping its scene: the record keeps its path and takes the new
  * version, and the text Atlas wrote is its base. An open scene is not touched: the receiver is told to close it and the
- * pull stays pending (cancelled). Null when Atlas refuses for another reason (not a scene Connect added): the caller
- * adds a new scene instead.
+ * pull stays pending (cancelled). Null when Atlas refuses for another reason (its index lost who added the scene):
+ * the caller adds a new scene instead.
  */
 async function replaceKnown(deps: MapPullDeps, known: PulledRecord & { sceneId: string }, input: MapPullInput, prepared: Prepared): Promise<PullOutcome | null> {
   const closeFirst = (): PullOutcome => {
@@ -192,7 +201,7 @@ async function updateChoice(deps: MapPullDeps, known: PulledRecord, file: TFile,
   // The version already pulled, still as Atlas saved it: nothing to add.
   if (base !== null && !changedHere && known.version === input.item.version) return 'unchanged';
   if (!changedHere) return { follow: true, asked: false };
-  const choice = await deps.confirmUpdate(input.item.title, typeof deps.scenes.replaceMap === 'function' && known.sceneId !== undefined);
+  const choice = await deps.confirmUpdate(input.item.title, replaceable(deps, known) !== null);
   return choice === null ? 'cancelled' : { follow: choice === 'theirs', asked: true };
 }
 
@@ -221,19 +230,19 @@ async function writeMap(deps: MapPullDeps, input: MapPullInput): Promise<PullOut
     return { ...added, text: file ? await app.vault.read(file) : null };
   };
   if (known && update) {
-    const canReplace = typeof scenes.replaceMap === 'function';
-    const { sceneId } = known;
-    if (canReplace && update.follow && sceneId !== undefined) {
-      const replaced = await replaceKnown(deps, { ...known, sceneId }, input, await prepare(parentOf(known.path)));
+    const own = replaceable(deps, known);
+    if (own && update.follow) {
+      const replaced = await replaceKnown(deps, own, input, await prepare(parentOf(known.path)));
       if (replaced) return replaced;
-      return installUpdate(deps, add, known, true, input, NOT_CONNECTS);
+      return installUpdate(deps, add, known, true, input, REFUSED);
     }
-    return installUpdate(deps, add, known, update.follow, input, update.asked ? null : CANNOT_REPLACE);
+    const why = typeof scenes.replaceMap === 'function' ? OLD_COPY : CANNOT_REPLACE;
+    return installUpdate(deps, add, known, update.follow, input, update.asked ? null : why);
   }
   const added = await add();
   const record = pulled.put({
     tableId: input.tableId, from: input.from, item: input.item.item, kind: 'map', path: added.mapPath, version: input.item.version,
-    pulledAt: (deps.now ?? Date.now)(), sceneId: added.sceneId, ...(known ? { baseKey: known.baseKey } : {}),
+    pulledAt: (deps.now ?? Date.now)(), sceneId: added.sceneId, ...(known ? { baseKey: known.baseKey } : {}), ...addedHere(deps),
   });
   await writeBaseOf(pulled, record, added);
   return { kind: 'created', path: added.mapPath };
