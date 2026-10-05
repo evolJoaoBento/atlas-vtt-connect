@@ -99,8 +99,12 @@ export class FakeAtlas implements AtlasApi {
 
   /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
   /** `scenesBefore113`: Atlas's scenes as before API 1.13.0 (no saved map fields, no `replaceMap`). */
+  /**
+   * `version`: by default the vendored API's, 1.14.0. Only Connect's version gate reads it: the fake behaves as 1.14.0
+   * whatever it says, so a test names an older version only where the gate is what it checks.
+   */
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault; scenesBefore113?: boolean } = {}) {
-    this.version = options.version ?? '1.13.0';
+    this.version = options.version ?? '1.14.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
     this.views = new FakeViews({

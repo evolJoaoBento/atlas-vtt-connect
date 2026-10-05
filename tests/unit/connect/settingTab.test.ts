@@ -34,6 +34,17 @@ describe('ConnectSettingTab', () => {
     }
   });
 
+  it('offers New table key, which asks before replacing the key', async () => {
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
+    let asked = 0;
+    const tab = new ConnectSettingTab(new App(), {} as Plugin, store, () => null, () => { asked++; });
+    tab.display();
+    const button = rowOf(tab.containerEl, 'Table key').querySelector('button')!;
+    expect(button.textContent).toBe('New table key');
+    button.click();
+    expect(asked).toBe(1);
+  });
+
   it('offers the same rows to Obsidian 1.13 and later as definitions, with search terms', async () => {
     const { tab, store } = await renderTab();
     const definitions = tab.getSettingDefinitions() as SettingDefinitionRender[];

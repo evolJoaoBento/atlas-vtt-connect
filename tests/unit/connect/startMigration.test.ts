@@ -9,6 +9,7 @@ import { failureNotice, RETRY_COMMAND, startMigration, type MigrationStart } fro
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { fakeDataPlugin } from './fakeDataPlugin';
 import { connected, HOSTING } from './hostingFixtures';
+import { KEY_MOVED_NOTICE } from '../../../src/connect/newTableKey';
 
 const FORK_SETTINGS = 'atlas-vtt/.atlas-data/settings.json';
 const FORK_PEOPLE = 'atlas-vtt/.atlas-data/sharing/people.json';
@@ -58,7 +59,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(LEFTOVER_NOTICE).toContain('atlas-vtt/.atlas-data/sharing');
     // An Atlas reload binds again: nothing runs twice.
     atlas.unload();
-    fire('atlas-vtt:api-ready', new FakeAtlas({ version: '1.13.0', capabilities: WITH_SHARING }));
+    fire('atlas-vtt:api-ready', new FakeAtlas({ capabilities: WITH_SHARING }));
     await vi.advanceTimersByTimeAsync(0);
     expect(notices).toHaveLength(1);
     expect(connect.commands.has('start-online-session')).toBe(true);
@@ -117,9 +118,12 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const store = await ConnectSettingsStore.load(fakeDataPlugin(data.saved.at(-1)), memoryKeyValueStore()); // Obsidian restarted
     const { plugin } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { playerName: 'GM', table: TABLE } }) } }).connect;
     const atlas = new FakeAtlas({ capabilities: [] });
-    await startMigration(plugin.app, atlas, atlas.connect(plugin), store, { notify: () => undefined, images: noImages, rereadDelayMs: 0 });
+    const notices: string[] = [];
+    await startMigration(plugin.app, atlas, atlas.connect(plugin), store, { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 });
     expect(store.get().playerName).toBe('Rin');
     expect(store.get().table).toEqual(TABLE);
+    // The table key came over from the preview's settings file: the GM hears once where it lives now.
+    expect(notices.filter((message) => message === KEY_MOVED_NOTICE)).toHaveLength(1);
   });
 
   it('a join that changes a setting while the folder is asked for keeps it, and the fork settings still come over', async () => {
@@ -138,7 +142,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
     const { connect } = connected([], undefined, undefined, { files: { [FORK_SETTINGS]: JSON.stringify({ online: { table: TABLE } }) } });
     Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
-    const atlas = new FakeAtlas({ version: '1.13.0', capabilities: [] });
+    const atlas = new FakeAtlas({ capabilities: [] });
     const extension = atlas.connect(connect.plugin);
     const notices: string[] = [];
     const start: MigrationStart = { notify: (message) => { notices.push(message); }, images: noImages, rereadDelayMs: 0 };
@@ -147,7 +151,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     expect(startMigration(connect.plugin.app, atlas, extension, store, start)).toBe(first);
     expect(await first).toBe(true);
     expect(store.get().table).toEqual(TABLE);
-    expect(notices).toEqual([MIGRATED_NOTICE]);
+    expect(notices).toEqual([MIGRATED_NOTICE, KEY_MOVED_NOTICE]);
     // No storage, so the folder and the map shares wait for a newer Atlas.
     expect(store.migratedFromFork).toBe(false);
     // Device keys are merged on every start: a key found later still arrives.
@@ -181,7 +185,7 @@ describe('the fork migration when Connect binds to Atlas', () => {
     const { connect } = connected([], undefined, undefined, {});
     const local = new Map<string, unknown>([[FORK_DEVICE_KEYS_STORAGE, { 'table-a': KEYS }]]);
     Object.assign(connect.plugin.app, { loadLocalStorage: (key: string) => local.get(key) ?? null, saveLocalStorage: (key: string, value: unknown) => { local.set(key, value); } });
-    const atlas = new FakeAtlas({ version: '1.13.0', capabilities: ['storage'] });
+    const atlas = new FakeAtlas({ capabilities: ['storage'] });
     expect(await startMigration(connect.plugin.app, atlas, atlas.connect(connect.plugin), store, { notify: () => undefined, images: { exists, open: async () => null } })).toBe(true);
     expect(local.get(DEVICE_KEYS_STORAGE)).toEqual({ 'table-a': KEYS });
     await vi.advanceTimersByTimeAsync(0);

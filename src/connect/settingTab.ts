@@ -2,6 +2,7 @@ import {
   Notice, PluginSettingTab, Setting, type App, type Plugin, type SettingDefinitionItem, type TextComponent, type ToggleComponent,
 } from 'obsidian';
 import { DEFAULT_ONLINE_SETTINGS, formatTurnServers, parseTurnServers, type OnlineSettings } from '../app/online/onlineSettings';
+import { NEW_TABLE_KEY_LABEL, newTableKey } from './newTableKey';
 import type { ConnectSettingsStore } from './settingsStore';
 
 function isHttpUrl(text: string): boolean {
@@ -33,8 +34,14 @@ interface SettingRow {
 export class ConnectSettingTab extends PluginSettingTab {
   private cleanups: Array<() => void> = [];
 
-  /** `sharingNotice`: why notes and maps cannot be shared with the bound Atlas, or null when they can (or no Atlas is bound). */
-  constructor(app: App, plugin: Plugin, private readonly settings: ConnectSettingsStore, private readonly sharingNotice: () => string | null = () => null) {
+  /**
+   * `sharingNotice`: why notes and maps cannot be shared with the bound Atlas, or null when they can (or no Atlas is
+   * bound). `replaceTableKey`: what the New table key button runs (`newTableKey`, which asks first).
+   */
+  constructor(
+    app: App, plugin: Plugin, private readonly settings: ConnectSettingsStore, private readonly sharingNotice: () => string | null = () => null,
+    private readonly replaceTableKey: () => void = () => { void newTableKey({ settings }); },
+  ) {
     super(app, plugin);
   }
 
@@ -62,7 +69,7 @@ export class ConnectSettingTab extends PluginSettingTab {
   private rows(): SettingRow[] {
     const notice = this.sharingNotice();
     return [
-      this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(),
+      this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(), this.tableKeyRow(),
       ...(notice ? [this.sharingRow(notice)] : []), this.propertiesRow(), this.imagesRow(), this.logRow(),
     ];
   }
@@ -182,6 +189,19 @@ export class ConnectSettingTab extends PluginSettingTab {
             if (url && !isHttpUrl(url)) new Notice("That isn't a web address; the player page was not changed.");
           });
         });
+      },
+    };
+  }
+
+  private tableKeyRow(): SettingRow {
+    return {
+      name: 'Table key',
+      desc: 'Proves to players that a session is your table. It stays on this device. Make a new one if a copy may have reached someone else; every player must then be approved again.',
+      aliases: ['key', 'table', 'security', 'privacy'],
+      render: (setting) => {
+        setting.addButton((button) => button
+          .setButtonText(NEW_TABLE_KEY_LABEL)
+          .onClick(() => this.replaceTableKey()));
       },
     };
   }

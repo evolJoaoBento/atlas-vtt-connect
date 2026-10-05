@@ -50,4 +50,10 @@ describe('main.ts wiring', () => {
     expect(first!.migration).toBe(plugin.settings);
     expect(second!.lifetime).toBe(first!.lifetime);
   });
+
+  it('offers New table key from load on, whether or not Atlas is bound', async () => {
+    const plugin = loadedPlugin();
+    await plugin.onload();
+    expect((plugin as unknown as { commands: Record<string, { name: string }> }).commands['new-table-key']?.name).toBe('New table key…');
+  });
 });

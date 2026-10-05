@@ -12,6 +12,8 @@ import { FORK_NAME, pageKey } from '../app/online/page/pageStorage';
 import { DEVICE_KEYS_STORAGE, isKeyPairJwk, OLD_DEVICE_KEYS_STORAGE, type KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 
 export const FORK_DEVICE_KEYS_STORAGE = `${FORK_NAME}-device-keys`;
+/** The preview's table key on this device, from its 0.6 on (it kept it in Atlas's settings file before). The two plugins must agree on it. */
+export const FORK_TABLE_KEY_STORAGE = `${FORK_NAME}-table-key`;
 export const FORK_IMAGES_DB_NAME = `${FORK_NAME}-images`;
 /** Set in Obsidian's local storage (this vault on this device) once the fork's kept images were copied: each device has its own. */
 export const IMAGES_COPIED_KEY = pageKey('fork-images-copied');

@@ -12,7 +12,7 @@ export const FORK_SETTINGS_FILE = 'atlas-vtt/.atlas-data/settings.json';
 /** Longer than Atlas's 500 ms save debounce and its write: a file caught mid-rewrite is whole again by then. */
 const REREAD_DELAY_MS = 1500;
 
-export type ForkSettingsStore = Pick<ConnectSettingsStore, 'get' | 'set' | 'changedSinceLoad' | 'forkStepDone' | 'markForkStep'>;
+export type ForkSettingsStore = Pick<ConnectSettingsStore, 'get' | 'set' | 'changedSinceLoad' | 'forkStepDone' | 'markForkStep' | 'markKeyMoved'>;
 
 export interface ForkSettingsDeps {
   adapter: Pick<DataAdapter, 'exists' | 'read'>;
@@ -58,7 +58,11 @@ export async function migrateForkSettings(deps: ForkSettingsDeps): Promise<Step<
   const parsed = await readForkSettings(deps);
   if (parsed === null) return { result: 'none', done: false };
   const copied = isRecord(parsed) && isRecord(parsed.online);
-  if (copied) settings.set(merged(resolveOnlineSettings(parsed.online), settings));
+  if (copied) {
+    const hadTable = settings.get().table !== null;
+    settings.set(merged(resolveOnlineSettings(parsed.online), settings));
+    if (!hadTable && settings.get().table !== null) settings.markKeyMoved();
+  }
   settings.markForkStep('settings');
   return { result: copied ? 'copied' : 'none', done: true };
 }

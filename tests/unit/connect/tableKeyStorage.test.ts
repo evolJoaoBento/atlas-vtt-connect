@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { migrateForkSettings } from '../../../src/connect/migrateForkSettings';
 import { ConnectSettingsStore, TABLE_KEY_STORAGE } from '../../../src/connect/settingsStore';
+import { FORK_TABLE_KEY_STORAGE } from '../../../src/connect/migrateLocalStores';
 import { ensureTableIdentity } from '../../../src/app/online/sharing/identity/tableKey';
 import { memoryKeyValueStore, type KeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
@@ -99,7 +100,71 @@ describe('the table key lives in local storage on this device, never in data.jso
     await settings.flush();
     expect(local.get(TABLE_KEY_STORAGE)).toEqual(TABLE);
     expect(settings.get().table).toEqual(TABLE);
+    expect(settings.takeKeyMoved()).toBe(true);
     expect(plugin.saved.length).toBeGreaterThan(0);
     for (const saved of plugin.saved) expect((saved as { online: object }).online).not.toHaveProperty('table');
+  });
+
+  it('retries a strip whose save failed when the plugin unloads', async () => {
+    let fail = true;
+    const saved: unknown[] = [];
+    const plugin = { loadData: async () => ({ online: { table: TABLE } }), saveData: async (value: unknown) => { if (fail) throw new Error('locked'); saved.push(value); } };
+    const store = await ConnectSettingsStore.load(plugin, memoryKeyValueStore());
+    await Promise.resolve();
+    fail = false;
+    await store.flush();
+    expect((saved.at(-1) as { online: object }).online).not.toHaveProperty('table');
+    // Nothing waiting: no further save.
+    await store.flush();
+    expect(saved).toHaveLength(1);
+  });
+
+  it('says once that the key moved here, and not when it was already on this device', async () => {
+    const moved = await ConnectSettingsStore.load(fakeDataPlugin({ online: { table: TABLE } }), memoryKeyValueStore());
+    expect(moved.takeKeyMoved()).toBe(true);
+    expect(moved.takeKeyMoved()).toBe(false);
+    const local = memoryKeyValueStore();
+    local.set(TABLE_KEY_STORAGE, TABLE);
+    expect((await ConnectSettingsStore.load(fakeDataPlugin(null), local)).takeKeyMoved()).toBe(false);
+  });
+});
+
+describe("the online play preview's table key on this device", () => {
+  it('keeps the name the preview uses', () => {
+    expect(FORK_TABLE_KEY_STORAGE).toBe(['atlas', 'online', 'table', 'key'].join('-'));
+  });
+
+  it('is adopted on every start while Connect has no table here, and never removed', async () => {
+    const local = memoryKeyValueStore();
+    local.set(FORK_TABLE_KEY_STORAGE, OTHER);
+    const plugin = fakeDataPlugin(null);
+    const store = await ConnectSettingsStore.load(plugin, local);
+    expect(store.get().table).toEqual(OTHER);
+    expect(local.get(TABLE_KEY_STORAGE)).toEqual(OTHER);
+    expect(local.get(FORK_TABLE_KEY_STORAGE)).toEqual(OTHER);
+    expect(store.takeKeyMoved()).toBe(true);
+    // A malformed entry is not adopted.
+    const bad = memoryKeyValueStore();
+    bad.set(FORK_TABLE_KEY_STORAGE, { id: 'short', publicKey: 'p', privateKey: {} });
+    expect((await ConnectSettingsStore.load(fakeDataPlugin(null), bad)).get().table).toBeNull();
+  });
+
+  it("comes after Connect's own key, here or in data.json, and before the preview's settings file", async () => {
+    const both = memoryKeyValueStore();
+    both.set(TABLE_KEY_STORAGE, TABLE);
+    both.set(FORK_TABLE_KEY_STORAGE, OTHER);
+    expect((await ConnectSettingsStore.load(fakeDataPlugin(null), both)).get().table).toEqual(TABLE);
+    const filed = memoryKeyValueStore();
+    filed.set(FORK_TABLE_KEY_STORAGE, OTHER);
+    expect((await ConnectSettingsStore.load(fakeDataPlugin({ online: { table: TABLE } }), filed)).get().table).toEqual(TABLE);
+    // The preview's settings file holds an older key: the local one wins.
+    const OLDER = { ...TABLE, id: 'c'.repeat(43), privateKey: { ...TABLE.privateKey, d: 'older' } };
+    const { app } = createInMemoryApp({ files: { 'atlas-vtt/.atlas-data/settings.json': JSON.stringify({ online: { table: OLDER } }) } });
+    const local = memoryKeyValueStore();
+    local.set(FORK_TABLE_KEY_STORAGE, OTHER);
+    const settings = await ConnectSettingsStore.load(fakeDataPlugin(null), local);
+    await migrateForkSettings({ adapter: app.vault.adapter, settings, rereadDelayMs: 0 });
+    expect(settings.get().table).toEqual(OTHER);
+    expect(local.get(TABLE_KEY_STORAGE)).toEqual(OTHER);
   });
 });

@@ -31,6 +31,12 @@ export class App {
 export class Plugin {
   constructor(public app?: App) {}
   addSettingTab(_tab: unknown): void {}
+  /** The commands added, by id. */
+  commands: Record<string, { id: string; name: string; callback?: () => unknown }> = {};
+  addCommand(command: { id: string; name: string; callback?: () => unknown }): typeof command {
+    this.commands[command.id] = command;
+    return command;
+  }
 }
 
 /** Obsidian's settings tab base: the container the tab renders into. */

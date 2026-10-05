@@ -83,7 +83,7 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
     metadataCache: Object.assign(memory.metadataCache, { on: cacheEvents.on, offref: cacheEvents.offref }),
   });
   const connect = hostPlugin(app);
-  const atlas = new FakeAtlas({ version: '1.13.0', capabilities, trigger: workspace.fire });
+  const atlas = new FakeAtlas({ capabilities, trigger: workspace.fire });
   if (gate) slowFolder(atlas, gate);
   workspace.plugins['atlas-vtt'] = { api: atlas };
   const network = new MemoryNetwork();

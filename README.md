@@ -75,6 +75,7 @@ To test against a real Atlas, check out the Atlas branch `api/extension-api` of 
 
 - **Git mode** (default): `npm run sync:atlas -- --atlas <Atlas checkout> --commit <sha>`. The checkout must be at `<sha>` with no tracked changes; the script runs `npm run build:packages` there.
 - **Exported tree**: `npm run sync:atlas -- --source <dir> --commit <full sha>`. Use this when the checkout is busy or on another branch. Export the tag (`git archive <tag> | tar -x -C <dir>`), link or install `node_modules`, run `npm run build:packages` in `<dir>`, then sync. `<dir>` needs `dist-packages`, `api-report` and `tests/api`; the script reads the contract case ids from those files and does not use git.
+- Both modes record `--repository` and `--branch` in SOURCE.json (default `evolJoaoBento/atlas-vtt`, `api/extension-api`); name them when syncing from elsewhere.
 
 ### Test inventory
 

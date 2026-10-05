@@ -81,7 +81,7 @@ describe('hosting through the Atlas API', () => {
     let answer: () => void = () => undefined;
     const { atlas, connect, fire } = connected(HOSTING, new Promise<void>((resolve) => { answer = resolve; }));
     atlas.unload();
-    const again = new FakeAtlas({ version: '1.13.0', capabilities: HOSTING });
+    const again = new FakeAtlas({ capabilities: HOSTING });
     fire('atlas-vtt:api-ready', again);
     await vi.advanceTimersByTimeAsync(0);
     expect(connect.added()).toBe(5);
@@ -100,7 +100,7 @@ describe('hosting through the Atlas API', () => {
     const { atlas, connect, fire } = connected();
     await vi.advanceTimersByTimeAsync(0);
     atlas.unload();
-    const again = new FakeAtlas({ version: '1.13.0', capabilities: HOSTING });
+    const again = new FakeAtlas({ capabilities: HOSTING });
     fire('atlas-vtt:api-ready', again);
     await vi.advanceTimersByTimeAsync(0);
     expect(connect.commands.size).toBe(4);

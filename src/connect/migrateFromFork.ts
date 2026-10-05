@@ -15,7 +15,7 @@ export const MIGRATED_NOTICE = 'Atlas VTT Connect brought over your online play 
 /** Added when the sharing folder was copied: the preview's copy stays, and the user should know what it holds. */
 export const LEFTOVER_NOTICE = `The preview's copy stays in ${FORK_SHARING_DIR} and still holds the old text of notes shared with you. Delete it once you've checked your people and shares.`;
 
-export type MigrationSettings = ForkSettingsStore & Pick<ConnectSettingsStore, 'migratedFromFork'>;
+export type MigrationSettings = ForkSettingsStore & Pick<ConnectSettingsStore, 'migratedFromFork' | 'takeKeyMoved'>;
 
 export interface MigrationDeps {
   adapter: MigrationAdapter;

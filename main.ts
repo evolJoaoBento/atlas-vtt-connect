@@ -1,10 +1,11 @@
-import { Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import './styles/main.scss';
 import { CanvasSceneView } from './src/app/online/obsidian/CanvasSceneView';
 import { ONLINE_SCENE_VIEW_TYPE } from './src/app/online/obsidian/onlineSceneTab';
 import { keyPerHost } from './src/app/online/obsidian/keyPerHost';
 import { AtlasLink } from './src/connect/atlasLink';
 import { ConnectSettingsStore } from './src/connect/settingsStore';
+import { KEY_MOVED_NOTICE, registerNewTableKey } from './src/connect/newTableKey';
 import { obsidianLocalStore } from './src/app/online/sharing/identity/deviceKeys';
 import { UPDATE_ATLAS_TO_SHARE } from './src/connect/connectSharing';
 import { ConnectSettingTab } from './src/connect/settingTab';
@@ -22,6 +23,8 @@ export default class AtlasVttConnectPlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.settings = await ConnectSettingsStore.load(this, obsidianLocalStore(this.app));
+    if (this.settings.takeKeyMoved()) new Notice(KEY_MOVED_NOTICE);
+    registerNewTableKey(this, this.settings);
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.
     this.registerView(ONLINE_SCENE_VIEW_TYPE, (leaf) => new CanvasSceneView(leaf));
     this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings, () => (this.canShare === false ? UPDATE_ATLAS_TO_SHARE : null)));

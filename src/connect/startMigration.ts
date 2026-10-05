@@ -8,6 +8,7 @@ import { Notice, type App, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 import { openIndexedDbImageStore } from '../app/online/assets/indexedDbImageStore';
 import { obsidianLocalStore } from '../app/online/sharing/identity/deviceKeys';
+import { KEY_MOVED_NOTICE } from './newTableKey';
 import { need } from './capabilities';
 import { migrateFromFork, MIGRATED_NOTICE, type MigrationSettings } from './migrateFromFork';
 import { FORK_SETTINGS_FILE, migrateForkSettings } from './migrateForkSettings';
@@ -61,6 +62,7 @@ async function migrateSettingsOnly(app: App, settings: MigrationSettings, start:
   try {
     const step = await migrateForkSettings({ adapter: app.vault.adapter, settings, ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }) });
     if (step.result === 'copied') notify(MIGRATED_NOTICE);
+    if (settings.takeKeyMoved()) notify(KEY_MOVED_NOTICE);
   } catch (error) {
     console.error("[Atlas VTT Connect] Could not bring over the preview's online settings; tried again next start:", error);
   }
@@ -82,6 +84,7 @@ async function migrateVault(app: App, api: AtlasApi, atlas: AtlasExtension, sett
         ...(start.rereadDelayMs === undefined ? {} : { rereadDelayMs: start.rereadDelayMs }),
       });
     }
+    if (settings.takeKeyMoved()) notify(KEY_MOVED_NOTICE);
   } catch (error) {
     console.error('[Atlas VTT Connect] Could not bring over the preview\'s online play data:', error);
     notify(failureNotice(error));

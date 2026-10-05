@@ -1,6 +1,7 @@
 // node scripts/sync-atlas.mjs --atlas <Atlas checkout> --commit <sha>   (git mode: checks the checkout is at <sha>, builds, copies)
 // node scripts/sync-atlas.mjs --source <built tree> --commit <sha>      (exported tree, e.g. `git archive <tag> | tar -x`, already
 //   built with `npm run build:packages`: copies dist-packages and api-report and records <sha>; no git needed)
+// Both take --repository <owner/name> and --branch <name> for SOURCE.json (default evolJoaoBento/atlas-vtt, api/extension-api).
 // Copies Atlas's extension packages into vendor/atlas (decision D1).
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -48,5 +49,5 @@ const files = hashTree(vendor);
 const report = readFileSync(path.join(vendor, 'api-types/atlas-vtt-api.d.ts'), 'utf8');
 const apiVersion = report.match(/export declare const API_VERSION = "([^"]+)";/)?.[1] ?? fail('No API_VERSION in the report.');
 const contractCases = [...new Set(contractCaseIds())].sort();
-writeFileSync(path.join(vendor, 'SOURCE.json'), JSON.stringify({ repository: 'evolJoaoBento/atlas-vtt', branch: 'api/extension-api', commit: head, apiVersion, contractCases, files }, null, 2) + '\n');
+writeFileSync(path.join(vendor, 'SOURCE.json'), JSON.stringify({ repository: parsed.repository, branch: parsed.branch, commit: head, apiVersion, contractCases, files }, null, 2) + '\n');
 console.log(`Vendored Atlas ${head.slice(0, 7)} (API ${apiVersion}): ${Object.keys(files).length} files, ${contractCases.length} contract cases.`);

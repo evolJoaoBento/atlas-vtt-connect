@@ -1,6 +1,7 @@
 import type { Plugin } from 'obsidian';
 import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, validStoredTable, type OnlineSettings, type StoredTable } from '../app/online/onlineSettings';
 import type { KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
+import { FORK_TABLE_KEY_STORAGE } from './migrateLocalStores';
 
 /**
  * Where the GM's table key lives: Obsidian's local storage, which Obsidian keeps per vault on each device. Never in
@@ -56,6 +57,10 @@ export class ConnectSettingsStore {
   private readonly changed: Set<keyof OnlineSettings>;
   /** Whether the table key is safely in local storage (read back after writing), or there is none: then `data.json` holds none. */
   private tableKept = true;
+  /** A save that did not reach the file; `flush` (at unload) tries it again. */
+  private unsaved = false;
+  /** The table key moved here this session (out of `data.json`, or from the online play preview): `takeKeyMoved` tells once. */
+  private keyMoved = false;
 
   private constructor(
     private readonly plugin: DataPlugin, private readonly local: KeyValueStore, private online: OnlineSettings,
@@ -69,7 +74,10 @@ export class ConnectSettingsStore {
   /**
    * `local` is Obsidian's local storage (`obsidianLocalStore`). A table key found in `data.json` (written before keys
    * moved out, or synced from a device that still runs such a version) is moved once: written to local storage, read
-   * back, and only then stripped from `data.json`. A key already in local storage wins over the synced one.
+   * back, and only then stripped from `data.json`. A key already in local storage wins over the synced one. With
+   * neither, the online play preview's own key on this device (its local storage, from its 0.6 on) is adopted, on
+   * every start and per device; the preview's entry is never removed. Its older key in Atlas's settings file comes
+   * last, through the settings step of the migration (`migrateForkSettings`).
    */
   static async load(plugin: DataPlugin, local: KeyValueStore): Promise<ConnectSettingsStore> {
     const stored: unknown = await plugin.loadData();
@@ -81,10 +89,31 @@ export class ConnectSettingsStore {
     online.table = kept ?? synced;
     const store = new ConnectSettingsStore(plugin, local, online, data.migratedFromFork === 1, listOf(data.forkSteps, isForkStep), listOf(data.forkOwnKeys, isSettingKey));
     const inFile = typeof data.online === 'object' && data.online !== null && 'table' in data.online;
-    if (!kept && synced) store.tableKept = store.keepTable(synced);
+    if (!kept && synced) {
+      store.tableKept = store.keepTable(synced);
+      store.keyMoved = true;
+    }
+    const fork = kept || synced ? null : validStoredTable(local.get(FORK_TABLE_KEY_STORAGE));
+    if (fork) {
+      store.online.table = fork;
+      store.tableKept = store.keepTable(fork);
+      store.keyMoved = true;
+    }
     // Strip the key from the file (or the leftover entry) once it is safe on this device.
     if (inFile && store.tableKept) store.saveNow();
     return store;
+  }
+
+  /** True once after the table key moved to this device's local storage this session; the caller shows `KEY_MOVED_NOTICE`. */
+  takeKeyMoved(): boolean {
+    const moved = this.keyMoved;
+    this.keyMoved = false;
+    return moved;
+  }
+
+  /** The table key came over from the online play preview's settings file (`migrateForkSettings`). */
+  markKeyMoved(): void {
+    this.keyMoved = true;
   }
 
   get(): OnlineSettings {
@@ -132,11 +161,12 @@ export class ConnectSettingsStore {
     this.saveNow();
   }
 
-  /** Saves at once when a change is waiting; called when the plugin unloads. */
+  /** Saves at once when a change is waiting, or the last save failed (a strip of the table key included); called when the plugin unloads. */
   async flush(): Promise<void> {
-    if (this.saveTimer === null) return;
-    window.clearTimeout(this.saveTimer);
-    this.saveTimer = null;
+    if (this.saveTimer !== null) {
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    } else if (!this.unsaved) return;
     await this.save();
   }
 
@@ -176,7 +206,9 @@ export class ConnectSettingsStore {
       ...(this.changed.size > 0 ? { forkOwnKeys: [...this.changed] } : {}),
     };
     try {
+      this.unsaved = true;
       await this.plugin.saveData(data);
+      this.unsaved = false;
     } catch (error) {
       console.error('[Atlas VTT Connect] Could not save the settings:', error);
     }
