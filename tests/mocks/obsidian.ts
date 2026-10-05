@@ -208,6 +208,10 @@ export class Component {
   register(cb: () => void): void {
     this.cleanups.push(cb);
   }
+  /** As Obsidian's: the event is taken off its emitter (`ref.e`) on unload. */
+  registerEvent(ref: { e?: { offref(ref: unknown): void } }): void {
+    this.register(() => ref.e?.offref(ref));
+  }
   addChild<T>(child: T): T {
     return child;
   }

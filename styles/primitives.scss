@@ -55,4 +55,10 @@
   &.is-bottom {
     top: calc(100% + 4px);
   }
+
+  &.is-multiline {
+    width: max-content;
+    max-width: 260px;
+    white-space: normal;
+  }
 }

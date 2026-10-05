@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { App, Setting, type Plugin, type SettingDefinitionRender } from 'obsidian';
+import { UPDATE_ATLAS_TO_SHARE } from '../../../src/connect/connectSharing';
 import { ConnectSettingTab } from '../../../src/connect/settingTab';
 import { ConnectSettingsStore } from '../../../src/connect/settingsStore';
 import { fakeDataPlugin } from './fakeDataPlugin';
@@ -91,5 +92,16 @@ describe('ConnectSettingTab', () => {
     tab.hide();
     store.set({ signaling: { ...store.get().signaling, mode: 'custom' } });
     expect(address.classList.contains('is-disabled')).toBe(true);
+  });
+
+  it('says to update Atlas while the bound Atlas cannot share notes and maps, and not otherwise', async () => {
+    const store = await ConnectSettingsStore.load(fakeDataPlugin(null));
+    let notice: string | null = UPDATE_ATLAS_TO_SHARE;
+    const tab = new ConnectSettingTab(new App(), {} as Plugin, store, () => notice);
+    tab.display();
+    expect(rowOf(tab.containerEl, 'Sharing notes and maps').querySelector('.setting-item-description')?.textContent).toBe('Update Atlas VTT to share notes and maps.');
+    notice = null;
+    tab.display();
+    expect(() => rowOf(tab.containerEl, 'Sharing notes and maps')).toThrow();
   });
 });

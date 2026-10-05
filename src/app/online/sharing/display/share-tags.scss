@@ -1,0 +1,99 @@
+// Share tags in notes (editor, reading view, the Share with… preview): a label per start tag, the covered
+// text highlighted in the label's colour. Notes live outside any Atlas view, so main.scss imports this at the root.
+@use '../../../../../styles/atlas-mixins' as *;
+
+$share-tag-tones: (
+  private: --color-red-rgb,
+  public: --color-green-rgb,
+  only: --color-blue-rgb,
+  except: --color-orange-rgb,
+);
+
+.atlas-share-tag {
+  display: inline-block;
+  // An inline capsule in running text: vertical padding would grow the line, so it is smaller than the side padding.
+  padding: 0 0.5em;
+  border-radius: $radius-s;
+  font-size: var(--font-smallest);
+  font-weight: $font-weight-medium;
+  line-height: 1.6;
+  vertical-align: baseline;
+  white-space: nowrap;
+  margin-inline-end: $spacing-xs;
+  cursor: text;
+}
+
+@each $tone, $rgb in $share-tag-tones {
+  .atlas-share-tag--#{$tone} {
+    background-color: rgba(var(#{$rgb}), 0.2);
+    color: rgb(var(#{$rgb}));
+  }
+
+  .atlas-share-tag-hl--#{$tone},
+  .atlas-share-tag-block--#{$tone} {
+    background-color: rgba(var(#{$rgb}), 0.12);
+  }
+}
+
+.atlas-share-tag-hl {
+  border-radius: $radius-xs;
+}
+
+.atlas-share-tag-block {
+  border-radius: $radius-s;
+}
+
+// The atlas-share property (properties panel and Source mode frontmatter): its entries in the labels' colours.
+@each $tone, $rgb in $share-tag-tones {
+  .metadata-property .multi-select-pill.atlas-share-pill--#{$tone},
+  .atlas-share-yaml--#{$tone} {
+    background-color: rgba(var(#{$rgb}), 0.2);
+    color: rgb(var(#{$rgb}));
+  }
+
+  .metadata-property .atlas-share-text--#{$tone} .metadata-input-longtext,
+  .metadata-property .atlas-share-text--#{$tone} input {
+    color: rgb(var(#{$rgb}));
+  }
+}
+
+.atlas-share-yaml {
+  border-radius: $radius-s;
+}
+
+// Not recognised: the private colour with a dashed outline (the reason shows under the property).
+.atlas-share-tag.atlas-share-unrecognised,
+.metadata-property .multi-select-pill.atlas-share-unrecognised,
+.atlas-share-yaml.atlas-share-unrecognised {
+  outline: 1px dashed rgb(var(--color-red-rgb));
+  outline-offset: -1px;
+}
+
+.metadata-property .multi-select-pill.atlas-share-not-met .multi-select-pill-content::after {
+  content: ' (not met yet)';
+  opacity: 0.8;
+}
+
+.metadata-property:has(> .atlas-share-property-hint) {
+  flex-wrap: wrap;
+}
+
+.atlas-share-property-hint {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+
+  .atlas-share-tag {
+    margin-inline-end: 0;
+  }
+}
+
+.atlas-share-property-hint__reason {
+  flex-basis: 100%;
+  color: var(--text-error);
+}

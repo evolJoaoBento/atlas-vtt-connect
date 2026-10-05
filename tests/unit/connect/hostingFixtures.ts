@@ -6,7 +6,7 @@ import { decodeControl, encodeControl, type ControlMessage } from '../../../src/
 import { AtlasLink } from '../../../src/connect/atlasLink';
 import { startConnect } from '../../../src/connect/startConnect';
 import { FakeAtlas } from '../../fake/FakeAtlas';
-import { fakeWorkspaceApp } from '../../fake/fakeWorkspace';
+import { fakeEvents, fakeWorkspaceApp } from '../../fake/fakeWorkspace';
 import { createInMemoryApp } from '../../mocks/inMemoryVault';
 import { memorySettings } from './memorySettings';
 
@@ -18,6 +18,8 @@ export function hostPlugin(app: Plugin['app']) {
   let added = 0;
   const statusBar = document.createElement('div');
   const cleanups: Array<() => void> = [];
+  /** The editor extension lists the plugin registered (sharing registers one, once). */
+  const extensions: unknown[] = [];
   const plugin = {
     app,
     manifest: { id: 'atlas-vtt-connect' },
@@ -26,11 +28,14 @@ export function hostPlugin(app: Plugin['app']) {
     addCommand: (command: Command) => { added++; commands.set(command.id, command); return command; },
     removeCommand: (id: string) => { commands.delete(id); },
     addStatusBarItem: () => statusBar.createDiv(),
+    registerEditorExtension: (extension: unknown) => { extensions.push(extension); },
+    registerMarkdownPostProcessor: () => undefined,
   } as unknown as Plugin;
   return {
     plugin,
     commands,
     statusBar,
+    extensions,
     /** How many times a command was added, removed ones included. */
     added: () => added,
     /** Runs a palette command, as Obsidian does: a `checkCallback` is asked first. */
@@ -62,7 +67,13 @@ function slowFolder(atlas: FakeAtlas, gate: Promise<void>): void {
 export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<void>, playerKeys?: (hostId: string) => string) {
   const workspace = fakeWorkspaceApp();
   const { app } = workspace;
-  Object.assign(app, { vault: Object.assign(createInMemoryApp().app.vault, { getName: () => 'Vault' }) });
+  const memory = createInMemoryApp().app;
+  const vaultEvents = fakeEvents();
+  const cacheEvents = fakeEvents();
+  Object.assign(app, {
+    vault: Object.assign(memory.vault, { getName: () => 'Vault', on: vaultEvents.on, offref: vaultEvents.offref }),
+    metadataCache: Object.assign(memory.metadataCache, { on: cacheEvents.on, offref: cacheEvents.offref }),
+  });
   const connect = hostPlugin(app);
   const atlas = new FakeAtlas({ version: '1.6.0', capabilities, trigger: workspace.fire });
   if (gate) slowFolder(atlas, gate);
@@ -70,8 +81,11 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
   const network = new MemoryNetwork();
   const memoryHost = network.host('gm-id');
   const requests: Array<(allow: boolean) => void> = [];
+  /** What each binding said about sharing (`ConnectOptions.sharing`). */
+  const sharing: Array<boolean | null> = [];
   new AtlasLink(connect.plugin, (extension, api) => startConnect(connect.plugin, extension, api, {
     settings: memorySettings(),
+    sharing: (available) => { sharing.push(available); },
     ...(playerKeys ? { playerKeys } : {}),
     hosting: {
       createHost: async () => memoryHost,
@@ -91,5 +105,5 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
     requests.at(-1)?.(true);
     return { received, send: (message) => link.send('control', encodeControl(message)) };
   };
-  return { atlas, connect, join, fire: workspace.fire };
+  return { atlas, connect, join, sharing, fire: workspace.fire, vaultEvents, cacheEvents, workspace: app.workspace as unknown as ReturnType<typeof fakeEvents> };
 }

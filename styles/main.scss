@@ -6,3 +6,6 @@
 @use '../src/app/online/ui/online-session';
 @use '../src/app/online/gm-ui/online-panel';
 @use 'online-scene-canvas';
+@use '../src/app/online/sharing/ui/sharing';
+@use '../src/app/online/sharing/people/ui/people';
+@use '../src/app/online/sharing/display/share-tags';

@@ -3,13 +3,18 @@ import type { SessionPlayer } from '../../../../src/app/online/GmSession';
 import { JsonDataFile } from '../../../../src/app/online/sharing/dataFile';
 import { hostedTable } from '../../../../src/app/online/sharing/identity/reissue';
 import { makeDeviceProof } from '../../../../src/app/online/sharing/identity/proofs';
+import { isPerson, partAllows, ruleReaches } from '../../../../src/app/online/sharing/model/audience';
+import { mapShareReaches, type MapShare } from '../../../../src/app/online/sharing/model/mapShare';
+import { unknownNamesIn, unlinkedExceptNames } from '../../../../src/app/online/sharing/model/noteFilter';
+import { parseShareRule, unknownRuleNames } from '../../../../src/app/online/sharing/model/shareRule';
 import { IdentityDesk } from '../../../../src/app/online/sharing/people/IdentityDesk';
 import { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { parsePeopleData, personKey } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { parsePlaceholders, placeholderKey, type Placeholder } from '../../../../src/app/online/sharing/people/placeholderTypes';
+import { unlinkedMapWarnings } from '../../../../src/app/online/sharing/ui/unlinkedWarnings';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { PATHS } from './sharingPathsFixture';
-import { nodeIdentityCrypto as crypto, testTable } from './sharingFixtures';
+import { noteCatalogue, nodeIdentityCrypto as crypto, testPeople, testPerson, testTable } from './sharingFixtures';
 
 const T = 'T'.repeat(43);
 const U = 'U'.repeat(43);
@@ -86,6 +91,77 @@ describe('people added by name', () => {
     expect(parsePlaceholders([
       { id: dave.id, name: 'Dave', formerNames: ['Davey', 3, ''] }, { name: 'dave' }, { name: '' }, { name: 5 }, null, 'x', { formerNames: [] }, { name: 'Eve' },
     ])).toEqual([{ id: dave.id, name: 'Dave', formerNames: ['Davey'] }, { id: expect.any(String), name: 'Eve', formerNames: [] }]);
+  });
+});
+
+describe('a placeholder grants nothing', () => {
+  const ana = testPerson('ana', 'Ana');
+  const people = testPeople([ana], [dave]);
+  const ruleOf = (value: unknown) => parseShareRule(value);
+  const recipient = { tableId: ana.tableId, personId: 'ana' };
+
+  it('only|Dave and atlas-share: [Dave] reach nobody, and are no longer "unknown"', () => {
+    expect(ruleReaches(ruleOf(['Dave']), recipient, people)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, recipient, people)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Dave', 'Ana'] }, recipient, people)).toBe(true);
+    expect(unknownRuleNames(ruleOf(['Dave', 'Zed']), people)).toEqual(['Zed']);
+    expect(unknownNamesIn('---\natlas-share: [Dave]\n---\n%%[!only|Dave, Zed]%%x%%[!end]%%', people)).toEqual(['Zed']);
+  });
+
+  it('except|Dave, with Dave not linked yet, hides the part from everyone, like an unknown name', () => {
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, recipient, people)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Zed'] }, recipient, people)).toBe(false);
+    expect(ruleReaches(ruleOf(['public', 'except Dave']), recipient, people)).toBe(false);
+    expect(ruleReaches(ruleOf(['public', 'except Zed']), recipient, people)).toBe(false);
+  });
+
+  it('the real Dave arriving as "Dave (2)" does not see what was kept back from Dave', async () => {
+    const real = book();
+    await real.ready();
+    real.addPlaceholder('Dave');
+    const arrived = real.seen(T, 'dave2', 'Dave');
+    expect(arrived.name).toBe('Dave (2)');
+    const them = { tableId: T, personId: 'dave2' };
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, them, real)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, them, real)).toBe(false);
+    expect(ruleReaches(ruleOf(['public', 'except Dave']), them, real)).toBe(false);
+    expect(ruleReaches(ruleOf(['Dave']), them, real)).toBe(false);
+    // Once linked, except|Dave hides it from Dave and shows it to others; only|Dave reaches Dave.
+    real.linkPlaceholder(personKey(T, 'dave2'), named(real, 'Dave').id);
+    const eve = real.seen(T, 'eve', 'Eve');
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, them, real)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, { tableId: eve.tableId, personId: 'eve' }, real)).toBe(true);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, them, real)).toBe(true);
+  });
+
+  it('names the unlinked placeholders an except uses, for the sender’s warning', () => {
+    const text = '---\natlas-share: [public, except Dave]\n---\n%%[!except|Dave, Ana, Zed]%%x%%[!end]%%%%[!only|Dave]%%y%%[!end]%%';
+    expect(unlinkedExceptNames(text, people)).toEqual(['Dave']);
+    expect(unlinkedExceptNames('%%[!only|Dave]%%y%%[!end]%%', people)).toEqual([]);
+  });
+
+  it('a resolver that cannot tell placeholders treats the name as unknown', () => {
+    const plain = { byName: people.byName, allByName: people.allByName };
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, recipient, plain)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, recipient, plain)).toBe(false);
+  });
+
+  it('a map share with a placeholder key reaches nobody until linked, then the linked person', async () => {
+    const share = (key: string, field: 'people' | 'except'): MapShare => ({
+      item: 'i'.repeat(22), everyone: field === 'except', people: field === 'people' ? [key] : [], except: field === 'except' ? [key] : [], mode: 'full', notes: [],
+    });
+    const real = book();
+    await real.ready();
+    real.addPlaceholder('Dave');
+    const key = placeholderKey(named(real, 'Dave').id);
+    const eve = real.admit(T, 'Eve', D1);
+    expect(mapShareReaches(share(key, 'people'), { tableId: T, personId: eve.personId }, real)).toBe(false);
+    expect(mapShareReaches(share(key, 'except'), { tableId: T, personId: eve.personId }, real)).toBe(false);
+    const linked = real.admitAsPlaceholder(T, named(real, 'Dave').id, D2)!;
+    const recipientOf = { tableId: T, personId: linked.personId };
+    expect(mapShareReaches(share(key, 'people'), recipientOf, real)).toBe(true);
+    expect(mapShareReaches(share(key, 'except'), recipientOf, real)).toBe(false);
+    expect(mapShareReaches(share(key, 'except'), { tableId: T, personId: eve.personId }, real)).toBe(true);
   });
 });
 
@@ -182,6 +258,31 @@ describe('meeting a placeholder', () => {
   });
 });
 
+describe('preview as a placeholder', () => {
+  const text = 'Open. %%[!only|Dave]%%Dave’s secret. %%[!end]%%%%[!except|Dave]%%Not for Dave. %%[!end]%%%%[!only|Ana]%%Ana’s. %%[!end]%%';
+
+  it('shows what they would get once linked, and nothing real is touched', async () => {
+    const ana = testPerson('ana', 'Ana');
+    const catalogue = noteCatalogue({ 'N.md': { text, share: ['Dave'] } }, [ana], [dave]);
+    const got = await catalogue.previewNoteAsPlaceholder('Dave', 'N.md');
+    expect(got).toContain('Open.');
+    expect(got).toContain('Dave’s secret.');
+    expect(got).not.toContain('Not for Dave.');
+    expect(got).not.toContain('Ana’s.');
+    // A real recipient is unaffected: Dave is not linked, so what is kept back from him is kept back from everyone.
+    const asAna = await catalogue.previewNote({ tableId: ana.tableId, personId: 'ana' }, 'N.md');
+    expect(asAna).not.toContain('Not for Dave.');
+    expect(asAna).not.toContain('Dave’s secret.');
+    expect(await catalogue.list({ tableId: ana.tableId, personId: 'ana' })).toEqual([]);
+    expect(await catalogue.previewNoteAsPlaceholder('Nobody', 'N.md')).toBeNull();
+  });
+
+  it('never shows the placeholder a note it does not share, as a real stand-in would not be listed either', async () => {
+    const catalogue = noteCatalogue({ 'N.md': { text: 'Hi', share: ['Ana'] } }, [testPerson('ana', 'Ana')], [dave]);
+    expect(await catalogue.list({ tableId: 'preview', personId: 'placeholder' })).toEqual([]);
+  });
+});
+
 describe('stored map-share keys follow people', () => {
   it('a rename, a link and a reload all keep resolving the stored key, and a stale key resolves to nobody', async () => {
     const { app } = createInMemoryApp();
@@ -258,5 +359,29 @@ describe('a placeholder that is not linked yet', () => {
     const again = book(app);
     await again.ready();
     expect(again.unlinkedKey(placeholderKey(id))).toBe(false);
+  });
+});
+
+describe('a map shared with everyone except an unlinked placeholder', () => {
+  const share = (except: string[]): MapShare => ({ item: 'i'.repeat(22), everyone: true, people: [], except, mode: 'full', notes: [] });
+
+  it('reaches nobody until Dave is linked; then everyone but the real Dave', async () => {
+    const people = book();
+    await people.ready();
+    people.addPlaceholder('Dave');
+    const key = placeholderKey(named(people, 'Dave').id);
+    const eve = people.seen(T, 'eve', 'Eve');
+    const arrived = people.seen(T, 'dave2', 'Dave');
+    expect(arrived.name).toBe('Dave (2)');
+    const asDave2 = { tableId: T, personId: 'dave2' };
+    const asEve = { tableId: eve.tableId, personId: 'eve' };
+    expect(mapShareReaches(share([key]), asDave2, people)).toBe(false);
+    expect(mapShareReaches(share([key]), asEve, people)).toBe(false);
+    expect(unlinkedMapWarnings([key], people)).toEqual(['Dave isn’t linked yet; this map is kept back from everyone until you link Dave.']);
+    people.linkPlaceholder(personKey(T, 'dave2'), named(people, 'Dave').id);
+    expect(mapShareReaches(share([key]), asDave2, people)).toBe(false);
+    expect(mapShareReaches(share([key]), asEve, people)).toBe(true);
+    expect(unlinkedMapWarnings([key], people)).toEqual([]);
+    expect(unlinkedMapWarnings([personKey(T, 'gone')], people)).toEqual([]);
   });
 });

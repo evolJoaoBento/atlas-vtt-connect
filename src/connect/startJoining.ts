@@ -17,8 +17,9 @@ const JOIN_COMMAND = 'join-online-session';
  * `ui`, the dashboard tile. Joining needs no Atlas map and no hosting capability, so this runs for every Atlas
  * Connect binds to. It lives with the binding, as the fork's did with Atlas: an Atlas reload or disable ends a joined session.
  * The player keys outlive it (`playerKeyFor`, the plugin's), so the GM still recognises a player who joins again.
+ * Returns the service (sharing shares through it) and what stops it all.
  */
-export function startJoining(plugin: Plugin, atlas: AtlasExtension, api: AtlasApi, settings: JoinSettings, playerKeyFor?: (hostId: string) => string): Disposer {
+export function startJoining(plugin: Plugin, atlas: AtlasExtension, api: AtlasApi, settings: JoinSettings, playerKeyFor?: (hostId: string) => string): { service: OnlineJoinService; stop: Disposer } {
   const { app } = plugin;
   const service = new OnlineJoinService(app, settings, plugin.manifest.version, {
     openSceneTab: () => openSceneTab(app),
@@ -26,9 +27,10 @@ export function startJoining(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   });
   plugin.addCommand({ id: JOIN_COMMAND, name: JOIN_SESSION_LABEL, callback: () => openJoinSessionModal(app) });
   const stopTile = need(api, atlas, 'ui')?.addDashboardTile(joinSessionTile(app));
-  return () => {
+  const stop = (): void => {
     stopTile?.();
     plugin.removeCommand(JOIN_COMMAND);
     service.dispose();
   };
+  return { service, stop };
 }

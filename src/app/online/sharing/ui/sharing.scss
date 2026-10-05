@@ -1,0 +1,71 @@
+// The Share with… dialog. Imported by styles/main.scss.
+@use '../../../../../styles/atlas-mixins' as *;
+
+.atlas-share {
+  @include atlas-flex-col($spacing-m);
+}
+
+.atlas-share__section {
+  @include atlas-flex-col($spacing-s);
+}
+
+.atlas-share__people {
+  @include atlas-flex-col($spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-share__check,
+.atlas-share__note,
+.atlas-share__modes,
+.atlas-share__preview-label {
+  @include atlas-flex-row($spacing-s);
+}
+
+.atlas-share__heading {
+  margin: 0;
+  font-size: $font-ui-smaller;
+  font-weight: $font-weight-semibold;
+  color: var(--text-muted);
+}
+
+.atlas-share__private,
+.atlas-share__not-met {
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-share__person {
+  @include atlas-flex-row($spacing-s);
+  align-items: center;
+}
+
+.atlas-share__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-share__error {
+  margin: 0;
+  color: var(--text-error);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-share__warning {
+  margin: 0;
+  color: var(--text-warning);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-share__preview {
+  @include atlas-inset-surface;
+  max-height: 240px;
+  margin: 0;
+  padding: $spacing-s;
+  overflow: auto;
+  border-radius: $radius-l;
+  white-space: pre-wrap;
+  font-size: $font-ui-smaller;
+}

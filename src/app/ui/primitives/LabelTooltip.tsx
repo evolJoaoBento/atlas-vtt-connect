@@ -1,9 +1,15 @@
 import React, { useId, useState } from 'react';
 
-export interface LabelTooltipProps { label: string; side?: 'top' | 'bottom'; children: React.ReactElement }
+export interface LabelTooltipProps {
+  label: string;
+  side?: 'top' | 'bottom';
+  /** A longer label that wraps instead of staying on one line. */
+  multiline?: boolean;
+  children: React.ReactElement;
+}
 
 /** A small tooltip on hover and focus, never the browser's (no `title`). */
-export function LabelTooltip({ label, side = 'top', children }: LabelTooltipProps): React.ReactElement {
+export function LabelTooltip({ label, side = 'top', multiline = false, children }: LabelTooltipProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
@@ -16,7 +22,7 @@ export function LabelTooltip({ label, side = 'top', children }: LabelTooltipProp
       aria-describedby={open ? id : undefined}
     >
       {children}
-      {open && <span id={id} role="tooltip" className={`atlas-connect-tooltip is-${side}`}>{label}</span>}
+      {open && <span id={id} role="tooltip" className={`atlas-connect-tooltip is-${side}${multiline ? ' is-multiline' : ''}`}>{label}</span>}
     </span>
   );
 }

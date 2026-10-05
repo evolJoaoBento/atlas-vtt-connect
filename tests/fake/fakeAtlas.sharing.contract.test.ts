@@ -84,7 +84,7 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
 
   it('C-scenes-3: readMap returns the saved map with its size, a frozen copy without anything private, or null for a missing file', async () => {
     const { atlas, extension } = connected();
-    atlas.scenes.setMap(MAP, { ...emptyMap({ background: 'atlas-vtt/assets/bg.png' }), mapSize: { width: 320, height: 200 }, dmNotePath: 'DM/Secret.md', pins: { p: { notePath: 'DM/Secret.md' } } });
+    atlas.scenes.setMap(MAP, emptyMap({ background: 'atlas-vtt/assets/bg.png' }), { mapSize: { width: 320, height: 200 }, saved: { dmNotePath: 'DM/Secret.md', pins: { p: { notePath: 'DM/Secret.md' } } } });
     const map = (await extension.scenes.readMap(MAP))!;
     expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'mapSize', 'objects', 'widgets']);
     expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);

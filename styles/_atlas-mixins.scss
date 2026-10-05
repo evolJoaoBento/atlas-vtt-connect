@@ -1,8 +1,21 @@
-// Copied from Atlas VTT styles/_mixins.scss and styles/_tokens.scss at c1d4d15 (AGPL-3.0-only).
+// Copied from Atlas VTT styles/_mixins.scss and styles/_tokens.scss at c1d4d15 (AGPL-3.0-only), and from the fork at 6c939e6 (sharing's tokens and mixins).
 // Only the mixins Connect uses, with the tokens they need.
 
+$spacing-xs: 4px;
 $spacing-s: 8px;
+$spacing-m: 12px;
 $spacing-l: 16px;
+$radius-xs: var(--radius-s);
+$radius-s: var(--radius-s);
+$radius-m: var(--radius-m);
+$radius-l: var(--radius-m);
+$font-ui-small: var(--font-ui-small);
+$font-ui-smaller: var(--font-ui-smaller);
+$font-weight-medium: var(--font-medium);
+$font-weight-semibold: var(--font-semibold);
+$border-width-s: 1px;
+$transition-fast: 100ms;
+$transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
 $radius-xl: var(--radius-l);
 $shadow-elevated: var(--shadow-l);
 $border-width-m: 1.5px;
@@ -95,4 +108,64 @@ $close-button-gap: $spacing-s;
   min-height: calc(#{$close-button-size} + 2 * #{$close-button-gap});
   padding: $close-button-gap $close-button-gap $close-button-gap $inline-start;
   align-items: center;
+}
+
+/// Flex row with standard gap.
+@mixin atlas-flex-row($gap: $spacing-s) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+}
+
+/// Flex column with standard gap.
+@mixin atlas-flex-col($gap: $spacing-s) {
+  display: flex;
+  flex-direction: column;
+  gap: $gap;
+}
+
+/// Recessed surface for content inside a panel.
+@mixin atlas-inset-surface {
+  background: var(--background-secondary);
+  border: $border-width-s solid var(--background-modifier-border);
+  border-radius: $radius-l;
+}
+
+@mixin atlas-input-focus {
+  &:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--interactive-accent) 20%, transparent);
+  }
+}
+
+@mixin atlas-text-input {
+  width: 100%;
+  height: var(--input-height);
+  padding: 0 $spacing-s;
+  background: var(--background-modifier-form-field);
+  border: $border-width-s solid var(--background-modifier-border);
+  border-radius: $radius-m;
+  color: var(--text-normal);
+  font-size: $font-ui-small;
+  font-family: var(--font-interface);
+  outline: none;
+  box-shadow: none;
+  transition: border-color $transition-fast $transition-ease, box-shadow $transition-fast $transition-ease;
+
+  &::placeholder {
+    color: var(--text-faint);
+  }
+
+  &:hover:not(:focus) {
+    border-color: var(--background-modifier-border-hover);
+  }
+
+  @include atlas-input-focus;
+}
+
+@mixin atlas-help-text {
+  font-size: $font-ui-small;
+  color: var(--text-muted);
+  line-height: var(--line-height-normal);
 }

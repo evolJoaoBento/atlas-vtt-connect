@@ -9,8 +9,12 @@ export interface FakeSceneRecord {
   data: { extensions?: Record<string, Json>; sharing?: unknown; [key: string]: unknown };
 }
 
-/** A saved map as a test gives it: what `readMap` returns, plus anything private a real file also holds (pins, notes). */
-export type FakeSavedMap = SavedMapInput & { mapSize?: { width: number; height: number } } & Record<string, unknown>;
+/** A saved map as a test gives it: what `readMap` returns, plus (`saved`) anything private a real file also holds (pins, notes). */
+export interface FakeSavedMap {
+  map: SavedMapInput;
+  mapSize: { width: number; height: number };
+  saved: Record<string, unknown>;
+}
 
 type AddInput = Parameters<ScenesApi['addToCollection']>[0];
 
@@ -83,9 +87,9 @@ export class FakeScenes {
     if (this.records.delete(sceneId)) this.changed();
   }
 
-  /** The saved map at `path`, as its file holds it. */
-  setMap(path: string, map: FakeSavedMap): void {
-    this.maps.set(path, structuredClone(map));
+  /** The saved map at `path`, as its file holds it; `saved` is what else the file holds, which `readMap` never hands out. */
+  setMap(path: string, map: SavedMapInput, options: { mapSize?: { width: number; height: number }; saved?: Record<string, unknown> } = {}): void {
+    this.maps.set(path, structuredClone({ map, mapSize: options.mapSize ?? { width: 0, height: 0 }, saved: options.saved ?? {} }));
   }
 
   /** The record as the index holds it (a copy). */
@@ -128,13 +132,14 @@ export class FakeScenes {
       },
       readMap: async (mapPath: string) => {
         if (typeof mapPath !== 'string' || !mapPath.endsWith('.atlasmap')) throw new Error('[Atlas API] readMap needs the path of an .atlasmap file.');
-        const map = this.maps.get(mapPath);
-        if (!map) return null;
+        const stored = this.maps.get(mapPath);
+        if (!stored) return null;
+        const { map } = stored;
         // Only the fields of `SavedMapInput`: pins, walls, lights, notes and logs stay behind.
         const { tokens, texts, drawings, fog } = map.objects;
         return deepFreeze(structuredClone({
           background: map.background, grid: map.grid, objects: { tokens, texts, drawings, fog }, widgets: map.widgets, initiative: map.initiative,
-          ...(map.lighting ? { lighting: map.lighting } : {}), mapSize: map.mapSize ?? { width: 0, height: 0 },
+          ...(map.lighting ? { lighting: map.lighting } : {}), mapSize: stored.mapSize,
         }));
       },
       addToCollection: (input: AddInput) => this.exclusive(() => this.add(input)),

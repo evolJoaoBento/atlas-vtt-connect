@@ -7,6 +7,8 @@ export interface FakeCollection {
   /** The maps the collection holds. */
   maps: readonly string[];
   gridDefaults?: CollectionGridDefaults;
+  /** The cone angle Atlas works out from the collection's game system when it has no grid defaults (e.g. 53.13 for D&D 5e). */
+  systemConeAngle?: number;
   resources?: readonly ResourceDefinition[];
   conditions?: readonly ConditionDefinition[];
   initiative?: InitiativeRules;
@@ -47,7 +49,7 @@ export class FakeRules {
     return deepFreeze(structuredClone({
       collectionId,
       gridDefaults,
-      measurement: { ...resolveMeasurementSettings(gridDefaults ?? undefined, null), coneAngle: gridDefaults?.coneAngle ?? DEFAULT_CONE_ANGLE },
+      measurement: { ...resolveMeasurementSettings(gridDefaults ?? undefined, null), coneAngle: gridDefaults?.coneAngle ?? collection?.systemConeAngle ?? DEFAULT_CONE_ANGLE },
       resources: collection?.resources ?? [],
       conditions: collection?.conditions ?? [],
       initiative: collection?.initiative ?? DEFAULT_INITIATIVE_RULES,

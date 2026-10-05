@@ -12,6 +12,8 @@ export interface NeedMap {
   lighting: AtlasExtension['lighting'];
   tokens: AtlasExtension['tokens'];
   ui: AtlasExtension['ui'];
+  scenes: AtlasExtension['scenes'];
+  bundles: AtlasExtension['bundles'];
 }
 
 /** The namespace for `capability` when this Atlas has it; null on an older Atlas. */

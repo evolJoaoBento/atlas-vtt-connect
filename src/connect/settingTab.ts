@@ -33,7 +33,8 @@ interface SettingRow {
 export class ConnectSettingTab extends PluginSettingTab {
   private cleanups: Array<() => void> = [];
 
-  constructor(app: App, plugin: Plugin, private readonly settings: ConnectSettingsStore) {
+  /** `sharingNotice`: why notes and maps cannot be shared with the bound Atlas, or null when they can (or no Atlas is bound). */
+  constructor(app: App, plugin: Plugin, private readonly settings: ConnectSettingsStore, private readonly sharingNotice: () => string | null = () => null) {
     super(app, plugin);
   }
 
@@ -59,8 +60,10 @@ export class ConnectSettingTab extends PluginSettingTab {
   }
 
   private rows(): SettingRow[] {
+    const notice = this.sharingNotice();
     return [
-      this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(), this.propertiesRow(), this.imagesRow(), this.logRow(),
+      this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(),
+      ...(notice ? [this.sharingRow(notice)] : []), this.propertiesRow(), this.imagesRow(), this.logRow(),
     ];
   }
 
@@ -181,6 +184,11 @@ export class ConnectSettingTab extends PluginSettingTab {
         });
       },
     };
+  }
+
+  /** Shown while the bound Atlas cannot share: an older Atlas without `scenes` and `bundles`. */
+  private sharingRow(notice: string): SettingRow {
+    return { name: 'Sharing notes and maps', desc: notice, aliases: ['sharing', 'share', 'update'], render: () => undefined };
   }
 
   private propertiesRow(): SettingRow {

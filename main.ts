@@ -5,6 +5,7 @@ import { ONLINE_SCENE_VIEW_TYPE } from './src/app/online/obsidian/onlineSceneTab
 import { keyPerHost } from './src/app/online/obsidian/keyPerHost';
 import { AtlasLink } from './src/connect/atlasLink';
 import { ConnectSettingsStore } from './src/connect/settingsStore';
+import { UPDATE_ATLAS_TO_SHARE } from './src/connect/connectSharing';
 import { ConnectSettingTab } from './src/connect/settingTab';
 import { startConnect } from './src/connect/startConnect';
 
@@ -14,13 +15,17 @@ export default class AtlasVttConnectPlugin extends Plugin {
 
   /** One key per GM host for the plugin's lifetime: a join after an Atlas reload is recognised by the GM. */
   private readonly playerKeys = keyPerHost();
+  /** Whether the bound Atlas can share notes and maps; null while none is bound. */
+  private canShare: boolean | null = null;
 
   async onload(): Promise<void> {
     this.settings = await ConnectSettingsStore.load(this);
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.
     this.registerView(ONLINE_SCENE_VIEW_TYPE, (leaf) => new CanvasSceneView(leaf));
-    this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings));
-    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, { settings: this.settings, playerKeys: this.playerKeys })).start();
+    this.addSettingTab(new ConnectSettingTab(this.app, this, this.settings, () => (this.canShare === false ? UPDATE_ATLAS_TO_SHARE : null)));
+    new AtlasLink(this, (atlas, api) => startConnect(this, atlas, api, {
+      settings: this.settings, playerKeys: this.playerKeys, sharing: (available) => { this.canShare = available; },
+    })).start();
     // Further services are added task by task (plan B4 onwards).
   }
 
