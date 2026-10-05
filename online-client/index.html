@@ -1,0 +1,84 @@
+<!-- online-client/index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Atlas VTT · Join</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="screen" class="screen">
+    <main class="card">
+      <h1>Join the table</h1>
+      <form id="join" hidden>
+        <label for="name">Your name</label>
+        <input id="name" maxlength="40" autocomplete="nickname" required>
+        <button type="submit">Join</button>
+      </form>
+      <p id="status" role="status"></p>
+    </main>
+    <footer class="links">
+      Atlas VTT online play · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect" target="_blank" rel="noopener">Source code (AGPL-3.0)</a>
+      · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Licences</a>
+    </footer>
+  </div>
+  <section id="table" class="table" hidden aria-label="Scene">
+    <canvas id="map" role="img" aria-label="Map"></canvas>
+    <header class="top-bar">
+      <span id="session-name" class="session-name"></span>
+      <span id="connection" class="connection" role="status"></span>
+      <div id="image-progress" class="image-progress" hidden>
+        <progress id="image-progress-bar" aria-label="Loading images"></progress>
+        <span id="image-progress-text" role="status"></span>
+      </div>
+      <button id="dice-log-button" class="icon-button" type="button" aria-label="Dice log" aria-expanded="false" aria-controls="dice-log"></button>
+      <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
+    </header>
+    <div id="view-buttons" class="view-buttons" hidden>
+      <button id="follow-gm" type="button">Follow GM</button>
+      <button id="fit-map" class="secondary" type="button">Fit map</button>
+    </div>
+    <!-- What shows at the top of the map, one under another so none covers another: a refused move, a roll, your own throw. -->
+    <div class="top-stack">
+      <div class="top-notes">
+        <p id="move-notice" class="move-notice" role="status" hidden></p>
+        <button id="dice-toast" class="dice-toast" type="button" aria-live="polite" hidden></button>
+      </div>
+      <div id="dice-throws" class="dice-throws"></div>
+    </div>
+    <div id="dice-tray" class="dice-tray" role="group" aria-label="Dice tray" hidden></div>
+    <nav id="toolbar" class="toolbar" aria-label="Tools"></nav>
+    <aside id="dice-log" class="dice-log" hidden aria-label="Dice log">
+      <div class="dice-log-header">
+        <h2>Dice log</h2>
+        <button id="dice-log-close" class="icon-button" type="button" aria-label="Close dice log">×</button>
+      </div>
+      <p id="dice-log-empty" class="dice-log-empty">No rolls yet</p>
+      <ol id="dice-log-list" class="dice-log-list" aria-label="Rolls"></ol>
+    </aside>
+    <aside id="menu" class="menu" hidden aria-label="Menu">
+      <div class="menu-header">
+        <h2>Players</h2>
+        <button id="menu-close" class="icon-button" type="button" aria-label="Close menu">×</button>
+      </div>
+      <ul id="players" aria-label="Players"></ul>
+      <ul id="widgets" aria-label="Widgets" hidden></ul>
+      <ol id="initiative" aria-label="Initiative" hidden></ol>
+      <div id="dice-display" class="dice-display"></div>
+      <div class="image-settings">
+        <label class="keep-images">
+          <input id="keep-images" type="checkbox" role="switch" checked>
+          <span id="keep-images-label">Keep images on this device</span>
+        </label>
+        <button id="clear-images" class="secondary" type="button" disabled>Clear saved images</button>
+      </div>
+      <footer class="links">
+        Atlas VTT online play · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect" target="_blank" rel="noopener">Source code (AGPL-3.0)</a>
+        · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">Licences</a>
+      </footer>
+    </aside>
+  </section>
+  <script type="module" src="./main.mts"></script>
+</body>
+</html>

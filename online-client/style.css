@@ -1,0 +1,322 @@
+/* online-client/style.css */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f6f7; --card: #fff; --text: #1f2328; --muted: #5a6068; --accent: #7c5cff; --border: #d8dbe0;
+  --bar: rgba(255, 255, 255, 0.92); --gap: 8px; --target: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161719; --card: #202124; --text: #e8e8ea; --muted: #a0a4ab; --border: #33363b; --bar: rgba(32, 33, 36, 0.92); }
+}
+* { box-sizing: border-box; }
+/* The display rules below would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+
+/* Full-screen messages: the name form, waiting, refused and ended. */
+.screen {
+  min-height: 100%; display: grid; place-items: center; align-content: center; gap: 16px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.card { width: min(420px, 100%); padding: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; display: grid; gap: 12px; }
+h1 { margin: 0; font-size: 20px; }
+h2 { margin: 0; font-size: 16px; }
+form { display: grid; gap: 8px; }
+input { min-height: var(--target); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+button { min-height: var(--target); padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+button:disabled { opacity: 0.5; cursor: default; }
+#status { margin: 0; color: var(--muted); }
+.links { color: var(--muted); font-size: 13px; }
+.links a { color: inherit; }
+
+/* The table: the map fills the window, everything else floats over it. */
+.table {
+  position: fixed; inset: 0; overflow: hidden; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  /* A pinch or double-tap that starts on the bar or a button must not zoom the page. */
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+/* The map sits below the top bar, so the GM's framing is never hidden behind it. */
+#map { grid-row: 2; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+/* A grab hand over the player's own tokens; grabbing while a token or the map is dragged. */
+#map.can-grab { cursor: grab; }
+#map:active, #map.is-grabbing { cursor: grabbing; }
+/* "Move not allowed.": over the top of the map, never taking input. */
+/* The top of the map: the move notice, a roll's toast and your own throw, stacked so none covers another. */
+.top-stack {
+  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: var(--gap); pointer-events: none;
+}
+.top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
+.top-notes:not(:has(> :not([hidden]))) { display: none; }
+.dice-toast, .dice-throws { pointer-events: auto; }
+.move-notice {
+  margin: 0;
+  padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
+}
+.top-bar {
+  grid-row: 1; position: relative; z-index: 1; display: flex; align-items: center; gap: var(--gap);
+  padding: max(var(--gap), env(safe-area-inset-top)) max(var(--gap), env(safe-area-inset-right)) var(--gap) max(var(--gap), env(safe-area-inset-left));
+  background: var(--bar); border-bottom: 1px solid var(--border);
+}
+.session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.connection { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.image-progress { flex: 1; min-width: 80px; display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+.image-progress progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.icon-button {
+  width: var(--target); height: var(--target); padding: 0; margin-left: auto; display: grid; place-items: center;
+  background: transparent; color: var(--text); border: 1px solid var(--border); font-size: 20px; font-weight: 500;
+}
+.view-buttons {
+  position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex; gap: var(--gap);
+}
+
+/* The menu: a side panel, a bottom sheet on narrow screens. */
+.menu {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(320px, 100%); overflow-y: auto;
+  display: grid; align-content: start; gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) 12px;
+  background: var(--card); border-left: 1px solid var(--border); z-index: 2; touch-action: pan-y;
+}
+.menu-header { display: flex; align-items: center; gap: 12px; }
+.menu ul, .menu ol { margin: 0; padding: 12px; list-style-position: inside; border: 1px solid var(--border); border-radius: 12px; }
+.image-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+.keep-images { display: flex; align-items: center; gap: 8px; min-height: var(--target); }
+.keep-images input { width: 22px; height: 22px; min-height: 0; padding: 0; accent-color: var(--accent); }
+@media (max-width: 720px) {
+  .menu {
+    top: auto; left: 0; width: auto; max-height: 70%; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+}
+
+/* The toolbar, dice tray, dice log and toast: Atlas's floating surfaces. They copy styles/_mixins.scss
+   (atlas-elevated-surface, atlas-panel-radius($radius-2xl)): controls sit $spacing-s inside a 1.5 px border, and their
+   outer corners run concentric with the surface's (24 − 1.5 − 8 = 14.5 px). */
+:root {
+  --panel-radius: 24px; --panel-border: 1.5px; --inset: 8px;
+  --inset-radius: calc(var(--panel-radius) - var(--panel-border) - var(--inset));
+  --tool-size: 36px; --hover: rgba(127, 127, 127, 0.16); --shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --toolbar-height: calc(var(--tool-size) + 2 * var(--inset) + 2 * var(--panel-border));
+}
+/* Atlas's 36 px controls grow to the page's 44 px touch targets on phones. */
+@media (pointer: coarse) { :root { --tool-size: 44px; } }
+
+.tool-icon {
+  display: block; width: 18px; height: 18px; background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+}
+#map[data-tool="measure"], #map[data-tool="laser"], #map[data-tool="measure"]:active, #map[data-tool="laser"]:active { cursor: crosshair; }
+
+.toolbar {
+  grid-row: 2; grid-column: 1; align-self: end; justify-self: center; position: relative; z-index: 1;
+  display: flex; align-items: center; gap: var(--inset); padding: var(--inset); max-width: calc(100% - 32px);
+  margin-bottom: max(12px, env(safe-area-inset-bottom));
+  background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+}
+.toolbar-item { position: relative; display: flex; align-items: center; }
+.tool-button, .tool-chevron, .menu-entry {
+  min-height: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 500;
+}
+.tool-button {
+  position: relative; width: var(--tool-size); height: var(--tool-size); display: grid; place-items: center; border-radius: 8px;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.tool-button:hover, .tool-chevron:hover, .tool-button[aria-expanded="true"] { background: var(--hover); }
+.tool-button:active:not(:disabled) { transform: scale(0.96); }
+.tool-button.is-active, .tool-button.is-active:hover { background: var(--accent); color: #fff; }
+.tool-button:focus-visible, .tool-chevron:focus-visible, .menu-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .tool-button:active:not(:disabled) { transform: none; } }
+/* The first and last controls shown have their outer corners concentric with the bar's. */
+.toolbar > :nth-child(1 of :not([hidden])) > .tool-button {
+  border-top-left-radius: var(--inset-radius); border-bottom-left-radius: var(--inset-radius);
+}
+.toolbar > :nth-last-child(1 of :not([hidden])) > .tool-button,
+.toolbar > :nth-last-child(1 of :not([hidden])) > .tool-chevron {
+  border-top-right-radius: var(--inset-radius); border-bottom-right-radius: var(--inset-radius);
+}
+/* Measure is a split button, as Atlas's tool group. */
+.tool-group { background: var(--hover); border-radius: 8px; }
+.tool-group > .tool-button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.tool-chevron { width: 20px; height: var(--tool-size); display: grid; place-items: center; border-radius: 0 8px 8px 0; }
+.tool-chevron .tool-icon { width: 12px; height: 12px; }
+
+/* Tooltips from data-label; the browser's own (title) never show. */
+@media (hover: hover) {
+  .tool-button[data-label]:hover::after, .tool-button[data-label]:focus-visible::after,
+  .tray-face[data-label]:hover::after, .tray-face[data-label]:focus-visible::after {
+    content: attr(data-label); position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); z-index: 3;
+    padding: 8px; border-radius: 8px; background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border);
+    box-shadow: var(--shadow); font-size: 13px; font-weight: 500; line-height: 1; white-space: nowrap; pointer-events: none;
+  }
+}
+
+/* Menus hang above their button, flush with its right edge; their rows are capsules 4 px inside the border. */
+.toolbar-menu {
+  position: absolute; bottom: calc(100% + 12px); right: 0; z-index: 3; min-width: 180px;
+  display: grid; gap: 4px; padding: 4px; background: var(--card); border: var(--panel-border) solid var(--border);
+  border-radius: calc(18px + 4px + var(--panel-border)); box-shadow: var(--shadow);
+}
+.menu-entry {
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 18px; font-size: 14px; text-align: left;
+}
+.menu-entry:hover { background: var(--hover); }
+/* The laser flyout: round swatches in two rows of four, and the hint under them. */
+.swatch-menu { min-width: 0; width: 196px; padding: 8px; gap: 8px; border-radius: var(--panel-radius); }
+.swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; justify-items: center; }
+.swatch {
+  width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; background: var(--swatch);
+  border: 2px solid var(--border);
+}
+.swatch.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.menu-hint { margin: 0; font-size: 12px; line-height: 1.3; color: var(--muted); }
+.menu-entry.is-active { color: var(--accent); }
+
+/* The dice tray floats above the toolbar, like Atlas's above its Dice button. */
+.dice-tray {
+  grid-row: 2; grid-column: 1; align-self: end; justify-self: center; z-index: 2;
+  margin-bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset));
+  display: grid; gap: var(--inset); padding: var(--inset); max-width: calc(100% - 32px);
+  background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+}
+.dice-note { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
+.dice-note:empty { display: none; }
+/* Atlas's tray (dice-dropdown.scss): drawn dice in one row of square faces, a "−" grip under each. */
+.tray-dice { display: grid; grid-template-columns: repeat(7, 48px); gap: var(--inset); justify-content: center; }
+@media (max-width: 440px) { .tray-dice { grid-template-columns: repeat(4, 48px); } }
+.tray-die { display: grid; gap: 4px; }
+.tray-face, .tray-grip {
+  min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; width: 100%;
+  color: var(--muted); font-weight: 500; touch-action: manipulation;
+}
+.tray-face {
+  position: relative; height: 48px; background: var(--hover); border: var(--panel-border) solid var(--border); border-radius: 8px;
+}
+.tray-face:active:not(:disabled) { transform: scale(0.96); }
+.tray-face:disabled, .tray-grip:disabled { cursor: default; opacity: 0.6; }
+.tray-dice > .tray-die:first-child > .tray-face { border-top-left-radius: var(--inset-radius); }
+.tray-dice > .tray-die:last-child > .tray-face { border-top-right-radius: var(--inset-radius); }
+.tray-grip { height: 24px; background: transparent; border-radius: 6px; }
+.tray-grip:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.tray-grip .tool-icon { width: 14px; height: 14px; }
+.tray-grip.is-empty { visibility: hidden; }
+.tray-count {
+  position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+/* Pencil drawings lie in the surface; the dark scheme inverts the graphite, as Atlas's dark theme does. */
+.die-face { position: relative; display: block; width: 32px; height: 32px; }
+.die-face__art { display: block; width: 32px; height: 32px; mix-blend-mode: multiply; -webkit-user-drag: none; user-select: none; }
+@media (prefers-color-scheme: dark) { .die-face__art { filter: invert(1) hue-rotate(180deg); mix-blend-mode: screen; } }
+.die-face--percentile > .die-face__art { position: absolute; width: 24px; height: 24px; }
+.die-face--percentile > .die-face__art:first-child { top: 0; left: 0; opacity: 0.7; }
+.die-face--percentile > .die-face__art:last-child { right: 0; bottom: 0; }
+.tray-modifier { display: flex; align-items: center; gap: 4px; }
+.tray-modifier-label { margin-right: auto; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.tray-step { width: 32px; height: 32px; }
+.tray-modifier-value { width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.tray-formula {
+  margin: 0; padding: 4px var(--inset); border: 1px solid var(--border); border-radius: 8px; background: var(--hover);
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+.tray-formula.is-empty { font-style: italic; color: var(--muted); }
+.tray-actions { display: flex; gap: var(--inset); }
+.tray-actions > button { min-height: var(--tool-size); padding: 0 16px; }
+.tray-actions > button:first-child { border-bottom-left-radius: var(--inset-radius); }
+.tray-actions > button:nth-last-child(1 of :not([hidden])) { border-bottom-right-radius: var(--inset-radius); }
+.tray-roll { flex: 1; }
+
+/* The dice log: a side panel on the left, a bottom sheet on narrow screens, like the menu. */
+.dice-log {
+  position: absolute; top: 0; left: 0; bottom: 0; z-index: 2; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
+  display: grid; align-content: start; gap: var(--inset);
+  padding: max(var(--inset), env(safe-area-inset-top)) var(--inset) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
+  background: var(--card); border-right: 1px solid var(--border);
+}
+.dice-log-header { display: flex; align-items: center; gap: 12px; }
+.dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
+.dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
+.dice-entry { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+.dice-entry-name { font-size: 13px; font-weight: 600; }
+.dice-entry-summary { display: flex; align-items: baseline; gap: var(--inset); }
+.dice-entry-formula, .dice-entry-eq { color: var(--muted); font-size: 13px; }
+.dice-entry-total { font-size: 22px; font-weight: 700; }
+.dice-entry-dice { display: flex; flex-wrap: wrap; gap: 4px; }
+.die-badge { padding: 2px 6px; border-radius: 6px; background: var(--hover); font-size: 12px; font-variant-numeric: tabular-nums; }
+.die-badge.is-max { color: #2f9e44; }
+.die-badge.is-min { color: #e03131; }
+.die-badge.is-more { color: var(--muted); }
+/* A critical roll, as Atlas's log marks it: a coloured edge. */
+.dice-entry.is-crit-success { border-color: #2f9e44; box-shadow: inset 3px 0 0 #2f9e44; }
+.dice-entry.is-crit-fail { border-color: #e03131; box-shadow: inset 3px 0 0 #e03131; }
+
+/* A new roll, at the top while the log is closed; a tap opens the log. */
+.dice-toast {
+  margin: 0; min-height: 0; min-width: 200px; max-width: 100%; padding: var(--inset); text-align: left;
+  background: var(--card); color: var(--text); font-weight: 400; border: var(--panel-border) solid var(--border);
+  border-radius: 16px; box-shadow: var(--shadow);
+}
+.dice-toast .dice-entry { padding: 4px; border: 0; }
+
+/* The player's own roll, thrown as Atlas's 3D dice at the top of the map (`dice3d/throwPanel.mts`). */
+.dice-throws { display: contents; }
+.dice-throws:empty { display: none; }
+.dice-throw {
+  pointer-events: auto; width: min(21rem, calc(100vw - 32px)); display: grid; gap: var(--inset); padding: var(--inset);
+  background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius);
+  box-shadow: var(--shadow); cursor: pointer; touch-action: manipulation; animation: dice-throw-in 0.3s ease-out both;
+}
+.dice-throw.is-leaving { opacity: 0; transform: translateY(-14px) scale(0.96); transition: opacity 0.43s, transform 0.43s; }
+.dice-throw.is-crit-success { border-color: #2f9e44; box-shadow: var(--shadow), 0 0 24px rgba(47, 158, 68, 0.45); }
+.dice-throw.is-crit-fail { border-color: #e03131; box-shadow: var(--shadow), 0 0 24px rgba(224, 49, 49, 0.45); }
+.dice-throw-header { display: flex; align-items: center; gap: var(--inset); }
+.dice-throw-label { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dice-throw-close { width: 32px; height: 32px; margin: 0; font-size: 18px; border-top-right-radius: var(--inset-radius); }
+.dice-throw-stage { position: relative; height: min(13rem, 40vh); overflow: hidden; border-radius: 12px; }
+/* A phone on its side: a lower stage, and the throw beside the notice and toast rather than under them, clear of the toolbar. */
+@media (max-height: 500px) {
+  /* What the top bar, the panel's own parts and the toolbar leave of the height, at most 22vh. */
+  .dice-throw-stage { height: max(3.5rem, min(22vh, calc(100vh - 292px))); }
+  .dice-throw-slot, .dice-throw-slot.has-breakdown { min-height: 2.6rem; }
+}
+@media (max-height: 500px) and (min-width: 560px) {
+  .top-stack { flex-direction: row; align-items: flex-start; }
+}
+/* Atlas draws in the canvas's bottom-left corner and lets it only grow (`DiceRenderer.setView`): the stage clips the rest. */
+.dice-throw-stage canvas { position: absolute; bottom: 0; left: 0; display: block; max-width: none; }
+.dice-throw-slot { margin: 0; min-height: 3.2rem; display: grid; justify-items: center; align-content: center; gap: 2px; }
+.dice-throw-slot.has-breakdown { min-height: 4.25rem; }
+.dice-throw-formula { color: var(--muted); }
+.dice-throw-total { font-size: 32px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.dice-throw-breakdown { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+@keyframes dice-throw-in { from { opacity: 0; transform: translateY(-28px) scale(0.92); } }
+@media (prefers-reduced-motion: reduce) { .dice-throw, .dice-throw.is-leaving { animation: none; transition: none; transform: none; } }
+
+/* Roll display in the menu: Atlas's three choices as a segmented row. */
+.dice-display { display: grid; gap: 8px; }
+.dice-display-label { font-size: 14px; font-weight: 600; }
+.segmented { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 12px; }
+.segmented-option { flex: 1; min-height: 36px; padding: 0 8px; background: transparent; color: var(--text); font-weight: 500; border-radius: 8px; }
+.segmented-option[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+/* The Dice log button sits beside Menu. */
+.icon-button + .icon-button { margin-left: 0; }
+.icon-button .tool-icon { width: 20px; height: 20px; }
+
+@media (max-width: 720px) {
+  .dice-log {
+    top: auto; right: 0; width: auto; max-height: 70%; border-right: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+    padding-right: max(var(--inset), env(safe-area-inset-right));
+  }
+  /* Follow GM and Fit map move above the toolbar. */
+  .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
+}
+#initiative:has(li.side) { list-style: none; padding-left: 0; }
+#initiative li.side { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--muted, inherit); list-style: none; }
+#initiative li.side[aria-current="true"] { color: var(--accent); }
+#initiative li.sitting-out { opacity: 0.45; }
+#initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }
