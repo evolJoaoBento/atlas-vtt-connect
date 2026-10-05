@@ -27,7 +27,7 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
   if (!paths || gone()) return () => undefined;
   const people = PeopleBook.forApp(plugin.app, paths);
-  const service = new OnlineSessionService(plugin.app, options.settings, { ...sessionDeps(atlas), people, ...options.hosting });
+  const service = new OnlineSessionService(plugin.app, options.settings, { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers') }), people, ...options.hosting });
   return registerOnline(plugin, service, { presentation: atlas.presentation });
 }
 

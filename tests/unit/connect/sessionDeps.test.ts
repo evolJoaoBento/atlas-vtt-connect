@@ -1,3 +1,4 @@
+import type { AtlasCapability } from '@atlas-vtt/api-types';
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CONE_ANGLE } from '@atlas-vtt/shared/grid';
 import { sessionDeps } from '../../../src/app/online/atlas/sessionDeps';
@@ -5,9 +6,10 @@ import { connectingPlugin, FakeAtlas } from '../../fake/FakeAtlas';
 
 const MAP = 'maps/a.atlasmap';
 
-function deps() {
-  const atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage'] });
-  return { atlas, deps: sessionDeps(atlas.connect(connectingPlugin('atlas-vtt-connect'))) };
+function deps(capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers']) {
+  const atlas = new FakeAtlas({ capabilities });
+  const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
+  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null }) };
 }
 
 describe('sessionDeps', () => {
@@ -24,10 +26,9 @@ describe('sessionDeps', () => {
     expect(d.coneAngle!(MAP)).toBe(53.13);
     expect(d.resources!(MAP)).toEqual([hp]);
     expect(d.initiativeRules!(MAP)).toEqual({ mode: 'sides', roll: '1d20', firstSide: 'opponents' });
-    expect(d.diceRules!(null)).toEqual(atlas.connect(connectingPlugin('other')).rules.forMap(null).dice);
   });
 
-  it("follows rules-changed, and Atlas's player view and laser settings", () => {
+  it("follows rules-changed, and Atlas's player view settings", () => {
     const { atlas, deps: d } = deps();
     const resources = vi.fn();
     const stop = d.watchResources!(resources);
@@ -41,9 +42,16 @@ describe('sessionDeps', () => {
     d.playerViewSettings.onChange(viewRules);
     atlas.setSetting('laserPointer', { color: '#00ff00', size: 3 });
     expect(viewRules).not.toHaveBeenCalled();
-    expect(d.gmLaserColor!()).toBe('#00ff00');
     atlas.setSetting('playerView', { showGrid: false, showTokenNameplates: true, showWidgets: true, showInitiative: true });
     expect(viewRules).toHaveBeenCalledTimes(1);
     expect(d.playerViewSettings.getLocalPlayerViewSettings().showGrid).toBe(false);
+  });
+
+  it("gives players' dice and lasers when Atlas has them, and neither on an Atlas without", () => {
+    expect(deps().deps).toHaveProperty('dice');
+    expect(deps().deps).toHaveProperty('laser');
+    const older = deps(['views', 'presentation', 'rules', 'settings', 'storage']).deps;
+    expect(older).not.toHaveProperty('dice');
+    expect(older).not.toHaveProperty('laser');
   });
 });

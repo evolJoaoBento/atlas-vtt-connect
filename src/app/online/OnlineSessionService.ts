@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import type { CollectionGridDefaults, DiceRules, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
+import type { CollectionGridDefaults, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import type { GmSession, SessionPlayer } from './GmSession';
 import { hostSession, type HostedSession, type HostedSharingHooks, type OptionalParts } from './hostedSession';
@@ -50,10 +50,6 @@ export interface Deps extends OptionalParts {
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Tells when those resources or rules may have changed. */
   watchResources?: (listener: () => void) => () => void;
-  /** The dice rules of a map's collection, for players' dice (B7). */
-  diceRules?: (mapPath: string | null) => DiceRules;
-  /** The colour of the GM's own laser, for players' lasers (B7). */
-  gmLaserColor?: () => string;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
   table?: () => Promise<TableIdentity | null>;
   identityCrypto?: IdentityCrypto;

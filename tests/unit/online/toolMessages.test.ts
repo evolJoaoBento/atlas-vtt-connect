@@ -125,6 +125,13 @@ describe('diceLogEntry', () => {
     expect(logged?.total).toBe(450);
   });
 
+  it('counts the dice a roll made elsewhere already left out of its own list as more', () => {
+    expect(diceLogEntry({ ...result, unlistedDice: 7 }, 'Anna')).toMatchObject({ unlisted: 7 });
+    const big = { ...result, rolls: Array.from({ length: 150 }, () => ({ die: 'd6', value: 3, max: 6 })), unlistedDice: 7 };
+    expect(diceLogEntry(big, 'Anna')?.unlisted).toBe(57);
+    for (const bad of [0, -3, 1.5, Number.NaN]) expect(diceLogEntry({ ...result, unlistedDice: bad }, 'Anna')).toEqual(entry());
+  });
+
   it('keeps exploded and subtracted dice in their order, with the crit', () => {
     const rolls = [
       { die: 'd6', value: 6, max: 6 }, { die: 'd6', value: 2, max: 6, exploded: true as const }, { die: 'd4', value: 1, max: 4, negative: true as const },

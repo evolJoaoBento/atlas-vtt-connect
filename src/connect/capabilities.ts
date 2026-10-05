@@ -7,6 +7,8 @@ export interface NeedMap {
   rules: AtlasExtension['rules'];
   settings: AtlasExtension['settings'];
   storage: AtlasExtension['storage'];
+  dice: AtlasExtension['dice'];
+  lasers: AtlasExtension['lasers'];
 }
 
 /** The namespace for `capability` when this Atlas has it; null on an older Atlas. */

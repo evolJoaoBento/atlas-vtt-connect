@@ -13,9 +13,6 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-rules-6': "Atlas-internal: needs Atlas's settings service and its user system presets",
   'C-rules-7': "Atlas-internal: the asset index's own loading and its failure log",
   // The fake does not simulate these namespaces yet; the task named in each reason adds its cases and removes the entry.
-  'C-dice-1': 'tested in B7',
-  'C-dice-2': 'tested in B7',
-  'C-laser-1': 'tested in B7',
   'C-light-1': 'tested in B9',
   'C-light-2': 'tested in B9',
   'C-light-3': 'tested in B9',

@@ -150,7 +150,9 @@ export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry
     die, value, ...(negative && { negative }), ...(exploded && { exploded }),
   }));
   const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
-  const unlisted = all.length - dice.length;
+  // A roll made elsewhere (physical dice) may come with dice its own list leaves out already.
+  const { unlistedDice = 0 } = result;
+  const unlisted = all.length - dice.length + (Number.isSafeInteger(unlistedDice) && unlistedDice > 0 ? unlistedDice : 0);
   const entry: DiceLogEntry = {
     id: result.id,
     name: name.slice(0, DICE_LIMITS.nameLength),

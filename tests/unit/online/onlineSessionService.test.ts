@@ -1,4 +1,7 @@
+import type { DiceRollResult } from '@atlas-vtt/api-types';
+import { rollFormula } from '@atlas-vtt/shared/rules';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { diceHostPart } from '../../../src/app/online/atlas/toolParts';
 import { OnlineSessionService, type Deps } from '../../../src/app/online/OnlineSessionService';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
@@ -352,8 +355,39 @@ describe('OnlineSessionService', () => {
     svc.stop();
   });
 
-  // "rolls admitted players' dice and relays the dice log while hosting, and stops listening on stop" needs the
-  // dice host (plan B7).
+  it("rolls admitted players' dice and relays the dice log while hosting, and stops listening on stop", async () => {
+    const presented = presenter();
+    const { view, tavern } = viewWithViewport(presented, null);
+    presented.present(view, tavern);
+    const { dice } = presented.extension;
+    const network = new MemoryNetwork();
+    const host = network.host('gm-id');
+    const answers: Array<(allow: boolean) => void> = [];
+    const svc = new OnlineSessionService(app, settings, {
+      table: async () => null, createHost: async () => host, ...atlasDeps(presented), dice: diceHostPart(dice),
+      showRequest: (_player, answer) => { answers.push(answer); return { hide: () => {} }; },
+    });
+    const rolled: DiceRollResult[] = [];
+    dice.onRolled((result) => rolled.push(result));
+    await svc.start();
+    const link = await network.client().connect('gm-id');
+    const received: ControlMessage[] = [];
+    link.onMessage((_channel, data) => {
+      const decoded = decodeControl(data);
+      if (decoded.kind === 'message') received.push(decoded.message);
+    });
+    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    answers[0]!(true);
+    expect(received.filter((message) => message.type === 'dice-log')).toEqual([{ v: 1, type: 'dice-log', entries: [], replay: true }]);
+    link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 }));
+    expect(rolled[0]).toMatchObject({ formula: 'd20+2', rolledBy: 'Anna' });
+    expect(received.filter((message) => message.type === 'dice-log')).toHaveLength(2);
+    svc.stop();
+    expect(presented.atlas.dice.listening()).toBe(1);
+    const before = received.filter((message) => message.type === 'dice-log').length;
+    dice.publish(rollFormula('d6'));
+    expect(received.filter((message) => message.type === 'dice-log')).toHaveLength(before);
+  });
 
   it('does not host while this Atlas is in a session it joined', async () => {
     const createHost = vi.fn();

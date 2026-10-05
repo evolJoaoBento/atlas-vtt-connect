@@ -101,7 +101,7 @@ export interface Presenter extends PresentedSceneSource {
   clear(): void;
 }
 
-export function presenter(atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage'] })): Presenter {
+export function presenter(atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers'] })): Presenter {
   const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
   const source = presentedSource(extension);
   return {

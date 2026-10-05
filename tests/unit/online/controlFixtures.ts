@@ -16,6 +16,7 @@ import { decodeControl, type ControlMessage } from '../../../src/app/online/prot
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
+import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, presenter, sceneView, type ViewState } from './presentedFixtures';
@@ -36,14 +37,21 @@ export function partyState(tokens: Record<string, TokenEntity> = partyTokens()):
   return { ...state, objects: { ...state.objects, tokens } };
 }
 
+/** What a control world's presented scene can be given: its scene, and the rules of the players' view. */
+export interface ControlScene {
+  state?: ViewState;
+  rules?: Partial<PlayerViewRules>;
+}
+
 /** The presented scene of a control world: the broadcaster, the presenter and the view. */
-function presentedScene(gm: GmSession) {
+function presentedScene(gm: GmSession, options: ControlScene) {
   const presented = presenter();
-  const settings = { getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }), onChange: () => () => {} };
+  const rules: PlayerViewRules = { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true, ...options.rules };
+  const settings = { getLocalPlayerViewSettings: () => rules, onChange: () => () => {} };
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
   const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: () => {} });
   broadcaster.start();
-  return { presented, broadcaster, ...sceneView(presented, partyState(), { mapSize: { width: 2000, height: 1500 } }) };
+  return { presented, broadcaster, ...sceneView(presented, options.state ?? partyState(), { mapSize: { width: 2000, height: 1500 } }) };
 }
 
 export interface ControlPlayer {
@@ -56,7 +64,7 @@ export interface ControlPlayer {
   controlLists(): string[][];
 }
 
-export function controlWorld(options: { scene?: boolean } = {}) {
+export function controlWorld(options: { scene?: boolean | ControlScene } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   const control = new TokenControl();
@@ -67,7 +75,7 @@ export function controlWorld(options: { scene?: boolean } = {}) {
     onPlayersChanged: (players) => control.retainPlayers(new Set(players.map((player) => player.playerId))),
   });
   gm.start();
-  const scene = options.scene ? presentedScene(gm) : null;
+  const scene = options.scene ? presentedScene(gm, options.scene === true ? {} : options.scene) : null;
   const lists = new ControlLists({ session: gm, control });
   lists.start();
   const stopDeleted = scene ? watchDeletedTokens(scene.presented, control) : () => undefined;

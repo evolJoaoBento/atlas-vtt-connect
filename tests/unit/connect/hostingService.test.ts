@@ -13,6 +13,7 @@ import { snapshotOf } from '../online/sceneFixtures';
 import { memorySettings } from './memorySettings';
 
 const HOSTING: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage'];
+const WITH_TOOLS: AtlasCapability[] = [...HOSTING, 'dice', 'lasers'];
 
 /** Connect's plugin as hosting uses it: commands, status bar items, and what it registered for its own unload. */
 function hostPlugin(app: Plugin['app']) {
@@ -81,7 +82,7 @@ function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<voi
     },
   }), () => undefined).start();
   /** A web player who asks to join and is allowed, recording what the GM sends. */
-  const join = async (name: string): Promise<{ received: ControlMessage[] }> => {
+  const join = async (name: string): Promise<{ received: ControlMessage[]; send(message: ControlMessage): void }> => {
     const link = await network.client().connect('gm-id');
     const received: ControlMessage[] = [];
     link.onMessage((channel, data) => {
@@ -90,7 +91,7 @@ function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Promise<voi
     });
     link.send('control', encodeControl({ v: 1, type: 'join', name, playerKey: `key-${name}`, client: { kind: 'web', version: '1' } }));
     requests.at(-1)?.(true);
-    return { received };
+    return { received, send: (message) => link.send('control', encodeControl(message)) };
   };
   return { atlas, connect, join, fire: workspace.fire };
 }
@@ -197,5 +198,48 @@ describe('hosting through the Atlas API', () => {
     connect.unload(); // Connect itself unloading stops the session too
     expect(onlineSessionStore.getState().status).toBe('idle');
     expect(again.presentation.targets).toEqual([]);
+  });
+
+  it("rolls players' dice and shows their lasers through Atlas, and lets go of both when Atlas unloads", async () => {
+    const { atlas, connect, join } = connected(WITH_TOOLS);
+    await vi.advanceTimersByTimeAsync(0);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(0);
+    const ana = await join('Ana');
+    const bea = await join('Bea');
+    atlas.views.setSnapshot('v1', snapshotOf());
+    await atlas.presentation.present('v1', 't1');
+    await vi.advanceTimersByTimeAsync(60);
+    const snapshot = ana.received.find((message) => message.type === 'scene-snapshot');
+    const sceneId = snapshot?.type === 'scene-snapshot' ? snapshot.scene.sceneId : 'none';
+    const logged: string[] = [];
+    atlas.connect({ manifest: { id: 'other' }, register: () => undefined } as never).dice.onRolled((roll) => logged.push(`${roll.rolledBy}:${roll.formula}`));
+    ana.send({ v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 });
+    expect(logged).toEqual(['Ana:d20+2']);
+    expect(bea.received.filter((message) => message.type === 'dice-log').at(-1)).toMatchObject({ entries: [{ name: 'Ana', formula: 'd20+2' }], replay: false });
+    ana.send({ v: 1, type: 'laser', sceneId, points: [{ x: 5, y: 6 }], lifted: false });
+    expect(atlas.lasers.shown('v1')).toMatchObject([{ points: [{ x: 5, y: 6 }], lifted: false }]);
+    expect(bea.received.filter((message) => message.type === 'laser')).toHaveLength(1);
+
+    atlas.unload();
+    expect(atlas.dice.listening()).toBe(0);
+    expect(atlas.lasers.listening('v1')).toBe(0);
+    expect(atlas.listenerCount()).toBe(0);
+  });
+
+  it("hosts without players' dice and lasers on an Atlas that lacks them, and a roll or laser from a player does nothing", async () => {
+    const { atlas, connect, join } = connected();
+    await vi.advanceTimersByTimeAsync(0);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onlineSessionStore.getState().status).toBe('hosting');
+    const ana = await join('Ana');
+    atlas.views.setSnapshot('v1', snapshotOf());
+    await atlas.presentation.present('v1', 't1');
+    await vi.advanceTimersByTimeAsync(60);
+    ana.send({ v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 0 });
+    ana.send({ v: 1, type: 'laser', sceneId: 'x', points: [{ x: 1, y: 1 }], lifted: false });
+    expect(ana.received.filter((message) => message.type === 'dice-log' || message.type === 'laser')).toEqual([]);
+    expect(onlineSessionStore.getState().status).toBe('hosting');
   });
 });

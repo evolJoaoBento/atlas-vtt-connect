@@ -162,6 +162,14 @@ export class FakeViews {
     this.hooks.emitMapClosed(viewId);
   }
 
+  /** Runs `close` when the view closes, as the registrations of the views namespace do; null when there is no such view. */
+  watchClose(viewId: ViewId, close: () => void): Disposer | null {
+    const view = this.views.get(viewId);
+    if (!view) return null;
+    view.closers.add(close);
+    return () => { view.closers.delete(close); };
+  }
+
   /** For the presentation: the view's tabs and store, or undefined once closed. */
   tabsOf(viewId: ViewId): { tabs: readonly FakeTab[]; activeTabId: string | null } | undefined {
     return this.views.get(viewId);
