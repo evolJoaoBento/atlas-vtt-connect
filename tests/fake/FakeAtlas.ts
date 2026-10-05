@@ -106,12 +106,12 @@ export class FakeAtlas implements AtlasApi {
     });
     this.presentation = new FakePresentation(this.views);
     this.rules = new FakeRules((collectionId) => this.emit('rules-changed', collectionId));
-    this.dice = new FakeDice(this.rules);
+    this.dice = new FakeDice(this.rules, this.views, () => this.settings.diceDisplay);
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
     this.ui = this.capabilities.has('ui') ? new FakeUi(this.views) : undefined;
-    this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault);
+    this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths());
     this.bundles = new FakeBundles();
   }
 

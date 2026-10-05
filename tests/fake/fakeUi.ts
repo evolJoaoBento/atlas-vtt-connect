@@ -1,6 +1,7 @@
 import type {
   DashboardTile, Disposer, MenuItem, PaletteCommand, PaletteSection, PanelHandle, PanelSpec, ToolbarItem, TokenMenuContext, UiApi, ViewContext, ViewId,
 } from '@atlas-vtt/api-types';
+import { drawableMenu, openMenu, type OpenMenu } from './fakeMenus';
 import type { FakeViews, Own } from './fakeViews';
 
 type Kind = 'toolbar' | 'palette' | 'dashboard' | 'viewMenu' | 'tokenMenu' | 'panel';
@@ -43,21 +44,6 @@ function drawableBadge(value: unknown): string | number | true | null {
   if (value === true) return true;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   return typeof value === 'string' && value !== '' ? value : null;
-}
-
-/** Menu entries as Atlas draws them: items without a label go, submenus keep their drawable children and go when none is left, `checked` and `disabled` belong to plain items. */
-function drawableMenu(items: unknown): MenuItem[] {
-  if (!Array.isArray(items)) return [];
-  return items.flatMap((item: unknown): MenuItem[] => {
-    if (typeof item !== 'object' || item === null) return [];
-    const { label, icon, onClick, submenu, checked, disabled } = item as MenuItem;
-    if (!isText(label)) return [];
-    if (submenu !== undefined) {
-      const children = drawableMenu(submenu);
-      return children.length > 0 ? [{ label, ...(icon ? { icon } : {}), submenu: children }] : [];
-    }
-    return [{ label, ...(icon ? { icon } : {}), ...(onClick ? { onClick } : {}), ...(checked !== undefined ? { checked: checked === true } : {}), ...(disabled !== undefined ? { disabled: disabled === true } : {}) }];
-  });
 }
 
 /** Palette commands as Atlas lists them: a malformed command is skipped. */
@@ -136,6 +122,16 @@ export class FakeUi {
     const ctx = this.ctxOf(viewId);
     if (!this.views.isOpen(viewId)) return [];
     return this.specs<MenuProvider<ViewContext>>('viewMenu').flatMap((provider) => drawableMenu(guarded('view menu provider', () => provider(ctx), [])));
+  }
+
+  /** The "More options" menu opened in the view: its submenus are read anew, `keepOpen` items leave it open (`fakeMenus`). */
+  openViewMenu(viewId: ViewId): OpenMenu {
+    return openMenu(() => this.viewMenu(viewId));
+  }
+
+  /** A token's context menu opened in the view, as `openViewMenu`. */
+  openTokenMenu(viewId: ViewId, tokenId: string, tokenKind: TokenMenuContext['tokenKind']): OpenMenu {
+    return openMenu(() => this.tokenMenu(viewId, tokenId, tokenKind));
   }
 
   /** A token's context menu: the extension items, in GM views only. */
@@ -286,7 +282,7 @@ export class FakeUi {
   }
 
   private ctxOf(viewId: ViewId): ViewContext {
-    return { viewId, kind: 'map', isPlayerView: false };
+    return { viewId, kind: this.views.kindOf(viewId), isPlayerView: false };
   }
 
   private entriesOf<T>(kind: Kind): Array<Entry<T>> {

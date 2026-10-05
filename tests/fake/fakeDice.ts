@@ -1,7 +1,7 @@
-import type { DiceApi, DiceRollRequest, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
+import type { DiceApi, DiceRollRequest, DiceRollResult, Disposer, ViewId } from '@atlas-vtt/api-types';
 import { rollByRules } from '@atlas-vtt/shared/rules';
 import type { FakeRules } from './fakeRules';
-import type { Own } from './fakeViews';
+import type { FakeViews, Own } from './fakeViews';
 
 const deepFreeze = <T>(value: T): T => {
   if (typeof value === 'object' && value !== null) for (const member of Object.values(value)) deepFreeze(member);
@@ -15,6 +15,13 @@ function isRoll(value: unknown): value is DiceRollResult {
   if (typeof value !== 'object' || value === null) return false;
   const roll = value as Record<string, unknown>;
   return isText(roll.id) && isText(roll.formula) && isNumber(roll.timestamp) && isNumber(roll.total) && isNumber(roll.modifiers) && Array.isArray(roll.rolls);
+}
+
+/** Atlas's `landsOnAFace`: `max` a whole number of 1 or more, `value` a whole number from 1 to `max`. */
+function landsOnAFace(die: unknown): boolean {
+  if (typeof die !== 'object' || die === null) return false;
+  const { value, max } = die as Record<string, unknown>;
+  return Number.isInteger(max) && (max as number) >= 1 && Number.isInteger(value) && (value as number) >= 1 && (value as number) <= (max as number);
 }
 
 /** A small seeded generator (mulberry32), so a roll is the same every run. */
@@ -31,14 +38,23 @@ function seeded(seed: number): () => number {
 /**
  * Atlas's dice log as the test drives it. `roll` rolls by the rules of the map's collection and logs the roll;
  * every extension's `onRolled` listeners hear a roll, `publish` included, before the call returns. Results are deep-frozen copies.
+ * `throw` (1.13.0) throws a given roll in a loaded view once per roll id (`thrownIn`), and answers false with the
+ * user's dice shown as result cards, for a view not open or not loaded, or for a roll whose dice do not land on a face.
  */
 export class FakeDice {
   private readonly listeners = new Set<(result: DiceRollResult) => void>();
   private random = seeded(1);
   /** The `mapPath` of each `roll` request, in order: what the rules were asked for. */
   readonly rolledFor: Array<string | null> = [];
+  private readonly thrown = new Map<ViewId, DiceRollResult[]>();
 
-  constructor(private readonly rules: FakeRules) {}
+  /** `display`: the user's dice display setting (Atlas's `diceDisplay`). */
+  constructor(private readonly rules: FakeRules, private readonly views?: FakeViews, private readonly display: () => string = () => 'full') {}
+
+  /** The rolls `throw` threw in the view, in order. */
+  thrownIn(viewId: ViewId): readonly DiceRollResult[] {
+    return this.thrown.get(viewId) ?? [];
+  }
 
   /** The dice faces from now on, as `Math.random` would give them; the default is seeded. */
   setRandom(random: () => number): void {
@@ -71,6 +87,13 @@ export class FakeDice {
       publish: (result: DiceRollResult): void => {
         if (!isRoll(result)) throw new Error('[Atlas API] publish needs a roll: { id, timestamp, formula, rolls, modifiers, total }.');
         this.emit(structuredClone(result));
+      },
+      throw: (viewId: ViewId, roll: DiceRollResult): boolean => {
+        if (!isRoll(roll) || !roll.rolls.every(landsOnAFace)) return false;
+        if (typeof viewId !== 'string' || !this.views?.isLoaded(viewId) || this.display() === 'card') return false;
+        const thrown = this.thrown.get(viewId) ?? [];
+        if (!thrown.some((each) => each.id === roll.id)) this.thrown.set(viewId, [...thrown, deepFreeze(structuredClone(roll))]);
+        return true;
       },
     });
   }

@@ -1,8 +1,12 @@
 import type { Json, SceneRecord, ScenesApi } from '@atlas-vtt/api-types';
 import { importScene, type AddInput, type ImportTarget } from './fakeSceneImport';
+import { replaceScene, type ReplaceInput, type ReplaceTarget } from './fakeSceneReplace';
 import { mapFileText, savedMapInput, type FakeMapState } from './fakeSavedMap';
 
-/** A scene record as Atlas's asset index keeps it: extension data under `data.extensions`, and the fork's legacy `data.sharing`. */
+/**
+ * A scene record as Atlas's asset index keeps it: extension data under `data.extensions`, the fork's legacy
+ * `data.sharing`, and for a scene an extension added, `createdBy` and `createdImages` (in the index only).
+ */
 export interface FakeSceneRecord {
   id: string;
   name: string;
@@ -45,10 +49,11 @@ function loadedData(data: FakeSceneRecord['data']): FakeSceneRecord['data'] {
 }
 
 /**
- * Atlas's scene records and saved maps (Appendix A, C-scenes-1..4): extension data per extension id (a legacy
+ * Atlas's scene records and saved maps (Appendix A, C-scenes-1..5): extension data per extension id (a legacy
  * `data.sharing` moved into Connect's as the index loads), `readMap` from the map files in the vault (`fakeSavedMap`),
- * and `addToCollection` as Atlas's `sceneImport` (`fakeSceneImport`) under one lock. Every change to a record's name,
- * map or collection, an add and a removal fire 'scenes-changed'.
+ * `addToCollection` as Atlas's `sceneImport` (`fakeSceneImport`) and `replaceMap` as its `sceneReplace`
+ * (`fakeSceneReplace`), under one lock. Every change to a record's name, map or collection, an add and a removal fire
+ * 'scenes-changed'.
  */
 export class FakeScenes {
   private readonly records = new Map<string, FakeSceneRecord>();
@@ -63,8 +68,11 @@ export class FakeScenes {
   private nextId = 1;
   /** Set by a test: the next `addToCollection` fails after its writes, or (`after: 'record'`) once its record was added. */
   failNextAdd: { error: Error; after: 'writes' | 'record' } | null = null;
+  /** Set by a test: runs inside the next `replaceMap` calls, after the images and before the map is written. */
+  beforeMapWrite: (() => void) | null = null;
 
-  constructor(private readonly changed: () => void, vault?: FakeSceneVault) {
+  /** `openMaps`: the map paths open in a map view (loaded, or among its scene tabs), which `replaceMap` refuses. */
+  constructor(private readonly changed: () => void, vault?: FakeSceneVault, private readonly openMaps: () => ReadonlySet<string> = () => new Set()) {
     this.files = vault?.files ?? new Map();
     this.folders = vault?.folders ?? new Set();
   }
@@ -112,11 +120,11 @@ export class FakeScenes {
     return record ? structuredClone(record) : null;
   }
 
-  /** What a copy, export or install of the scene's record carries: never extension data or the legacy `data.sharing`. */
+  /** What a copy, export or install of the scene's record carries (its record file): never extension data, the legacy `data.sharing`, or who added it. */
   exported(sceneId: string): FakeSceneRecord | null {
     const record = this.record(sceneId);
     if (!record) return null;
-    const { extensions: _extensions, sharing: _sharing, ...data } = record.data;
+    const { extensions: _extensions, sharing: _sharing, createdBy: _createdBy, createdImages: _createdImages, ...data } = record.data;
     return { ...record, data };
   }
 
@@ -148,11 +156,12 @@ export class FakeScenes {
         if (typeof mapPath !== 'string' || !mapPath.endsWith('.atlasmap')) throw new Error('[Atlas API] readMap needs the path of an .atlasmap file.');
         const text = this.files.get(mapPath);
         if (text === undefined) return null;
-        // Only the fields of `SavedMapInput`: pins, walls, lights, notes and logs stay behind.
+        // The fields of `SavedMap`: the GM's note, the dice log, explored memory and the rest stay behind.
         const map = savedMapInput(text);
         return deepFreeze({ ...map, mapSize: (map.background ? this.imageSizes.get(map.background) : undefined) ?? { width: 0, height: 0 } });
       },
-      addToCollection: (input: AddInput) => this.exclusive(async () => importScene(this.importTarget(), input)),
+      addToCollection: (input: AddInput) => this.exclusive(async () => importScene(this.importTarget(), input, extensionId)),
+      replaceMap: (sceneId: string, input: ReplaceInput) => this.exclusive(async () => replaceScene(this.replaceTarget(), extensionId, sceneId, input)),
     });
   }
 
@@ -169,9 +178,9 @@ export class FakeScenes {
       folders: this.folders,
       collections: this.collections,
       scenes: () => new Map([...this.records].map(([id, record]) => [id, record.mapPath])),
-      addRecord: (name, collectionId, mapPath) => {
+      addRecord: (name, collectionId, mapPath, created) => {
         const id = `scene-${this.nextId++}`;
-        this.records.set(id, { id, name, collectionId, mapPath, data: {} });
+        this.records.set(id, { id, name, collectionId, mapPath, data: { ...created } });
         this.changed();
         return id;
       },
@@ -181,6 +190,16 @@ export class FakeScenes {
         this.failNextAdd = null;
         return failure;
       },
+    };
+  }
+
+  private replaceTarget(): ReplaceTarget {
+    return {
+      files: this.files,
+      record: (sceneId) => this.records.get(sceneId),
+      records: () => [...this.records.values()],
+      openMaps: this.openMaps,
+      beforeMapWrite: this.beforeMapWrite,
     };
   }
 }

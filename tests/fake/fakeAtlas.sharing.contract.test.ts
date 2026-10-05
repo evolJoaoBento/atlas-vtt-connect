@@ -52,14 +52,18 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
     expect(atlas.scenes.exported(legacy)!.data).toEqual({ tags: ['t'] });
   });
 
-  // C-scenes-2 and C-scenes-3 follow Atlas's own cases (tests/api/scenes.test.ts at api-pr-11-end), over a vault.
+  // C-scenes-2 and C-scenes-3 follow Atlas's own cases (tests/api/scenes.test.ts at api-pr-13-end), over a vault.
   function inVault() {
     const vault = createInMemoryApp();
     const atlas = new FakeAtlas({ capabilities: ['scenes'], vault });
     atlas.scenes.addScene({ name: 'Cave', collectionId: 'source', mapPath: MAP });
     atlas.scenes.setMap(MAP, emptyMap({ background: 'atlas-vtt/assets/bg.png' }), {
       mapSize: { width: 320, height: 200 },
-      saved: { diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask', objects: { pins: { p1: { id: 'p1', notePath: 'DM/Secret.md' } }, walls: { w: { id: 'w' } } } },
+      saved: {
+        diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask',
+        objects: { pins: { p1: { id: 'p1', kind: 'pin', x: 5, y: 6, notePath: 'Notes/Cave entrance.md' } }, walls: { w: { id: 'w' } } },
+        camera: { x: 12, y: 34, scale: 2 }, initiativeTrackerOpen: true, tokenSettings: { showNameplates: true, showHPBars: false, showStressBars: true, tokenRingSize: 1.5 },
+      },
     });
     return { atlas, vault, scenes: atlas.connect(connectingPlugin('ext')).scenes };
   }
@@ -148,11 +152,17 @@ describe('FakeAtlas follows the scenes and bundles cases', () => {
   it('C-scenes-3: readMap copies nothing private, hands out a frozen copy and sizes a map without a background 0 x 0', async () => {
     const { atlas, scenes } = inVault();
     const map = (await scenes.readMap(MAP))!;
-    expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'lighting', 'mapSize', 'objects', 'widgets']);
+    expect(Object.keys(map).sort()).toEqual([
+      'background', 'camera', 'grid', 'initiative', 'initiativeTrackerOpen', 'lightZones', 'lighting', 'lights', 'mapSize', 'objects',
+      'pins', 'tokenSettings', 'walls', 'widgets',
+    ]);
     expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
     expect(JSON.stringify(map)).not.toContain('Secret');
+    expect(JSON.stringify(map)).not.toContain('mask');
     expect(Object.isFrozen(map)).toBe(true);
     expect(Object.isFrozen(map.objects)).toBe(true);
+    expect(Object.isFrozen(map.pins!.p1)).toBe(true);
+    expect(Object.isFrozen(map.tokenSettings)).toBe(true);
     const plain = 'atlas-vtt/collections/source/scenes/Plain.atlasmap';
     atlas.scenes.setMap(plain, { background: null, grid: null, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} } });
     const read = (await scenes.readMap(plain))!;

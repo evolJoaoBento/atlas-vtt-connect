@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.11.0";
+export declare const API_VERSION = "1.13.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -50,6 +50,8 @@ export declare interface AtlasExtension {
     readonly ui: UiApi;
     readonly scenes: ScenesApi;
     readonly bundles: BundlesApi;
+    /** Only when `has('remote-view')`. */
+    readonly remoteViews?: RemoteViewsApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -257,6 +259,18 @@ export declare interface DiceApi {
     onRolled(listener: (result: DiceRollResult) => void): Disposer;
     /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
     publish(result: DiceRollResult): void;
+    /**
+     * Throws `roll`, a result decided elsewhere, with Atlas's 3D dice in the map view `viewId` (a GM map view or a remote
+     * view), seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed. Each roll id is thrown
+     * once per view: handing it again throws nothing and answers true. False when nothing is thrown: the view is not open
+     * or its map not loaded, its dice display is not showing, the user shows dice as result cards, or `roll` is not a roll
+     * (a die whose value is not a whole number from 1 to its `max` included); show the roll your own way then.
+     * Where the view cannot draw 3D dice (no WebGL), or the roll does not list all its dice, Atlas shows its result card.
+     * It only throws: nothing is logged, `onRolled` hears nothing and the player window shows nothing (`publish` does those).
+     * `publish` already throws a roll without `rolledBy` in every open GM map view; use `throw` for a roll you do not
+     * publish, or one published with `rolledBy`.
+     */
+    throw?(viewId: ViewId, roll: DiceRollResult): boolean;
 }
 
 declare type DiceCrit = 'high' | 'low' | null;
@@ -591,6 +605,45 @@ declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness'
  */
 export declare type LightLevel = 'bright' | 'dim' | 'dark' | 'magical-dark';
 
+/** A light placed on the map. */
+export declare interface LightSource {
+    id: string;
+    kind: 'light';
+    x: number;
+    y: number;
+    emission: LightEmission;
+    /** Switched off by the GM. */
+    hidden?: boolean;
+    /** Where a light with an `angle` shines, in degrees like a token's rotation: 0 faces up on the map, 90 right. Unset is 0. */
+    rotation?: number;
+    /**
+     * A light that follows the ambient light, like a street lamp: it shines only while the scene's
+     * ambient light (0–1) is at or below this level. Unset, or 1, it always shines. Read with
+     * `ambientGate` and `isLightOn`.
+     */
+    activeBelowAmbient?: number;
+}
+
+/**
+ * An area of the map with ambient light of its own: a cave mouth that is dark by day, a lit hall
+ * in a dark dungeon. Map geometry the GM draws like walls (undo-tracked, in `objects.lightZones`);
+ * later zones lie over earlier ones. Read them with `lightZoneList`.
+ */
+export declare interface LightZone {
+    id: string;
+    kind: 'light-zone';
+    name?: string;
+    /** The zone's corners in world pixels, at least three. Inside them the zone's light counts. */
+    polygon: {
+        x: number;
+        y: number;
+    }[];
+    /** The ambient light inside, as the scene's: 0 is pitch black, 1 is daylight. */
+    ambient: number;
+    /** Tint of that light; unset is the scene's. */
+    ambientColor?: string;
+}
+
 /**
  * One Atlas view's lasers for online play: the GM's own as it is drawn (`LaserPointerRenderer`
  * emits, `LaserRelay` listens), and other people's to show (`LaserRelay` shows,
@@ -638,9 +691,32 @@ export declare interface MenuItem {
     /** Lucide name */
     icon?: string;
     onClick?(): void;
+    /** A submenu finds itself again by its label when it is read anew: give the submenus among one menu's items distinct labels. */
     submenu?: MenuItem[];
     checked?: boolean;
     disabled?: boolean;
+    /**
+     * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
+     * provider again after `ui.invalidate()`, so its checkmarks follow. An item in the menu itself also leaves it open, but
+     * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu.
+     */
+    keepOpen?: boolean;
+}
+
+/**
+ * Note pin object that links to an Obsidian note
+ */
+export declare interface NotePin {
+    id: string;
+    kind: 'pin';
+    x: number;
+    y: number;
+    notePath: string;
+    icon?: string;
+    label?: string;
+    gmOnly?: boolean;
+    /** Links the note to the grid cell containing (x, y) instead of marking a point; hex grids show that hex, other grids a pin. */
+    hex?: boolean;
 }
 
 export declare interface PaletteCommand {
@@ -735,7 +811,7 @@ export declare interface PresentationApi {
     current(): PresentedSceneInfo | null;
     /**
      * Switches `viewId` to `tabId` (default: its active tab), waits for the load, presents. Never throws.
-     * False for a closed view or when nothing new is on screen. After a failed load the scene stays registered
+     * False for a closed view, a remote view, or when nothing new is on screen. After a failed load the scene stays registered
      * as presented but held (`current().held === true`), and `presented(scene, true)` follows if its map later loads.
      */
     present(viewId: ViewId, tabId?: string): Promise<boolean>;
@@ -790,6 +866,111 @@ export declare interface RemoteLaser {
     lifted: boolean;
     /** Milliseconds from each point to the one before it in the stroke, when the sender timed them. */
     dt?: ReadonlyArray<number>;
+}
+
+export declare interface RemotePlayerState {
+    movableTokenIds: readonly string[];
+    measurement: MeasurementSettings;
+    /**
+     * Stand-ins the GM's projection decided on; players never receive the GM's definitions. Decided per token: a resource
+     * definition with `visibleToPlayers: false` draws no bar on that token; it still counts for its downed look (`defeatedWhenSpent`).
+     */
+    tokenUi: {
+        conditions: readonly ConditionDefinition[];
+        resources: Readonly<Record<string, readonly ResourceDefinition[]>>;
+    };
+    initiative: {
+        rules: InitiativeRules | null;
+        health: Readonly<Record<string, {
+            value: number;
+            max: number;
+        }>>;
+    };
+}
+
+export declare interface RemoteSceneInput {
+    /** Records in Atlas's own types; images by URL (object URLs are released by the caller after replacing them). */
+    background: {
+        url: string | null;
+        width: number;
+        height: number;
+    };
+    grid: GridState | null;
+    objects: SceneSnapshot['objects'];
+    /** Token image URL by token id. A token's `notePath` and `statblockPath` are dropped: they name another vault's notes. */
+    tokenImages: Readonly<Record<string, string | null>>;
+    widgets: SceneSnapshot['widgets'];
+    /** The initiative list shows whenever `entries` is non-empty. */
+    initiative: InitiativeState;
+}
+
+export declare interface RemoteStatus {
+    title: string;
+    connection: string;
+    tone: 'connected' | 'pending' | 'ended';
+    message: string | null;
+    action?: {
+        label: string;
+        run(): void;
+    };
+}
+
+/**
+ * A remote view: read-only, never saved, with no undo history. Every method does nothing once the view closed, and every
+ * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*` and `tokens.snapPoint` take its `viewId`;
+ * `views.active()` never returns it, and `tokens.move` and `presentation.present` refuse it.
+ */
+export declare interface RemoteView {
+    readonly viewId: ViewId;
+    /**
+     * Shows the scene: copied, so the caller keeps no reference into Atlas, and the snapshot is loaded with the map path
+     * `remote:<viewId>`. Null shows an empty, unloaded scene. A record handed again as the same object is not copied again.
+     */
+    setScene(scene: RemoteSceneInput | null): void;
+    setPlayer(state: RemotePlayerState): void;
+    /** The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus. */
+    setStatus(status: RemoteStatus): void;
+    /** The shared log shown in this view's dice log (the first 100 entries, copied); Clear is hidden, Roll again calls `onRoll`. */
+    setDiceLog(entries: readonly DiceRollResult[]): void;
+    /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
+    throwRoll(result: DiceRollResult): void;
+    /**
+     * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
+     * resizes until the player moves the camera. Throws when `camera` is not finite numbers with a size above 0.
+     */
+    setCamera(camera: ViewCamera, options?: {
+        animate?: boolean;
+    }): void;
+    /** Ends a drag in progress; the token goes back. */
+    cancelDrag(): void;
+    /** The player let go of a token they may move, at the snapped drop point. The token goes back until the scene moves it. */
+    onTokenDrop(listener: (move: TokenMove) => void): Disposer;
+    /** The player moved the camera (`byUser`), or Fit map ran; lets the extension stop following the GM. */
+    onCameraMoved(listener: (byUser: boolean) => void): Disposer;
+    /**
+     * The dice tray, at most the view's `maxDice` (100 by default), or Roll again; return null once sent, or why not (shown in the tray, or as a notice for
+     * Roll again). Listeners are asked in the order they were added until one returns null; a roll is sent by one listener at
+     * most. With no listener, or when none sent it, the first reason given shows ("The roll could not be sent." for a listener
+     * that throws or for none). The tray never rolls locally in a remote view.
+     */
+    onRoll(listener: (dice: Readonly<Record<string, number>>, modifier: number) => string | null): Disposer;
+    /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
+    onClose(listener: () => void): Disposer;
+    close(): void;
+}
+
+export declare interface RemoteViewsApi {
+    /**
+     * Opens (or reveals, with `reuse`) a tab of type `atlas-vtt-remote`, owned by the calling extension. `maxDice` is the most
+     * dice its tray offers for one roll, a whole number from 1 to 100 (default 100); a revealed view keeps its own title, icon
+     * and `maxDice`. Throws on a malformed option; rejects when the view could not open.
+     */
+    open(options: {
+        title: string;
+        icon?: string;
+        reuse?: boolean;
+        maxDice?: number;
+    }): Promise<RemoteView>;
 }
 
 export declare interface ResourceDefinition {
@@ -850,7 +1031,25 @@ export declare interface RulesApi {
     forMap(mapPath: string | null): MapRules;
 }
 
-/** The parts of a saved map an extension may read and write; everything else in the file stays Atlas's. */
+/**
+ * A saved map as `readMap` reads it: its `SavedMapInput` and the background's size, ready to hand to `addToCollection`.
+ * Atlas 1.13.0 and later always set the optional fields, normalised as Atlas loads the map, also for a file that lacks
+ * them (empty records, the camera at the origin, Atlas's token settings, the tracker closed); an older Atlas leaves
+ * them out.
+ */
+export declare type SavedMap = SavedMapInput & {
+    mapSize: {
+        width: number;
+        height: number;
+    };
+    tokenSettings?: TokenSettings;
+};
+
+/**
+ * The parts of a saved map an extension may read and write; everything else in the file (the GM's note, the dice log,
+ * explored memory, pinned note previews, the loot roller) stays Atlas's. A field left out is written as Atlas writes a
+ * new map: no pins, walls, lights or light zones, the camera at the origin, Atlas's token settings, the tracker closed.
+ */
 export declare interface SavedMapInput {
     /** As in `SceneSnapshot`. Written with `addToCollection`, image paths are relative to its `images` and become vault paths; `readMap` returns vault paths. */
     background: BackgroundState;
@@ -859,6 +1058,26 @@ export declare interface SavedMapInput {
     widgets: SceneSnapshot['widgets'];
     initiative: InitiativeState;
     lighting?: SceneLighting;
+    /**
+     * The note pins, with their note links. A pin's `notePath` is a vault path, never rewritten as an image path; Atlas
+     * does not check that the note exists (its loader keeps a pin whose note is missing), so write the notes first.
+     * Entries are handed out as saved, also ones Atlas cannot read and skips.
+     */
+    pins?: Readonly<Record<string, NotePin>>;
+    /** The walls, lights and light zones of dynamic lighting. Walls and lights are handed out as saved, also ones Atlas cannot read and skips. */
+    walls?: Readonly<Record<string, WallSegment>>;
+    lights?: Readonly<Record<string, LightSource>>;
+    lightZones?: Readonly<Record<string, LightZone>>;
+    /** Where the GM's camera was when the map was saved: finite x and y, a scale above 0. */
+    camera?: {
+        x: number;
+        y: number;
+        scale: number;
+    };
+    /** How the map shows its tokens; Atlas's defaults fill what is not given. */
+    tokenSettings?: Partial<TokenSettings>;
+    /** Whether the initiative tracker was open; only `true` opens it. */
+    initiativeTrackerOpen?: boolean;
 }
 
 /** Dynamic lighting of one scene. Saved in the map file, never undo-tracked. */
@@ -906,16 +1125,14 @@ export declare interface ScenesApi {
     /** Sets or (null) clears it. Atlas drops it from copies, exports and imports, and leaves it out of fingerprints. */
     setData(sceneId: string, value: Json | null): Promise<void>;
     /** A saved `.atlasmap` file, migrated to the current format, without opening a view; a frozen copy. Null when there is no such file. */
-    readMap(mapPath: string): Promise<(SavedMapInput & {
-        mapSize: {
-            width: number;
-            height: number;
-        };
-    }) | null>;
+    readMap(mapPath: string): Promise<SavedMap | null>;
     /**
      * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
      * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
-     * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused.
+     * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused, and so is a
+     * malformed optional field of `map` (a pin without a plain vault `notePath`, a camera that is not finite numbers with
+     * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records): it throws
+     * before anything is written. A `readMap` result can be handed in as it is.
      */
     addToCollection(input: {
         collection: {
@@ -925,6 +1142,27 @@ export declare interface ScenesApi {
         };
         name: string;
         folder: string;
+        map: SavedMapInput;
+        images: ReadonlyArray<{
+            path: string;
+            data: ArrayBuffer;
+        }>;
+    }): Promise<{
+        sceneId: string;
+        mapPath: string;
+    }>;
+    /**
+     * Replaces the map of a scene this extension added with `addToCollection`, keeping its scene id, name, collection and
+     * map path. `map` and `images` are as for `addToCollection`, with images relative to the map file's folder; an image
+     * whose name is taken there gets a number. The new images are written, then the map file, under the asset index lock;
+     * only then are images removed, and only ones Atlas wrote for this scene (`addToCollection`, earlier `replaceMap`
+     * calls) that the new map, another asset, another map and resolved note links no longer use. No other file is ever
+     * removed. The GM's note link, dice log, pinned note previews and loot roller are kept; explored memory resets.
+     * Rejects, writing nothing, for a scene another extension or the GM made (Atlas notes which extension added a scene,
+     * in its index only), for a scene open in any map view or its scene tabs (close it first, so no open view saves over
+     * the new map; checked again just before the map is written), and for malformed input. A failed write removes the images it wrote and puts the old map back.
+     */
+    replaceMap?(sceneId: string, input: {
         map: SavedMapInput;
         images: ReadonlyArray<{
             path: string;
@@ -963,7 +1201,7 @@ export declare interface SceneSnapshot {
     };
     readonly initiative: InitiativeState;
     readonly initiativeTrackerOpen: boolean;
-    /** Never sent to players by Atlas Online; read only to decide (with `lighting.playerVisibility`). */
+    /** The GM's lighting settings: an extension should never send them to players, only decide by them (with `lighting.playerVisibility`). */
     readonly lighting: SceneLighting;
 }
 
@@ -1075,7 +1313,7 @@ export declare interface TokensApi {
     snapPoint(viewId: ViewId, point: Point, tokenSize: number): Readonly<Point>;
     /**
      * Moves tokens as one undo step, like a GM drop: the moved tokens rise to the top of the stack and are no longer held. Checked in this order, and nothing is written when any move
-     * fails: the map is loaded (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
+     * fails: the map is loaded and the view is not a remote view, which is read-only (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
      * `allowHidden` (`hidden`), every position is a number within 1e9 of the origin (`invalid-position`, also when snapping would
      * not give one). A token named twice moves to its last position. Throws when `moves` is not a list or `options` is malformed.
      */
@@ -1087,6 +1325,15 @@ declare interface TokenSense {
     id: string;
     /** Game units; unset takes the definition's default, or reaches without limit. */
     range?: number;
+}
+
+/** How a map shows its tokens (the map's token settings), saved in its file. */
+export declare interface TokenSettings {
+    showNameplates: boolean;
+    /** Keys of the collection's resources this map does not show to the GM; see `resources/sceneVisibility.ts`. */
+    hiddenResources: string[];
+    showInstanceBadges: boolean;
+    tokenRingSize: number;
 }
 
 /** How a token sees. Distances are game units. */
@@ -1188,6 +1435,41 @@ export declare interface ViewsApi {
     /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
     watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;
 }
+
+/** What a wall can stop: the sight of tokens, or light. */
+declare type WallChannel = 'sight' | 'light';
+
+export declare interface WallSegment {
+    id: string;
+    kind: 'wall';
+    type: WallType;
+    p1: {
+        x: number;
+        y: number;
+    };
+    p2: {
+        x: number;
+        y: number;
+    };
+    direction?: 'left' | 'right' | undefined;
+    closed?: boolean;
+    /** A door the GM locked: it is closed and its badge does not open it until it is unlocked. A GM aid; light and sight read only `closed`. */
+    locked?: boolean;
+    /**
+     * The one thing the wall stops: a curtain stops sight and lets light through, glass that glows
+     * stops light and lets sight through. Unset, it stops both. A door keeps its kind.
+     */
+    blocks?: WallChannel | undefined;
+    /**
+     * A hedge, a low wall, a fence: sight and light pass the first limited wall on their way and
+     * stop at the second, so what stands at it or right behind it is seen, and nothing through
+     * two. A solid wall stops them as ever. With `blocks`, it is limited for that thing alone.
+     */
+    limited?: boolean | undefined;
+    chainId?: string;
+}
+
+declare type WallType = 'solid' | 'door' | 'secret-door';
 
 declare interface Widget {
     id: string;

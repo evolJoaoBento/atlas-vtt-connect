@@ -90,3 +90,5 @@ export declare const WIDGET_ICONS: WidgetIcon[];
 export declare const DEFAULT_WIDGET_ICON: WidgetIcon;
 /** Maps any stored icon name (including pre-icon-set legacy values) to a known icon. */
 export declare function resolveWidgetIcon(icon: string | undefined): WidgetIcon;
+/** Whether `name` names an icon of the set; a name the object prototype has (`constructor`, `__proto__`) is none. */
+export declare function isWidgetIcon(name: unknown): name is WidgetIcon;

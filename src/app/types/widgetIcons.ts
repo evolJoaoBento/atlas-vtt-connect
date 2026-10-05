@@ -1,4 +1,4 @@
-// Copied from Atlas VTT src/app/types/widgetIcons.ts at c1d4d15 (AGPL-3.0-only).
+// Copied from Atlas VTT src/app/types/widgetIcons.ts at ad4bea2 (AGPL-3.0-only).
 /**
  * Widget icon set: silhouettes from game-icons.net (CC BY 3.0, see README credits).
  * Stored as path data on a 512×512 canvas so they render inline and inherit
@@ -178,5 +178,10 @@ export function resolveWidgetIcon(icon: string | undefined): WidgetIcon {
   if (icon === 'timer') return 'hourglass';
   if (icon === 'book') return 'spellbook';
   if (icon === 'hand') return 'strength';
-  return icon && icon in WIDGET_ICON_PATHS ? (icon as WidgetIcon) : DEFAULT_WIDGET_ICON;
+  return isWidgetIcon(icon) ? icon : DEFAULT_WIDGET_ICON;
+}
+
+/** Whether `name` names an icon of the set; a name the object prototype has (`constructor`, `__proto__`) is none. */
+export function isWidgetIcon(name: unknown): name is WidgetIcon {
+  return typeof name === 'string' && Object.hasOwn(WIDGET_ICON_PATHS, name);
 }

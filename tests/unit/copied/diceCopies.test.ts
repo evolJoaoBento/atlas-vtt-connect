@@ -21,6 +21,10 @@ describe("the join page's copies of Atlas's dice display modules", () => {
     [{ die: 'd6', value: 4, max: 6, negative: true }, { die: 'd20', value: 9, max: 20 }],
     Array.from({ length: 25 }, () => ({ die: 'd6', value: 1, max: 6 })),
     [],
+    // Values off the die (API 1.13.0's landsOnAFace): a card.
+    [{ die: 'd20', value: 25, max: 20 }],
+    [{ die: 'd6', value: 2, max: 6 }, { die: 'd20', value: 0, max: 20 }],
+    [{ die: 'd100', value: 42.5, max: 100 }],
   ] as unknown as Array<Parameters<typeof sceneFromRolls>[0]>;
 
   it('offer the same display choices, hints and throw styles', () => {

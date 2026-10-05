@@ -12,6 +12,8 @@ type Scene = Omit<SceneSnapshot, 'viewId'>;
 
 interface FakeView {
   readonly viewId: ViewId;
+  /** A GM map view, or a remote view (1.12.0): listed and announced like a map view, never `active()`. */
+  readonly kind: ViewInfo['kind'];
   tabs: FakeTab[];
   activeTabId: string | null;
   scene: Scene;
@@ -73,12 +75,36 @@ export class FakeViews {
   constructor(private readonly hooks: FakeViewsHooks) {}
 
   /** Opens a map view with these tabs (the first active), its store empty until `setSnapshot`. */
-  open(viewId: ViewId, tabs: FakeTab[] = [{ tabId: 't1', mapPath: 'maps/a.atlasmap', name: 'A' }]): void {
+  open(viewId: ViewId, tabs: FakeTab[] = [{ tabId: 't1', mapPath: 'maps/a.atlasmap', name: 'A' }], kind: ViewInfo['kind'] = 'map'): void {
     if (this.views.has(viewId)) return;
     this.views.set(viewId, {
-      viewId, tabs: [...tabs], activeTabId: tabs[0]?.tabId ?? null, scene: EMPTY_SCENE, camera: null,
+      viewId, kind, tabs: [...tabs], activeTabId: tabs[0]?.tabId ?? null, scene: EMPTY_SCENE, camera: null,
       subscribers: new Set(), cameraWatchers: new Set(), closers: new Set(), loadedPath: null,
     });
+  }
+
+  /**
+   * Opens another extension's remote view (1.12.0): no tabs, listed with `kind: 'remote'`; `setSnapshot` with the map
+   * path `remote:<viewId>` loads it, which fires 'map-loaded' as for a map view. It is never `active()`.
+   */
+  openRemote(viewId: ViewId): void {
+    this.open(viewId, [], 'remote');
+  }
+
+  /** The view's kind; 'map' for a view that is not open. */
+  kindOf(viewId: ViewId): ViewInfo['kind'] {
+    return this.views.get(viewId)?.kind ?? 'map';
+  }
+
+  /** The map paths open in a map view, loaded or among its scene tabs (what `scenes.replaceMap` refuses). */
+  openMapPaths(): Set<string> {
+    const paths = new Set<string>();
+    for (const view of this.views.values()) {
+      if (view.kind !== 'map') continue;
+      if (view.scene.mapPath) paths.add(view.scene.mapPath);
+      for (const tab of view.tabs) paths.add(tab.mapPath);
+    }
+    return paths;
   }
 
   /** The view's store scene now; undefined for a view that is closed or was never opened. */
@@ -135,9 +161,9 @@ export class FakeViews {
     this.activeId = viewId;
   }
 
-  /** The workspace's active map view id; null for none or a closed one. */
+  /** The workspace's active map view id; null for none, a closed one or a remote view. */
   activeViewId(): ViewId | null {
-    return this.activeId !== null && this.views.has(this.activeId) ? this.activeId : null;
+    return this.activeId !== null && this.views.get(this.activeId)?.kind === 'map' ? this.activeId : null;
   }
 
   /** Whether the view is open. */
@@ -217,7 +243,8 @@ export class FakeViews {
     return Object.freeze({
       list: (): ViewInfo[] => [...this.views.values()].map((view) => this.infoOf(view)),
       active: (): ViewInfo | null => {
-        const view = this.activeId === null ? undefined : this.views.get(this.activeId);
+        const id = this.activeViewId();
+        const view = id === null ? undefined : this.views.get(id);
         return view ? this.infoOf(view) : null;
       },
       snapshot: (viewId: ViewId): SceneSnapshot | null => {
@@ -234,7 +261,7 @@ export class FakeViews {
 
   private infoOf(view: FakeView): ViewInfo {
     return {
-      viewId: view.viewId, kind: 'map', activeTabId: view.activeTabId,
+      viewId: view.viewId, kind: view.kind, activeTabId: view.activeTabId,
       tabs: view.tabs.map((tab) => ({ ...tab })), mapPath: view.scene.mapPath, loaded: view.scene.loaded,
     };
   }

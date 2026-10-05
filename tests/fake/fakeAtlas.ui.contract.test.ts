@@ -250,4 +250,24 @@ describe('FakeAtlas draws slots as Atlas does', () => {
     badge = true;
     expect(drawn()).toBe(true);
   });
+
+  it('C-ui-3: a keepOpen item leaves its menu open, and an open submenu reads its provider again after invalidate', () => {
+    const { atlas, ext } = setup();
+    let ticked = false;
+    ext.ui.addTokenMenuItems(() => [
+      { label: 'Close me', onClick: noop },
+      { label: 'Controlled by', submenu: [{ label: 'Ana', checked: ticked, keepOpen: true, onClick: () => { ticked = !ticked; ext.ui.invalidate(); } }] },
+    ]);
+    const menu = atlas.ui!.openTokenMenu('v1', 'tok', 'character');
+    expect(menu.submenu(['Controlled by'])).toEqual([expect.objectContaining({ label: 'Ana', checked: false, keepOpen: true })]);
+    expect(menu.choose(['Controlled by', 'Ana'])).toBe(true);
+    expect(menu.isOpen).toBe(true);
+    expect(menu.submenu(['Controlled by'])[0]).toMatchObject({ checked: true });
+    expect(menu.choose(['Close me'])).toBe(true);
+    expect(menu.isOpen).toBe(false);
+    ext.ui.addViewMenuItems(() => [{ label: 'Odd', keepOpen: 'yes' as never, onClick: noop }]);
+    const view = atlas.ui!.openViewMenu('v1');
+    view.choose(['Odd']);
+    expect(view.isOpen).toBe(false);
+  });
 });

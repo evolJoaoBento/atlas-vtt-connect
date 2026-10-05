@@ -1,11 +1,13 @@
 import { normalizePath } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
-import { mapStrings } from '../../src/app/utils/mapStrings';
+import { checkedSceneFields, isPlainRelative, withImagePaths } from './fakeMapFields';
 import { savedMapText } from './fakeSavedMap';
 
 /**
- * `scenes.addToCollection` as Atlas does it (`src/api/sceneImport.ts` at api-pr-11-end): everything is checked before
- * the first write; images go to `folder/path` and the map's strings naming them become those vault paths; the map file
+ * `scenes.addToCollection` as Atlas does it (`src/api/sceneImport.ts` at api-pr-13-end): everything is checked before
+ * the first write, the optional fields of 1.13.0 too (`checkedSceneFields`); images go to `folder/path` and the strings
+ * of the scene's own parts naming them become those vault paths (never a pin's `notePath`); the index notes the
+ * extension that added the scene and the images it wrote (`createdBy`, `createdImages`, for `replaceMap`); the map file
  * is `savedMapText` under a free name (`collectionFolderName` stem, numbered past files in the folder and paths the
  * index names); a failure after the first write removes what this call wrote, last first: the record it added (only
  * that one), its files, the folder it created and the collection it created.
@@ -21,7 +23,7 @@ export interface ImportTarget {
   collections: Map<string, string>;
   /** Scene id → map path, of every record in the index. */
   scenes(): Map<string, string | null>;
-  addRecord(name: string, collectionId: string, mapPath: string): string;
+  addRecord(name: string, collectionId: string, mapPath: string, created: { createdBy: string; createdImages: string[] }): string;
   removeRecord(sceneId: string): void;
   /** A test's planned failure: after the writes, or after the record was added (the index save failing). */
   takeFailure(): { error: Error; after: 'writes' | 'record' } | null;
@@ -31,13 +33,6 @@ const COLLECTIONS_DIR = 'atlas-vtt/collections';
 const INVALID_NAME_CHARACTERS = /[\\/:*?"<>|#^[\]]/;
 
 const parentOf = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
-
-/** Whether `path` is a plain relative path: no empty, `.` or `..` segment, no leading slash or backslash, no control character. */
-function isPlainRelative(path: unknown): path is string {
-  return typeof path === 'string' && path.length > 0 && path.length < 1024 && !path.includes('\\') && !path.startsWith('/')
-    && ![...path].some((character) => character.charCodeAt(0) < 0x20)
-    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
-}
 
 function collectionNameProblem(name: string): string | null {
   const trimmed = name.trim();
@@ -86,7 +81,7 @@ function freeMapPath(target: ImportTarget, folder: string, name: string): string
 
 const exists = (target: ImportTarget, path: string): boolean => target.files.has(path) || target.folders.has(path);
 
-export function importScene(target: ImportTarget, input: AddInput): { sceneId: string; mapPath: string } {
+export function importScene(target: ImportTarget, input: AddInput, owner: string): { sceneId: string; mapPath: string } {
   if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
     throw new Error('[Atlas API] addToCollection needs { collection, name, folder, map, images }.');
   }
@@ -100,6 +95,7 @@ export function importScene(target: ImportTarget, input: AddInput): { sceneId: s
     if (!isPlainRelative(folder) || !`${folder}/x`.startsWith(`${COLLECTIONS_DIR}/${collection.id}/`)) {
       throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${COLLECTIONS_DIR}/${collection.id}.`);
     }
+    const fields = checkedSceneFields(input.map);
     const targets = new Map<string, ArrayBuffer>();
     for (const image of input.images) {
       const path: unknown = image?.path;
@@ -117,12 +113,11 @@ export function importScene(target: ImportTarget, input: AddInput): { sceneId: s
     }
     mapPath = freeMapPath(target, folder, input.name);
     const imagePaths = new Map([...targets.keys()].map((at) => [at.slice(folder.length + 1), at]));
-    const map = mapStrings(input.map, (text) => imagePaths.get(text) ?? text);
     written.push(mapPath);
-    target.files.set(mapPath, savedMapText(map, mapPath, input.name.trim()));
+    target.files.set(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
     const failure = target.takeFailure();
     if (failure?.after === 'writes') throw failure.error;
-    const sceneId = target.addRecord(input.name.trim(), collection.id, mapPath);
+    const sceneId = target.addRecord(input.name.trim(), collection.id, mapPath, { createdBy: owner, createdImages: [...targets.keys()] });
     if (failure?.after === 'record') throw failure.error;
     return { sceneId, mapPath };
   } catch (error) {

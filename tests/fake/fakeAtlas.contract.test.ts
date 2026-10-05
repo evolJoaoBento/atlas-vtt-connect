@@ -14,6 +14,18 @@ export const ATLAS_ONLY: Record<string, string> = {
   'C-rules-7': "Atlas-internal: the asset index's own loading and its failure log",
 };
 
+/**
+ * Cases a later task simulates, each with its owner: the remote view (`remoteViews`, 1.12.0) is B15's, which brings it
+ * into Connect. The fake already lists a remote view among the views (`FakeViews.openRemote`), as 1.12.0 does.
+ */
+export const LATER_TASK: Record<string, string> = {
+  'C-remote-1': 'B15: remoteViews.open, reuse and onClose',
+  'C-remote-2': 'B15: unloading closes the remote views',
+  'C-remote-3': 'B15: setScene in the snapshot (Atlas-only, store, per the plan)',
+  'C-remote-4': 'B15: token drops, lasers and camera moves in a remote view',
+  'C-remote-5': 'B15: the remote dice tray and log (Atlas-only, UI, per the plan)',
+};
+
 describe('FakeAtlas follows the contract cases', () => {
   it('C-storage-1: folder() is the extension folder and is stable', async () => {
     const atlas = new FakeAtlas({ capabilities: ['storage'] });
@@ -97,12 +109,32 @@ describe('FakeAtlas follows the contract cases', () => {
     expect(atlas.has('nonsense' as never)).toBe(false);
   });
 
-  it('every case Atlas pins is tested here or listed as Atlas-only', () => {
+  it('C-views-3: a remote view (1.12.0) is listed and announced as kind remote, and is never active', () => {
+    const atlas = new FakeAtlas({ capabilities: ['views'] });
+    const extension = atlas.connect(connectingPlugin('ext'));
+    const loaded = vi.fn();
+    const closed = vi.fn();
+    extension.on('map-loaded', loaded);
+    extension.on('map-closed', closed);
+    atlas.views.open('gm');
+    atlas.views.openRemote('r1');
+    atlas.views.setSnapshot('r1', { ...atlas.views.sceneOf('r1')!, mapPath: 'remote:r1', loaded: true });
+    atlas.views.setActive('r1');
+    expect(extension.views.list().map((info) => [info.viewId, info.kind])).toEqual([['gm', 'map'], ['r1', 'remote']]);
+    expect(loaded).toHaveBeenCalledWith(expect.objectContaining({ viewId: 'r1', kind: 'remote', mapPath: 'remote:r1' }));
+    expect(extension.views.active()).toBeNull();
+    atlas.views.close('r1');
+    expect(closed).toHaveBeenCalledWith('r1');
+  });
+
+  it('every case Atlas pins is tested here, listed as Atlas-only, or owned by a later task', () => {
     const text = readdirSync('tests/fake').filter((name) => name.endsWith('.contract.test.ts'))
       .map((name) => readFileSync(`tests/fake/${name}`, 'utf8')).join('\n');
     const tested = new Set([...text.matchAll(/^\s*it\('(C-[a-z]+-[0-9]+):/gm)].map((match) => match[1]));
-    const missing = source.contractCases.filter((id) => !ATLAS_ONLY[id] && !tested.has(id));
+    const missing = source.contractCases.filter((id) => !ATLAS_ONLY[id] && !LATER_TASK[id] && !tested.has(id));
     expect(missing).toEqual([]);
-    expect(Object.keys(ATLAS_ONLY).filter((id) => !source.contractCases.includes(id))).toEqual([]);
+    expect([...Object.keys(ATLAS_ONLY), ...Object.keys(LATER_TASK)].filter((id) => !source.contractCases.includes(id))).toEqual([]);
+    // A case a later task owns is not tested here yet: once it is, its entry goes.
+    expect(Object.keys(LATER_TASK).filter((id) => tested.has(id) || ATLAS_ONLY[id])).toEqual([]);
   });
 });

@@ -37,6 +37,8 @@ export interface DiceScene {
     /** Face each die lands on, in plan order. */
     faces: number[];
 }
+/** Whether a rolled die shows a face it has: a whole number from 1 to its sides, which are a whole number above 0. */
+export declare function landsOnAFace(die: Pick<RolledDie, 'max' | 'value'>): boolean;
 /**
  * The stage for Atlas' rolled dice, or null when they cannot all be shown as
  * real bodies.

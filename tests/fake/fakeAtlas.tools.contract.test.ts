@@ -115,4 +115,22 @@ describe('FakeAtlas follows the dice and laser contract cases', () => {
     expect(atlas.lasers.shown('v2')[0]?.points).toHaveLength(64);
     expect(atlas.lasers.shown('v2')[0]?.points.at(-1)).toEqual({ x: 199, y: 0 });
   });
+
+  it('C-dice-2: throw (1.13.0) throws a given roll once per id in a loaded view, and answers false where nothing is thrown', () => {
+    const atlas = new FakeAtlas({ capabilities: ['views', 'dice'] });
+    const dice = atlas.connect(connectingPlugin('ext')).dice;
+    const roll: DiceRollResult = { id: 'r1', timestamp: 1, formula: '1d20', rolls: [{ die: 'd20', value: 7, max: 20 }], modifiers: 0, total: 7 };
+    atlas.views.open('v1', [{ tabId: 't1', mapPath: MAP, name: 'A' }]);
+    atlas.setSetting('diceDisplay', 'full');
+    expect(dice.throw!('v1', roll)).toBe(false);
+    atlas.views.setSnapshot('v1', { ...atlas.views.sceneOf('v1')!, mapPath: MAP, loaded: true });
+    expect(dice.throw!('v1', roll)).toBe(true);
+    expect(dice.throw!('v1', roll)).toBe(true);
+    expect(atlas.dice.thrownIn('v1').map((each) => each.id)).toEqual(['r1']);
+    expect(dice.throw!('nope', roll)).toBe(false);
+    for (const value of [25, 0, 2.5]) expect(dice.throw!('v1', { ...roll, id: `bad-${value}`, rolls: [{ die: 'd20', value, max: 20 }] })).toBe(false);
+    atlas.setSetting('diceDisplay', 'card');
+    expect(dice.throw!('v1', { ...roll, id: 'r2' })).toBe(false);
+    expect(atlas.dice.thrownIn('v1')).toHaveLength(1);
+  });
 });
