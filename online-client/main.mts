@@ -9,6 +9,7 @@ import { AssetLoader } from '../src/app/online/assets/AssetLoader';
 import { openIndexedDbImageStore } from '../src/app/online/assets/indexedDbImageStore';
 import { randomId } from '../src/app/online/ids';
 import { parseJoinFragment } from '../src/app/online/joinLink';
+import { pageKey, readKept } from '../src/app/online/page/pageStorage';
 import { createOnlineLog } from '../src/app/online/onlineLog';
 import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
 import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
@@ -116,10 +117,10 @@ let sessionState: PlayerSessionState | null = null;
 let scene: PlayerScene | null = null;
 let started = false;
 
-/** Diagnostics: run `localStorage.setItem('atlas-online:log', 'on')` in this page's console; the switch is read on every event, so no reload is needed. */
+/** Diagnostics: run `localStorage.setItem('atlas-vtt-connect:log', 'on')` in this page's console; the switch is read on every event, so no reload is needed. */
 const log = createOnlineLog(() => {
   try {
-    return localStorage.getItem('atlas-online:log') === 'on';
+    return readKept(localStorage, 'log') === 'on';
   } catch {
     return false;
   }
@@ -145,10 +146,10 @@ function syncToolbar(): void {
 }
 
 /** localStorage can throw in private windows; the page still works without it. */
-function stored(key: string, fallback: () => string): string {
+function stored(name: string, fallback: () => string): string {
   try {
-    const value = localStorage.getItem(key) ?? fallback();
-    localStorage.setItem(key, value);
+    const value = readKept(localStorage, name) ?? fallback();
+    localStorage.setItem(pageKey(name), value);
     return value;
   } catch {
     return fallback();
@@ -218,7 +219,7 @@ if (!target) {
   status.textContent = NO_CANVAS_TEXT;
 } else {
   form.hidden = false;
-  nameInput.value = stored('atlas-online:name', () => '');
+  nameInput.value = stored('name', () => '');
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (started) return;
@@ -227,7 +228,7 @@ if (!target) {
       status.textContent = NAME_PROBLEM_TEXT;
       return;
     }
-    try { localStorage.setItem('atlas-online:name', name); } catch { /* private window */ }
+    try { localStorage.setItem(pageKey('name'), name); } catch { /* private window */ }
     started = true;
     form.hidden = true;
     session = createJoinSession({
@@ -235,7 +236,7 @@ if (!target) {
       hostId: target.hostId,
       name,
       // One key per GM session, so different GMs cannot recognise or pose as the same player.
-      playerKey: stored(`atlas-online:player-key:${target.hostId}`, () => randomId()),
+      playerKey: stored(`player-key:${target.hostId}`, () => randomId()),
       clientVersion: VERSION,
       transport: createPeerClient(target.server),
       onChange: render,

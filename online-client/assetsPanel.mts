@@ -6,14 +6,15 @@
  */
 import type { AssetCache, AssetCacheState } from '../src/app/online/assets/AssetCache';
 import type { AssetProgress } from '../src/app/online/assets/AssetLoader';
+import { pageKey, readKept } from '../src/app/online/page/pageStorage';
 import { clearImagesText, keepImagesText, progressText } from '../src/app/online/preview/assetStatus';
 
-const KEEP_KEY = 'atlas-online:keep-images';
+const KEEP_KEY = pageKey('keep-images');
 
 /** The remembered switch: on unless the player turned it off. localStorage can throw in private windows. */
 export function rememberedKeep(): boolean {
   try {
-    return localStorage.getItem(KEEP_KEY) !== 'off';
+    return readKept(localStorage, 'keep-images') !== 'off';
   } catch {
     return true;
   }

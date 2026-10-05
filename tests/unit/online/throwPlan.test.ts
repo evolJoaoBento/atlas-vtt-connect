@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AFTERGLOW, GLEAM } from '../../../online-client/dice3d/stageClock.mts';
 import { LEAVE_MS, LINGER_MS, LINGER_STUCK_MS, TICK_DELAY_MS } from '../../../online-client/dice3d/throwPanel.mts';
@@ -11,11 +12,20 @@ import { beginThrow } from '@atlas-vtt/shared/dice3d';
 import { throwRandom } from '@atlas-vtt/shared/dice3d';
 import { planThrow, type ThrowStage } from '../../../src/app/online/page/throwPlan';
 
-// Atlas's source is not in this repository: the drift check below reads a checkout of Atlas when there is one
-// (`ATLAS_SRC`, by default the sibling worktree the vendor is synced from) and is skipped without it.
+// Atlas's source is not in this repository: the drift check below reads the vendored commit
+// (`vendor/atlas/SOURCE.json`) from a checkout of Atlas when there is one (`ATLAS_SRC`, by default the
+// sibling worktree the vendor is synced from) and is skipped without it or without that commit.
 const ATLAS_SRC = process.env.ATLAS_SRC ?? resolve(process.cwd(), '../atlas-vtt-upstream-wt');
-const hasAtlasSource = existsSync(join(ATLAS_SRC, 'src/app/react/components/dice3d/DiceStage.tsx'));
-const source = (path: string): string => readFileSync(join(ATLAS_SRC, path), 'utf8');
+const COMMIT = (JSON.parse(readFileSync('vendor/atlas/SOURCE.json', 'utf8')) as { commit: string }).commit;
+const source = (path: string): string => execFileSync('git', ['-C', ATLAS_SRC, 'show', `${COMMIT}:${path}`], { encoding: 'utf8' });
+const hasAtlasSource = ((): boolean => {
+  try {
+    source('src/app/react/components/dice3d/DiceStage.tsx');
+    return true;
+  } catch {
+    return false;
+  }
+})();
 const STAGE: ThrowStage = { before: [5, 3.5], measure: () => [4.2, 3] };
 
 function scene(): DiceScene {

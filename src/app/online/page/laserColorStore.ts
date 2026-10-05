@@ -4,17 +4,18 @@
  * Shared with the web page.
  */
 import { swatchLaserColor } from '../tools/laserColors';
+import { pageKey, readKept } from './pageStorage';
 
-export const LASER_COLOR_KEY = 'atlas-online:laser-color';
+export const LASER_COLOR_KEY = pageKey('laser-color');
 
 /** The page passes `() => localStorage`: reaching for it can throw, so it is read inside the guard. */
-type Reader = () => Pick<Storage, 'getItem'>;
+type Reader = () => Pick<Storage, 'getItem' | 'setItem'>;
 type Writer = () => Pick<Storage, 'setItem'>;
 
 /** The remembered swatch, or null when there is none or storage is unavailable. */
 export function loadLaserColor(storage: Reader): string | null {
   try {
-    return swatchLaserColor(storage().getItem(LASER_COLOR_KEY));
+    return swatchLaserColor(readKept(storage(), 'laser-color'));
   } catch {
     return null;
   }

@@ -12,6 +12,13 @@ describe("the join page's copies of Atlas's dice display modules", () => {
     [{ die: 'd20', value: 20, max: 20 }, { die: 'd6', value: 3, max: 6 }],
     [{ die: 'd6', value: 2, max: 6 }, { die: 'd6', value: 5, max: 6, exploded: true }],
     [{ die: 'd13', value: 9, max: 13 }],
+    [{ die: 'd100', value: 100, max: 100 }],
+    [{ die: 'd100', value: 10, max: 100 }],
+    [{ die: 'd100', value: 7, max: 100 }],
+    [{ die: 'd100', value: 70, max: 100 }, { die: 'd8', value: 4, max: 8 }, { die: 'd100', value: 1, max: 100 }],
+    [{ die: 'd2', value: 1, max: 2 }, { die: 'd2', value: 2, max: 2 }],
+    [{ die: 'd3', value: 1, max: 3 }, { die: 'd3', value: 2, max: 3 }, { die: 'd3', value: 3, max: 3 }],
+    [{ die: 'd6', value: 4, max: 6, negative: true }, { die: 'd20', value: 9, max: 20 }],
     Array.from({ length: 25 }, () => ({ die: 'd6', value: 1, max: 6 })),
     [],
   ] as unknown as Array<Parameters<typeof sceneFromRolls>[0]>;

@@ -5,18 +5,19 @@
  * taken. Shared with the web page.
  */
 import { isDiceDisplay, type DiceDisplay } from '../../dice3d/diceDisplay';
+import { pageKey, readKept } from './pageStorage';
 
-export const DICE_DISPLAY_KEY = 'atlas-online:dice-display';
+export const DICE_DISPLAY_KEY = pageKey('dice-display');
 /** Atlas's own default. */
 export const DEFAULT_PAGE_DICE_DISPLAY: DiceDisplay = 'full';
 
 /** The page passes `() => localStorage`: reaching for it can throw, so it is read inside the guard. */
-type Reader = () => Pick<Storage, 'getItem'>;
+type Reader = () => Pick<Storage, 'getItem' | 'setItem'>;
 type Writer = () => Pick<Storage, 'setItem'>;
 
 export function loadDiceDisplay(storage: Reader): DiceDisplay {
   try {
-    const kept = storage().getItem(DICE_DISPLAY_KEY);
+    const kept = readKept(storage(), 'dice-display');
     return isDiceDisplay(kept) ? kept : DEFAULT_PAGE_DICE_DISPLAY;
   } catch {
     return DEFAULT_PAGE_DICE_DISPLAY;
