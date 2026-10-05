@@ -5,7 +5,7 @@
  * the player's token drops, laser and rolls, and draws other people's lasers. Only what the GM's projection sent
  * players reaches the view. Closing the view leaves the session; the session ending elsewhere closes the view.
  */
-import type { Disposer, LasersApi, RemoteSceneInput, RemoteView, UiApi } from '@atlas-vtt/api-types';
+import type { Disposer, LasersApi, RemotePlayerState, RemoteSceneInput, RemoteView, UiApi } from '@atlas-vtt/api-types';
 import type { PlayerSessionState } from '../../PlayerSession';
 import type { SceneCamera } from '../../scene/sceneCamera';
 import type { PlayerScene } from '../../scene/sceneTypes';
@@ -20,6 +20,7 @@ import { RemoteFollower } from './remoteFollower';
 import { RemoteLaserLink } from './RemoteLaserLink';
 import { remoteToolbarItems } from './remoteToolbar';
 import { RemoteTokenMoves } from './remoteTokenMoves';
+import { sameValue } from '../../scene/sceneDiff';
 import { RemoteSceneMemo, remotePlayerState } from './toRemoteScene';
 
 export type RemoteSceneService = Pick<OnlineJoinService, 'attach' | 'images' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'leave'>;
@@ -51,12 +52,14 @@ export interface RemoteSceneClientOptions {
   frames?: Frames;
 }
 
-/** Runs a call into Atlas that throws on input it refuses: logged, so the session's other messages still go. */
-function guarded(what: string, call: () => void): void {
+/** Runs a call into Atlas that throws on input it refuses: logged, so the session's other messages still go; false when it threw. */
+function guarded(what: string, call: () => void): boolean {
   try {
     call();
+    return true;
   } catch (error) {
     console.error(`[Atlas VTT Connect] The online scene could not show ${what}:`, error);
+    return false;
   }
 }
 
@@ -77,6 +80,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
   private state: PlayerSessionState | null = null;
   private shown: PlayerScene | null = null;
   private controlled: readonly string[] = [];
+  /** The player state Atlas has: the same again is not sent, so Atlas's initiative list keeps its element and scroll. */
+  private sentPlayer: RemotePlayerState | null = null;
   private detachSession: (() => void) | null = null;
   private imagesFrame: number | null = null;
   private disposed = false;
@@ -208,14 +213,15 @@ export class RemoteSceneClient implements OnlineSceneSink {
     if (this.disposed) return;
     const scene = this.shown;
     const input = scene ? this.memo.input(scene, this.options.service.images, (tokenId) => this.moves.positionOf(tokenId)) : null;
-    guarded('the scene', () => this.view.setScene(input));
-    // The images the previous scene showed may go now (`shownUrls`).
-    shownUrls.show(this, urlsOf(input));
+    // The images the previous scene showed may go now (`shownUrls`); a scene Atlas refused leaves them shown.
+    if (guarded('the scene', () => this.view.setScene(input))) shownUrls.show(this, urlsOf(input));
   }
 
   private feedPlayer(): void {
     if (this.disposed) return;
-    guarded('the player state', () => this.view.setPlayer(remotePlayerState(this.shown, this.movable())));
+    const player = remotePlayerState(this.shown, this.movable());
+    if (this.sentPlayer && sameValue(player, this.sentPlayer)) return;
+    if (guarded('the player state', () => this.view.setPlayer(player))) this.sentPlayer = player;
   }
 
   private showStatus(): void {

@@ -4,6 +4,7 @@ import { FIT_MAP_ITEM, FOLLOW_GM_ITEM } from '../../../../src/app/online/obsidia
 import {
   ROLL_CONNECTION_LOST_TEXT, ROLL_NOT_SENT_TEXT, ROLL_RECONNECTING_TEXT, ROLL_SESSION_ENDED_TEXT,
 } from '../../../../src/app/online/obsidian/onlineRollRefusal';
+import { shownUrls } from '../../../../src/app/online/obsidian/objectUrlImages';
 import { laserColor } from '../../../../src/app/online/tools/laserColors';
 import { playerScene } from '../sceneFixtures';
 import { admitted, remoteSceneSetup } from './remoteSceneFixtures';
@@ -199,5 +200,35 @@ describe('RemoteSceneClient', () => {
     t.sink().scene(playerScene({ sceneId: 'scene-2' }));
     t.sink().session(admitted());
     expect(t.handle.calls.length).toBe(calls);
+  });
+  it('keeps showing the images of the last scene Atlas took when it refuses the next one', async () => {
+    const revoked: string[] = [];
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: (url: string) => { revoked.push(url); } });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const t = await setup({ images: { background: (id) => (id ? `blob:map/${id}` : null), token: () => null } });
+      t.sink().scene(playerScene({ map: { asset: 'refused-test', width: 1000, height: 800, cellSize: 70 } }));
+      // The loader lets the map image go as the next scene arrives.
+      shownUrls.revoke('blob:map/refused-test');
+      expect(revoked).toEqual([]);
+      // Atlas refuses a map wider than it shows: the scene it has still shows the old image.
+      t.sink().scene(playerScene({ sceneId: 'scene-2', map: { asset: 'other', width: 200_000, height: 800, cellSize: 70 } }));
+      expect(t.handle.scene?.background.url).toBe('blob:map/refused-test');
+      expect(revoked).toEqual([]);
+      t.sink().scene(playerScene({ sceneId: 'scene-3', map: { asset: 'other', width: 1000, height: 800, cellSize: 70 } }));
+      expect(revoked).toEqual(['blob:map/refused-test']);
+      t.client.dispose();
+    } finally {
+      delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+    }
+  });
+
+  it('keeps following when Fit map has nothing to fit', async () => {
+    const t = await setup();
+    t.sink().scene(playerScene({ map: { asset: null, width: 0, height: 0, cellSize: 70 }, grid: null, tokens: {} }));
+    const asked = t.handle.count('setCamera');
+    t.atlas.ui!.clickToolbar(FIT_MAP_ITEM, t.view.viewId);
+    expect(t.handle.count('setCamera')).toBe(asked);
+    expect(t.atlas.ui!.drawToolbar(t.view.viewId).find((item) => item.id === FOLLOW_GM_ITEM)?.active).toBe(true);
   });
 });

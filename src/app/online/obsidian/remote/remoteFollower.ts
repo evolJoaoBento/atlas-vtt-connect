@@ -68,8 +68,9 @@ export class RemoteFollower {
     this.go(true);
   }
 
-  /** Shows the whole scene; the player stays broken away. */
+  /** Shows the whole scene; the player stays broken away. A scene without bounds has nothing to fit, and follows on. */
   fitMap(): void {
+    if (!this.fitted) return;
     this.setFollowing(false);
     this.ask(this.fitted, true);
   }

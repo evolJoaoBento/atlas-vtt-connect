@@ -77,13 +77,38 @@ describe("the remote view's initiative list", () => {
     expect(t.handle.player?.initiative).toEqual({ rules: null, health: {} });
   });
 
-  it('hands Atlas the same list again when something else in the scene changes, so it is not redrawn', async () => {
+  it('sends the player state again only when it changed, so Atlas keeps the list (and its scroll) when something else moves', async () => {
     const t = await shown({ entries: ENTRIES }, SIDES);
-    const lists = (): unknown[] => t.handle.calls.filter((call) => call.method === 'setScene').map((call) => (call.args[0] as { initiative: unknown }).initiative);
-    const scene = t.handle.calls.filter((call) => call.method === 'setScene').at(-1)?.args[0];
-    expect(scene).toBeDefined();
+    const sent = t.handle.count('setPlayer');
+    // Another token moves and a token takes a condition another token already shows: the stand-ins are the same.
+    const scene = projected({ entries: ENTRIES }, SIDES);
+    t.sink().scene({ ...scene, tokens: { ...scene.tokens, orc: { ...scene.tokens.orc!, x: 300 } } });
+    expect(t.handle.count('setScene')).toBeGreaterThan(1);
+    expect(t.handle.count('setPlayer')).toBe(sent);
     t.sink().images();
     t.runFrames();
-    expect(lists().at(-1)).toBe(lists().at(-2));
+    t.sink().control([]);
+    expect(t.handle.count('setPlayer')).toBe(sent);
+    // A real change is sent.
+    t.sink().control(['hero']);
+    expect(t.handle.count('setPlayer')).toBe(sent + 1);
+    t.sink().scene(projected({ entries: ENTRIES }, TURN_ORDER));
+    expect(t.handle.count('setPlayer')).toBe(sent + 2);
+    expect(t.handle.player?.initiative.rules?.mode).toBe('turn-order');
+  });
+
+  it('sends a condition change only when the stand-in definitions change', async () => {
+    const t = await remoteSceneSetup();
+    const base = projected({ entries: ENTRIES }, SIDES);
+    const withCondition = (ids: Record<string, string[]>): typeof base => ({
+      ...base,
+      tokens: Object.fromEntries(Object.entries(base.tokens).map(([id, tok]) => [id, { ...tok, conditions: (ids[id] ?? []).map((c) => ({ id: c, value: null })) }])),
+    });
+    t.sink().scene(withCondition({ orc: ['prone'] }));
+    const sent = t.handle.count('setPlayer');
+    t.sink().scene(withCondition({ orc: ['prone'], boss: ['prone'] }));
+    expect(t.handle.count('setPlayer')).toBe(sent);
+    t.sink().scene(withCondition({ orc: ['prone', 'blinded'] }));
+    expect(t.handle.count('setPlayer')).toBe(sent + 1);
   });
 });
