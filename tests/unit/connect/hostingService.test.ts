@@ -50,7 +50,7 @@ describe('hosting through the Atlas API', () => {
     expect(connect.run('stop-online-session')).toBe(false);
   });
 
-  it('registers the session commands, not Atlas\'s own present commands, and no join command without joining', async () => {
+  it('registers the session commands, not Atlas\'s own present commands, beside the join command', async () => {
     const { connect } = connected();
     await vi.advanceTimersByTimeAsync(0);
     expect([...connect.commands.values()].map((command) => command.name)).toEqual(['Join online session…', 'Online session…', 'Start online session', 'Stop online session']);
