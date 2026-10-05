@@ -25,7 +25,8 @@ const UNDO_NOTICE: Record<UndoOutcome, string> = {
 
 const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction({
   title: `${title} changed here and was shared again`,
-  message: ['Keep both saves the new version as a second scene. Take theirs replaces your copy.'],
+  // Atlas cannot replace a scene yet (`installUpdate` in mapPull.ts): both answers add the new version as a scene.
+  message: ['Keep both adds the new version as a second scene, and later pulls keep updating yours. Take theirs adds it as a new scene that later pulls update, and your copy stays.'],
   choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const, style: 'warning' }],
 });
 
