@@ -9,7 +9,7 @@ import { createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshot
 /**
  * A scene saved lit fails closed in the projection itself, whatever the caller passes: without a lighting
  * frame, or with a closed one, players get the dark map and nothing else; with an open frame, what lies in
- * the dark or reaches past the map's edge is left out.
+ * the dark, or wholly past the map's edge, is left out, and an item crossing the edge is checked by its part inside.
  */
 const MAP = { width: 1000, height: 800 };
 const RULES = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
@@ -98,10 +98,11 @@ describe('texts and drawings of a lit scene with an open frame', () => {
     expect(Object.keys(scene.tokens)).toEqual(['hero']);
   });
 
-  it('leaves out a text or drawing that crosses the map edge, which the darkness does not cover', () => {
+  // The fork's hotfix (a04e19b): an item crossing the edge is checked by the part of it inside the map.
+  it('leaves out a text or drawing crossing the map edge whose part inside the map is dark, and sends one whose part is lit', () => {
     const scene = projectForPlayers(snapshot(true), context(halfDark()));
     expect(Object.keys(scene.texts)).not.toContain('edge');
-    expect(Object.keys(scene.texts)).not.toContain('far');
+    expect(Object.keys(scene.texts)).toContain('far');
     expect(Object.keys(scene.drawings)).not.toContain('edge');
   });
 
@@ -109,7 +110,16 @@ describe('texts and drawings of a lit scene with an open frame', () => {
     const frame = halfDark();
     const darkCoverage = FogCoverage.EMPTY.covering(frame.darkness.covered);
     const scene = projectForPlayers(snapshot(true), { ...context(frame), darkCoverage });
-    expect(Object.keys(scene.texts)).toEqual(['lit']);
+    expect(Object.keys(scene.texts).sort()).toEqual(['far', 'lit']);
     expect(Object.keys(scene.drawings)).toEqual(['lit']);
+  });
+
+  it('leaves out a text or drawing wholly outside the map, though nothing is dark', () => {
+    const lit: LightingFrame = { seen: () => true, darkness: darknessOf({ cols: 1, rows: 1, cellSize: 1000, map: MAP, dark: Uint8Array.of(0) }) };
+    const state = snapshot(true);
+    const outside = { ...state, objects: { ...state.objects, texts: { out: text('out', 1200, 200) }, drawings: { out: stroke('out', [{ x: 1200, y: 600 }, { x: 1250, y: 610 }]) } } };
+    const scene = projectForPlayers(outside, context(lit));
+    expect(scene.texts).toEqual({});
+    expect(scene.drawings).toEqual({});
   });
 });

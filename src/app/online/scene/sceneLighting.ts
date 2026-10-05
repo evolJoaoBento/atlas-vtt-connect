@@ -1,10 +1,11 @@
 /**
  * What a lit scene hides from online players comes from a `LightingSource`: one `PresentationLighting` per
- * shown presentation, asked for a frame at each projection. This file holds the source for an Atlas
- * without the `lighting` capability; the source that reads Atlas's player visibility is `LiveLighting`.
+ * shown presentation, asked for a frame at each projection. With Atlas's `lighting` capability it reads the
+ * player visibility (`liveLighting`); without it a scene saved lit fails closed (`noLightingCapability`).
  */
-import type { SceneSnapshot } from '@atlas-vtt/api-types';
-import { closedFrame, type LightingFrame } from './lightingFrame';
+import type { LightingApi, SceneSnapshot } from '@atlas-vtt/api-types';
+import { LiveLighting } from './LiveLighting';
+import { closedFrame, OPEN_FRAME, type LightingFrame } from './lightingFrame';
 
 export const LIT_SCENE_NEEDS_UPDATE_NOTICE = 'Update Atlas VTT to show lit scenes to online players.';
 
@@ -41,5 +42,23 @@ export function noLightingCapability(notify: (message: string) => void): Lightin
       restart: () => undefined,
       dispose: () => undefined,
     }),
+  };
+}
+
+/**
+ * Atlas's answer decides, never the snapshot's lighting flag: `pending` is dark and `ready` is used though the
+ * snapshot reads unlit (a map loading or a tab switch), and `unlit` on a scene saved lit is open, not closed:
+ * with dynamic lighting off the player window shows the scene as unlit.
+ */
+export function liveLighting(lighting: Pick<LightingApi, 'playerVisibility' | 'watch'>): LightingSource {
+  return {
+    open: ({ viewId }, onDue) => {
+      const live = new LiveLighting(lighting, viewId, onDue);
+      return {
+        frame: (snapshot) => live.frame(snapshot.mapSize) ?? (snapshot.lighting.enabled ? OPEN_FRAME : null),
+        restart: () => live.restart(),
+        dispose: () => live.dispose(),
+      };
+    },
   };
 }

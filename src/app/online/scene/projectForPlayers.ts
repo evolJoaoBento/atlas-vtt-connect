@@ -13,7 +13,6 @@ import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr }
 import type { FogCoverage } from './FogCoverage';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
-import type { WorldBounds } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type Covers, type ProjectionMemo } from './projectRecords';
@@ -70,10 +69,11 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const objects = state.objects;
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
   const cellSize = positiveOr(state.grid?.size, DEFAULT_GRID_SIZE);
-  // A scene saved lit whose lighting is missing, or whose frame is closed, shows players nothing but the dark map.
+  // A scene saved lit whose lighting is missing, or whose frame is closed, shows players nothing but the dark map;
+  // one Atlas says its lighting hides nothing (an open frame: dynamic lighting off) projects as unlit.
   const lit = state.lighting?.enabled === true;
   const closed = context.lighting?.closed === true || (lit && !context.lighting);
-  const lighting = closed ? closedFrame(context.mapSize) : context.lighting ?? null;
+  const lighting = closed ? closedFrame(context.mapSize) : context.lighting?.open === true ? null : context.lighting ?? null;
   const hidden: Covers = lighting ? darkCovers(context, lighting) : context.coverage;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
@@ -97,15 +97,25 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
 }
 
 /**
- * What texts and drawings of a lit scene are checked against: the fog with the darkness over it, and
- * whatever reaches beyond the map, where the darkness does not (a lit scene shows nothing out there).
+ * What texts and drawings of a lit scene are checked against: the fog with the darkness over it. The darkness is
+ * clipped to the map and a coverage grid answers false outside it, so an item wholly outside the map (or on a map
+ * of unknown size) counts as hidden, and any other is checked by the part of it inside the map, the only part the
+ * darkness can cover: an item whose estimated size pokes past the edge of a lit map is still sent, a dark one is not.
  */
 function darkCovers(context: ProjectionContext, lighting: LightingFrame): Covers {
   const dark = context.darkCoverage ?? context.coverage.covering(lighting.darkness.covered);
   const { width, height } = context.mapSize;
-  const inside = (bounds: WorldBounds): boolean => width > 0 && height > 0
-    && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width && bounds.y + bounds.height <= height;
-  return { isCovered: (bounds) => !inside(bounds) || dark.isCovered(bounds) };
+  return {
+    isCovered: (bounds) => {
+      const right = bounds.x + Math.max(0, bounds.width);
+      const bottom = bounds.y + Math.max(0, bounds.height);
+      if (!(width > 0 && height > 0 && [bounds.x, bounds.y, right, bottom].every(Number.isFinite))) return true;
+      if (right < 0 || bottom < 0 || bounds.x > width || bounds.y > height) return true;
+      const x = Math.max(bounds.x, 0);
+      const y = Math.max(bounds.y, 0);
+      return dark.isCovered({ x, y, width: Math.min(right, width) - x, height: Math.min(bottom, height) - y });
+    },
+  };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {

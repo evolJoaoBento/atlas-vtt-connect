@@ -20,7 +20,15 @@ export interface LightingFrame {
   darkness: Darkness;
   /** Set when the view's lighting could not be read: nothing but the dark map is sent (`closedFrame`). */
   closed?: boolean;
+  /**
+   * Set when Atlas says lighting hides nothing (`unlit`) on a scene saved lit (dynamic lighting off): the
+   * projection is then exactly the unlit one (`OPEN_FRAME`). Only Atlas's own answer gives it.
+   */
+  open?: boolean;
 }
+
+/** Lighting hides nothing: every token as without lighting, no darkness, nothing beyond the map's edge left out. */
+export const OPEN_FRAME: LightingFrame = Object.freeze({ seen: () => true, darkness: NO_DARKNESS, open: true });
 
 /** Every token left out and the whole map dark: what players get while the view's lighting cannot be read. */
 export function closedFrame(map: MapSize): LightingFrame {

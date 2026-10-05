@@ -1,6 +1,7 @@
 /** The `Deps` of `OnlineSessionService` that come from Atlas: the presented scene, the collections' rules, Atlas's settings. */
-import type { AtlasExtension, DiceApi, LasersApi } from '@atlas-vtt/api-types';
+import type { AtlasExtension, DiceApi, LasersApi, LightingApi } from '@atlas-vtt/api-types';
 import type { Deps } from '../OnlineSessionService';
+import { liveLighting } from '../scene/sceneLighting';
 import { presentedSource } from './presentedSource';
 import { diceHostPart, laserRelayPart } from './toolParts';
 
@@ -10,17 +11,19 @@ type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 's
 export interface OptionalNamespaces {
   dice: DiceApi | null;
   lasers: LasersApi | null;
+  lighting: LightingApi | null;
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser'
+  'presented' | 'views' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting'
 >;
 
 /**
  * Connect's own settings are not among these: the service takes them itself. Players' dice and lasers are
  * there only when this Atlas has the `dice` and `lasers` capabilities; without them the session hosts without.
+ * Without `lighting` a scene saved lit shows players only the dark map, and the GM is told (`noLightingCapability`).
  */
-export function sessionDeps(atlas: SessionAtlas, { dice, lasers }: OptionalNamespaces): AtlasSessionDeps {
+export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting }: OptionalNamespaces): AtlasSessionDeps {
   return {
     presented: presentedSource(atlas),
     views: atlas.views,
@@ -35,5 +38,6 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers }: OptionalNames
     },
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
+    ...(lighting ? { lighting: liveLighting(lighting) } : {}),
   };
 }

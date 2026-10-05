@@ -175,6 +175,11 @@ export class FakeViews {
     return this.views.get(viewId);
   }
 
+  /** Whether the view's store holds a loaded map; a map loading is not. */
+  isLoaded(viewId: ViewId): boolean {
+    return this.views.get(viewId)?.scene.loaded === true;
+  }
+
   /** Whether the store holds `tabId`'s map, loaded (Atlas's `showsTab`). */
   showsTab(viewId: ViewId, tabId: string): boolean {
     const view = this.views.get(viewId);

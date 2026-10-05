@@ -1,6 +1,7 @@
 import type { AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer, SettingsApi, StorageApi } from '@atlas-vtt/api-types';
 import { FakeDice } from './fakeDice';
 import { FakeLasers } from './fakeLasers';
+import { FakeLighting } from './fakeLighting';
 import { FakePresentation } from './fakePresentation';
 import { FakeRules } from './fakeRules';
 import { FakeViews, type Own } from './fakeViews';
@@ -8,7 +9,7 @@ import { FakeViews, type Own } from './fakeViews';
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
 
 /** Namespaces the fake does not simulate yet; the extension carries a throwing stand-in once their capability is on. */
-const NAMESPACES = ['lighting', 'tokens'] as const;
+const NAMESPACES = ['tokens'] as const;
 
 /** Atlas's settings as the fake starts with them; `setSetting` changes them. */
 const DEFAULT_SETTINGS: AtlasSettingsView = {
@@ -24,7 +25,7 @@ const deepFreeze = <T>(value: T): T => {
   return Object.freeze(value);
 };
 
-/** A namespace whose simulation lands with the feature that first uses it (B9 lighting, B10 tokens). */
+/** A namespace whose simulation lands with the feature that first uses it (B10 tokens). */
 function notSimulated(name: string): unknown {
   return new Proxy({}, { get: (_target, member) => { throw new Error(`FakeAtlas does not simulate ${name}.${String(member)} yet.`); } });
 }
@@ -83,13 +84,15 @@ export class FakeAtlas implements AtlasApi {
   readonly dice: FakeDice;
   /** The GM's laser per view, and the lasers shown in a view. */
   readonly lasers: FakeLasers;
+  /** What each view's player window shows (`lighting.playerVisibility`). */
+  readonly lighting: FakeLighting;
 
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
     this.version = options.version ?? '1.0.0';
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
     this.views = new FakeViews({
-      emitMapLoaded: (info) => this.emit('map-loaded', info),
+      emitMapLoaded: (info) => { this.emit('map-loaded', info); this.lighting.changed(info.viewId); },
       emitMapClosed: (viewId) => this.emit('map-closed', viewId),
       storeChanged: (viewId) => this.presentation.storeChanged(viewId),
       tabsChanged: (viewId) => this.presentation.tabsChanged(viewId),
@@ -99,6 +102,7 @@ export class FakeAtlas implements AtlasApi {
     this.rules = new FakeRules((collectionId) => this.emit('rules-changed', collectionId));
     this.dice = new FakeDice(this.rules);
     this.lasers = new FakeLasers(this.views);
+    this.lighting = new FakeLighting(this.views);
   }
 
   has(capability: AtlasCapability): boolean {
@@ -157,6 +161,7 @@ export class FakeAtlas implements AtlasApi {
     if (this.capabilities.has('rules')) extension.rules = this.rules.api();
     if (this.capabilities.has('dice')) extension.dice = this.dice.api(own);
     if (this.capabilities.has('lasers')) extension.lasers = this.lasers.api(own);
+    if (this.capabilities.has('lighting')) extension.lighting = this.lighting.api(own);
     if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
     if (this.capabilities.has('storage')) extension.storage = storageApi(id);
     return extension as unknown as AtlasExtension;

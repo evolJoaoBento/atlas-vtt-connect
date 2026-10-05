@@ -9,7 +9,7 @@ const MAP = 'maps/a.atlasmap';
 function deps(capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'lasers']) {
   const atlas = new FakeAtlas({ capabilities });
   const extension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
-  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null }) };
+  return { atlas, deps: sessionDeps(extension, { dice: extension.dice ?? null, lasers: extension.lasers ?? null, lighting: extension.lighting ?? null }) };
 }
 
 describe('sessionDeps', () => {
@@ -53,5 +53,10 @@ describe('sessionDeps', () => {
     const older = deps(['views', 'presentation', 'rules', 'settings', 'storage']).deps;
     expect(older).not.toHaveProperty('dice');
     expect(older).not.toHaveProperty('laser');
+  });
+
+  it("reads players' darkness from Atlas's lighting when it has it; without, the broadcaster's closed stub applies", () => {
+    expect(deps(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting']).deps.lighting).toBeDefined();
+    expect(deps().deps).not.toHaveProperty('lighting');
   });
 });

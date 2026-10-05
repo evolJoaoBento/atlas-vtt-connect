@@ -3,6 +3,7 @@
  * by construction: paint fogs only cells the shape covers whole, erase clears
  * every cell it touches.
  */
+import { insideSpans } from '@atlas-vtt/shared/draw';
 import type { ScenePoint } from './sceneTypes';
 import { distanceSqToSegment, simplifyPoints } from './simplifyPoints';
 
@@ -168,25 +169,6 @@ function cellInsideCapsule(left: number, top: number, size: number, a: ScenePoin
     && distanceSqToSegment({ x: left + size, y: top }, a, b) <= radiusSq
     && distanceSqToSegment({ x: left, y: top + size }, a, b) <= radiusSq
     && distanceSqToSegment({ x: left + size, y: top + size }, a, b) <= radiusSq;
-}
-
-/** The x ranges of a horizontal line at `y` that lie inside the polygon, by nonzero winding. */
-export function insideSpans(points: readonly ScenePoint[], y: number): Array<[number, number]> {
-  const crossings: Array<{ x: number; winding: number }> = [];
-  for (let index = 0; index < points.length; index++) {
-    const a = points[index]!;
-    const b = points[(index + 1) % points.length]!;
-    if ((a.y <= y) === (b.y <= y)) continue;
-    crossings.push({ x: a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x), winding: b.y > a.y ? 1 : -1 });
-  }
-  crossings.sort((p, q) => p.x - q.x);
-  const spans: Array<[number, number]> = [];
-  let winding = 0;
-  for (let index = 0; index < crossings.length - 1; index++) {
-    winding += crossings[index]!.winding;
-    if (winding !== 0) spans.push([crossings[index]!.x, crossings[index + 1]!.x]);
-  }
-  return spans;
 }
 
 /** Liang-Barsky: the part of segment (ax, ay)-(bx, by) inside the rectangle, or null when none is. */
