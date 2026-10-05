@@ -17,8 +17,8 @@ export interface NeedMap {
 }
 
 /**
- * The members each namespace must have as functions before Connect uses it: every required method of the vendored
- * types. Optional ones (`dice.throw`, `scenes.replaceMap`) are checked where they are called. A capability whose
+ * The members each namespace must have as functions before Connect uses it: the required methods of the vendored
+ * types that Connect calls (a member it never calls cannot switch a feature off). Optional ones (`dice.throw`, `scenes.replaceMap`) are checked where they are called. A capability whose
  * namespace lacks one counts as missing, so that feature degrades as on an Atlas without it; minors are never compared.
  */
 export const REQUIRED_MEMBERS: { readonly [K in keyof NeedMap]: ReadonlyArray<keyof NeedMap[K]> } = {
@@ -30,10 +30,10 @@ export const REQUIRED_MEMBERS: { readonly [K in keyof NeedMap]: ReadonlyArray<ke
   dice: ['roll', 'onRolled', 'publish'],
   lasers: ['onLocal', 'show'],
   lighting: ['playerVisibility', 'watch'],
-  tokens: ['snapPoint', 'move'],
+  tokens: ['move'],
   ui: ['addToolbarItem', 'addPaletteSection', 'addDashboardTile', 'addViewMenuItems', 'addTokenMenuItems', 'addPanel', 'invalidate'],
   scenes: ['list', 'findByMap', 'getData', 'setData', 'readMap', 'addToCollection'],
-  bundles: ['stripNoteProperties', 'forgetNoteProperties'],
+  bundles: ['stripNoteProperties'],
 };
 
 /** The namespace for `capability` when this Atlas has it and every member Connect calls; null otherwise. */

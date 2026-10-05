@@ -69,6 +69,16 @@ describe('player-safe refusal', () => {
     expect(fogTruncated({ odd: rect(400, 400, 200, 200, { type: 'cloud' as never, isErasing: true }) }, createProjectionMemo())).toBe(false);
   });
 
+  it("does not count a lasso that covers nothing, as Atlas's own stroke draws none (a stray click must not blank play)", () => {
+    const lasso = (points: unknown[]): Record<string, FogOperation> => ({ l: { id: 'l', kind: 'fog', type: 'lasso', timestamp: 1, isErasing: false, points } as FogOperation });
+    // Two points, and three within the 1 px simplification of a line: no area on the GM's canvas either.
+    expect(fogTruncated(lasso([{ x: 1, y: 1 }, { x: 5, y: 5 }]), createProjectionMemo())).toBe(false);
+    expect(fogTruncated(lasso([{ x: 0, y: 0 }, { x: 50, y: 0.2 }, { x: 100, y: 0 }]), createProjectionMemo())).toBe(false);
+    expect(new FogCoverageCache().get(lasso([{ x: 0, y: 0 }, { x: 50, y: 0.2 }, { x: 100, y: 0 }]), createProjectionMemo()).truncated).toBe(false);
+    // A point that does not read still fails closed.
+    expect(fogTruncated(lasso([{ x: 0, y: 0 }, { x: 'a', y: 1 }, { x: 100, y: 100 }]), createProjectionMemo())).toBe(true);
+  });
+
   it('refuses a paint brush wider than the wire allows (M2), not an erasing one', () => {
     const brush = (isErasing: boolean): Record<string, FogOperation> =>
       ({ wide: { id: 'wide', kind: 'fog', type: 'brush', timestamp: 1, isErasing, brushRadius: 20_000, points: [{ x: 0, y: 0 }] } as FogOperation });

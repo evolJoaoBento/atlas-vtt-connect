@@ -12,14 +12,22 @@ export const GRID_DRAW_LIMITS = { minSize: 2, cellsPerSide: 2000 } as const;
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const known = <T extends string>(values: readonly T[], value: unknown): value is T => values.includes(value as T);
 
+/**
+ * Whether a lattice of this type, size and offset lies over `map` within the limits: what Atlas's remote view also
+ * gets for a hidden grid it snaps to (`atlasGrid`), which it lays out cell by cell like a visible one.
+ */
+export function isDrawableGeometry(geometry: { type?: unknown; size?: unknown; offsetX?: unknown; offsetY?: unknown }, map: Pick<PlayerMap, 'width' | 'height'>): boolean {
+  const { type, size, offsetX, offsetY } = geometry;
+  if (!known(PLAYER_GRID_TYPES, type) || ![size, offsetX, offsetY].every(finite) || (size as number) < GRID_DRAW_LIMITS.minSize) return false;
+  const side = Math.max(map.width, map.height);
+  return finite(side) && side / (size as number) <= GRID_DRAW_LIMITS.cellsPerSide;
+}
+
 /** Whether `grid` can be drawn over `map` without a drawer looping past the limits. */
 export function isDrawableGrid(grid: unknown, map: Pick<PlayerMap, 'width' | 'height'>): grid is PlayerGrid {
   if (typeof grid !== 'object' || grid === null) return false;
-  const { type, size, offsetX, offsetY, lineType, lineWidth, opacity } = grid as Partial<Record<keyof PlayerGrid, unknown>>;
-  if (!known(PLAYER_GRID_TYPES, type) || !known(PLAYER_GRID_LINES, lineType)) return false;
-  if (![size, offsetX, offsetY, lineWidth, opacity].every(finite) || (size as number) < GRID_DRAW_LIMITS.minSize) return false;
-  const side = Math.max(map.width, map.height);
-  return finite(side) && side / (size as number) <= GRID_DRAW_LIMITS.cellsPerSide;
+  const { lineType, lineWidth, opacity } = grid as Partial<Record<keyof PlayerGrid, unknown>>;
+  return known(PLAYER_GRID_LINES, lineType) && [lineWidth, opacity].every(finite) && isDrawableGeometry(grid, map);
 }
 
 /**

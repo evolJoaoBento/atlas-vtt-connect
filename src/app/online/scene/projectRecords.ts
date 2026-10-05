@@ -12,7 +12,7 @@ import {
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { isSceneId } from './sceneValidation';
-import { wirePoints } from './simplifyPoints';
+import { finitePoints, wirePoints } from './simplifyPoints';
 
 /**
  * Projections by GM record. Immer keeps unchanged records, so their projections
@@ -98,17 +98,30 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
 }
 
 /**
+ * A lasso whose every point reads, yet projects to nothing: a lasso Atlas's own stroke would not close
+ * (under three points, or a sliver within the 1 px simplification of a line). It covers no area on the GM's canvas
+ * either, so it hides nothing; a stray click must not blank every player's scene.
+ */
+function coversNothing(op: FogOperation): boolean {
+  if (op.type !== 'lasso') return false;
+  const points: unknown = op.points;
+  return Array.isArray(points) && points.length > 0 && finitePoints(points).length === points.length;
+}
+
+/**
  * Whether the fog players would get covers less than the GM's: more operations than `SCENE_LIMITS.records`
  * (`extra` counts the darkness drawn with them), or one that covers but is not sent as it is: its id is refused,
- * it projects to nothing (an unknown type, points that do not read), or its brush is wider than the wire allows.
- * What such fog hides cannot be proven hidden, so live play sends a clear and a player-safe share is refused.
+ * it projects to nothing (an unknown type, points that do not read; not a lasso that covers nothing, `coversNothing`),
+ * or its brush is wider than the wire allows. What such fog hides cannot be proven hidden, so live play sends a clear
+ * and a player-safe share is refused.
  */
 export function fogTruncated(fog: Readonly<Record<string, FogOperation>> | undefined, memo: ProjectionMemo, extra = 0): boolean {
   const entries = Object.entries(fog ?? {});
   if (entries.length + extra > SCENE_LIMITS.records) return true;
   return entries.some(([id, op]) => {
     if (typeof op !== 'object' || op === null || Boolean(op.isErasing)) return false;
-    if (!isSceneId(id) || memoized(memo.fog, op, projectFogOp) === null) return true;
+    if (!isSceneId(id)) return true;
+    if (memoized(memo.fog, op, projectFogOp) === null) return !coversNothing(op);
     return op.type === 'brush' && finiteOr(op.brushRadius, 0) > SCENE_RANGES.stroke[1];
   });
 }

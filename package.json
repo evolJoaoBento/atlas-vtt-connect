@@ -10,7 +10,7 @@
     "build": "vite build",
     "build:page": "vite build -c vite.page.config.mts",
     "test": "vitest",
-    "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json",
+    "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json && eslint -c eslint.tests.config.mjs --max-warnings 0 tests scripts",
     "check:vendor": "node scripts/check-vendor.mjs",
     "sync:atlas": "node scripts/sync-atlas.mjs",
     "inventory": "node scripts/test-inventory.mjs"

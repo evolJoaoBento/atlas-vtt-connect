@@ -8,6 +8,7 @@ import type { GridState, InitiativeState, SavedMapInput } from '@atlas-vtt/api-t
 import { playerCellNumbers } from '../scene/playerCellNumbers';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerMeasurement, PlayerScene } from '../scene/sceneTypes';
+import { GRID_DRAW_LIMITS, isDrawableGeometry } from '../scene/drawableGrid';
 import { snapGridOf } from '../scene/snapGrid';
 import { atlasInitiative, atlasWidgets } from './convertPanels';
 import { atlasDrawing, atlasFog, atlasText } from './convertShapes';
@@ -51,12 +52,18 @@ export function gridUnits(measurement: PlayerMeasurement): Pick<GridState, 'snap
  * Atlas's drag and its resnap after a grid change put tokens where the GM does. On a map without a grid
  * it keeps the map's cell size, so tokens keep their size, and nothing snaps.
  */
+/** A cell size within the limits for `map`, for a grid that is off: Atlas still reads its size. */
+const fallbackSize = (map: Pick<PlayerScene['map'], 'width' | 'height'>): number =>
+  Math.max(GRID_DRAW_LIMITS.minSize, Math.ceil(Math.max(map.width, map.height) / GRID_DRAW_LIMITS.cellsPerSide));
+
 export function atlasGrid(scene: Pick<PlayerScene, 'grid' | 'map' | 'measurement'>): GridState {
   const units = gridUnits(scene.measurement);
   const grid = scene.grid;
   if (!grid) {
     const snap = snapGridOf(scene);
     const geometry = snap ?? { type: 'square' as const, size: scene.map.cellSize, offsetX: 0, offsetY: 0 };
+    // A hidden lattice Atlas would lay out past the limits (`isDrawableGeometry`): no grid at all, no snapping.
+    if (!isDrawableGeometry(geometry, scene.map)) return { enabled: false, visible: false, ...geometry, size: fallbackSize(scene.map), opacity: 0, ...units, snapToGrid: false };
     return { enabled: true, visible: false, ...geometry, opacity: 0, ...units, ...(snap ? {} : { snapToGrid: false }) };
   }
   const numbers = playerCellNumbers(grid);

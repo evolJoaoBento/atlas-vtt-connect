@@ -1,7 +1,5 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
-import globals from "globals";
-import tseslint from "typescript-eslint";
 
 // Obsidian's community directory scores the plugin with `recommended`, so every
 // finding of those rules is a public scorecard row. Additions below only make
@@ -12,18 +10,12 @@ import tseslint from "typescript-eslint";
 // `@typescript-eslint/*` rule there is a fatal ESLint error, which is what
 // Obsidian's whole-repository scan runs into.
 const SCRIPT_FILES = ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"];
-// Tests and build scripts never ship, so the scorecard rules do not apply to them: they get a looser set of their own
-// (typescript-eslint's recommended rules), so dead code and mistakes there are still caught.
-const LOOSER_FILES = ["tests/**/*.{ts,tsx,mts}", "scripts/**/*.{js,mjs}"];
-const LOOSER_DIRS = ["tests/**", "scripts/**"];
-const notLooser = (config) => ({ ...config, ignores: [...(config.ignores ?? []), ...LOOSER_DIRS] });
 
 export default defineConfig([
-  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "docs/", "vite/", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
-  ...obsidianmd.configs.recommended.map(notLooser),
+  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
+  ...obsidianmd.configs.recommended,
   {
     files: SCRIPT_FILES,
-    ignores: LOOSER_DIRS,
     rules: {
       // "Atlas" is the product name. `ignoreWords` rather than `brands`,
       // because `brands` replaces the rule's built-in list (Obsidian, GitHub, …).
@@ -68,20 +60,8 @@ export default defineConfig([
     files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts"],
     rules: { "no-restricted-globals": "off", "obsidianmd/no-global-this": "off" },
   },
-  ...tseslint.configs.recommended.map((config) => ({ ...config, files: LOOSER_FILES })),
-  {
-    files: LOOSER_FILES,
-    languageOptions: { globals: { ...globals.node, ...globals.browser } },
-    rules: {
-      // Fakes and fixtures cast freely to build partial Atlas and Obsidian objects.
-      "@typescript-eslint/no-explicit-any": "off",
-      // `_name` marks a value taken apart on purpose (`const { a: _a, ...rest } = …`).
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }],
-    },
-  },
   {
     files: SCRIPT_FILES,
-    ignores: LOOSER_DIRS,
     languageOptions: {
       parserOptions: {
         projectService: true,

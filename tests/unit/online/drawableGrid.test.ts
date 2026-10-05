@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
+import { atlasGrid } from '../../../src/app/online/obsidian/playerSceneRecords';
 import { UNDRAWABLE_GRID_WARNING } from '../../../src/app/online/playerSessionScene';
 import { drawableGridFilter, GRID_DRAW_LIMITS, isDrawableGrid } from '../../../src/app/online/scene/drawableGrid';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
@@ -77,5 +78,20 @@ describe('a player session', () => {
     expect(player.scene?.grid).toBeNull();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(UNDRAWABLE_GRID_WARNING, expect.objectContaining({ size: 1 }));
+  });
+});
+
+describe("the remote view's hidden grid", () => {
+  const big = { asset: 'map-asset', width: 10_000, height: 10_000, cellSize: 1 };
+  it('is off, not a 1 px lattice, when the snap grid or the map cell is too fine for the map', () => {
+    const base = playerScene({ map: big, grid: null });
+    const snapped = atlasGrid({ ...base, measurement: { ...base.measurement, snapGrid: { type: 'square', size: 1, offsetX: 0, offsetY: 0 } } });
+    expect(snapped).toMatchObject({ enabled: false, visible: false, snapToGrid: false });
+    expect(snapped.size).toBeGreaterThanOrEqual(5);
+    const { snapGrid: _snapGrid, ...withoutSnap } = base.measurement;
+    const fromCell = atlasGrid({ ...base, measurement: withoutSnap });
+    expect(fromCell).toMatchObject({ enabled: false, snapToGrid: false });
+    const fine = atlasGrid({ ...playerScene({ grid: null }), measurement: { ...base.measurement, snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 } } });
+    expect(fine).toMatchObject({ enabled: true, visible: false, size: 70 });
   });
 });
