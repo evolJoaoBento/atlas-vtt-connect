@@ -1,0 +1,168 @@
+// The online session panel's content. Atlas draws the panel around it (frame, title, close button), so this styles
+// only what Connect renders into it. Spacing follows Atlas's tokens (4, 8, 12 px) and the type is Obsidian's.
+
+$connect-mark-size: 8px;
+
+.atlas-connect-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.atlas-connect-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.atlas-connect-panel__heading {
+  margin: 0;
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+}
+
+.atlas-connect-panel__help {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
+}
+
+.atlas-connect-panel__error {
+  margin: 0;
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+}
+
+.atlas-connect-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: var(--font-medium);
+}
+
+.atlas-connect-panel__status-text {
+  flex: 1;
+}
+
+// A filled square reads as "stop", like a media control.
+.atlas-connect-panel__status svg {
+  fill: currentColor;
+}
+
+.atlas-connect-panel__dot {
+  flex-shrink: 0;
+  width: $connect-mark-size;
+  height: $connect-mark-size;
+  border-radius: 50%;
+  background: var(--color-green);
+}
+
+.atlas-connect-panel__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: var(--input-height);
+    padding: 0 8px;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+  }
+}
+
+.atlas-connect-panel__players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-connect-panel__player {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+}
+
+.atlas-connect-panel__player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-connect-panel__name {
+  flex: 1;
+  overflow: hidden;
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-connect-panel__note,
+.atlas-connect-panel__identity {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.atlas-connect-panel__client {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+
+  svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+  }
+}
+
+.atlas-connect-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-connect-panel__chip {
+  padding: 4px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  font-size: var(--font-ui-smaller);
+  line-height: 1;
+}
+
+.atlas-connect-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.atlas-connect-panel__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.atlas-connect-panel__same-name {
+  align-items: flex-start;
+}
+
+.atlas-connect-panel__warning {
+  flex: 1;
+  color: var(--text-warning);
+  font-size: var(--font-ui-smaller);
+}

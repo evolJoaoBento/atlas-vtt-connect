@@ -3,7 +3,7 @@ import type { Disposer, PresentationApi } from '@atlas-vtt/api-types';
 import { onlineSessionStore, type OnlineSessionState } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
 import { JOIN_SESSION_LABEL, ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
-import { openOnlineSession } from './ui/openOnlineSession';
+import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
 
 /** The presentation target Connect holds while hosting: Atlas's eye then presents to online players. */
 export const ONLINE_TARGET = { id: 'atlas-vtt-connect', label: 'online players', isActive: (): boolean => true } as const;
@@ -12,6 +12,8 @@ export interface RegisterOnlineOptions {
   presentation: Pick<PresentationApi, 'addTarget'>;
   /** Opens "Join online session…" (joining comes with plan B12); without it there is no join command. */
   joinSession?: (app: App) => void;
+  /** Atlas's UI slots, when it has them: "Online session…" then opens the panel in a map view. */
+  gmUi?: PanelOpener;
 }
 
 function statusText(state: OnlineSessionState): string {
@@ -27,7 +29,7 @@ function statusText(state: OnlineSessionState): string {
  */
 export function registerOnline(plugin: Plugin, service: OnlineSessionService, options: RegisterOnlineOptions): Disposer {
   const commands = ['online-session', 'start-online-session', 'stop-online-session'];
-  plugin.addCommand({ id: 'online-session', name: `${ONLINE_SESSION_LABEL}…`, callback: () => openOnlineSession(plugin.app) });
+  plugin.addCommand({ id: 'online-session', name: `${ONLINE_SESSION_LABEL}…`, callback: () => openOnlineSession(plugin.app, options.gmUi) });
   plugin.addCommand({
     id: 'start-online-session',
     name: START_SESSION_LABEL,
@@ -55,7 +57,7 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
 
   const item = plugin.addStatusBarItem();
   item.addClass('mod-clickable');
-  item.addEventListener('click', () => openOnlineSession(plugin.app));
+  item.addEventListener('click', () => openOnlineSession(plugin.app, options.gmUi));
   let stopTarget: Disposer | null = null;
   const render = (): void => {
     const state = onlineSessionStore.getState();

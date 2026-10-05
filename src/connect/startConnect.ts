@@ -2,6 +2,7 @@ import type { Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
 import { sessionDeps } from '../app/online/atlas/sessionDeps';
 import { OnlineSessionService, type Deps, type SessionSettings } from '../app/online/OnlineSessionService';
+import { registerGmUi } from '../app/online/gm-ui/registerGmUi';
 import { registerOnline } from '../app/online/registerOnline';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
 import { need } from './capabilities';
@@ -27,8 +28,16 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
   if (!paths || gone()) return () => undefined;
   const people = PeopleBook.forApp(plugin.app, paths);
-  const service = new OnlineSessionService(plugin.app, options.settings, { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens') }), people, ...options.hosting });
-  return registerOnline(plugin, service, { presentation: atlas.presentation });
+  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens') }), people, ...options.hosting };
+  const service = new OnlineSessionService(plugin.app, options.settings, deps);
+  // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
+  const ui = need(api, atlas, 'ui');
+  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views }, service, { presented: deps.presented }) : undefined;
+  const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, ...(gmUi ? { gmUi } : {}) });
+  return () => {
+    gmUi?.();
+    stopOnline();
+  };
 }
 
 /** Starts every Connect feature this Atlas supports; the returned disposer stops them all (Atlas unloaded or Connect unloading). */

@@ -5,6 +5,7 @@ import { FakeLighting } from './fakeLighting';
 import { FakePresentation } from './fakePresentation';
 import { FakeRules } from './fakeRules';
 import { FakeTokens } from './fakeTokens';
+import { FakeUi } from './fakeUi';
 import { FakeViews, type Own } from './fakeViews';
 
 type Listeners = { [E in keyof AtlasEvents]?: Set<AtlasEvents[E]> };
@@ -82,6 +83,8 @@ export class FakeAtlas implements AtlasApi {
   readonly lighting: FakeLighting;
   /** Token moves: each successful move is one GM undo step (`undoSteps`, `undo`). */
   readonly tokens: FakeTokens;
+  /** The UI slots extensions registered; undefined without the `ui` capability, as Atlas's `ui` is. */
+  readonly ui: FakeUi | undefined;
 
   constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger } = {}) {
     this.version = options.version ?? '1.0.0';
@@ -100,6 +103,7 @@ export class FakeAtlas implements AtlasApi {
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
+    this.ui = this.capabilities.has('ui') ? new FakeUi(this.views) : undefined;
   }
 
   has(capability: AtlasCapability): boolean {
@@ -159,6 +163,7 @@ export class FakeAtlas implements AtlasApi {
     if (this.capabilities.has('lasers')) extension.lasers = this.lasers.api(own);
     if (this.capabilities.has('lighting')) extension.lighting = this.lighting.api(own);
     if (this.capabilities.has('tokens')) extension.tokens = this.tokens.api();
+    if (this.ui) extension.ui = this.ui.api(id, own);
     if (this.capabilities.has('settings')) extension.settings = this.settingsApi();
     if (this.capabilities.has('storage')) extension.storage = storageApi(id);
     return extension as unknown as AtlasExtension;

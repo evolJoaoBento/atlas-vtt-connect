@@ -135,6 +135,16 @@ export class FakeViews {
     this.activeId = viewId;
   }
 
+  /** The workspace's active map view id; null for none or a closed one. */
+  activeViewId(): ViewId | null {
+    return this.activeId !== null && this.views.has(this.activeId) ? this.activeId : null;
+  }
+
+  /** Whether the view is open. */
+  isOpen(viewId: ViewId): boolean {
+    return this.views.has(viewId);
+  }
+
   /** Gives the view a viewport showing `camera` (or what a function returns at each read); null removes it. */
   setCamera(viewId: ViewId, camera: ViewCamera | (() => ViewCamera | null) | null): void {
     const view = this.views.get(viewId);

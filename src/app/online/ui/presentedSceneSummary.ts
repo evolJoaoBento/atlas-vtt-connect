@@ -23,12 +23,12 @@ export interface PresentedSceneSummary {
 }
 
 export interface PresentedSceneSummaries {
-  read(): PresentedSceneSummary;
+  read: () => PresentedSceneSummary;
   /**
    * Calls `onChange` when the presented scene, its tokens or its loading change. The API tells of no tab
    * renames, so a renamed tab shows with the next of those (`read` itself always reads the name afresh).
    */
-  subscribe(onChange: () => void): () => void;
+  subscribe: (onChange: () => void) => () => void;
 }
 
 const NOTHING: PresentedSceneSummary = { tabId: null, name: null, characters: [] };
