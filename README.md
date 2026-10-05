@@ -11,17 +11,16 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API, which means the build of the API branch (`api/extension-api`; see Developing below for how to build it). Connect is built against API 1.14.0 (Atlas 0.6.1-beta.0 with the API branch) and still runs on 1.13. Without the API, Connect shows a notice and stays off.
-- TODO (fill in once upstream ships it): the first Atlas release that includes the extension API.
-- The Atlas extension API build is the repository `evolJoaoBento/atlas-vtt`, branch `api/extension-api`. Once that branch is pushed and public, build Atlas from it (see Developing). Until then nobody but the maintainer can get a working Atlas for Connect.
+- **Atlas VTT with extension API 1.13 or newer.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against API 1.15.0 and still runs on 1.13 and 1.14, where a few details degrade: Follow GM and Fit map also show in other plugins' remote views (and do nothing there), Fit map leaves no margin, and the Online scene's status bar has no Shared with me button (use the command instead). Without the API, Connect shows a notice and stays off.
+- **The Atlas API build.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, version **0.6.0-beta.1**. Pin that version in BRAT: BRAT's "latest" in that repository is the online-play fork, not the API build. You can also build Atlas from the branch `api/extension-api` (see Developing).
+- TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
 ## Install with BRAT
 
-1. Install the BRAT plugin and Atlas VTT (a build with the extension API, see above).
-2. In BRAT, choose "Add beta plugin" and enter `evolJoaoBento/atlas-vtt-connect`.
-3. Enable Atlas VTT Connect in Settings, Community plugins.
-
-TODO (fill in when the first release is published): the release version to pick in BRAT.
+1. Install the BRAT plugin.
+2. In BRAT, choose "Add beta plugin", enter `evolJoaoBento/atlas-vtt`, and pick version **0.6.0-beta.1** (the Atlas API build; keep it pinned, see above).
+3. In BRAT, choose "Add beta plugin" again, enter `evolJoaoBento/atlas-vtt-connect`, and pick version **0.1.0-beta.1**.
+4. Enable Atlas VTT and Atlas VTT Connect in Settings, Community plugins.
 
 ## Hosting and joining
 
@@ -89,7 +88,7 @@ Release checklist, before the first tag:
 
 1. Push the Atlas extension API branch to `evolJoaoBento/atlas-vtt` (branch `api/extension-api`) and check that it is public, as named in this README and in THIRD_PARTY_NOTICES.md. Connect's source for the vendored Atlas code must be reachable (AGPL).
 2. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
-3. Fill the version TODOs in this README: the first Atlas release with the extension API, and the release version to pick in BRAT. Remove the lines when done.
+3. The BRAT versions in this README are filled in (Atlas API build 0.6.0-beta.1, Connect 0.1.0-beta.1). The TODO for the first upstream Atlas release with the extension API stays until that release ships.
 4. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.
 5. Enable Pages (source "GitHub Actions") and let `pages.yml` publish the player page, so the default address serves it.
 6. Run the verify block (`npx tsc --noEmit && npm run lint && npx vitest run && npm run build && npm run check:vendor`), then tag and push.

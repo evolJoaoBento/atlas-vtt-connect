@@ -2,7 +2,7 @@
  * What Atlas's remote view refuses (`remoteInput.ts`, `RemoteViewDice.checkedStatus`, `RemoteViewMotion.setCamera`),
  * mirrored so a Connect test fails where Atlas would throw. Messages follow Atlas's.
  */
-import type { DiceRollResult, RemotePlayerState, RemoteSceneInput, RemoteStatus, ViewCamera } from '@atlas-vtt/api-types';
+import type { DiceRollResult, RemotePlayerState, RemoteSceneInput, RemoteStatus, RemoteStatusAction, ViewCamera } from '@atlas-vtt/api-types';
 
 const MAX_REMOTE_MAP_SIDE = 100_000;
 const MODES: readonly unknown[] = ['metric', 'abstract'];
@@ -64,10 +64,21 @@ export function checkedPlayer(state: unknown): RemotePlayerState {
 export function checkedStatus(status: unknown): RemoteStatus {
   const given = (status ?? {}) as Partial<RemoteStatus>;
   const action = given.action;
+  const actions: unknown = given.actions;
+  if (actions !== undefined) {
+    const list = Array.isArray(actions) ? actions as Array<Partial<RemoteStatusAction> | null> : null;
+    const ids = list?.map((entry) => entry?.id);
+    const entries = list !== null && list.every((entry) => isObject(entry) && isText(entry.id) && entry.id !== '' && isText(entry.label) && entry.label !== ''
+      && (entry.icon === undefined || (isText(entry.icon) && entry.icon !== '')));
+    // At most 3 buttons in all with `action`; ids distinct.
+    if (!entries || !ids || new Set(ids).size !== ids.length || list!.length + (given.action ? 1 : 0) > 3) {
+      throw new Error('RemoteView.setStatus: "actions" must be at most 3 buttons in all with "action", each with a distinct id, a label and an optional icon.');
+    }
+  }
   const valid = isText(given.title) && isText(given.connection) && TONES.includes(given.tone) && (given.message === null || isText(given.message))
     && (action === undefined || (isText(action.label) && typeof action.run === 'function'));
   if (!valid) throw new Error('RemoteView.setStatus: the status must be a RemoteStatus.');
-  return given as RemoteStatus;
+  return Object.freeze({ ...given, ...(given.actions ? { actions: Object.freeze(given.actions.map((entry) => Object.freeze({ ...entry }))) } : {}) }) as RemoteStatus;
 }
 
 export function isRoll(value: unknown): value is DiceRollResult {

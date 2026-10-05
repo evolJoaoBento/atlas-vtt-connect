@@ -20,10 +20,19 @@ describe('the remote view toolbar', () => {
     expect(t.atlas.ui!.drawToolbar(t.view.viewId).find((item) => item.id === FOLLOW_GM_ITEM)?.active).toBe(false);
   });
 
-  it("does nothing in another extension's remote view", async () => {
+  it("shows nothing in another extension's remote view", async () => {
     const t = await remoteSceneSetup();
     t.sink().scene(playerScene());
     t.atlas.views.openRemote('other');
+    expect(t.atlas.ui!.drawToolbar('other').map((item) => item.id)).toEqual([]);
+    expect(t.atlas.ui!.drawToolbar(t.view.viewId).map((item) => item.id)).toEqual([FOLLOW_GM_ITEM, FIT_MAP_ITEM]);
+  });
+
+  it("on an Atlas before 1.15 both show in every remote view and do nothing in one that is not Connect's", async () => {
+    const t = await remoteSceneSetup({ before115: true });
+    t.sink().scene(playerScene());
+    t.atlas.views.openRemote('other');
+    expect(t.atlas.ui!.drawToolbar('other').map((item) => item.id)).toEqual([FOLLOW_GM_ITEM, FIT_MAP_ITEM]);
     const asked = t.handle.count('setCamera');
     t.atlas.ui!.clickToolbar(FIT_MAP_ITEM, 'other');
     t.atlas.ui!.clickToolbar(FOLLOW_GM_ITEM, 'other');

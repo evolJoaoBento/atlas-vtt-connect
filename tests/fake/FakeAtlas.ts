@@ -98,13 +98,14 @@ export class FakeAtlas implements AtlasApi {
   private readonly slots: FakeUi;
 
   /** `vault`: the in-memory app's files and folders, which `scenes.addToCollection` writes into (its own otherwise). */
+  /** `before115`: Atlas as before API 1.15.0 (`isVisible` ignored, no `padded`, no status `actions`, no `onStatusAction`). */
   /** `scenesBefore113`: Atlas's scenes as before API 1.13.0 (no saved map fields, no `replaceMap`). */
   /**
-   * `version`: by default the vendored API's, 1.14.0. Only Connect's version gate reads it: the fake behaves as 1.14.0
-   * whatever it says, so a test names an older version only where the gate is what it checks.
+   * `version`: by default the vendored API's, 1.15.0. Only Connect's version gate reads it: the fake behaves as 1.15.0
+   * whatever it says (but for `before115`), so a test names an older version only where the gate is what it checks.
    */
-  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault; scenesBefore113?: boolean } = {}) {
-    this.version = options.version ?? '1.14.0';
+  constructor(options: { version?: string; capabilities?: readonly AtlasCapability[]; trigger?: Trigger; vault?: FakeSceneVault; scenesBefore113?: boolean; before115?: boolean } = {}) {
+    this.version = options.version ?? (options.before115 ? '1.14.0' : '1.15.0');
     this.capabilities = new Set(options.capabilities ?? []);
     this.trigger = options.trigger ?? (() => undefined);
     this.views = new FakeViews({
@@ -120,11 +121,11 @@ export class FakeAtlas implements AtlasApi {
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
-    this.slots = new FakeUi(this.views);
+    this.slots = new FakeUi(this.views, (viewId) => this.remoteViews.ownerOf(viewId), options.before115 === true);
     this.ui = this.capabilities.has('ui') ? this.slots : undefined;
     this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths(), options.scenesBefore113 === true);
     this.bundles = new FakeBundles();
-    this.remoteViews = new FakeRemoteViews(this.views);
+    this.remoteViews = new FakeRemoteViews(this.views, options.before115 === true);
   }
 
   has(capability: AtlasCapability): boolean {

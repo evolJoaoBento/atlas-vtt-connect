@@ -51,9 +51,9 @@ describe('RemoteSceneClient', () => {
     const t = await setup();
     t.sink().scene(playerScene());
     // No GM camera yet: the whole map, at once.
-    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 500, centerY: 400, width: 1000, height: 800 }, animate: false });
+    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 500, centerY: 400, width: 1000, height: 800 }, animate: false, padded: false });
     t.sink().camera({ sceneId: 'scene-1', centerX: 200, centerY: 100, width: 400, height: 300 });
-    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 200, centerY: 100, width: 400, height: 300 }, animate: true });
+    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 200, centerY: 100, width: 400, height: 300 }, animate: true, padded: false });
     const isActive = (): boolean | undefined => t.atlas.ui!.drawToolbar(t.view.viewId).find((item) => item.id === FOLLOW_GM_ITEM)?.active;
     expect(isActive()).toBe(true);
     t.handle.moveCamera(true);
@@ -63,10 +63,10 @@ describe('RemoteSceneClient', () => {
     expect(t.handle.count('setCamera')).toBe(asked);
     t.atlas.ui!.clickToolbar(FOLLOW_GM_ITEM, t.view.viewId);
     expect(isActive()).toBe(true);
-    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 250, centerY: 100, width: 400, height: 300 }, animate: true });
+    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 250, centerY: 100, width: 400, height: 300 }, animate: true, padded: false });
     t.atlas.ui!.clickToolbar(FIT_MAP_ITEM, t.view.viewId);
     expect(isActive()).toBe(false);
-    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 500, centerY: 400, width: 1000, height: 800 }, animate: true });
+    expect(t.handle.cameras.at(-1)).toEqual({ camera: { centerX: 500, centerY: 400, width: 1000, height: 800 }, animate: true, padded: true });
     // Atlas's own Fit map (the hotkey) breaks away too, as the fork's did.
     t.atlas.ui!.clickToolbar(FOLLOW_GM_ITEM, t.view.viewId);
     t.handle.moveCamera(false);
@@ -143,6 +143,34 @@ describe('RemoteSceneClient', () => {
     expect(t.fake.reconnect).toHaveBeenCalledOnce();
     t.sink().session({ ...admitted(), status: 'lost', reason: 'ended' });
     expect(t.handle.status).not.toHaveProperty('action');
+  });
+
+  it('offers Shared with me beside Reconnect, within 3 buttons, and opens the dialog when it is chosen', async () => {
+    const t = await setup();
+    t.sink().session(admitted());
+    expect(t.handle.status?.actions).toEqual([{ id: 'shared-with-me', label: 'Shared with me…', icon: 'inbox' }]);
+    expect(t.handle.status).not.toHaveProperty('action');
+    t.sink().session({ ...admitted(), status: 'lost', reason: 'connection-lost' });
+    expect(t.handle.status?.action?.label).toBe(RECONNECT_LABEL);
+    expect(t.handle.status?.actions).toHaveLength(1);
+    t.handle.chooseStatusAction('shared-with-me');
+    expect(t.openShared).toHaveBeenCalledOnce();
+    t.client.dispose();
+    t.handle.chooseStatusAction('shared-with-me');
+    expect(t.openShared).toHaveBeenCalledOnce();
+  });
+
+  it('leaves the button out without an opener, and on an Atlas before 1.15 sends no actions and does not crash', async () => {
+    const none = await setup({ openShared: null });
+    none.sink().session(admitted());
+    expect(none.handle.status).not.toHaveProperty('actions');
+    const old = await setup({ before115: true });
+    old.sink().session({ ...admitted(), status: 'lost', reason: 'connection-lost' });
+    expect(old.handle.status).not.toHaveProperty('actions');
+    expect(old.handle.status?.action?.label).toBe(RECONNECT_LABEL);
+    old.sink().scene(playerScene());
+    old.atlas.ui!.clickToolbar(FIT_MAP_ITEM, old.view.viewId);
+    expect(old.handle.cameras.at(-1)?.padded).toBe(false);
   });
 
   it("rolls the tray's dice through the session", async () => {

@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import type { AtlasApi, AtlasExtension, RemoteView } from '@atlas-vtt/api-types';
 import { need } from '../../../connect/capabilities';
+import { openSharedFromView } from '../sharing/sharedFromView';
 import { LASER_PALETTE } from '../tools/laserColors';
 import { DICE_LIMITS } from '../tools/toolMessages';
 import { OnlineJoinService } from './OnlineJoinService';
@@ -22,6 +23,7 @@ function attachRemoteScene(app: App, api: AtlasApi, atlas: AtlasExtension, view:
   const service = OnlineJoinService.forApp(app);
   const client = service ? new RemoteSceneClient({
     view, service, lasers: need(api, atlas, 'lasers'), ui: need(api, atlas, 'ui'), laserColor: laserColorOf(api, atlas),
+    openShared: () => openSharedFromView(app),
   }) : null;
   if (!client?.attach()) {
     client?.dispose();

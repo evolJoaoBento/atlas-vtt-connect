@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.14.0";
+export declare const API_VERSION = "1.15.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -931,10 +931,22 @@ export declare interface RemoteStatus {
     connection: string;
     tone: 'connected' | 'pending' | 'ended';
     message: string | null;
+    /** A button that runs `run`, guarded; it comes first when `actions` are given too. */
     action?: {
         label: string;
         run(): void;
     };
+    /** More buttons after `action`, at most 3 buttons in all with it; a choice is told to `onStatusAction` by its id. */
+    actions?: readonly RemoteStatusAction[];
+}
+
+/** A button of the status bar that tells `RemoteView.onStatusAction` its `id`. */
+export declare interface RemoteStatusAction {
+    /** Distinct among the status's actions. */
+    id: string;
+    label: string;
+    /** Lucide name, drawn before the label. */
+    icon?: string;
 }
 
 /**
@@ -949,19 +961,28 @@ export declare interface RemoteView {
      * `remote:<viewId>`. Null shows an empty, unloaded scene. A record handed again as the same object is not copied again.
      */
     setScene(scene: RemoteSceneInput | null): void;
+    /** Says what the player may do and how their tokens show; a part equal by value to the one shown is kept, so nothing it draws redraws. */
     setPlayer(state: RemotePlayerState): void;
-    /** The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus. */
+    /**
+     * The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus,
+     * also for more than 3 buttons in all (`action` and `actions`), and for an entry of `actions` with an empty id, label or icon,
+     * or an id given twice.
+     */
     setStatus(status: RemoteStatus): void;
+    /** The player chose one of the status's `actions`: its id. Not called for `action`, which runs its own `run`. */
+    onStatusAction?(listener: (id: string) => void): Disposer;
     /** The shared log shown in this view's dice log (the first 100 entries, copied); Clear is hidden, Roll again calls `onRoll`. */
     setDiceLog(entries: readonly DiceRollResult[]): void;
     /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
     throwRoll(result: DiceRollResult): void;
     /**
      * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
-     * resizes until the player moves the camera. Throws when `camera` is not finite numbers with a size above 0.
+     * resizes until the player moves the camera. `padded` leaves the margin the remote view's Fit map (Shift+1) leaves around the map (16 screen
+     * pixels), for a Fit button of your own. Throws when `camera` is not finite numbers with a size above 0.
      */
     setCamera(camera: ViewCamera, options?: {
         animate?: boolean;
+        padded?: boolean;
     }): void;
     /** Ends a drag in progress; the token goes back. */
     cancelDrag(): void;
@@ -1396,11 +1417,23 @@ export declare interface ToolbarItem {
     priority?: number;
     /** Default ['map']. */
     views?: ReadonlyArray<'map' | 'remote'>;
+    /**
+     * Whether the item shows in this view, among the `views` it is for; left out, it always shows. Only `true` shows it: a hidden
+     * item takes no room in the bar and is not in "More tools". Read again after `ui.invalidate()`. A predicate that throws
+     * hides the item, and the failure is logged once.
+     */
+    isVisible?(ctx: ToolbarItemContext): boolean;
     /** Draws the button as the one in use, and keeps it in the bar rather than in "More tools". */
     isActive?(ctx: ViewContext): boolean;
     /** A dot (`true`) or a count on the button; `null` shows nothing. */
     badge?(ctx: ViewContext): string | number | true | null;
     onClick(ctx: ViewContext): void;
+}
+
+/** What `ToolbarItem.isVisible` is told: the view, and for a remote view whether the asking extension opened it. */
+export declare interface ToolbarItemContext extends ViewContext {
+    /** True in a remote view this extension opened (`remoteViews.open`); false in any other view. */
+    ownRemote: boolean;
 }
 
 export declare interface UiApi {
@@ -1413,7 +1446,7 @@ export declare interface UiApi {
     addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
     /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
     addPanel(panel: PanelSpec): PanelHandle;
-    /** Re-reads `isActive`, `badge`, palette commands and menu providers now. */
+    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands and menu providers now. */
     invalidate(): void;
 }
 

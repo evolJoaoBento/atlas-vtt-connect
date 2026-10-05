@@ -95,10 +95,45 @@ describe('FakeAtlas follows the remote view contract cases', () => {
     const moved = vi.fn();
     view.onCameraMoved(moved);
     view.setCamera({ centerX: 10, centerY: 20, width: 300, height: 200 }, { animate: true });
-    expect(handle.cameras).toEqual([{ camera: { centerX: 10, centerY: 20, width: 300, height: 200 }, animate: true }]);
+    expect(handle.cameras).toEqual([{ camera: { centerX: 10, centerY: 20, width: 300, height: 200 }, animate: true, padded: false }]);
     handle.moveCamera(true);
     handle.moveCamera(false);
     expect(moved.mock.calls).toEqual([[true], [false]]);
     expect(() => view.setCamera({ centerX: 0, centerY: 0, width: 0, height: 10 })).toThrow(/size above 0/);
+  });
+
+  it('API 1.15: status actions (at most 3 buttons in all, distinct ids) reach onStatusAction by id, never the action', async () => {
+    const { atlas, extension } = setup();
+    const view = await extension.remoteViews!.open({ title: 'Online scene' });
+    const handle = atlas.remoteViews.latest();
+    const base = { title: 'T', connection: 'Connected', tone: 'connected', message: null } as const;
+    const chosen = vi.fn();
+    const stop = view.onStatusAction!(chosen);
+    const run = vi.fn();
+    view.setStatus({ ...base, action: { label: 'Reconnect', run }, actions: [{ id: 'a', label: 'A', icon: 'inbox' }] });
+    handle.chooseStatusAction('a');
+    handle.chooseStatusAction('unknown');
+    expect(chosen.mock.calls).toEqual([['a']]);
+    expect(run).not.toHaveBeenCalled();
+    expect(() => view.setStatus({ ...base, action: { label: 'R', run }, actions: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }] })).toThrow(/actions/);
+    expect(() => view.setStatus({ ...base, actions: [{ id: 'a', label: 'A' }, { id: 'a', label: 'B' }] })).toThrow(/actions/);
+    expect(() => view.setStatus({ ...base, actions: [{ id: '', label: 'A' }] })).toThrow(/actions/);
+    expect(() => view.setStatus({ ...base, actions: [{ id: 'a', label: 'A', icon: '' }] })).toThrow(/actions/);
+    stop();
+    handle.chooseStatusAction('a');
+    expect(chosen).toHaveBeenCalledOnce();
+  });
+
+  it('API 1.15: setCamera padded is recorded; an Atlas before 1.15 has no onStatusAction and ignores padded', async () => {
+    const { atlas, extension } = setup();
+    const view = await extension.remoteViews!.open({ title: 'Online scene' });
+    view.setCamera({ centerX: 1, centerY: 2, width: 3, height: 4 }, { padded: true });
+    expect(atlas.remoteViews.latest().cameras.at(-1)).toMatchObject({ padded: true, animate: false });
+    const old = new FakeAtlas({ capabilities: ['views', 'remote-view'], before115: true });
+    const oldView = await old.connect(connectingPlugin('atlas-vtt-connect')).remoteViews!.open({ title: 'Online scene' });
+    oldView.setCamera({ centerX: 1, centerY: 2, width: 3, height: 4 }, { padded: true });
+    expect(old.remoteViews.latest().cameras.at(-1)?.padded).toBe(false);
+    expect(oldView.onStatusAction).toBeUndefined();
+    expect(old.version).toBe('1.14.0');
   });
 });

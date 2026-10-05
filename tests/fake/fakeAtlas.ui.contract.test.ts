@@ -284,4 +284,35 @@ describe('FakeAtlas draws slots as Atlas does', () => {
     view.choose(['Odd']);
     expect(view.isOpen).toBe(false);
   });
+
+  it('API 1.15: isVisible shows only on true; ownRemote is true only in a remote view this extension opened; a throw hides', async () => {
+    const atlas = new FakeAtlas({ capabilities: ['views', 'ui', 'remote-view'] });
+    const mine = atlas.connect(connectingPlugin('mine'));
+    const other = atlas.connect(connectingPlugin('other'));
+    atlas.views.open('map1');
+    await mine.remoteViews!.open({ title: 'Mine' });
+    const remote = atlas.remoteViews.latest().viewId;
+    let show = false;
+    const log = vi.spyOn(console, 'error').mockImplementation(noop);
+    mine.ui.addToolbarItem({ id: 'own', icon: 'x', label: 'Own', views: ['map', 'remote'], isVisible: (ctx) => ctx.ownRemote, onClick: noop });
+    mine.ui.addToolbarItem({ id: 'flag', icon: 'x', label: 'Flag', views: ['map', 'remote'], isVisible: () => show, onClick: noop });
+    mine.ui.addToolbarItem({ id: 'boom', icon: 'x', label: 'Boom', views: ['map', 'remote'], isVisible: () => { throw new Error('no'); }, onClick: noop });
+    mine.ui.addToolbarItem({ id: 'plain', icon: 'x', label: 'Plain', views: ['map', 'remote'], onClick: noop });
+    const ids = (viewId: string): string[] => atlas.ui!.drawToolbar(viewId).map((item) => item.id);
+    expect(ids(remote)).toEqual(['own', 'plain']);
+    expect(ids('map1')).toEqual(['plain']);
+    show = true;
+    expect(ids(remote)).toContain('flag');
+    other.ui.addToolbarItem({ id: 'theirs', icon: 'x', label: 'Theirs', views: ['remote'], isVisible: (ctx) => ctx.ownRemote, onClick: noop });
+    expect(ids(remote)).not.toContain('theirs');
+    log.mockRestore();
+  });
+
+  it('before API 1.15 isVisible is ignored: every item of the view kind shows', async () => {
+    const atlas = new FakeAtlas({ capabilities: ['views', 'ui', 'remote-view'], before115: true });
+    const ext = atlas.connect(connectingPlugin('mine'));
+    await ext.remoteViews!.open({ title: 'Mine' });
+    ext.ui.addToolbarItem({ id: 'hidden', icon: 'x', label: 'H', views: ['remote'], isVisible: () => false, onClick: noop });
+    expect(atlas.ui!.drawToolbar(atlas.remoteViews.latest().viewId).map((item) => item.id)).toEqual(['hidden']);
+  });
 });

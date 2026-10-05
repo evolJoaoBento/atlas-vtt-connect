@@ -68,11 +68,14 @@ export class RemoteFollower {
     this.go(true);
   }
 
-  /** Shows the whole scene; the player stays broken away. A scene without bounds has nothing to fit, and follows on. */
+  /**
+   * Shows the whole scene with the margin Atlas's own Fit map leaves (`padded`, API 1.15; an older Atlas ignores it); the
+   * player stays broken away. A scene without bounds has nothing to fit, and follows on.
+   */
   fitMap(): void {
     if (!this.fitted) return;
     this.setFollowing(false);
-    this.ask(this.fitted, true);
+    this.ask(this.fitted, true, true);
   }
 
   dispose(): void {
@@ -92,10 +95,10 @@ export class RemoteFollower {
     this.ask(target, animate);
   }
 
-  private ask(camera: ViewCamera | null, animate: boolean): void {
+  private ask(camera: ViewCamera | null, animate: boolean, padded = false): void {
     if (!camera) return;
     this.asked = camera;
-    this.view.setCamera(camera, { animate });
+    this.view.setCamera(camera, padded ? { animate, padded } : { animate });
   }
 
   private setFollowing(following: boolean): void {

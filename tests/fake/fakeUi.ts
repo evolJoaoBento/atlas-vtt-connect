@@ -1,5 +1,5 @@
 import type {
-  DashboardTile, Disposer, MenuItem, PaletteCommand, PaletteSection, PanelHandle, PanelSpec, ToolbarItem, TokenMenuContext, UiApi, ViewContext, ViewId,
+  DashboardTile, Disposer, MenuItem, PaletteCommand, PaletteSection, PanelHandle, PanelSpec, ToolbarItem, ToolbarItemContext, TokenMenuContext, UiApi, ViewContext, ViewId,
 } from '@atlas-vtt/api-types';
 import { drawableMenu, openMenu, type OpenMenu } from './fakeMenus';
 import type { FakeViews, Own } from './fakeViews';
@@ -74,7 +74,11 @@ export class FakeUi {
   private readonly open = new Map<Entry<PanelSpec>, Map<ViewId, OpenPanel>>();
   private versions = 0;
 
-  constructor(private readonly views: FakeViews) {}
+  /**
+   * `ownerOfRemote`: who opened the remote view (for `ownRemote`). `before115`: an Atlas before API 1.15.0, which
+   * ignores `isVisible` and shows every item of the view kind.
+   */
+  constructor(private readonly views: FakeViews, private readonly ownerOfRemote: (viewId: ViewId) => string | undefined = () => undefined, private readonly before115 = false) {}
 
   /** How many registrations each slot holds now, from every extension. */
   counts(): SlotCounts {
@@ -95,8 +99,10 @@ export class FakeUi {
   drawToolbar(viewId: ViewId): DrawnToolbarItem[] {
     const ctx = this.ctxOf(viewId);
     if (!this.views.isOpen(viewId)) return [];
-    return this.specs<ToolbarItem>('toolbar')
-      .filter((item) => (item.views ?? ['map']).includes(ctx.kind))
+    return this.entriesOf<ToolbarItem>('toolbar')
+      .filter(({ spec }) => (spec.views ?? ['map']).includes(ctx.kind))
+      .filter(({ owner, spec }) => this.before115 || this.visible(spec, { ...ctx, ownRemote: ctx.kind === 'remote' && this.ownerOfRemote(viewId) === owner }))
+      .map(({ spec }) => spec)
       .map((item, index) => ({ item, index, priority: typeof item.priority === 'number' && Number.isFinite(item.priority) ? item.priority : 50 }))
       .sort((a, b) => b.priority - a.priority || a.index - b.index)
       .map(({ item }) => ({
@@ -189,7 +195,7 @@ export class FakeUi {
     };
     return Object.freeze({
       addToolbarItem: (item: ToolbarItem): Disposer => {
-        check('ui.addToolbarItem', item, { id: 'text', icon: 'text', label: 'text', onClick: 'function' }, { shortcut: 'text', priority: 'number', isActive: 'function', badge: 'function' });
+        check('ui.addToolbarItem', item, { id: 'text', icon: 'text', label: 'text', onClick: 'function' }, { shortcut: 'text', priority: 'number', isActive: 'function', isVisible: 'function', badge: 'function' });
         const kinds: unknown = item.views;
         if (kinds !== undefined && !(Array.isArray(kinds) && kinds.every((kind) => VIEW_KINDS.includes(kind as string)))) {
           throw new Error('[Atlas API] ui.addToolbarItem: "views" must list \'map\' and \'remote\'.');
@@ -289,6 +295,11 @@ export class FakeUi {
   /** Changes when Atlas's slot `subscribe` fires: an `invalidate`, or a registration added or removed. */
   private slotState(): string {
     return `${this.versions}:${this.entries.size}`;
+  }
+
+  /** Atlas's `isVisible` rule: only `true` shows the item; a throw hides it (logged once per item in Atlas). */
+  private visible(item: ToolbarItem, ctx: ToolbarItemContext): boolean {
+    return item.isVisible ? guarded('isVisible', () => item.isVisible!(ctx), false) === true : true;
   }
 
   private ctxOf(viewId: ViewId): ViewContext {

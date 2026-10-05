@@ -15,6 +15,7 @@ import type { OnlineSceneSink } from '../onlineJoinTypes';
 import { diceLogResult, diceLogResults, traySelection } from '../onlineDice';
 import { rollRefusal } from '../onlineRollRefusal';
 import { onlineSceneStatus } from '../onlineSceneStatus';
+import { SHARED_WITH_ME_BUTTON } from '../../ui/onlineCopy';
 import { shownUrls } from '../objectUrlImages';
 import { RemoteFollower } from './remoteFollower';
 import { RemoteLaserLink } from './RemoteLaserLink';
@@ -26,6 +27,8 @@ import { RemoteSceneMemo, remotePlayerState } from './toRemoteScene';
 export type RemoteSceneService = Pick<OnlineJoinService, 'attach' | 'images' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'leave'>;
 
 export const RECONNECT_LABEL = 'Reconnect';
+/** The status bar's second button (API 1.15 `actions`): opens Shared with me, as the fork's bar did. */
+export const SHARED_ACTION_ID = 'shared-with-me';
 /** Why a pick of the wrong size is not sent; Atlas's tray already offers at most `maxDice` (the wire limit). */
 export const ROLL_DICE_COUNT_TEXT = `Roll 1 to ${DICE_LIMITS.dicePerRoll} dice.`;
 
@@ -46,6 +49,8 @@ export interface RemoteSceneClientOptions {
   lasers?: Pick<LasersApi, 'onLocal' | 'show'> | null;
   /** Atlas's toolbar, when this Atlas has it: Follow GM and Fit map. */
   ui?: Pick<UiApi, 'addToolbarItem' | 'invalidate'> | null;
+  /** Opens the Shared with me dialog; without it the status bar offers no such button. */
+  openShared?(): void;
   /** The player's Atlas laser colour, read for every batch sent. */
   laserColor(): string;
   /** Tests pass their own frames. */
@@ -106,6 +111,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
     this.stops.push(
       view.onTokenDrop((move) => { if (!this.disposed) this.moves.drop(move.tokenId, move.x, move.y); }),
       view.onRoll((dice, modifier) => this.roll(dice, modifier)),
+      // API 1.15; an older Atlas has no `onStatusAction` and the bar shows only Reconnect.
+      ...(view.onStatusAction ? [view.onStatusAction((id) => { if (!this.disposed && id === SHARED_ACTION_ID) options.openShared?.(); })] : []),
       // Closing the view (the tab, Atlas or Connect unloading) leaves the session.
       view.onClose(() => {
         this.dispose();
@@ -228,6 +235,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
     if (this.disposed) return;
     const status = onlineSceneStatus(this.state, this.shown !== null);
     const { service } = this.options;
+    // Sent only where the view tells of a choice (`onStatusAction`): an older Atlas knows no `actions`.
+    const actions = this.options.openShared && this.view.onStatusAction ? [{ id: SHARED_ACTION_ID, label: SHARED_WITH_ME_BUTTON, icon: 'inbox' }] : [];
     guarded('the status', () => this.view.setStatus({
       title: status.title,
       connection: status.connection,
@@ -235,6 +244,7 @@ export class RemoteSceneClient implements OnlineSceneSink {
       // A refused move says so for a while, as the fork's bar did beside the message.
       message: this.moves.notice ?? status.message,
       ...(status.reconnect ? { action: { label: RECONNECT_LABEL, run: (): void => { service.reconnect(); } } } : {}),
+      ...(actions.length > 0 ? { actions } : {}),
     }));
   }
 }

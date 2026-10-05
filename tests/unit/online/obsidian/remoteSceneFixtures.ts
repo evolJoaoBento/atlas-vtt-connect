@@ -25,10 +25,14 @@ export interface RemoteSceneSetupOptions {
   laserColor?: string;
   images?: RemoteImages;
   capabilities?: readonly AtlasCapability[];
+  /** An Atlas before API 1.15 (no `isVisible`, status `actions`, `padded`). */
+  before115?: boolean;
+  /** Connect's Shared with me opener; the default is a spy, `null` leaves the button out. */
+  openShared?: (() => void) | null;
 }
 
 export async function remoteSceneSetup(options: RemoteSceneSetupOptions = {}) {
-  const atlas = new FakeAtlas({ capabilities: options.capabilities ?? REMOTE_CAPABILITIES });
+  const atlas = new FakeAtlas({ capabilities: options.capabilities ?? REMOTE_CAPABILITIES, before115: options.before115 === true });
   const extension: AtlasExtension = atlas.connect(connectingPlugin('atlas-vtt-connect'));
   const view = await extension.remoteViews!.open({ title: 'Online scene', icon: 'network', reuse: true, maxDice: 20 });
   const handle: FakeRemoteHandle = atlas.remoteViews.latest();
@@ -55,14 +59,15 @@ export async function remoteSceneSetup(options: RemoteSceneSetupOptions = {}) {
     cancel: (id) => { queue.delete(id); },
   };
   const has = (capability: AtlasCapability): boolean => atlas.has(capability);
+  const openShared = options.openShared === undefined ? vi.fn() : options.openShared;
   const client = new RemoteSceneClient({
     view, service, lasers: has('lasers') ? extension.lasers : null, ui: has('ui') ? extension.ui : null,
-    laserColor: () => options.laserColor ?? LASER_PALETTE[0]!, frames,
+    laserColor: () => options.laserColor ?? LASER_PALETTE[0]!, frames, ...(openShared ? { openShared } : {}),
   });
   const attached = client.attach();
   const runFrames = (): void => { const due = [...queue.values()]; queue.clear(); due.forEach((draw) => draw()); };
   return {
-    atlas, extension, view, handle, fake, client, attached, detach, runFrames,
+    atlas, extension, view, handle, fake, openShared, client, attached, detach, runFrames,
     sink: (): OnlineSceneSink => {
       if (!sink) throw new Error('The client did not attach to the fake service');
       return sink;
