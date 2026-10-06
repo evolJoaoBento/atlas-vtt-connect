@@ -6,9 +6,9 @@ import type { SceneCamera } from './scene/sceneCamera';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
 import {
-  isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isScenePatchBody, isSceneSeq,
+  isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
-import { cleanLoggedTags, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
+import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
 export const MAX_PLAYER_NAME_LENGTH = 40;
@@ -58,6 +58,13 @@ export interface PresencePlayer {
   personId?: string;
 }
 
+/**
+ * GM to the players of one scene: whether it is paused (the GM is on another scene, so moves are refused) or live.
+ * Unsequenced, like `scene-camera`: sent with `session.send`, never on the sequenced scene channel, so an older
+ * page that ignores it sees no gap in its `seq` run. Scoped by `sceneId`: a page ignores it for any other scene.
+ */
+export interface SceneStateMessage { v: 1; type: 'scene-state'; sceneId: string; paused: boolean }
+
 export type ControlMessage =
   | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
   | { v: 1; type: 'admitted'; playerId: string; session: { title: string }; table?: TableProof }
@@ -76,6 +83,7 @@ export type ControlMessage =
   | { v: 1; type: 'scene-clear'; seq: number }
   | { v: 1; type: 'scene-resync'; seq: number }
   | ({ v: 1; type: 'scene-camera' } & SceneCamera)
+  | SceneStateMessage
   /** GM to one player: the tokens that player may move, for this session. */
   | { v: 1; type: 'token-control'; tokenIds: string[] }
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
@@ -142,6 +150,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'scene-clear': (m) => isSceneSeq(m.seq),
   'scene-resync': (m) => isLastSeq(m.seq),
   'scene-camera': (m) => isSceneCamera(m),
+  'scene-state': (m) => isSceneState(m),
   'token-control': (m) => Array.isArray(m.tokenIds) && m.tokenIds.length <= MAX_CONTROLLED_TOKENS
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
@@ -157,7 +166,11 @@ export function encodeControl(message: ControlMessage): string {
   return JSON.stringify(message);
 }
 
-export function decodeControl(raw: unknown): Decoded {
+/**
+ * One message off the wire. `known` limits the types this decoder reads, as an older client's would be:
+ * any other type decodes as `ignored` (the tests use it to replay a message to an older page's table).
+ */
+export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decoded {
   if (typeof raw !== 'string') return { kind: 'invalid', reason: 'not-text' };
   if (raw.length > MAX_CONTROL_MESSAGE_BYTES) return { kind: 'invalid', reason: 'too-large' };
   // Check UTF-8 byte length only if string is potentially large
@@ -174,11 +187,11 @@ export function decodeControl(raw: unknown): Decoded {
   if (!isRecord(parsed) || typeof parsed.type !== 'string') return { kind: 'invalid', reason: 'no-type' };
   if (parsed.v !== PROTOCOL_VERSION) return { kind: 'version' };
   const type = parsed.type as ControlMessage['type'];
-  if (!Object.hasOwn(VALIDATORS, type)) return { kind: 'ignored' };
+  if (!Object.hasOwn(VALIDATORS, type) || (known !== undefined && !known.has(type))) return { kind: 'ignored' };
   const validate = VALIDATORS[type];
   if (!validate(parsed)) return { kind: 'invalid', reason: `bad-${type}` };
   const message = parsed as unknown as ControlMessage;
-  if (message.type === 'dice-log') cleanLoggedTags(message.entries);
+  if (message.type === 'dice-log') cleanLoggedEntries(message.entries);
   return { kind: 'message', message };
 }
 

@@ -1,5 +1,5 @@
 /** Scene messages before each player's `seq` is set, kept under the control channel's size limit. */
-import { MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../protocol';
+import { MAX_CONTROL_MESSAGE_BYTES, type ControlMessage, type SceneStateMessage } from '../protocol';
 import { sortedByOrder, type PlayerScene, type ScenePatchBody } from './sceneTypes';
 
 type SceneMessage = Extract<
@@ -70,4 +70,9 @@ export function snapshotMessages(scene: PlayerScene): SceneOutgoing[] | null {
 export function patchMessage(patch: ScenePatchBody): SceneOutgoing | null {
   const message: SceneOutgoing = { v: 1, type: 'scene-patch', set: patch.set, upsert: patch.upsert, remove: patch.remove };
   return byteLength(message) <= MESSAGE_BUDGET_BYTES ? message : null;
+}
+
+/** Tells a scene's players it is paused or live again. Unsequenced: send it with `session.send`, never on a sequenced channel. */
+export function sceneStateMessage(sceneId: string, paused: boolean): SceneStateMessage {
+  return { v: 1, type: 'scene-state', sceneId, paused };
 }

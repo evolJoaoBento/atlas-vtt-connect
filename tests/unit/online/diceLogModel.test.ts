@@ -66,6 +66,14 @@ describe('the join page dice log', () => {
     expect(ownRolls(merged.fresh).map(({ id }) => id)).toEqual(['b', 'c']);
   });
 
+  it("keeps a roll's scene label through the merge, and adds none to a roll without one", () => {
+    const log = new PlayerDiceLog({ onChange: () => {} });
+    log.receive([{ ...entry('a'), scene: 'Cave' }], true);
+    log.receive([entry('b')], false);
+    expect(log.entries.map(({ id, scene }) => [id, scene])).toEqual([['b', undefined], ['a', 'Cave']]);
+    expect('scene' in log.entries[0]!).toBe(false);
+  });
+
   it('keeps the newest 50', () => {
     const log = new PlayerDiceLog({ onChange: () => {} });
     for (let i = 0; i < 60; i++) log.receive([entry(`r${i}`)], false);

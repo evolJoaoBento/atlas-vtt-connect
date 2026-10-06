@@ -60,6 +60,11 @@ export interface DiceLogEntry {
   mine?: true;
   /** When it was rolled: milliseconds since 1970 on the GM's clock. */
   at: number;
+  /**
+   * The roller's scene (its tab name), on player rolls only while more than one scene is in use; plain text,
+   * trimmed, at most 64 characters (`cleanSceneLabel`). A label that is not well-formed is dropped, never the roll.
+   */
+  scene?: string;
 }
 
 /** Someone's laser as a player receives it: new points of it, and whether it was let go. */
@@ -182,12 +187,29 @@ export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry
   return isDiceLogEntry(entry) ? entry : null;
 }
 
+export const SCENE_LABEL_MAX = 64;
+/** Controls (newlines and tabs too) and invisible formatting characters (bidi overrides, zero width). */
+const FORBIDDEN_IN_LABEL = /[\p{Cc}\p{Cf}]/u;
+
+/** The scene label trimmed when it is plain text of 1 to 64 code points; undefined otherwise. */
+export function cleanSceneLabel(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const label = value.trim();
+  if (label.length === 0 || label.length > SCENE_LABEL_MAX * 2 || FORBIDDEN_IN_LABEL.test(label)) return undefined;
+  return Array.from(label).length <= SCENE_LABEL_MAX ? label : undefined;
+}
+
 /**
- * Drops the tags of a received entry's dice that are not well-formed, in place (the entries are fresh from JSON).
- * `isDiceLogEntry` never looks at tags, so a bad tag costs the die its tag and never refuses the roll.
+ * Drops what is not well-formed in received entries, in place (the entries are fresh from JSON): a die's tag, and the
+ * entry's scene label. `isDiceLogEntry` never looks at either, so a bad one is dropped and never refuses the roll.
  */
-export function cleanLoggedTags(entries: readonly DiceLogEntry[]): void {
+export function cleanLoggedEntries(entries: readonly DiceLogEntry[]): void {
   for (const entry of entries) {
+    if ('scene' in entry) {
+      const label = cleanSceneLabel(entry.scene);
+      if (label === undefined) delete entry.scene;
+      else entry.scene = label;
+    }
     entry.dice.forEach((die, index) => {
       if (!('color' in die) && !('colorName' in die)) return;
       const { die: kind, value, negative, exploded } = die;

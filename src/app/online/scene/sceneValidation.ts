@@ -67,6 +67,11 @@ export function isSceneCamera(message: Fields): boolean {
     && isExtent(message.width) && isExtent(message.height);
 }
 
+/** A `scene-state`: a scene id and whether that scene is paused. */
+export function isSceneState(message: Fields): boolean {
+  return isSceneId(message.sceneId) && typeof message.paused === 'boolean';
+}
+
 function isPoint(value: unknown): boolean {
   return isFields(value) && isCoordinate(value.x) && isCoordinate(value.y);
 }
