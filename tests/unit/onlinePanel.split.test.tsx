@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionPlayer } from '../../src/app/online/GmSession';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../src/app/online/onlineSessionStore';
@@ -39,7 +39,8 @@ async function hostSplit(players: SessionPlayer[], assignments: Record<string, s
 }
 
 const presentTo = (panel: ReturnType<typeof within>): HTMLButtonElement => panel.getByRole('button', { name: /^Present to:/ });
-const popover = (panel: ReturnType<typeof within>): HTMLElement | null => panel.queryByRole('group', { name: /^Present .+ to$/ });
+/** The checklist, drawn into the document body (a portal), outside the panel's scrolling body (review I2). */
+const popover = (_panel: ReturnType<typeof within>): HTMLElement | null => screen.queryByRole('group', { name: /^Present .+ to$/ });
 
 beforeEach(() => {
   harness = gmUiHarness({ capabilities: ['scene-tabs'] });
@@ -98,6 +99,42 @@ describe('the panel\'s Present to (spec 3.2)', () => {
     act(() => { vi.advanceTimersByTime(1000); });
     expect(popover(panel)).not.toBeNull();
     fireEvent.mouseLeave(wrapper);
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(popover(panel)).toBeNull();
+  });
+
+  // Review I2: the panel's body scrolls and clips what overflows it, so the checklist is not drawn inside it.
+  it('draws the checklist outside the panel, at fixed coordinates under the button, kept inside the pane', async () => {
+    const panel = await hostSplit([anna]);
+    const container = await harness.openPanel();
+    const button = presentTo(panel);
+    const leaf = document.createElement('div');
+    leaf.className = 'workspace-leaf';
+    leaf.getBoundingClientRect = () => ({ left: 0, top: 0, right: 300, bottom: 400, width: 300, height: 400, x: 0, y: 0, toJSON: () => ({}) });
+    container.parentElement!.insertBefore(leaf, container);
+    leaf.appendChild(container);
+    button.getBoundingClientRect = () => ({ left: 250, top: 100, right: 380, bottom: 124, width: 130, height: 24, x: 250, y: 100, toJSON: () => ({}) });
+    fireEvent.click(button);
+    const list = popover(panel)!;
+    expect(container.contains(list)).toBe(false);
+    expect(list.parentElement).toBe(document.body);
+    expect(list.style.top).toBe('128px');
+    expect(Number.parseFloat(list.style.left)).toBeLessThanOrEqual(296);
+    expect(list.style.maxHeight).toBe('268px');
+  });
+
+  it('the pointer moving from the button onto the checklist keeps it open', async () => {
+    vi.useFakeTimers();
+    const panel = await hostSplit([anna]);
+    const wrapper = presentTo(panel).parentElement!;
+    fireEvent.mouseEnter(wrapper);
+    act(() => { vi.advanceTimersByTime(300); });
+    const list = popover(panel)!;
+    fireEvent.mouseLeave(wrapper, { relatedTarget: list });
+    fireEvent.mouseEnter(list);
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(popover(panel)).not.toBeNull();
+    fireEvent.mouseLeave(list, { relatedTarget: document.body });
     act(() => { vi.advanceTimersByTime(300); });
     expect(popover(panel)).toBeNull();
   });
