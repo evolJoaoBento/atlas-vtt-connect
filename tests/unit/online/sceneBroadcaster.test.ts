@@ -5,7 +5,7 @@ import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
-import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneLimits';
+import { REMOTE_FOG_LIMITS } from '../../../src/app/online/scene/remoteFogLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
@@ -603,10 +603,10 @@ describe('SceneBroadcaster', () => {
   });
 
   describe('fog with more operations than can be sent', () => {
-    /** `records` small operations and, last, one that covers the hero: the one a truncation would drop. */
+    /** Atlas's remote view takes 2,000 operations: that many small ones and, last, one that covers the hero. */
     function tooMuchFog(): Record<string, FogOperation> {
       const fog: Record<string, FogOperation> = {};
-      for (let i = 0; i < SCENE_LIMITS.records; i++) {
+      for (let i = 0; i < REMOTE_FOG_LIMITS.ops; i++) {
         fog[`f${i}`] = { id: `f${i}`, kind: 'fog', type: 'rectangle', timestamp: i, isErasing: false, x: 5000 + i, y: 5000, width: 1, height: 1 };
       }
       fog.cover = { id: 'cover', kind: 'fog', type: 'rectangle', timestamp: 1e9, isErasing: false, x: 0, y: 0, width: 500, height: 500 };

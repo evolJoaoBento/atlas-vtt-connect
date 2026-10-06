@@ -10,7 +10,7 @@
 import type {
   DrawingStroke, FogOperation, GridState, InitiativeState, RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput, TextElement, TokenEntity,
 } from '@atlas-vtt/api-types';
-import { setOwn } from '../../scene/sceneDiff';
+import { sameValue, setOwn } from '../../scene/sceneDiff';
 import { withMeasurementDefaults } from '../../scene/sceneLimits';
 import type { PlayerMeasurement, PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import type { RemoteImages } from '../onlineJoinTypes';
@@ -25,21 +25,30 @@ export type PositionOf = (tokenId: string) => ScenePoint | null;
 
 interface Entry<S, A> { source: S; key: string; record: A }
 
-/** Converted records by id, the same object while its source and key stay the same. */
+/**
+ * Converted records by id, the same object while its source (the same object, or equal by value: a snapshot hands
+ * new objects for what did not change) and key stay the same; the same record while every entry is.
+ */
 class RecordMemo<S, A> {
   private entries = new Map<string, Entry<S, A>>();
+  private result: Record<string, A> | null = null;
 
   build(records: Readonly<Record<string, S>>, keyOf: (id: string) => string, convert: (id: string, source: S) => A): Record<string, A> {
     const next = new Map<string, Entry<S, A>>();
     const result: Record<string, A> = {};
+    let unchanged = this.result !== null && this.entries.size === Object.keys(records).length;
     for (const [id, source] of Object.entries(records)) {
       const key = keyOf(id);
       const previous = this.entries.get(id);
-      const entry = previous && previous.source === source && previous.key === key ? previous : { source, key, record: convert(id, source) };
+      const same = previous !== undefined && previous.key === key && (previous.source === source || sameValue(previous.source, source));
+      const entry = same ? previous : { source, key, record: convert(id, source) };
+      if (!same) unchanged = false;
       next.set(id, entry);
       setOwn(result, id, entry.record);
     }
     this.entries = next;
+    if (unchanged && this.result) return this.result;
+    this.result = result;
     return result;
   }
 }

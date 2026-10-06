@@ -6,6 +6,8 @@
  * answered with a `scene-resync`; the GM replies with a snapshot.
  */
 import type { ControlMessage } from '../protocol';
+import { fogStats, fogOverRemoteLimits } from './remoteFogLimits';
+import { keepFogIdentity } from './fogIdentity';
 import { applyPatch } from './sceneDiff';
 import { withMeasurementDefaults } from './sceneLimits';
 import type { PlayerDrawing, PlayerFogOp, PlayerScene, PlayerSceneBody } from './sceneTypes';
@@ -49,6 +51,8 @@ export class PlayerSceneMirror {
   private lastSeq = 0;
   private lastResyncAt = Number.NEGATIVE_INFINITY;
   private resyncTimer: number | null = null;
+  /** The last scene had more fog than Atlas's remote view works out (`REMOTE_FOG_LIMITS`): nothing shows until a snapshot or a clear. */
+  private refused = false;
 
   constructor(private readonly options: PlayerSceneMirrorOptions) {}
 
@@ -61,6 +65,7 @@ export class PlayerSceneMirror {
       case 'scene-snapshot':
         this.cancelResync();
         this.lastSeq = message.seq;
+        this.refused = false;
         this.pending = {
           body: message.scene, fogParts: message.fogParts, drawingParts: message.drawingParts,
           fogReceived: 0, drawingsReceived: 0, fog: new Map(), drawings: new Map(),
@@ -72,18 +77,22 @@ export class PlayerSceneMirror {
         this.receivePart(message);
         break;
       case 'scene-patch':
+        if (this.refused && !this.pending && message.seq === this.lastSeq + 1) {
+          this.lastSeq = message.seq;
+          break;
+        }
         if (!this.current || this.pending || message.seq !== this.lastSeq + 1) {
           this.lost();
           break;
         }
         this.lastSeq = message.seq;
-        this.current = this.withDefaults(applyPatch(this.current, message));
-        this.options.onChange(this.current);
+        this.show(this.withDefaults(applyPatch(this.current, message)));
         break;
       case 'scene-clear': {
         this.cancelResync();
         this.lastSeq = message.seq;
         const hadScene = this.current !== null || this.pending !== null;
+        this.refused = false;
         this.current = null;
         this.pending = null;
         if (hadScene) this.options.onChange(null);
@@ -128,13 +137,27 @@ export class PlayerSceneMirror {
     this.pending = null;
     const body = pending.body;
     // Named fields only: the body is network data and may carry keys this version does not know.
-    this.current = {
+    this.show({
       sceneId: body.sceneId, map: body.map, grid: body.grid, tokens: body.tokens, texts: body.texts,
       widgets: body.widgets, initiative: body.initiative,
       measurement: withMeasurementDefaults(body.measurement),
-      fog: toRecord(pending.fog), drawings: toRecord(pending.drawings),
-    };
-    this.options.onChange(this.current);
+      fog: keepFogIdentity(this.current?.fog, toRecord(pending.fog)), drawings: toRecord(pending.drawings),
+    });
+  }
+
+  /**
+   * Shows `scene`, unless its fog is more than a remote view works out: then the scene is hidden (fail closed, never
+   * the map without its fog) until the GM sends another snapshot. A GM sends none such; it clears instead.
+   */
+  private show(scene: PlayerScene): void {
+    if (fogOverRemoteLimits(fogStats(scene.fog), scene.map)) {
+      this.refused = true;
+      this.current = null;
+      this.options.onChange(null);
+      return;
+    }
+    this.current = scene;
+    this.options.onChange(scene);
   }
 
   /** A patch from an older GM may set a measurement without every field. */

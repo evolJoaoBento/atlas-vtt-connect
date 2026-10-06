@@ -251,7 +251,7 @@ export class SceneBroadcaster implements SessionHandler {
     if (!snapshot?.loaded) return null;
     const lighting = this.lighting?.frame(snapshot) ?? null;
     // Rebuilt only when the fog operations or the darkness change.
-    return { snapshot, lighting, fog: this.fogCache.get(snapshot.objects.fog, this.memo, lighting?.darkness) };
+    return { snapshot, lighting, fog: this.fogCache.get(snapshot.objects.fog, this.memo, lighting?.darkness, snapshot.mapSize) };
   }
 
   private clearForTruncatedFog(live: ShownScene, snapshot: SceneSnapshot): void {

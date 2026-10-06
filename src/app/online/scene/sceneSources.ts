@@ -10,6 +10,8 @@ import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords'
 import type { SceneSession } from './sceneContracts';
 import type { LightingSource } from './sceneLighting';
 import { SCENE_LIMITS } from './sceneLimits';
+import { addFogStats, fogOverRemoteLimits, fogStats, type FogStats } from './remoteFogLimits';
+import type { MapSize } from './sceneTypes';
 
 export type { PresentedSceneSource } from '../atlas/presentedSource';
 export type { SceneSession } from './sceneContracts';
@@ -79,19 +81,26 @@ export interface ShownScene {
 /** What players cannot see under the fog; a lit scene's texts and drawings are checked by the raster itself (`LightingFrame.shows`). */
 export interface FogCoverages {
   coverage: FogCoverage;
-  /** The GM's fog and the darkness have more operations than the limit, so some would not be sent. */
+  /**
+   * The GM's fog and the darkness have more operations than the wire holds, so some would not be sent, or more than Atlas's
+   * remote view works out (`REMOTE_FOG_LIMITS`: operations, points in all, points in one operation, a brush wider than the map).
+   */
   truncated: boolean;
 }
 
 /** Coverage rasterised from the fog players receive, rebuilt only when the fog changes; a new darkness never replays it. */
 export class FogCoverageCache {
-  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage; dropped: boolean } | null = null;
+  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage; dropped: boolean; stats: FogStats } | null = null;
 
-  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): FogCoverages {
+  /** `map`: the size players get, which the brush limit reads. */
+  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS, map: MapSize = { width: 0, height: 0 }): FogCoverages {
     if (!this.fog || this.fog.fog !== fog) {
-      this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)), dropped: fogTruncated(fog, memo) };
+      const projected = projectFog(fog, memo);
+      this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projected), dropped: fogTruncated(fog, memo), stats: fogStats(projected) };
     }
-    const truncated = this.fog.dropped || Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
+    // The darkness is one operation; the GM's fog is counted once per change of its operations.
+    const sent = addFogStats(this.fog.stats, fogStats(darkness.fog));
+    const truncated = this.fog.dropped || Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records || fogOverRemoteLimits(sent, map);
     return { coverage: this.fog.coverage, truncated };
   }
 }
