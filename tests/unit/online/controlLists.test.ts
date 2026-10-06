@@ -3,8 +3,10 @@ import { encodeControl } from '../../../src/app/online/protocol';
 import { RESYNC_MIN_INTERVAL_MS } from '../../../src/app/online/scene/PlayerSceneMirror';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { controlWorld, partyTokens } from './controlFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
-describe('control lists', () => {
+describe.each(HUB_PATHS)('control lists, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

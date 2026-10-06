@@ -7,6 +7,7 @@ import type { WorldBounds } from '../../../src/app/online/scene/FogCoverage';
 import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneHub';
 import { LIT_SCENE_NEEDS_UPDATE_NOTICE } from '../../../src/app/online/scene/sceneLighting';
 import { atlasCellSize, character, fakeLighting, hostLit, litTavern, MAP, PENDING, projectLit, ready, scene, testLighting } from './lightingFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
 const text = (id: string, x: number, y: number): TextElement => ({
   id, kind: 'text', x, y, text: 'SECRET', fontSize: 16, fontFamily: 'serif', color: '#000000',
@@ -15,7 +16,8 @@ const text = (id: string, x: number, y: number): TextElement => ({
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("players' darkness from Atlas's player visibility", () => {
+describe.each(HUB_PATHS)("players' darkness from Atlas's player visibility, $atlas", ({ tabs }) => {
+  onHubPath(tabs);
   it('pending sends no tokens and full darkness', () => {
     const frame = new LiveLighting(fakeLighting({ status: 'pending' }), 'v1', () => undefined).frame({ width: 700, height: 700 });
     expect(frame!.seen('a')).toBe(false);
@@ -57,7 +59,8 @@ describe("players' darkness from Atlas's player visibility", () => {
 });
 
 /** Each leak found in the fork or the API, as a case that would show it again (progress.md). */
-describe('leak repros', () => {
+describe.each(HUB_PATHS)('leak repros, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   it("applies lighting to tokens only: a token the GM hid, or under the GM's fog, is not sent though Atlas reads it seen", () => {
     const fog: Record<string, FogOperation> = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 5, isErasing: false, x: 700, y: 300, width: 200, height: 200 } };
     const entry = (tokenId: string, order: number): InitiativeEntry => ({ id: tokenId, tokenId, name: tokenId, initiative: 10, initiativeModifier: 0, imagePath: '', isActive: order === 0, isNPC: true, order });
@@ -152,7 +155,8 @@ function pixelsOf(bounds: WorldBounds, map: { width: number; height: number }): 
   return pixels;
 }
 
-describe('positive visibility of texts and drawings (ruling L-POS)', () => {
+describe.each(HUB_PATHS)('positive visibility of texts and drawings (ruling L-POS), $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   it('sends nothing of an all-dark map that is not 8-aligned', () => {
     const map = { width: 1003, height: 797 };
     const state = { ...scene({}, {

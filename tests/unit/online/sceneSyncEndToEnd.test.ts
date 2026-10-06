@@ -10,8 +10,9 @@ import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink, ClientTransport } from '../../../src/app/online/transport/types';
 import type { ResourceDefinition } from '@atlas-vtt/api-types';
-import { presenter, sceneView, type ViewState } from './presentedFixtures';
+import { sceneView, type ViewState } from './presentedFixtures';
 import { createDefaultInitiativeState } from './sceneFixtures';
+import { HUB_PATHS, onHubPath, pathPresenter, pathTabs } from './hubPath';
 
 type SceneState = ViewState;
 type Objects = SceneState['objects'];
@@ -93,10 +94,10 @@ function world() {
     getLocalPlayerViewSettings: (): PlayerViewRules => rules,
     onChange: (listener: () => void): (() => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
   };
-  const presented = presenter();
+  const presented = pathPresenter();
   const notices: string[] = [];
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: (message) => notices.push(message), hash: nodeHash });
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
+  const broadcaster = new SceneHub({ tabs: pathTabs(presented), assignments: new SceneAssignments(),
     session: gm, presented, settings, assets, notify: (message) => notices.push(message), resources: () => definitions,
     watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
   });
@@ -147,7 +148,8 @@ function world() {
   };
 }
 
-describe('scene sync end to end', () => {
+describe.each(HUB_PATHS)('scene sync end to end, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

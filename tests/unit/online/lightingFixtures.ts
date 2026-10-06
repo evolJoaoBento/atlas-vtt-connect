@@ -19,6 +19,7 @@ import type { MapSize, PlayerScene } from '../../../src/app/online/scene/sceneTy
 import { FakeAtlas } from '../../fake/FakeAtlas';
 import { emptySceneState, presenter, sceneView, type SceneView, type ViewState } from './presentedFixtures';
 import { fakeAssetIds, snapshotOf } from './sceneFixtures';
+import { pathCapabilities, pathTabs } from './hubPath';
 
 export const MAP: MapSize = { width: 1000, height: 800 };
 /**
@@ -135,7 +136,7 @@ export interface LitHost {
  * capability, presenting the Tavern with `state` on `MAP` to one admitted player.
  */
 export function hostLit(state: ViewState, options: { lighting: boolean; visibility?: PlayerVisibility }): LitHost {
-  const atlas = new FakeAtlas({ capabilities: options.lighting ? [...HOSTING, 'lighting'] : HOSTING });
+  const atlas = new FakeAtlas({ capabilities: pathCapabilities(options.lighting ? [...HOSTING, 'lighting'] : HOSTING) });
   const presenting = presenter(atlas);
   const { view, store, tavern } = sceneView(presenting, state, { mapSize: MAP });
   if (options.visibility) atlas.lighting.setVisibility(view, options.visibility);
@@ -143,7 +144,7 @@ export function hostLit(state: ViewState, options: { lighting: boolean; visibili
   const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: need(atlas, extension, 'lighting'), tokens: null });
   const sent: ControlMessage[] = [];
   const notices: string[] = [];
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
+  const broadcaster = new SceneHub({ tabs: pathTabs(presenting), assignments: new SceneAssignments(),
     session: { use: () => () => undefined, send: (_playerId, message) => { sent.push(message); }, getPlayers: () => [{ playerId: 'p1', name: 'Anna', status: 'admitted' }] },
     presented: deps.presented,
     settings: deps.playerViewSettings,

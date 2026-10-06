@@ -3,6 +3,7 @@ import { MOVES_PER_SECOND, MoveRateLimit } from '../../../src/app/online/control
 import { createHexLayout, nearestHexCenter, snapTokenCenter } from '@atlas-vtt/shared/grid';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { controlWorld, partyState, partyTokens, type ControlWorld } from './controlFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
 async function withHero(w: ControlWorld) {
   w.present();
@@ -16,7 +17,8 @@ function hide(w: ControlWorld, value: unknown): void {
   w.store.setState((state) => ({ objects: { ...state.objects, tokens: { ...state.objects.tokens, hero: { ...state.objects.tokens.hero!, isHidden: value as boolean } } } }));
 }
 
-describe('token moves on the GM side', () => {
+describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

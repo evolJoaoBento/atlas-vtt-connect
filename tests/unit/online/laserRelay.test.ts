@@ -3,11 +3,13 @@ import { encodeControl } from '../../../src/app/online/protocol';
 import type { PlayerLaser } from '../../../src/app/online/tools/toolMessages';
 import { LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
 import { toolsWorld } from './toolsFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
 /** Atlas's laser colour setting in the fake, which the GM's laser takes. */
 const GM_COLOR = '#ff0000';
 
-describe('LaserRelay', () => {
+describe.each(HUB_PATHS)('LaserRelay, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

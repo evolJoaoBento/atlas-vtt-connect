@@ -10,6 +10,7 @@ import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { LiveScene } from '../../../src/app/online/atlas/presentedSource';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, presenter, sceneView, type ViewState } from './presentedFixtures';
+import { HUB_PATHS, onHubPath, pathPresenter, pathTabs } from './hubPath';
 
 function character(id: string, x: number): Character {
   return { id, kind: 'character', x, y: 140, imagePath: `art/${id}.png`, name: id };
@@ -32,11 +33,11 @@ function world() {
   const requests: SessionPlayer[] = [];
   const gm = new GmSession(network.host('gm'), { title: 'Vault', onJoinRequest: (p) => requests.push(p), onRequestClosed: () => {}, onPlayersChanged: () => {} });
   gm.start();
-  const presented = presenter();
+  const presented = pathPresenter();
   const notices: string[] = [];
   const settings = { getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }), onChange: () => () => {} };
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
+  const broadcaster = new SceneHub({ tabs: pathTabs(presented), assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
   broadcaster.start();
   const raw = async (): Promise<ControlMessage[]> => {
     const link = await network.client().connect('gm');
@@ -56,7 +57,8 @@ function world() {
 const sceneTypes = (messages: ControlMessage[]): string[] => messages.map((message) => message.type)
   .filter((type) => type.startsWith('scene-') && type !== 'scene-fog' && type !== 'scene-drawings');
 
-describe('presentedSource', () => {
+describe.each(HUB_PATHS)('presentedSource, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   it('gives one object per presentation: the same through a hold and its resume, a new one after clear', async () => {
     const presented = presenter();
     const view = sceneView(presented, emptySceneState());
@@ -125,7 +127,8 @@ describe('presentedSource', () => {
   });
 });
 
-describe('the broadcaster across presentations', () => {
+describe.each(HUB_PATHS)('the broadcaster across presentations, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

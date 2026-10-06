@@ -11,7 +11,8 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
-import { emptySceneState, FakeViewport, presenter, viewWithViewport, type ViewState as CameraSceneState } from './presentedFixtures';
+import { emptySceneState, FakeViewport, viewWithViewport, type ViewState as CameraSceneState } from './presentedFixtures';
+import { HUB_PATHS, onHubPath, pathPresenter, pathTabs } from './hubPath';
 
 interface Received { message: ControlMessage; at: number }
 type TimedCamera = SceneCamera & { at: number };
@@ -27,10 +28,11 @@ function world(state: CameraSceneState = emptySceneState()) {
     showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true,
   };
   const settings = { getLocalPlayerViewSettings: (): PlayerViewRules => rules, onChange: (): (() => void) => () => {} };
-  const presented = presenter();
+  const presented = pathPresenter();
+  const tabs = pathTabs(presented);
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: () => {} });
-  const sender = new CameraSender({ session: gm, presented, projection: broadcaster });
+  const broadcaster = new SceneHub({ tabs, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: () => {} });
+  const sender = new CameraSender({ session: gm, presented, projection: broadcaster, tabs });
   broadcaster.start();
   sender.start();
   const viewport = new FakeViewport();
@@ -71,7 +73,8 @@ function world(state: CameraSceneState = emptySceneState()) {
 
 const untimed = ({ at: _at, ...camera }: TimedCamera): SceneCamera => camera;
 
-describe('CameraSender', () => {
+describe.each(HUB_PATHS)('CameraSender, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

@@ -10,6 +10,7 @@ import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneHub';
 import type { ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { character, hostLit, litTavern, MAP, PENDING, ready, testLighting, UNLIT } from './lightingFixtures';
 import { insideByNonzero } from './sceneFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
 const WHOLE_MAP = [{ x: 0, y: 0, width: MAP.width, height: MAP.height }];
 /** The hero sees the left half: a wall at x = 500. */
@@ -23,7 +24,8 @@ const ring = (frame: ReturnType<LiveLighting['frame']>): ScenePoint[] => {
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
-describe('live lighting of a presentation', () => {
+describe.each(HUB_PATHS)('live lighting of a presentation, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   it('is nothing while the scene is unlit or dynamic lighting is off', () => {
     expect(new LiveLighting(testLighting(UNLIT).api, 'v1', () => undefined).frame(MAP)).toBeNull();
   });
@@ -132,7 +134,8 @@ describe('live lighting of a presentation', () => {
   });
 });
 
-describe('the broadcaster with dynamic lighting', () => {
+describe.each(HUB_PATHS)('the broadcaster with dynamic lighting, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   const heroAndGoblin = () => litTavern({ tokens: { hero: character('hero', 140, 400), goblin: character('goblin', 800, 400) } }, { ambient: 1 });
 
   it('sends what the player window shows, follows the view\'s sight, and never a wall', async () => {

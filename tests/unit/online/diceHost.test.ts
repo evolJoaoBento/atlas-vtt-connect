@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DICE_LIMITS } from '../../../src/app/online/tools/toolMessages';
 import { TAVERN_MAP } from './presentedFixtures';
 import { toolsWorld } from './toolsFixtures';
+import { HUB_PATHS, onHubPath } from './hubPath';
 
 type World = ReturnType<typeof toolsWorld>;
 
@@ -12,7 +13,8 @@ function setDiceRules(w: World, dice: DiceRules): void {
   w.atlas.rules.saveCollection('c1', { maps: [TAVERN_MAP], dice });
 }
 
-describe('DiceHost', () => {
+describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 

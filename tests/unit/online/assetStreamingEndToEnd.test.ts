@@ -13,9 +13,10 @@ import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub'
 import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { MemoryNetwork, type MemoryLink } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
-import { presenter, sceneView, type ViewState } from './presentedFixtures';
+import { sceneView, type ViewState } from './presentedFixtures';
 import { createDefaultInitiativeState } from './sceneFixtures';
 import { fingerprintOf, imageBytes, memoryImageFiles, MemoryStore, nodeHash, type MemoryImageFiles } from './assetFixtures';
+import { HUB_PATHS, onHubPath, pathPresenter, pathTabs } from './hubPath';
 
 type SceneState = ViewState;
 type Objects = SceneState['objects'];
@@ -90,8 +91,8 @@ function world(files: MemoryImageFiles, tokens = objects(TAVERN)) {
   const settings = { getLocalPlayerViewSettings: (): PlayerViewRules => RULES, onChange: (): (() => void) => () => {} };
   const notices: string[] = [];
   const registry = new AssetRegistry({ files: files.source, notify: (message) => notices.push(message), hash: nodeHash });
-  const presented = presenter();
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets: registry, notify: (message) => notices.push(message) });
+  const presented = pathPresenter();
+  const broadcaster = new SceneHub({ tabs: pathTabs(presented), assignments: new SceneAssignments(), session: gm, presented, settings, assets: registry, notify: (message) => notices.push(message) });
   const server = new AssetServer({ session: gm, projection: broadcaster, files: registry });
   broadcaster.start();
   server.start();
@@ -155,7 +156,8 @@ function world(files: MemoryImageFiles, tokens = objects(TAVERN)) {
   };
 }
 
-describe('asset streaming end to end', () => {
+describe.each(HUB_PATHS)('asset streaming end to end, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
