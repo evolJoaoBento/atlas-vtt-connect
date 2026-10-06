@@ -2,10 +2,11 @@
  * The player tools' messages: dice rolls, the shared dice log and lasers. Their types, limits
  * and checks, shared with the web player page, so this file imports only shared modules.
  */
-import { isDieType, type DiceCrit, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
+import { diceFormula, isDieType, parseFormula, type DiceCrit, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
 import { SCENE_RANGES } from '../scene/sceneLimits';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { isSceneId } from '../scene/sceneValidation';
+import { dieTagOf } from './diceTags';
 
 export const DICE_LIMITS = {
   /** Dice in one player roll. */
@@ -30,12 +31,15 @@ export const GM_ROLLER_NAME = 'GM';
 /**
  * One die of a logged roll, as Atlas's `RolledDie` without `max` (the die's sides): `negative` when it
  * subtracts (`2d6-1d4`, an explosion downwards), `exploded` when an explosion of the die before it rolled it.
+ * `color` (`#rrggbb`) and `colorName` tag a die as Atlas 1.16 does (`diceTags.ts`); a page without them ignores them.
  */
 export interface LoggedDie {
   die: string;
   value: number;
   negative?: true;
   exploded?: true;
+  color?: string;
+  colorName?: string;
 }
 
 /** One roll in the shared dice log. */
@@ -94,6 +98,16 @@ export function isDiceModifier(value: unknown): value is number {
   return Number.isSafeInteger(value) && Math.abs(value as number) <= DICE_LIMITS.modifier;
 }
 
+/**
+ * The formula for a player's roll, or null when `dice.roll` would refuse it (Atlas 1.16 reads at most 100 dice, 10 terms,
+ * 64 characters, and a modifier of at most four digits). A roll that passes `isDiceSelection` and `isDiceModifier` always
+ * fits (at most 20 dice, 8 terms, `d100` and `-1000`); this is the check that keeps it so if those limits ever grow.
+ */
+export function playerRollFormula(dice: DiceSelection, modifier: number): string | null {
+  const formula = diceFormula(dice, modifier);
+  return parseFormula(formula).ok ? formula : null;
+}
+
 /** Absent, or exactly `true`. */
 const isFlag = (value: unknown): boolean => value === undefined || value === true;
 
@@ -146,9 +160,10 @@ export function isLaserColor(value: unknown): value is string {
  * holding a die players cannot take (more than 9999 sides) lists none of its dice, and counts them all unlisted.
  */
 export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry | null {
-  const all = result.rolls.map(({ die, value, negative, exploded }): LoggedDie => ({
-    die, value, ...(negative && { negative }), ...(exploded && { exploded }),
-  }));
+  const all = result.rolls.map((rolled): LoggedDie => {
+    const { die, value, negative, exploded } = rolled;
+    return { die, value, ...(negative && { negative }), ...(exploded && { exploded }), ...dieTagOf(rolled) };
+  });
   const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
   // A roll made elsewhere (physical dice) may come with dice its own list leaves out already.
   const { unlistedDice = 0 } = result;
@@ -165,6 +180,20 @@ export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry
     at: result.timestamp,
   };
   return isDiceLogEntry(entry) ? entry : null;
+}
+
+/**
+ * Drops the tags of a received entry's dice that are not well-formed, in place (the entries are fresh from JSON).
+ * `isDiceLogEntry` never looks at tags, so a bad tag costs the die its tag and never refuses the roll.
+ */
+export function cleanLoggedTags(entries: readonly DiceLogEntry[]): void {
+  for (const entry of entries) {
+    entry.dice.forEach((die, index) => {
+      if (!('color' in die) && !('colorName' in die)) return;
+      const { die: kind, value, negative, exploded } = die;
+      entry.dice[index] = { die: kind, value, ...(negative && { negative }), ...(exploded && { exploded }), ...dieTagOf(die) };
+    });
+  }
 }
 
 /** The entry as `playerId` gets it: marked `mine` when they rolled it. */

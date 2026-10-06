@@ -10,6 +10,7 @@
 import { dieExtreme, entryRolls, PlayerDiceLog, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
 import { dieLabel } from '@atlas-vtt/shared/rules';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
+import { dieTagOf, dieTagText } from '../src/app/online/tools/diceTags';
 import type { DiceLogEntry } from '../src/app/online/tools/toolMessages';
 import { iconElement } from './icons.mts';
 
@@ -35,6 +36,25 @@ function text(className: string, content: string): HTMLSpanElement {
   return element;
 }
 
+/**
+ * A tagged die's tag as Atlas's log writes it: " · ● Fire", the colour dot (decorative) and the name as text, or the
+ * colour code when it has no name, so colour is never the only signal. Checked again here; null for an untagged die.
+ */
+function tagElement(die: DiceLogEntry['dice'][number]): HTMLSpanElement | null {
+  const tag = dieTagOf(die);
+  const label = dieTagText(tag);
+  if (label === null) return null;
+  const element = text('die-tag', ' · ');
+  if (tag.color) {
+    const dot = text('die-tag-dot', '●');
+    dot.setAttribute('aria-hidden', 'true');
+    dot.style.setProperty('--die-tag-colour', tag.color);
+    element.append(dot, ' ');
+  }
+  element.append(label);
+  return element;
+}
+
 function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
   const item = document.createElement(tag);
   item.className = 'dice-entry';
@@ -49,6 +69,8 @@ function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
     const badge = text('die-badge', dieLabel(rolls, index));
     const extreme = dieExtreme(die);
     if (extreme) badge.classList.add(`is-${extreme}`);
+    const tag = tagElement(die);
+    if (tag) badge.append(tag);
     dice.append(badge);
   });
   if (entry.unlisted) dice.append(text('die-badge is-more', `+${entry.unlisted} more`));

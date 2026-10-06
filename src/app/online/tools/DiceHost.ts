@@ -7,13 +7,12 @@
  * player are ignored. A `GmSession` handler, started after the token control host.
  */
 import type { DiceRollRequest, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
-import { diceFormula } from '@atlas-vtt/shared/rules';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
-import type { ControlMessage } from '../protocol';
+import { MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../protocol';
 import { RateLimit } from '../rateLimit';
 import type { CameraProjection } from '../scene/CameraSender';
 import type { PresentedSceneSource, SceneSession } from '../scene/sceneSources';
-import { DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, type DiceLogEntry } from './toolMessages';
+import { DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry } from './toolMessages';
 
 /** Every roll Atlas's dice log gets (`dice.onRolled`), and a way to add one made elsewhere (`dice.publish`). */
 export interface DiceFeed {
@@ -30,6 +29,25 @@ export interface DiceHostOptions {
   /** Rolls and logs by the rules of the collection holding `mapPath` (`dice.roll`); the feed hears the roll before this returns. */
   roll(request: DiceRollRequest): DiceRollResult;
   feed: DiceFeed;
+}
+
+/** Room left in a message for its envelope. */
+const ENVELOPE_BYTES = 1024;
+
+/**
+ * The newest entries (the list is newest first) that fit one message. Tagged dice make an entry larger, and the log
+ * holds up to 50 of up to 100 dice each: the oldest are left out, as a log a page cannot take at all would show none.
+ */
+export function fitDiceLog(entries: readonly DiceLogEntry[]): DiceLogEntry[] {
+  const encoder = new TextEncoder();
+  let bytes = ENVELOPE_BYTES;
+  const fitting: DiceLogEntry[] = [];
+  for (const entry of entries) {
+    bytes += encoder.encode(JSON.stringify(entry)).length + 1;
+    if (bytes > MAX_CONTROL_MESSAGE_BYTES) break;
+    fitting.push(entry);
+  }
+  return fitting;
 }
 
 export class DiceHost implements SessionHandler {
@@ -53,7 +71,7 @@ export class DiceHost implements SessionHandler {
 
   /** Every admission, a reconnect or a new tab included, replaces the player's log. */
   onAdmitted(player: SessionPlayer): void {
-    const entries = this.history.map(({ entry, rolledBy }) => entryFor(entry, rolledBy, player.playerId));
+    const entries = fitDiceLog(this.history.map(({ entry, rolledBy }) => entryFor(entry, rolledBy, player.playerId)));
     this.options.session.send(player.playerId, { v: 1, type: 'dice-log', entries, replay: true });
   }
 
@@ -63,9 +81,17 @@ export class DiceHost implements SessionHandler {
    */
   onMessage(player: SessionPlayer, message: ControlMessage): void {
     if (message.type !== 'dice-roll' || !this.limit.allow(player.playerId, Date.now())) return;
+    const formula = playerRollFormula(message.dice, message.modifier);
+    if (formula === null) {
+      console.warn('[Atlas VTT Connect] A player roll was ignored: Atlas does not roll that formula.');
+      return;
+    }
     this.rolling = { playerId: player.playerId, name: player.name };
     try {
-      this.options.roll({ formula: diceFormula(message.dice, message.modifier), mapPath: this.playersMapPath(), rolledBy: player.name });
+      this.options.roll({ formula, mapPath: this.playersMapPath(), rolledBy: player.name });
+    } catch (error) {
+      // Atlas refuses a formula it cannot roll by throwing; one player's roll must not stop the session's other messages.
+      console.warn('[Atlas VTT Connect] A player roll was ignored:', error);
     } finally {
       this.rolling = null;
     }

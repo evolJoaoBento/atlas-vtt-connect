@@ -250,6 +250,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 .die-badge.is-max { color: #2f9e44; }
 .die-badge.is-min { color: #e03131; }
 .die-badge.is-more { color: var(--muted); }
+.die-tag { color: var(--muted); }
+.die-tag-dot { color: var(--die-tag-colour, currentColor); }
 /* A critical roll, as Atlas's log marks it: a coloured edge. */
 .dice-entry.is-crit-success { border-color: #2f9e44; box-shadow: inset 3px 0 0 #2f9e44; }
 .dice-entry.is-crit-fail { border-color: #e03131; box-shadow: inset 3px 0 0 #e03131; }

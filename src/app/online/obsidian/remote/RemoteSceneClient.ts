@@ -9,7 +9,7 @@ import type { Disposer, LasersApi, RemotePlayerState, RemoteSceneInput, RemoteVi
 import type { PlayerSessionState } from '../../PlayerSession';
 import type { SceneCamera } from '../../scene/sceneCamera';
 import type { PlayerScene } from '../../scene/sceneTypes';
-import { DICE_LIMITS, type DiceLogEntry, type PlayerLaser } from '../../tools/toolMessages';
+import { DICE_LIMITS, isDiceModifier, type DiceLogEntry, type PlayerLaser } from '../../tools/toolMessages';
 import type { OnlineJoinService } from '../OnlineJoinService';
 import type { OnlineSceneSink } from '../onlineJoinTypes';
 import { diceLogResult, diceLogResults, traySelection } from '../onlineDice';
@@ -31,6 +31,9 @@ export const RECONNECT_LABEL = 'Reconnect';
 export const SHARED_ACTION_ID = 'shared-with-me';
 /** Why a pick of the wrong size is not sent; Atlas's tray already offers at most `maxDice` (the wire limit). */
 export const ROLL_DICE_COUNT_TEXT = `Roll 1 to ${DICE_LIMITS.dicePerRoll} dice.`;
+
+/** Why a modifier outside what the GM's Atlas rolls (a whole number within the wire's limit) is not sent. */
+export const ROLL_MODIFIER_TEXT = `Use a whole modifier from -${DICE_LIMITS.modifier} to ${DICE_LIMITS.modifier}.`;
 
 export interface Frames {
   request(draw: () => void): number;
@@ -213,6 +216,7 @@ export class RemoteSceneClient implements OnlineSceneSink {
   private roll(dice: Readonly<Record<string, number>>, modifier: number): string | null {
     const picked = traySelection(dice);
     if (!picked) return ROLL_DICE_COUNT_TEXT;
+    if (!isDiceModifier(modifier)) return ROLL_MODIFIER_TEXT;
     return this.options.service.sendDiceRoll(picked, modifier) ? null : rollRefusal(this.state);
   }
 

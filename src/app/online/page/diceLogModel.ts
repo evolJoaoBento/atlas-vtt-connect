@@ -106,8 +106,9 @@ export class PlayerDiceLog {
 
 /** A logged roll's dice as Atlas rolled them: each with its sides (`max`) and flags. */
 export function entryRolls(entry: Pick<DiceLogEntry, 'dice'>): RolledDie[] {
-  return entry.dice.map(({ die, value, negative, exploded }) => ({
+  return entry.dice.map(({ die, value, negative, exploded, color, colorName }) => ({
     die, value, max: Number(die.slice(1)), ...(negative && { negative }), ...(exploded && { exploded }),
+    ...(color !== undefined && { color }), ...(colorName !== undefined && { colorName }),
   }));
 }
 

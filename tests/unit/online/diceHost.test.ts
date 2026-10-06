@@ -223,7 +223,9 @@ describe('DiceHost', () => {
     const w = toolsWorld();
     w.present();
     const a = await w.join('A');
-    w.publish(rollFormula('120d4', () => 0.5, 1));
+    // Atlas rolls at most 100 dice, so a roll of more comes from elsewhere (physical dice) and is published as it is.
+    const rolled = rollFormula('100d4', () => 0.5, 1);
+    w.publish({ ...rolled, rolls: [...rolled.rolls, ...rolled.rolls.slice(0, 20)], total: 360 });
     const [entry] = w.logs(a).at(-1)?.entries ?? [];
     expect(entry).toMatchObject({ unlisted: 20, total: 360 });
     expect(entry?.dice).toHaveLength(DICE_LIMITS.entryDice);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RECONNECT_LABEL, ROLL_DICE_COUNT_TEXT } from '../../../../src/app/online/obsidian/remote/RemoteSceneClient';
+import { RECONNECT_LABEL, ROLL_DICE_COUNT_TEXT, ROLL_MODIFIER_TEXT } from '../../../../src/app/online/obsidian/remote/RemoteSceneClient';
 import { FIT_MAP_ITEM, FOLLOW_GM_ITEM } from '../../../../src/app/online/obsidian/remote/remoteToolbar';
 import {
   ROLL_CONNECTION_LOST_TEXT, ROLL_NOT_SENT_TEXT, ROLL_RECONNECTING_TEXT, ROLL_SESSION_ENDED_TEXT,
@@ -116,6 +116,14 @@ describe('RemoteSceneClient', () => {
     ]);
   });
 
+  it("gives Atlas's dice log the tags of each die", async () => {
+    const t = await setup();
+    t.sink().diceLog([
+      { id: 'r1', name: 'GM', formula: '2d6', dice: [{ die: 'd6', value: 4, color: '#ff6a00', colorName: 'Fire' }, { die: 'd6', value: 2 }], modifier: 0, total: 6, at: 1000 },
+    ]);
+    expect((t.handle.diceLog[0] as { rolls: unknown[] }).rolls).toEqual([{ die: 'd6', value: 4, max: 6, color: '#ff6a00', colorName: 'Fire' }, { die: 'd6', value: 2, max: 6 }]);
+  });
+
   it("draws other people's lasers on this scene in their colours, and nobody's for another scene", async () => {
     const t = await setup();
     t.sink().session(admitted(['p1', 'p2']));
@@ -181,6 +189,16 @@ describe('RemoteSceneClient', () => {
     expect(t.handle.options.maxDice).toBe(20);
     expect(t.handle.rollFromTray({ d6: 21 })).toBe('Roll 1 to 20 dice.');
     expect(t.handle.rollFromTray({ nope: 2 })).toBe(ROLL_DICE_COUNT_TEXT);
+  });
+
+  it('says so, and sends nothing, for a modifier the GM Atlas would not roll (a whole number within 1000)', async () => {
+    const t = await setup();
+    t.sink().session(admitted());
+    expect(t.handle.rollFromTray({ d20: 1 }, 1000)).toBeNull();
+    expect(t.handle.rollFromTray({ d20: 1 }, -1000)).toBeNull();
+    t.fake.sendDiceRoll.mockClear();
+    for (const modifier of [1001, -1001, 0.5, Number.NaN, 10_000]) expect(t.handle.rollFromTray({ d20: 1 }, modifier)).toBe(ROLL_MODIFIER_TEXT);
+    expect(t.fake.sendDiceRoll).not.toHaveBeenCalled();
   });
 
   it("says why a roll did not go, from the session's state", async () => {

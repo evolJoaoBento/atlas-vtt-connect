@@ -8,7 +8,7 @@ import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, Scene
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isScenePatchBody, isSceneSeq,
 } from './scene/sceneValidation';
-import { isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
+import { cleanLoggedTags, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
 export const MAX_PLAYER_NAME_LENGTH = 40;
@@ -176,9 +176,10 @@ export function decodeControl(raw: unknown): Decoded {
   const type = parsed.type as ControlMessage['type'];
   if (!Object.hasOwn(VALIDATORS, type)) return { kind: 'ignored' };
   const validate = VALIDATORS[type];
-  return validate(parsed)
-    ? { kind: 'message', message: parsed as unknown as ControlMessage }
-    : { kind: 'invalid', reason: `bad-${type}` };
+  if (!validate(parsed)) return { kind: 'invalid', reason: `bad-${type}` };
+  const message = parsed as unknown as ControlMessage;
+  if (message.type === 'dice-log') cleanLoggedTags(message.entries);
+  return { kind: 'message', message };
 }
 
 /** A player's display name, cleaned up; null when nothing usable is left or it is too long. */
