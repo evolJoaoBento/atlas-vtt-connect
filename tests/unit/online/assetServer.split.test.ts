@@ -70,7 +70,7 @@ describe('AssetServer with a split party', () => {
     expect(benAssets.log()).toEqual(['asset-start:art/shared.png', 'end:art/shared.png']);
   });
 
-  it('a request that arrived before a move is checked again when its image starts', async () => {
+  it('a request queued before a move is dropped with the images the new scene lacks', async () => {
     const { w, anna, annaAssets } = await split();
     // Ambush's map is being read; its token art waits. Anna moves to Bridge, which has neither.
     annaAssets.request(['art/shared.png', `art/${TOKEN.a}.png`]);

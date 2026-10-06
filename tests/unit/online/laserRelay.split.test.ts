@@ -81,4 +81,18 @@ describe('LaserRelay with a split party', () => {
     expect(benPoints).not.toContain(2);
     expect(benPoints).not.toContain(3);
   });
+
+  it('points drawn on B and still waiting for their batch never reach A once A is shown', async () => {
+    const { w, anna, cy, ben } = await party();
+    await vi.advanceTimersByTimeAsync(LASER_INTERVAL_MS * 2);
+    // The first point goes at once; the second waits out the batch interval.
+    w.atlas.lasers.emitLocal(VIEW, { kind: 'point', x: 1, y: 1 });
+    w.atlas.lasers.emitLocal(VIEW, { kind: 'point', x: 2, y: 2 });
+    const benBefore = ben.received.length;
+    await w.switchTo('a');
+    await vi.advanceTimersByTimeAsync(LASER_INTERVAL_MS * 4);
+    expect(gmLasers(anna)).toEqual([]);
+    expect(gmLasers(cy)).toEqual([]);
+    expect(gmLasers(ben, benBefore).filter((laser) => !laser.lifted)).toEqual([]);
+  });
 });
