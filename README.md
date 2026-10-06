@@ -21,7 +21,7 @@ If you use the online play preview (the fork's built-in online play, Atlas VTT 0
 
 1. Install the BRAT plugin.
 2. In BRAT, choose "Add beta plugin", enter `evolJoaoBento/atlas-vtt`, and pick version **0.6.0-beta.4** (the Atlas API build; keep it pinned, see above).
-3. In BRAT, choose "Add beta plugin" again, enter `evolJoaoBento/atlas-vtt-connect`, and pick version **0.1.0-beta.1**.
+3. In BRAT, choose "Add beta plugin" again, enter `evolJoaoBento/atlas-vtt-connect`, and pick version **0.1.0-beta.3**.
 4. Enable Atlas VTT and Atlas VTT Connect in Settings, Community plugins.
 
 ## Hosting and joining
@@ -61,7 +61,7 @@ Connect replaces the online play preview (the fork of Atlas VTT with online play
 
 1. In BRAT, find `evolJoaoBento/atlas-vtt` and change its pinned version from the preview's (0.5.x or 0.6.1-beta.x) to **0.6.0-beta.4**, the API build. The lower number is expected: it is a different build, not an older preview. Keep it pinned.
 2. Restart Obsidian, or turn Atlas VTT off and on.
-3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.1**) and enable it.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.3**) and enable it.
 
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
 - **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.
@@ -99,7 +99,7 @@ Release checklist, before the first tag:
 1. Push Connect's `main` to `evolJoaoBento/atlas-vtt-connect`. Until then the repository is empty: the player page, the source link and the notice links all 404, and Pages cannot deploy.
 2. Push the Atlas extension API branch to `evolJoaoBento/atlas-vtt` (branch `api/extension-api`) and check that it is public, as named in this README and in THIRD_PARTY_NOTICES.md. Connect's source for the vendored Atlas code must be reachable (AGPL).
 3. Run `npm run sync:atlas` once from that public location, so `vendor/atlas/SOURCE.json` names its `repository` and `branch`.
-4. The BRAT versions in this README are filled in (Atlas API build 0.6.0-beta.4, Connect 0.1.0-beta.1). The TODO for the first upstream Atlas release with the extension API stays until that release ships.
+4. The BRAT versions in this README are filled in (Atlas API build 0.6.0-beta.4, Connect 0.1.0-beta.3). The TODO for the first upstream Atlas release with the extension API stays until that release ships.
 5. Check that `manifest.json`'s `version`, the key in `versions.json` and the tag are the same, and that `minAppVersion` is right.
 6. Enable Pages in the repository's settings (source "GitHub Actions"), run or wait for `pages.yml`, and check that it goes green and that the default address serves the player page.
 7. Run the verify block (`npx tsc --noEmit && npm run lint && npx vitest run && npm run build && npm run check:vendor && npm run build:page`), then tag and push the tag.
