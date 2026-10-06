@@ -14,7 +14,8 @@ import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, presenter, sceneView, type ViewState } from './presentedFixtures';
 
@@ -54,7 +55,7 @@ function presentedScene(gm: GmSession, options: ControlScene) {
   const rules: PlayerViewRules = { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true, ...options.rules };
   const settings = { getLocalPlayerViewSettings: () => rules, onChange: () => () => {} };
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: () => {} });
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: () => {} });
   broadcaster.start();
   return { presented, broadcaster, ...sceneView(presented, options.state ?? partyState(), { mapSize: options.mapSize ?? { width: 2000, height: 1500 } }) };
 }

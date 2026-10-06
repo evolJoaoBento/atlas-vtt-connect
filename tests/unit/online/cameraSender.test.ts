@@ -5,7 +5,8 @@ import { decodeControl, type ControlMessage } from '../../../src/app/online/prot
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { CameraSender } from '../../../src/app/online/scene/CameraSender';
 import { CAMERA_INTERVAL_MS, type SceneCamera } from '../../../src/app/online/scene/sceneCamera';
-import { SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
@@ -28,7 +29,7 @@ function world(state: CameraSceneState = emptySceneState()) {
   const settings = { getLocalPlayerViewSettings: (): PlayerViewRules => rules, onChange: (): (() => void) => () => {} };
   const presented = presenter();
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: () => {} });
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: () => {} });
   const sender = new CameraSender({ session: gm, presented, projection: broadcaster });
   broadcaster.start();
   sender.start();
@@ -142,7 +143,8 @@ describe('CameraSender', () => {
     const before = w.sceneTypes('anna').length;
     w.tabs.getState().setActiveTab(w.tavern);
     await vi.advanceTimersByTimeAsync(0);
-    expect(w.sceneTypes('anna').slice(before)).toEqual(['scene-snapshot', 'scene-camera']);
+    // Split party (spec Goal 2): a resume patches what changed (nothing here) and says the scene is live again.
+    expect(w.sceneTypes('anna').slice(before)).toEqual(['scene-state', 'scene-camera']);
     expect(w.cameras('anna').at(-1)).toMatchObject({ centerX: 520, centerY: 410 });
   });
 
@@ -171,7 +173,9 @@ describe('CameraSender', () => {
     await vi.advanceTimersByTimeAsync(0);
     w.viewport.moveTo(9000, 9000);
     const cleo = await w.join('cleo');
-    expect(w.sceneTypes('cleo')).toEqual(['scene-snapshot', 'scene-camera']);
+    await vi.advanceTimersByTimeAsync(0);
+    // Split party (spec Goal 2): a held scene is paused, which its new player is told after the camera (spec 5.1).
+    expect(w.sceneTypes('cleo')).toEqual(['scene-snapshot', 'scene-camera', 'scene-state']);
     expect(cleo.camera).toEqual(bea.camera);
   });
 

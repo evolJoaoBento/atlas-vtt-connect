@@ -4,7 +4,8 @@ import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
-import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { PeerLink, ClientTransport } from '../../../src/app/online/transport/types';
@@ -95,7 +96,7 @@ function world() {
   const presented = presenter();
   const notices: string[] = [];
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: (message) => notices.push(message), hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
     session: gm, presented, settings, assets, notify: (message) => notices.push(message), resources: () => definitions,
     watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
   });

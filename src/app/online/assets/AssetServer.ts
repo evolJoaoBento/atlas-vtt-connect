@@ -1,6 +1,6 @@
 /**
  * Serves the images of the scene players have over each player's assets
- * channel. A `GmSession` handler, like `SceneBroadcaster`: requests come only
+ * channel. A `GmSession` handler, like `SceneHub`: requests come only
  * from admitted players, only fingerprints of the current projection are
  * served, one image at a time per player (map first), in chunks paced on the
  * channel's buffer so scene updates on the control channel are never starved.
@@ -18,7 +18,7 @@ export interface AssetServerOptions {
     use(handler: SessionHandler): () => void;
     assetChannel(playerId: string): ChannelPort | null;
   };
-  /** The scene players have (the broadcaster). */
+  /** The scene players have (the scene hub). */
   projection: {
     currentProjection(): PlayerScene | null;
     onProjection(listener: (scene: PlayerScene | null) => void): () => void;

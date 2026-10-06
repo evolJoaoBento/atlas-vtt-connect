@@ -10,7 +10,8 @@ import type { ControlMessage } from '../../../src/app/online/protocol';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import type { LightingFrame } from '../../../src/app/online/scene/lightingFrame';
 import { projectForPlayers } from '../../../src/app/online/scene/projectForPlayers';
-import { SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { liveLighting } from '../../../src/app/online/scene/sceneLighting';
@@ -122,7 +123,7 @@ export interface LitHost {
   /** The presented view's id. */
   view: string;
   store: SceneView['store'];
-  broadcaster: SceneBroadcaster;
+  broadcaster: SceneHub;
   sent: ControlMessage[];
   notices: string[];
   /** What players have now. */
@@ -142,7 +143,7 @@ export function hostLit(state: ViewState, options: { lighting: boolean; visibili
   const deps = sessionDeps(extension, { dice: null, lasers: null, lighting: need(atlas, extension, 'lighting'), tokens: null });
   const sent: ControlMessage[] = [];
   const notices: string[] = [];
-  const broadcaster = new SceneBroadcaster({
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
     session: { use: () => () => undefined, send: (_playerId, message) => { sent.push(message); }, getPlayers: () => [{ playerId: 'p1', name: 'Anna', status: 'admitted' }] },
     presented: deps.presented,
     settings: deps.playerViewSettings,

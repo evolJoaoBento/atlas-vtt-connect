@@ -1,6 +1,6 @@
-/** What the broadcaster needs of its neighbours, and the change detection it shares with them. */
+/** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
 import type { CollectionGridDefaults, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
-import type { LiveScene, PresentedSceneSource } from '../atlas/presentedSource';
+import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
@@ -21,7 +21,8 @@ export interface PlayerViewSettingsSource {
   onChange(listener: () => void): () => void;
 }
 
-export interface SceneBroadcasterOptions {
+/** What every scene's projection reads: the session, the presented scene, the GM's rules and the collections' settings. */
+export interface SceneProjectionOptions {
   session: SceneSession;
   presented: PresentedSceneSource;
   settings: PlayerViewSettingsSource;
@@ -68,16 +69,6 @@ export const SCENE_TICK_MS = 50;
 export const SCENE_TOO_LARGE_NOTICE = 'This scene is too large to send to online players.';
 export const FOG_TRUNCATED_NOTICE = 'This scene has too much fog to show to online players.';
 
-/** The presented scene while it is shown (not held). */
-export interface ShownScene {
-  readonly scene: LiveScene;
-  readonly sceneId: string;
-  /** A snapshot that is not `loaded` (a map loading, or none loaded) holds no scene of its own: nothing is sent. */
-  loading: boolean;
-  slice: Slice | null;
-  readonly unsubscribe: () => void;
-}
-
 /** What players cannot see under the fog; a lit scene's texts and drawings are checked by the raster itself (`LightingFrame.shows`). */
 export interface FogCoverages {
   coverage: FogCoverage;
@@ -108,7 +99,7 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'>,
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'>,
 ): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);

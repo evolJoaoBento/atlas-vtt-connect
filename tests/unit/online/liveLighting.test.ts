@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
 import { LiveLighting } from '../../../src/app/online/scene/LiveLighting';
-import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneHub';
 import type { ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { character, hostLit, litTavern, MAP, PENDING, ready, testLighting, UNLIT } from './lightingFixtures';
 import { insideByNonzero } from './sceneFixtures';

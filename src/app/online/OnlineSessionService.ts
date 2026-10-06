@@ -132,6 +132,7 @@ export class OnlineSessionService {
           ...(deps.resources ? { resources: deps.resources } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
           ...(deps.watchResources ? { watchResources: deps.watchResources } : {}),
+          ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,
       }, this.sharingHooks);

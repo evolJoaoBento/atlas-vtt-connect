@@ -62,6 +62,11 @@ export class LiveLighting {
     }
   }
 
+  /** Whether Atlas cannot tell yet what players see (`pending`): a scene going live waits for it (ruling P8). */
+  pending(): boolean {
+    return this.visibility().status === 'pending';
+  }
+
   /** The store holds the scene anew (reloaded in place): nothing worked out for it before stands in. */
   restart(): void {
     this.built = null;

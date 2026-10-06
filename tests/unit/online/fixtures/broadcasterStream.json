@@ -1,0 +1,1886 @@
+{
+ "edits": {
+  "early": [
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 3
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 300,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 4
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "fog": {
+       "e1": {
+        "type": "rectangle",
+        "erase": true,
+        "order": 3,
+        "x": 944,
+        "y": 944,
+        "width": 216,
+        "height": 216
+       }
+      },
+      "texts": {
+       "tx": {
+        "x": 1100,
+        "y": 1100,
+        "text": "Beware",
+        "fontSize": 16,
+        "fontFamily": "serif",
+        "color": "#000000",
+        "backgroundColor": null,
+        "padding": 0,
+        "borderRadius": 0,
+        "opacity": 1,
+        "width": null,
+        "height": null,
+        "align": "center",
+        "bold": false,
+        "italic": false,
+        "rotation": 0,
+        "scale": 1
+       }
+      },
+      "drawings": {
+       "d1": {
+        "type": "pen",
+        "order": 2,
+        "points": [
+         {
+          "x": 1000,
+          "y": 1000
+         },
+         {
+          "x": 1010,
+          "y": 1010
+         }
+        ],
+        "color": "#ff0000",
+        "width": 2,
+        "opacity": 1,
+        "icon": null
+       }
+      }
+     },
+     "remove": {},
+     "seq": 5
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "fog": {
+       "b1": {
+        "type": "brush",
+        "erase": false,
+        "order": 4,
+        "radius": 80,
+        "points": [
+         {
+          "x": 300,
+          "y": 140
+         },
+         {
+          "x": 301,
+          "y": 140
+         }
+        ]
+       }
+      }
+     },
+     "remove": {
+      "tokens": [
+       "hero"
+      ]
+     },
+     "seq": 6
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": "Goblin",
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 7
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": "Goblin",
+        "hp": null,
+        "stress": null,
+        "resources": [
+         {
+          "color": "#eab308",
+          "share": 0.5,
+          "spent": false
+         }
+        ],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 8
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {},
+     "remove": {
+      "tokens": [
+       "goblin"
+      ]
+     },
+     "seq": 9
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 10
+    }
+   }
+  ],
+  "late": [
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 300,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 3
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "fog": {
+       "e1": {
+        "type": "rectangle",
+        "erase": true,
+        "order": 3,
+        "x": 944,
+        "y": 944,
+        "width": 216,
+        "height": 216
+       }
+      },
+      "texts": {
+       "tx": {
+        "x": 1100,
+        "y": 1100,
+        "text": "Beware",
+        "fontSize": 16,
+        "fontFamily": "serif",
+        "color": "#000000",
+        "backgroundColor": null,
+        "padding": 0,
+        "borderRadius": 0,
+        "opacity": 1,
+        "width": null,
+        "height": null,
+        "align": "center",
+        "bold": false,
+        "italic": false,
+        "rotation": 0,
+        "scale": 1
+       }
+      },
+      "drawings": {
+       "d1": {
+        "type": "pen",
+        "order": 2,
+        "points": [
+         {
+          "x": 1000,
+          "y": 1000
+         },
+         {
+          "x": 1010,
+          "y": 1010
+         }
+        ],
+        "color": "#ff0000",
+        "width": 2,
+        "opacity": 1,
+        "icon": null
+       }
+      }
+     },
+     "remove": {},
+     "seq": 4
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "fog": {
+       "b1": {
+        "type": "brush",
+        "erase": false,
+        "order": 4,
+        "radius": 80,
+        "points": [
+         {
+          "x": 300,
+          "y": 140
+         },
+         {
+          "x": 301,
+          "y": 140
+         }
+        ]
+       }
+      }
+     },
+     "remove": {
+      "tokens": [
+       "hero"
+      ]
+     },
+     "seq": 5
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": "Goblin",
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 6
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": "Goblin",
+        "hp": null,
+        "stress": null,
+        "resources": [
+         {
+          "color": "#eab308",
+          "share": 0.5,
+          "spent": false
+         }
+        ],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 7
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {},
+     "remove": {
+      "tokens": [
+       "goblin"
+      ]
+     },
+     "seq": 8
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 9
+    }
+   }
+  ]
+ },
+ "holds": {
+  "A": [
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 3
+    }
+   },
+   {
+    "step": "hold"
+   },
+   {
+    "step": "resume"
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 4
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 5
+    }
+   },
+   {
+    "step": "resumed"
+   },
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 6
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 7
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 50,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 8
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 60,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 9
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 10
+    }
+   }
+  ],
+  "B": [
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 3
+    }
+   },
+   {
+    "step": "hold"
+   },
+   {
+    "step": "resume"
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 4
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 5
+    }
+   },
+   {
+    "step": "resumed"
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 50,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 6
+    }
+   },
+   {
+    "link": 2
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 50,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 60,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 3
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 4
+    }
+   }
+  ],
+  "C": [
+   {
+    "step": "hold"
+   },
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 2
+    }
+   },
+   {
+    "step": "resume"
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 3
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 4
+    }
+   },
+   {
+    "step": "resumed"
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 50,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 5
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 60,
+        "y": 50,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      }
+     },
+     "remove": {},
+     "seq": 6
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 7
+    }
+   }
+  ]
+ },
+ "secrets": {
+  "A": [
+   {
+    "link": 1
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 1
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-snapshot",
+     "scene": {
+      "sceneId": "S1",
+      "map": {
+       "asset": null,
+       "width": 2000,
+       "height": 1500,
+       "cellSize": 70
+      },
+      "grid": {
+       "type": "square",
+       "size": 70,
+       "offsetX": 0,
+       "offsetY": 0,
+       "color": null,
+       "opacity": 0.5,
+       "lineType": "solid",
+       "lineWidth": 1,
+       "hexNumbers": null,
+       "hexNumberOpacity": null,
+       "cellNumbers": null,
+       "cellNumberOpacity": null
+      },
+      "tokens": {
+       "hero": {
+        "x": 140,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": null,
+        "hp": null,
+        "stress": null,
+        "resources": [],
+        "downed": false
+       }
+      },
+      "texts": {},
+      "widgets": [],
+      "initiative": null,
+      "measurement": {
+       "mode": "abstract",
+       "unitType": "feet",
+       "unitDistance": 5,
+       "ruleDistance": 5,
+       "diagonalRule": "equidistant",
+       "snapToGrid": true,
+       "coneAngle": 90,
+       "snapGrid": {
+        "type": "square",
+        "size": 70,
+        "offsetX": 0,
+        "offsetY": 0
+       },
+       "rangeBands": []
+      }
+     },
+     "fogParts": 1,
+     "drawingParts": 0,
+     "seq": 2
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-fog",
+     "part": 0,
+     "records": {
+      "f1": {
+       "type": "rectangle",
+       "erase": false,
+       "order": 1,
+       "x": 900,
+       "y": 900,
+       "width": 400,
+       "height": 400
+      }
+     },
+     "seq": 3
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-patch",
+     "set": {},
+     "upsert": {
+      "tokens": {
+       "hero": {
+        "x": 200,
+        "y": 140,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [
+         {
+          "id": "prone",
+          "value": null
+         }
+        ],
+        "name": "Hero",
+        "hp": null,
+        "stress": null,
+        "resources": [
+         {
+          "color": "#22c55e",
+          "share": 0.7,
+          "spent": false
+         }
+        ],
+        "downed": false
+       },
+       "goblin": {
+        "x": 1050,
+        "y": 1050,
+        "size": 1,
+        "rotation": 0,
+        "layer": 0,
+        "image": null,
+        "ring": "#ffffff",
+        "conditions": [],
+        "name": "Goblin",
+        "hp": null,
+        "stress": null,
+        "resources": [
+         {
+          "color": "#eab308",
+          "share": 0.5,
+          "spent": false
+         }
+        ],
+        "downed": false
+       }
+      },
+      "fog": {
+       "e1": {
+        "type": "rectangle",
+        "erase": true,
+        "order": 3,
+        "x": 950,
+        "y": 950,
+        "width": 200,
+        "height": 200
+       }
+      },
+      "drawings": {
+       "d1": {
+        "type": "pen",
+        "order": 2,
+        "points": [
+         {
+          "x": 1000,
+          "y": 1000
+         },
+         {
+          "x": 1010,
+          "y": 1010
+         }
+        ],
+        "color": "#ff0000",
+        "width": 2,
+        "opacity": 1,
+        "icon": null
+       }
+      }
+     },
+     "remove": {},
+     "seq": 4
+    }
+   },
+   {
+    "message": {
+     "v": 1,
+     "type": "scene-clear",
+     "seq": 5
+    }
+   }
+  ]
+ }
+}

@@ -1,5 +1,5 @@
 /**
- * The broadcaster's timing and what one projection sends: a tick batches the changes of up to
+ * A scene slot's timing and what one projection sends: a tick batches the changes of up to
  * `SCENE_TICK_MS`, and a projection's snapshot messages are built once and kept while it is what
  * players have. A scene too large to send tells the GM once per presentation.
  */
@@ -75,6 +75,13 @@ export class SnapshotCache {
       }
     }
     return this.snapshot.messages;
+  }
+
+  /** The snapshot of `scene` to one player through `send`; a clear when it is too large. */
+  sendTo(scene: PlayerScene, send: (message: SceneOutgoing) => void): void {
+    const messages = this.messagesOf(scene);
+    if (!messages) send({ v: 1, type: 'scene-clear' });
+    else for (const message of messages) send(message);
   }
 
   /** Whether the snapshot of `scene` was tried and was too large. */

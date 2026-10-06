@@ -4,7 +4,7 @@ import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
 import { LiveLighting } from '../../../src/app/online/scene/LiveLighting';
 import { drawingBounds, textBounds } from '../../../src/app/online/scene/objectBounds';
 import type { WorldBounds } from '../../../src/app/online/scene/FogCoverage';
-import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS } from '../../../src/app/online/scene/SceneHub';
 import { LIT_SCENE_NEEDS_UPDATE_NOTICE } from '../../../src/app/online/scene/sceneLighting';
 import { atlasCellSize, character, fakeLighting, hostLit, litTavern, MAP, PENDING, projectLit, ready, scene, testLighting } from './lightingFixtures';
 

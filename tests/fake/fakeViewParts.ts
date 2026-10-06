@@ -38,6 +38,8 @@ export interface FakeView {
 /** What the views namespace tells the rest of the fake: events, and changes the presentation follows. */
 export interface FakeViewsHooks {
   emitMapLoaded(info: ViewInfo): void;
+  /** The store holds a newly loaded map, before its subscribers hear of it: the view's sight is pending again. */
+  mapLoading(viewId: ViewId): void;
   emitMapClosed(viewId: ViewId): void;
   storeChanged(viewId: ViewId): void;
   tabsChanged(viewId: ViewId): void;

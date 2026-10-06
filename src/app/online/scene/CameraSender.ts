@@ -5,8 +5,8 @@
  * scene is held, since the view then shows another map. The last camera sent goes
  * once more to everyone when the scene is presented or resumed, and to a player who
  * gets a snapshot (admission, resync), also while held. A second `GmSession`
- * handler beside `SceneBroadcaster`, registered after it, so its messages follow the
- * broadcaster's snapshots.
+ * handler beside `SceneHub`, registered after it, so its messages follow the
+ * hub's snapshots.
  */
 import type { LiveScene } from '../atlas/presentedSource';
 import type { SessionHandler, SessionPlayer } from '../GmSession';

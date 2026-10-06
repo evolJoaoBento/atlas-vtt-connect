@@ -1,6 +1,6 @@
 /**
  * One hosted session, from the host transport to its handlers: the body of `OnlineSessionService.start`.
- * The scene broadcaster, the camera sender and the asset server always run. Token control (needs Atlas's `tokens`),
+ * The scene hub, the camera sender and the asset server always run. Token control (needs Atlas's `tokens`),
  * players' dice and lasers (B7) are optional parts: each starts only when its dep is given, and without
  * it the session runs without that feature (no token assignments, no dice, no lasers relayed).
  */
@@ -16,8 +16,10 @@ import { peerServerOptions, type OnlineSettings } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
 import { CameraSender } from './scene/CameraSender';
-import { SceneBroadcaster, type SceneBroadcasterOptions } from './scene/SceneBroadcaster';
+import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
+import type { TabScenes } from './atlas/tabScenes';
+import { SceneAssignments } from './split/SceneAssignments';
 import type { IdentityCrypto, TableIdentity } from './sharing/identity/identityCrypto';
 import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
 import { HostIdentity } from './sharing/people/hostIdentity';
@@ -38,8 +40,8 @@ export interface HostedSharingHooks {
 /** What an optional part of the session gets: the session (through the log), the presented scene, what players have. */
 export interface HostedContext {
   session: SceneSession;
-  presented: SceneBroadcasterOptions['presented'];
-  projection: SceneBroadcaster;
+  presented: SceneProjectionOptions['presented'];
+  projection: SceneHub;
 }
 
 export interface HostedPart {
@@ -70,7 +72,10 @@ export interface HostEnvironment extends OptionalParts {
   showRequest(player: SessionPlayer, answer: (allow: boolean) => void, info?: JoinRequestInfo): { hide(): void };
   images: ImageFiles;
   views: Pick<ViewsApi, 'list'>;
-  scene: Omit<SceneBroadcasterOptions, 'session' | 'assets' | 'notify'>;
+  scene: Omit<SceneProjectionOptions, 'session' | 'assets' | 'notify'> & {
+    /** The GM's scene tabs for this session (Atlas's `scene-tabs`); without it there is no split party. */
+    tabScenes?: () => TabScenes;
+  };
   /** Whether this start is still the current one; a later stop or start makes it stale. */
   isCurrent(): boolean;
 }
@@ -85,6 +90,8 @@ export interface HostedSession {
   /** The note to show while hosting: the join link is too long to work, or none. */
   readonly linkError: string | null;
   readonly tokenControl: TokenControl | null;
+  /** Which scene each player sees, and the split party's assignments. */
+  readonly scenes: SceneHub;
   stop(): void;
 }
 
@@ -149,14 +156,16 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const notify = (message: string): void => { new Notice(message); };
   // One registry per session: fingerprints are cached for the session, the size notice shows once.
   const registry = new AssetRegistry({ files: env.images, notify });
-  // The broadcaster and the camera sender send through the log, so diagnostics see every scene message.
+  // The scene hub and the camera sender send through the log, so diagnostics see every scene message.
   const scenes = loggedSession(session, log);
-  const broadcaster = new SceneBroadcaster({ ...env.scene, session: scenes, assets: registry, notify });
-  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: broadcaster };
-  // The GM's view of the presented scene, which players follow by default; started after the broadcaster.
-  const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: broadcaster });
+  const { tabScenes, ...sceneOptions } = env.scene;
+  const tabs = tabScenes?.() ?? null;
+  const hub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
+  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
+  // The GM's view of the presented scene, which players follow by default; started after the scene hub.
+  const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub });
   // Serves the images of the scene players have, over each player's assets channel.
-  const assetServer = new AssetServer({ session, projection: broadcaster, files: registry });
+  const assetServer = new AssetServer({ session, projection: hub, files: registry });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
   const tokenControl = env.tokenControl?.(context) ?? null;
   const dice = env.dice?.(context) ?? null;
@@ -173,7 +182,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
-    broadcaster.stop();
+    hub.stop();
+    tabs?.dispose();
     registry.dispose();
     session.stop();
     current = null;
@@ -181,7 +191,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   };
   try {
     stopLog = logPresentedScene(env.scene.presented, env.views, log);
-    broadcaster.start();
+    hub.start();
     cameraSender.start();
     assetServer.start();
     for (const part of given([tokenControl, dice, laser])) {
@@ -190,11 +200,12 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     }
     if (table && sharing) stopSharing = sharing.started({ session, table });
   } catch (error) {
-    // No session may keep running without its broadcaster; `start` reports the error.
+    // No session may keep running without its scene hub; `start` reports the error.
     stop();
     throw error;
   }
   return {
-    session, requests, table, hostId: host.id, joinUrl, linkError: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null, stop,
+    session, requests, table, hostId: host.id, joinUrl, linkError: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null,
+    scenes: hub, stop,
   };
 }

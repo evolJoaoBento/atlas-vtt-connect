@@ -3,7 +3,8 @@ import type { Character } from '@atlas-vtt/api-types';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
-import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { LIT_SCENE_NEEDS_UPDATE_NOTICE } from '../../../src/app/online/scene/sceneLighting';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { LiveScene } from '../../../src/app/online/atlas/presentedSource';
@@ -35,7 +36,7 @@ function world() {
   const notices: string[] = [];
   const settings = { getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }), onChange: () => () => {} };
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
   broadcaster.start();
   const raw = async (): Promise<ControlMessage[]> => {
     const link = await network.client().connect('gm');
@@ -136,10 +137,11 @@ describe('the broadcaster across presentations', () => {
     const sceneId = w.broadcaster.currentProjection()?.sceneId;
     view.tabs.getState().setActiveTab(view.dungeon);
     await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
-    expect(sceneTypes(received)).toEqual(['scene-snapshot']);
+    // Split party (spec Goal 2): the held scene is paused, and its resume patches what changed (nothing here).
+    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-state']);
     view.tabs.getState().setActiveTab(view.tavern);
     await vi.advanceTimersByTimeAsync(0);
-    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-snapshot']);
+    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-state', 'scene-state']);
     expect(w.broadcaster.currentProjection()?.sceneId).toBe(sceneId);
   });
 
@@ -150,9 +152,10 @@ describe('the broadcaster across presentations', () => {
     const received = await w.raw();
     const first = w.broadcaster.currentProjection()?.sceneId;
     view.tabs.getState().setActiveTab(view.dungeon);
-    expect(sceneTypes(received)).toEqual(['scene-snapshot']);
+    // Split party (spec Goal 2): the held scene is paused.
+    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-state']);
     w.presented.present(view.view, view.dungeon);
-    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-clear']);
+    expect(sceneTypes(received)).toEqual(['scene-snapshot', 'scene-state', 'scene-clear']);
     w.presented.clear();
     w.presented.present(view.view, view.tavern);
     view.tabs.getState().setActiveTab(view.tavern);

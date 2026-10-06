@@ -9,7 +9,8 @@ import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { SCENE_TICK_MS, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { MemoryNetwork, type MemoryLink } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
 import { presenter, sceneView, type ViewState } from './presentedFixtures';
@@ -90,7 +91,7 @@ function world(files: MemoryImageFiles, tokens = objects(TAVERN)) {
   const notices: string[] = [];
   const registry = new AssetRegistry({ files: files.source, notify: (message) => notices.push(message), hash: nodeHash });
   const presented = presenter();
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets: registry, notify: (message) => notices.push(message) });
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), session: gm, presented, settings, assets: registry, notify: (message) => notices.push(message) });
   const server = new AssetServer({ session: gm, projection: broadcaster, files: registry });
   broadcaster.start();
   server.start();

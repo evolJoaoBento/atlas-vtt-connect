@@ -7,7 +7,11 @@ import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMe
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { REMOTE_FOG_LIMITS } from '../../../src/app/online/scene/remoteFogLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { readFileSync } from 'node:fs';
+import { createTabScenes } from '../../../src/app/online/atlas/tabScenes';
+import { applied, recordFlows, replay, segment, seqsUnbroken, states, type StreamHandlerInput, type Streams } from './sceneStreamFlows';
+import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneHub } from '../../../src/app/online/scene/SceneHub';
+import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
 import { MAP_SIZE_POLL_MS } from '../../../src/app/online/scene/sceneTicks';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
@@ -93,7 +97,7 @@ interface Harness {
   gm: GmSession;
   requests: SessionPlayer[];
   presented: Presenter;
-  broadcaster: SceneBroadcaster;
+  broadcaster: SceneHub;
   notices: string[];
   setRules(next: Partial<PlayerViewRules>): void;
   /** The GM edits the collection's resources; the broadcaster is told, as the collection settings event does. */
@@ -123,7 +127,7 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
   let definitions: readonly ResourceDefinition[] = [HP];
   let initiativeRules: InitiativeRules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
   const resourceListeners = new Set<() => void>();
-  const broadcaster = new SceneBroadcaster({
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
     session: gm, presented, settings, assets, notify: (message) => notices.push(message),
     resources: () => definitions,
     initiativeRules: () => initiativeRules,
@@ -194,7 +198,7 @@ describe('scene messages', () => {
   });
 });
 
-describe('SceneBroadcaster', () => {
+describe('SceneHub', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
@@ -490,7 +494,9 @@ describe('SceneBroadcaster', () => {
     store.setState(sceneState({ villain: character('villain', 600) }));
     h.setResources([SHOWN_HP]);
     await tick();
-    expect(sceneTypes(raw.received)).toEqual(['scene-snapshot']);
+    // Split party (spec Goal 2): the held scene's players are told it is paused, unsequenced.
+    expect(sceneTypes(raw.received)).toEqual(['scene-snapshot', 'scene-state']);
+    expect(raw.received.at(-1)).toEqual({ v: 1, type: 'scene-state', sceneId: heldId, paused: true });
 
     const late = await join(h, 'key-late');
     expect(Object.keys(late.scene?.tokens ?? {})).toEqual(['hero']);
@@ -506,6 +512,28 @@ describe('SceneBroadcaster', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(late.scene?.sceneId).toBe(heldId);
     expect(late.scene?.tokens.hero?.resources).toEqual([HP_BAR]);
+  });
+
+  it('a held scene resumes with a patch, not a snapshot', async () => {
+    const h = setup();
+    const { view, store, tabs, tavern, dungeon } = fakeView(sceneState({ hero: character('hero', 140) }));
+    h.presented.present(view, tavern);
+    const raw = await rawPlayer(h, 'raw');
+    const heldId = h.broadcaster.currentProjection()?.sceneId;
+    tabs.getState().setActiveTab(dungeon);
+    store.setState({ isMapLoading: true });
+    store.setState(sceneState({ villain: character('villain', 600) }));
+    await tick();
+    // The GM moved the hero on the tavern before leaving it: what the tavern holds when it comes back.
+    store.setState({ isMapLoading: true });
+    tabs.getState().setActiveTab(tavern);
+    store.setState({ ...sceneState({ hero: character('hero', 300) }), isMapLoading: false });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sceneTypes(raw.received)).toEqual(['scene-snapshot', 'scene-state', 'scene-patch', 'scene-state']);
+    const patch = raw.received.find((message) => message.type === 'scene-patch');
+    expect(patch?.type === 'scene-patch' ? Object.keys(patch.upsert.tokens ?? {}) : []).toEqual(['hero']);
+    expect(raw.received.at(-1)).toEqual({ v: 1, type: 'scene-state', sceneId: heldId, paused: false });
+    expect(h.broadcaster.currentProjection()?.tokens.hero?.x).toBe(300);
   });
 
   it('sends a scene presented before the session started', async () => {
@@ -795,6 +823,42 @@ describe('SceneBroadcaster', () => {
     await tick();
     await tick();
     expect(player.scene?.map.asset).toBe(fingerprintOf('new map bytes'));
+  });
+
+  describe.each([
+    { atlas: 'before scene-tabs', tabs: false },
+    { atlas: 'with scene-tabs', tabs: true },
+  ])('with no assignments, $atlas', ({ tabs }) => {
+    const hubOf = (input: StreamHandlerInput): SceneHub => new SceneHub({
+      ...input, tabs: tabs ? createTabScenes(input.extension) : null, assignments: new SceneAssignments(),
+    });
+
+    it('with no assignments every player gets exactly what SceneBroadcaster sent', async () => {
+      const recorded = JSON.parse(readFileSync('tests/unit/online/fixtures/broadcasterStream.json', 'utf8')) as Streams;
+      const streams = await recordFlows(hubOf, tabs);
+      // Live all along: the same messages, in the same order, with the same seq.
+      expect(streams.edits).toEqual(recorded.edits);
+      expect(streams.secrets).toEqual(recorded.secrets);
+      // Held and resumed: one unsequenced scene-state each way, and the resume's snapshot replaced by at most one patch.
+      expect(Object.keys(streams.holds!)).toEqual(Object.keys(recorded.holds!));
+      for (const [player, lines] of Object.entries(streams.holds!)) {
+        const old = recorded.holds![player]!;
+        expect(applied(segment(lines, null, 'hold')), player).toEqual(applied(segment(old, null, 'hold')));
+        expect(applied(segment(lines, 'hold', 'resume')), player).toEqual(applied(segment(old, 'hold', 'resume')));
+        expect(states(segment(lines, 'hold', 'resume')).map((state) => state.paused), player).toEqual([true]);
+        const resumed = segment(lines, 'resume', 'resumed');
+        expect(applied(segment(old, 'resume', 'resumed')).map((line) => 'message' in line && line.message.type), player)
+          .toEqual(['scene-snapshot', 'scene-fog']);
+        expect(applied(resumed).filter((line) => 'message' in line).map((line) => 'message' in line && line.message.type)).not.toContain('scene-snapshot');
+        expect(applied(resumed).length, player).toBeLessThanOrEqual(1);
+        expect(states(resumed).map((state) => state.paused), player).toEqual([false]);
+        expect(applied(segment(lines, 'resumed', null)), player).toEqual(applied(segment(old, 'resumed', null)));
+        // Every scene the player saw is the one SceneBroadcaster gave them, and no gap asked for a resync.
+        expect(replay(segment(lines, null, 'resumed')).scene, player).toEqual(replay(segment(old, null, 'resumed')).scene);
+        expect(replay(lines), player).toEqual({ ...replay(old), resyncs: 0 });
+        expect(seqsUnbroken(lines), player).toBe(true);
+      }
+    });
   });
 
   it('tells projection listeners each change of what players have', async () => {

@@ -68,8 +68,10 @@ export class FakeViews {
     const { viewId: _ignored, tabId: _tab, ...scene } = snapshot;
     const before = sliceOf(view.scene, this.tabIdOf(view));
     view.scene = scene;
-    this.notifyIfChanged(view, before);
     const loadedPath = scene.loaded ? scene.mapPath : null;
+    // Whatever the renderer worked out for the last map is gone before anyone reads the new one (sight is pending).
+    if (loadedPath !== null && loadedPath !== view.loadedPath) this.hooks.mapLoading(viewId);
+    this.notifyIfChanged(view, before);
     if (loadedPath !== view.loadedPath) {
       view.loadedPath = loadedPath;
       if (loadedPath !== null) this.hooks.emitMapLoaded(this.infoOf(view));

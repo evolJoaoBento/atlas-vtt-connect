@@ -15,6 +15,8 @@ export interface PresentationLighting {
   frame(snapshot: SceneSnapshot): LightingFrame | null;
   /** The store holds the scene anew (reloaded in place): nothing worked out for it before stands in. */
   restart(): void;
+  /** Whether what players see is not known yet; a parked scene going live keeps its projection meanwhile (P8). Absent: never. */
+  pending?(): boolean;
   dispose(): void;
 }
 
@@ -57,6 +59,7 @@ export function liveLighting(lighting: Pick<LightingApi, 'playerVisibility' | 'w
       return {
         frame: (snapshot) => live.frame(snapshot.mapSize) ?? (snapshot.lighting.enabled ? OPEN_FRAME : null),
         restart: () => live.restart(),
+        pending: () => live.pending(),
         dispose: () => live.dispose(),
       };
     },

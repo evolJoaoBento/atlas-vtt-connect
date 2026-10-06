@@ -24,7 +24,14 @@ export interface TabScenes {
   liveTab(): TabKey | null;
   /** The snapshot of `key`'s view, only while it is loaded and names `key`'s tab; null otherwise. */
   liveSnapshot(key: TabKey): SceneSnapshot | null;
-  /** Called when the live tab of a view changes (to another tab, or to none), with `liveTab()` then. */
+  /**
+   * Whether `key` is its view's active tab: the GM is on it, its map loaded or loading. It decides only whether a scene
+   * is live or parked; what is sent of it comes from `liveSnapshot`, never from this.
+   */
+  isActive(key: TabKey): boolean;
+  /** Calls `listener` after each change of `viewId`'s store (`views.subscribe`); only the live scene is watched so. */
+  watch(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
+  /** Called when a view's live tab or active tab changes (to another tab, or to none), with `liveTab()` then. */
   subscribeLive(listener: (live: TabKey | null) => void): Disposer;
   /** Called when the tabs change ('tabs-changed', a view opening or closing), with the tabs that went (none for a rename). */
   subscribeTabs(listener: (closed: TabKey[]) => void): Disposer;
@@ -49,8 +56,9 @@ const infosOf = (view: ViewInfo): TabInfo[] => view.tabs.map((tab) => ({ viewId:
 
 interface Watched {
   tabs: TabInfo[];
-  /** The tab this view's snapshot named live last; listeners hear when it changes. */
+  /** The tab this view's snapshot named live last, and its active tab then; listeners hear when either changes. */
   live: string | null;
+  active: string | null;
   stop: Disposer;
 }
 
@@ -84,8 +92,10 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
     const entry = watched.get(viewId);
     if (!entry) return;
     const live = liveTabIn(views.snapshot(viewId));
-    if (live === entry.live) return;
+    const active = activeTabOf(views, viewId);
+    if (live === entry.live && active === entry.active) return;
     entry.live = live;
+    entry.active = active;
     emit(liveListeners, liveTab());
   };
   const track = (view: ViewInfo): TabKey[] => {
@@ -93,7 +103,8 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
     const entry = watched.get(view.viewId);
     const tabs = infosOf(view);
     if (!entry) {
-      watched.set(view.viewId, { tabs, live: liveTabIn(views.snapshot(view.viewId)), stop: views.subscribe(view.viewId, () => recheck(view.viewId)) });
+      const live = liveTabIn(views.snapshot(view.viewId));
+      watched.set(view.viewId, { tabs, live, active: view.activeTabId, stop: views.subscribe(view.viewId, () => recheck(view.viewId)) });
       return [];
     }
     const closed = entry.tabs.filter((tab) => !tabs.some((next) => next.tabId === tab.tabId)).map(({ viewId, tabId }) => ({ viewId, tabId }));
@@ -110,7 +121,7 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
     if (!entry) return;
     watched.delete(viewId);
     entry.stop();
-    if (entry.live !== null) emit(liveListeners, liveTab());
+    if (entry.live !== null || entry.active !== null) emit(liveListeners, liveTab());
     emit(tabsListeners, entry.tabs.map((tab) => ({ viewId, tabId: tab.tabId })));
   };
 
@@ -133,6 +144,8 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
       const snapshot = views.snapshot(key.viewId);
       return snapshot && liveTabIn(snapshot) === key.tabId ? snapshot : null;
     },
+    isActive: (key) => watched.has(key.viewId) && activeTabOf(views, key.viewId) === key.tabId,
+    watch: (viewId, listener) => views.subscribe(viewId, listener),
     subscribeLive: (listener) => {
       liveListeners.add(listener);
       return () => { liveListeners.delete(listener); };
