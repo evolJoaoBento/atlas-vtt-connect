@@ -5,6 +5,7 @@ import { decodeAsset, encodeAsset, encodeChunk, type AssetChunk, type AssetMessa
 import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import type { AssetFile } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
+import type { SlotChange, SlotView } from '../../../src/app/online/scene/slotViews';
 import type { ChannelPort } from '../../../src/app/online/transport/types';
 import { imageBytes, settle } from './assetFixtures';
 import { fingerprint as fp, sceneWithImages } from './sceneFixtures';
@@ -81,10 +82,12 @@ function setup(scene: PlayerScene | null, files: Record<string, Uint8Array> = {}
     assetChannel: (playerId: string): ChannelPort | null => ports.get(playerId) ?? null,
   };
   let current = scene;
-  const listeners = new Set<(next: PlayerScene | null) => void>();
+  // Every player has the one scene shown (no split party).
+  const slot = (): SlotView | null => current && { tab: { viewId: 'gm', tabId: 'tab' }, sceneId: current.sceneId, state: 'live', lastSent: current, mapPath: '', name: '' };
+  const listeners = new Set<(change: SlotChange) => void>();
   const projection = {
-    currentProjection: (): PlayerScene | null => current,
-    onProjection: (listener: (next: PlayerScene | null) => void): (() => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    slotOf: slot,
+    onSlotChange: (listener: (change: SlotChange) => void): (() => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
   };
   const read = vi.fn(readWith ?? (async (id: string): Promise<AssetFile | null> => {
     const bytes = files[id];
@@ -99,7 +102,12 @@ function setup(scene: PlayerScene | null, files: Record<string, Uint8Array> = {}
     request: (playerId: string, ids: string[]): void => send(playerId, encodeAsset({ v: 1, type: 'asset-request', ids })),
     cancel: (playerId: string, ids: string[]): void => send(playerId, encodeAsset({ v: 1, type: 'asset-cancel', ids })),
     send,
-    show: (next: PlayerScene | null): void => { current = next; listeners.forEach((listener) => listener(next)); },
+    show: (next: PlayerScene | null): void => {
+      const before = slot();
+      current = next;
+      const change: SlotChange | null = slot() ? { kind: 'projected', slot: slot()! } : before && { kind: 'freed', slot: before };
+      if (change) listeners.forEach((listener) => listener(change));
+    },
   };
 }
 

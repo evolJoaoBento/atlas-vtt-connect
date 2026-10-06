@@ -21,7 +21,7 @@ export abstract class SlotReads implements SlotProjection {
   protected abstract readonly places: PlayerPlaces;
 
   slotOf(playerId: string): SlotView | null {
-    const slot = this.places.slotOf(playerId);
+    const slot = this.places.slotOf(playerId, (id) => this.sceneSlotOf(id));
     return slot ? viewOf(slot) : null;
   }
 
@@ -45,6 +45,8 @@ export abstract class SlotReads implements SlotProjection {
   }
 
   abstract splitActive(): boolean;
+  /** The slot of the scene `playerId` resolves to now (`SceneAssignments.sceneOf`). */
+  protected abstract sceneSlotOf(playerId: string): SceneSlot | null;
   abstract scenesInUse(): number;
 
   onSlotChange(listener: (change: SlotChange) => void): () => void {

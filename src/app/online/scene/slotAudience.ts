@@ -46,8 +46,10 @@ export class PlayerPlaces {
     });
   }
 
-  slotOf(playerId: string): SceneSlot | null {
-    return this.placed.get(playerId) ?? null;
+  /** The scene `playerId` was sent; for an admitted player not placed yet (being admitted), the one their admission sends. */
+  slotOf(playerId: string, resolve: (playerId: string) => SceneSlot | null): SceneSlot | null {
+    if (this.placed.has(playerId)) return this.placed.get(playerId) ?? null;
+    return admitted(this.players()).includes(playerId) ? resolve(playerId) : null;
   }
 
   /** Moves every placed admitted player whose scene is no longer the one they have (`targetOf`). */

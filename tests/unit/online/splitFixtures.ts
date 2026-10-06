@@ -18,7 +18,7 @@ import type { TabKey } from '../../../src/app/online/split/tabKey';
 import type { PeerLink } from '../../../src/app/online/transport/types';
 import { connectingPlugin, FakeAtlas } from '../../fake/FakeAtlas';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
-import { memoryImageFiles, nodeHash } from './assetFixtures';
+import { imageBytes, memoryImageFiles, nodeHash, type MemoryImageFiles } from './assetFixtures';
 import { emptySceneState, snapshotOfState } from './presentedFixtures';
 
 export const VIEW = 'gm';
@@ -60,6 +60,9 @@ export interface SplitWorld {
   extension: AtlasExtension;
   presented: PresentedSceneSource;
   hub: SceneHub;
+  /** The session's content registry, over `files`. */
+  registry: AssetRegistry;
+  files: MemoryImageFiles;
   tabs: TabScenes;
   assignments: SceneAssignments;
   gm: GmSession;
@@ -77,7 +80,12 @@ export interface SplitWorld {
   tick(): Promise<void>;
 }
 
-export async function splitWorld(options: { lighting?: boolean; visibility?: PlayerVisibility } = {}): Promise<SplitWorld> {
+/** Every image the tabs' scenes show (`images: true`): each map, each tab's token art and `art/shared.png`. */
+export const IMAGES: Record<string, Uint8Array> = Object.fromEntries([
+  ...TABS.map(({ tabId }) => `maps/${tabId}.png`), ...TABS.map(({ tabId }) => `art/${TOKEN[tabId]}.png`), 'art/shared.png',
+].map((path, index) => [path, imageBytes(64 + index, index + 1)]));
+
+export async function splitWorld(options: { lighting?: boolean; visibility?: PlayerVisibility; images?: boolean } = {}): Promise<SplitWorld> {
   const capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'scene-tabs', ...(options.lighting ? ['lighting' as const] : [])];
   const atlas = new FakeAtlas({ capabilities });
   atlas.views.open(VIEW, TABS.map((entry) => ({ ...entry })));
@@ -97,12 +105,14 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   const resourceListeners = new Set<() => void>();
   const notices: string[] = [];
   const tabs = createTabScenes(extension);
+  const files = memoryImageFiles(options.images ? IMAGES : {});
+  const registry = new AssetRegistry({ files: files.source, notify: () => {}, hash: nodeHash });
   const presented = presentedSource(extension);
   const assignments = new SceneAssignments();
   const hub = new SceneHub({
     session: gm, presented, tabs, assignments,
     settings: { getLocalPlayerViewSettings: () => rules, onChange: (listener) => { ruleListeners.add(listener); return () => { ruleListeners.delete(listener); }; } },
-    assets: new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash }),
+    assets: registry,
     notify: (message) => notices.push(message),
     resources: () => resources,
     watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
@@ -110,7 +120,7 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   });
   hub.start();
   return {
-    atlas, extension, presented, hub, tabs, assignments, gm, notices,
+    atlas, extension, presented, hub, registry, files, tabs, assignments, gm, notices,
     join: async (key) => {
       const link = await network.client().connect('gm');
       const received: ControlMessage[] = [];

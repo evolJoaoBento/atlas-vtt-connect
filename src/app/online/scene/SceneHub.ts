@@ -254,7 +254,11 @@ export class SceneHub extends SlotReads implements SessionHandler {
 
   /** What the player's scene has, or a clear when they have none: never a new projection. */
   private sendCurrent(playerId: string): void {
-    this.places.sendCurrent(playerId, this.slotAt(this.options.assignments.sceneOf(playerId, this.presentedTab())));
+    this.places.sendCurrent(playerId, this.sceneSlotOf(playerId));
+  }
+
+  protected sceneSlotOf(playerId: string): SceneSlot | null {
+    return this.slotAt(this.options.assignments.sceneOf(playerId, this.presentedTab()));
   }
 
   /** A slot for `tab`, in place of any other there (a new presentation of an assigned tab is a new scene). */

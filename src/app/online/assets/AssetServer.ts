@@ -1,13 +1,15 @@
 /**
- * Serves the images of the scene players have over each player's assets
- * channel. A `GmSession` handler, like `SceneHub`: requests come only
- * from admitted players, only fingerprints of the current projection are
- * served, one image at a time per player (map first), in chunks paced on the
- * channel's buffer so scene updates on the control channel are never starved.
+ * Serves each player the images of their own scene over their assets channel (ruling P4). A `GmSession` handler, like
+ * `SceneHub`: requests come only from admitted players, and a player is served only fingerprints of what their scene's
+ * slot last sent them (`allowedFor`), checked when the request arrives, when the image starts and before its first
+ * chunk. When a player's scene changes (moved, or its projection), their transfers outside it stop with `asset-denied`.
+ * One image at a time per player (their map first), in chunks paced on the channel's buffer so scene updates on the
+ * control channel are never starved.
  */
 import type { SessionHandler, SessionPlayer } from '../gmSessionTypes';
 import type { AssetFile } from '../scene/sceneContracts';
 import type { PlayerScene } from '../scene/sceneTypes';
+import type { SlotProjection } from '../scene/slotViews';
 import type { ChannelPort } from '../transport/types';
 import { ASSET_LIMITS, sceneAssetIds } from './assetIds';
 import { decodeAsset, encodeAsset, encodeChunk, IMAGE_HANDLE_MAX } from './assetProtocol';
@@ -18,11 +20,8 @@ export interface AssetServerOptions {
     use(handler: SessionHandler): () => void;
     assetChannel(playerId: string): ChannelPort | null;
   };
-  /** The scene players have (the scene hub). */
-  projection: {
-    currentProjection(): PlayerScene | null;
-    onProjection(listener: (scene: PlayerScene | null) => void): () => void;
-  };
+  /** The scene each player has (the scene hub). */
+  projection: Pick<SlotProjection, 'slotOf' | 'onSlotChange'>;
   /** Verified file reads (the registry): null when a file cannot be served. */
   files: { read(id: string): Promise<AssetFile | null> };
 }
@@ -51,8 +50,8 @@ export class AssetServer implements SessionHandler {
   private readonly queues = new Map<string, PlayerQueue>();
   private readonly reads: SharedReads;
   private readonly stops: Array<() => void> = [];
-  private allowed = new Set<string>();
-  private mapId: string | null = null;
+  /** The images of each projection a slot sent, worked out once per projection. */
+  private readonly idsOf = new WeakMap<PlayerScene, ReadonlySet<string>>();
 
   constructor(private readonly options: AssetServerOptions) {
     this.reads = new SharedReads((id) => options.files.read(id));
@@ -60,8 +59,19 @@ export class AssetServer implements SessionHandler {
 
   start(): void {
     const { session, projection } = this.options;
-    this.projectionChanged(projection.currentProjection());
-    this.stops.push(session.use(this), projection.onProjection((scene) => this.projectionChanged(scene)));
+    this.stops.push(session.use(this), projection.onSlotChange(() => this.scenesChanged()));
+  }
+
+  /** The images `playerId` may fetch: those of what their scene last sent them; none without a scene. */
+  allowedFor(playerId: string): ReadonlySet<string> {
+    const scene = this.sceneOf(playerId);
+    if (!scene) return new Set();
+    let ids = this.idsOf.get(scene);
+    if (!ids) {
+      ids = new Set(sceneAssetIds(scene));
+      this.idsOf.set(scene, ids);
+    }
+    return ids;
   }
 
   stop(): void {
@@ -88,11 +98,11 @@ export class AssetServer implements SessionHandler {
     for (const id of ids) {
       if (queue.current?.id === id || queue.pending.includes(id)) continue;
       const full = queue.pending.length + (queue.current ? 1 : 0) >= ASSET_LIMITS.pendingPerPlayer;
-      if (full || !this.allowed.has(id)) {
+      if (full || !this.allowedFor(playerId).has(id)) {
         queue.port.send(encodeAsset({ v: 1, type: 'asset-denied', id }));
         continue;
       }
-      if (id === this.mapId) queue.pending.unshift(id);
+      if (id === this.mapIdOf(playerId)) queue.pending.unshift(id);
       else queue.pending.push(id);
     }
     this.pump(playerId, queue);
@@ -105,14 +115,23 @@ export class AssetServer implements SessionHandler {
     this.pump(playerId, queue);
   }
 
-  private projectionChanged(scene: PlayerScene | null): void {
-    this.allowed = new Set(sceneAssetIds(scene));
-    this.mapId = scene?.map.asset ?? null;
+  private sceneOf(playerId: string): PlayerScene | null {
+    return this.options.projection.slotOf(playerId)?.lastSent ?? null;
+  }
+
+  private mapIdOf(playerId: string): string | null {
+    return this.sceneOf(playerId)?.map.asset ?? null;
+  }
+
+  /** A player's scene changed, or what it sent: what left it stops, and their map goes first. */
+  private scenesChanged(): void {
     for (const [playerId, queue] of [...this.queues]) {
+      const allowed = this.allowedFor(playerId);
+      const mapId = this.mapIdOf(playerId);
       const held = queue.current ? [queue.current.id, ...queue.pending] : queue.pending;
-      const gone = new Set(held.filter((id) => !this.allowed.has(id)));
+      const gone = new Set(held.filter((id) => !allowed.has(id)));
       if (gone.size > 0) this.remove(queue, gone, true);
-      const at = this.mapId === null ? -1 : queue.pending.indexOf(this.mapId);
+      const at = mapId === null ? -1 : queue.pending.indexOf(mapId);
       if (at > 0) queue.pending.unshift(...queue.pending.splice(at, 1));
       if (gone.size > 0 || at > 0) this.pump(playerId, queue);
     }
@@ -177,6 +196,11 @@ export class AssetServer implements SessionHandler {
     if (!transfer) {
       const id = queue.pending.shift();
       if (id === undefined) return false;
+      // Checked again as it starts: the player may have changed scene since asking.
+      if (!this.allowedFor(playerId).has(id)) {
+        queue.port.send(encodeAsset({ v: 1, type: 'asset-denied', id }));
+        return true;
+      }
       const next: Transfer = { id, handle: queue.nextHandle, file: null, offset: 0 };
       queue.nextHandle = queue.nextHandle >= IMAGE_HANDLE_MAX ? 1 : queue.nextHandle + 1;
       queue.current = next;
@@ -200,7 +224,8 @@ export class AssetServer implements SessionHandler {
 
   private fileRead(playerId: string, queue: PlayerQueue, transfer: Transfer, file: AssetFile | null): void {
     if (queue.current !== transfer || this.queues.get(playerId) !== queue) return;
-    if (!file || file.bytes.byteLength === 0) {
+    // Checked again before its first chunk: a move while the file was read stops it.
+    if (!file || file.bytes.byteLength === 0 || !this.allowedFor(playerId).has(transfer.id)) {
       this.finish(queue, transfer);
       queue.port.send(encodeAsset({ v: 1, type: 'asset-denied', id: transfer.id }));
     } else {
