@@ -14,6 +14,7 @@ import { createOnlineLog } from '../src/app/online/onlineLog';
 import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
 import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
 import { OwnRollThrows } from '../src/app/online/page/ownRollThrows';
+import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
 import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
@@ -84,7 +85,11 @@ const ownRolls = new OwnRollThrows({
   container: element('dice-throws'),
   display: () => diceDisplay.value,
   reducedMotion: () => reducedMotion?.matches === true,
-  load: () => import('./dice3d/diceThrows.mts').then((chunk) => chunk.diceThrows),
+  // Atlas's dice draw through a DOM host (API 1.17.0): the page's is installed with them, in their own chunk.
+  load: () => import('@atlas-vtt/shared/dice3d').then(({ installDomHost }) => {
+    installDomHost(browserDomHost());
+    return import('./dice3d/diceThrows.mts');
+  }).then((chunk) => chunk.diceThrows),
   fallback: (entry) => diceLog.log.toastRoll(entry),
 });
 const diceLog = new DiceLogView({

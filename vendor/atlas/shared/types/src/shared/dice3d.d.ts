@@ -10,4 +10,5 @@ export * from '../app/dice3d/stagePool';
 export * from '../app/dice3d/throwChain';
 export * from '../app/dice3d/throwSeed';
 export * from '../app/react/components/dice3d/diceRollText';
+export { installDomHost, type DomHost } from '../app/host/dom';
 export * from './diceDisplay';

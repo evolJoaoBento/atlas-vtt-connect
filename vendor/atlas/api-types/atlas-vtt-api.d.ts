@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.16.0";
+export declare const API_VERSION = "1.17.0";
 
 /**
  * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
@@ -22,7 +22,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -37,6 +37,11 @@ export declare interface AtlasEvents {
     'settings-changed': (key: AtlasSettingKey) => void;
     /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
     'scenes-changed': () => void;
+    /**
+     * 1.17.0 (`scene-tabs`): a GM map view's tabs (added, closed, moved, renamed) or its active tab changed. Fires once per
+     * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
+     */
+    'tabs-changed': (view: ViewInfo) => void;
 }
 
 export declare interface AtlasExtension {
@@ -785,7 +790,8 @@ export declare interface MenuItem {
     /**
      * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
      * provider again after `ui.invalidate()`, so its checkmarks follow. An item in the menu itself also leaves it open, but
-     * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu.
+     * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu. From 1.17.0
+     * the scene tab menu's own items (`addSceneTabMenuSection`) follow `ui.invalidate()` too.
      */
     keepOpen?: boolean;
 }
@@ -910,8 +916,8 @@ export declare interface PresentationApi {
     /** Hears every change of the presented scene; each callback runs guarded, and the listener is dropped when this extension unloads. */
     subscribe(listener: PresentationListener): Disposer;
     /**
-     * Adds an audience besides the player window. Its `id`, `label` and `isActive` are read once; `isActive` is then
-     * called on `target` itself, guarded. Adding the same object again changes nothing; another target with an `id`
+     * Adds an audience besides the player window. Its `id`, `label`, `isActive` and `tabBadge` are read once; `isActive`
+     * and `tabBadge` are then called on `target` itself, guarded. Adding the same object again changes nothing; another target with an `id`
      * this extension already added, or a malformed one, throws. Removed by the returned disposer or when this extension unloads.
      */
     addTarget(target: PresentationTarget): Disposer;
@@ -934,6 +940,17 @@ export declare interface PresentationTarget {
     label: string;
     /** While any target is active, the scene tab's eye presents without opening the player window, its tooltip names the target, a presented scene's eye stops presenting, and right-click offers "Open player window". */
     isActive(): boolean;
+    /**
+     * 1.17.0 (`scene-tabs`): a short mark after a tab's eye ("2 players"), or null for none. At most 24 characters,
+     * plain text (trimmed; longer is cut with "…"). A tab with a mark draws its eye as shown, and the mark joins the eye's
+     * accessible name; what clicking the eye does is unchanged. Asked only while the target is active (the first active
+     * target's non-null mark wins), on render and after `ui.invalidate()`. A throw or a value that is not a string or null
+     * shows no mark and is logged once.
+     */
+    tabBadge?(tab: {
+        viewId: ViewId;
+        tabId: string;
+    }): string | null;
 }
 
 export declare interface PresentedSceneInfo {
@@ -1331,6 +1348,12 @@ export declare interface SceneSnapshot {
     readonly mapPath: string | null;
     readonly loaded: boolean;
     /**
+     * 1.17.0 (`scene-tabs`): the tab whose scene this is, set once `loaded`; null while loading and in remote views.
+     * Null too while the view's `activeTabId` already names the next tab but the store still holds the previous one's
+     * scene, so a snapshot whose `tabId` names a tab always holds that tab's scene. A snapshot with no tab is no tab's.
+     */
+    readonly tabId?: string | null;
+    /**
      * The loaded background's size in world pixels; 0 × 0 without one.
      * Read when the snapshot is taken: the background may finish drawing after `loaded`; take a fresh snapshot when you need the size.
      */
@@ -1354,6 +1377,30 @@ export declare interface SceneSnapshot {
     readonly initiativeTrackerOpen: boolean;
     /** The GM's lighting settings: an extension should never send them to players, only decide by them (with `lighting.playerVisibility`). */
     readonly lighting: SceneLighting;
+}
+
+/** 1.17.0 (`scene-tabs`): the scene tab whose eye was right-clicked, read anew each time the menu reads its sections. */
+export declare interface SceneTabMenuContext {
+    viewId: ViewId;
+    tabId: string;
+    mapPath: string;
+    /** The tab's name, as its tab shows it. */
+    name: string;
+    /** The view's active tab. */
+    active: boolean;
+    /** Atlas's presented tab, held or not. */
+    presented: boolean;
+}
+
+/** 1.17.0 (`scene-tabs`): an extension's part of the menu that right-clicking a scene tab's eye opens. */
+export declare interface SceneTabMenuSection {
+    /** Shown as a label row at the section's top; plain text, trimmed, at most 40 characters (longer is cut). */
+    heading: string;
+    /**
+     * Read when the menu opens and again after `ui.invalidate()` (and when the view's tabs change) while it is open, so
+     * the checkmarks of top-level items follow. Return [] to leave the section out. A throw leaves it out and is logged once.
+     */
+    items(context: SceneTabMenuContext): MenuItem[];
 }
 
 export declare interface SettingsApi {
@@ -1563,7 +1610,13 @@ export declare interface UiApi {
     addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
     /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
     addPanel(panel: PanelSpec): PanelHandle;
-    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands and menu providers now. */
+    /**
+     * 1.17.0 (`scene-tabs`): a section in the menu that right-clicking a scene tab's eye opens (or the context-menu key or
+     * Shift+F10 on the eye), after Atlas's own "Open player window": a separator, the `heading` as a label row, then the
+     * items. The menu opens whenever it has something to show. `heading` must be non-empty once trimmed and `items` a function.
+     */
+    addSceneTabMenuSection?(section: SceneTabMenuSection): Disposer;
+    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
     invalidate(): void;
 }
 
@@ -1608,12 +1661,20 @@ export declare interface ViewsApi {
     active(): ViewInfo | null;
     /** The scene in the view's store now; null for a view that is not open. */
     snapshot(viewId: ViewId): SceneSnapshot | null;
-    /** Called after each store change that replaced one of the snapshot's fields (by reference). */
+    /** Called after each store change that replaced one of the snapshot's fields (by reference); from 1.17.0 also when `tabId` changes. */
     subscribe(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
     /** The view's visible world area now, frozen; null for a view that is not open, has no viewport yet or has no size. */
     camera(viewId: ViewId): ViewCamera | null;
     /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
     watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;
+    /**
+     * 1.17.0 (`scene-tabs`): makes a tab of a GM map view active without presenting it.
+     * Answers true once that tab's map is loaded. Answers false for a closed, unknown or remote view,
+     * an unknown tab, or when another switch overtook this one; also when the view closes before the tab has loaded, or
+     * the switch and load take longer than 60 s. Never throws for these.
+     * The presented scene holds while the view shows another tab, as on any switch, and resumes when the GM returns to it.
+     */
+    showTab?(viewId: ViewId, tabId: string): Promise<boolean>;
 }
 
 /** What a wall can stop: the sight of tokens, or light. */

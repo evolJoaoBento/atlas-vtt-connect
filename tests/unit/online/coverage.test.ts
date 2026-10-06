@@ -211,6 +211,7 @@ describe('coverage of grid and scene fields', () => {
       viewId: (state) => ({ ...state, viewId: 'view-2' }),
       loaded: (state) => ({ ...state, loaded: false }),
       mapPath: (state) => ({ ...state, mapPath: 'maps/other.atlasmap' }),
+      tabId: (state) => ({ ...state, tabId: 'tab-2' }),
     };
     expectCoverage(SCENE_FIELD_COVERAGE, variants, sceneState(), project);
   });

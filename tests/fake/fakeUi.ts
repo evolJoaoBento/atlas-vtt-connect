@@ -1,7 +1,9 @@
 import type {
-  DashboardTile, Disposer, MenuItem, PaletteCommand, PaletteSection, PanelHandle, PanelSpec, ToolbarItem, ToolbarItemContext, TokenMenuContext, UiApi, ViewContext, ViewId,
+  DashboardTile, Disposer, MenuItem, PaletteCommand, PaletteSection, PanelHandle, PanelSpec, SceneTabMenuSection, ToolbarItem,
+  ToolbarItemContext, TokenMenuContext, UiApi, ViewContext, ViewId,
 } from '@atlas-vtt/api-types';
 import { drawableMenu, openMenu, type OpenMenu } from './fakeMenus';
+import { FakeSceneTabMenus, type FakeUiTabs, type OpenSceneTabMenu } from './fakeSceneTabMenu';
 import type { FakeViews, Own } from './fakeViews';
 
 type Kind = 'toolbar' | 'palette' | 'dashboard' | 'viewMenu' | 'tokenMenu' | 'panel';
@@ -72,13 +74,41 @@ function guarded<T>(what: string, run: () => T, fallback: T): T {
 export class FakeUi {
   private readonly entries = new Set<Entry>();
   private readonly open = new Map<Entry<PanelSpec>, Map<ViewId, OpenPanel>>();
+  private readonly tabMenus: FakeSceneTabMenus;
   private versions = 0;
 
   /**
    * `ownerOfRemote`: who opened the remote view (for `ownRemote`). `before115`: an Atlas before API 1.15.0, which
    * ignores `isVisible` and shows every item of the view kind.
    */
-  constructor(private readonly views: FakeViews, private readonly ownerOfRemote: (viewId: ViewId) => string | undefined = () => undefined, private readonly before115 = false) {}
+  constructor(
+    private readonly views: FakeViews,
+    private readonly ownerOfRemote: (viewId: ViewId) => string | undefined = () => undefined,
+    private readonly before115 = false,
+    private readonly tabs: FakeUiTabs = { enabled: () => false, presented: () => null },
+  ) {
+    this.tabMenus = new FakeSceneTabMenus(views, tabs, () => this.slotState());
+  }
+
+  /** How many scene tab menu sections extensions hold now. */
+  sceneTabSectionCount(): number {
+    return this.tabMenus.count;
+  }
+
+  /** The scene tab menu's sections for the tab whose eye was right-clicked, read now. */
+  sceneTabMenuSections(viewId: ViewId, tabId: string): Array<{ heading: string; items: MenuItem[] }> {
+    return this.tabMenus.sectionsFor(viewId, tabId);
+  }
+
+  /** The scene tab menu's items for that tab, every section's in order (the headings are label rows, not items). */
+  sceneTabMenu(viewId: ViewId, tabId: string): MenuItem[] {
+    return this.sceneTabMenuSections(viewId, tabId).flatMap((section) => section.items);
+  }
+
+  /** Right-clicks the tab's eye: the menu's own rows follow `invalidate` and tab changes (`FakeSceneTabMenus`). */
+  openSceneTabMenu(viewId: ViewId, tabId: string): OpenSceneTabMenu {
+    return this.tabMenus.open(viewId, tabId);
+  }
 
   /** How many registrations each slot holds now, from every extension. */
   counts(): SlotCounts {
@@ -216,6 +246,7 @@ export class FakeUi {
       addViewMenuItems: (fn: MenuProvider<ViewContext>): Disposer => provider('ui.addViewMenuItems', 'viewMenu', fn),
       addTokenMenuItems: (fn: MenuProvider<TokenMenuContext>): Disposer => provider('ui.addTokenMenuItems', 'tokenMenu', fn),
       addPanel: (spec: PanelSpec): PanelHandle => this.addPanel(owner, own, spec, assertNew),
+      ...(this.tabs.enabled() ? { addSceneTabMenuSection: (section: SceneTabMenuSection): Disposer => this.tabMenus.add(own, section) } : {}),
       invalidate: (): void => { this.versions++; },
     });
   }
@@ -294,7 +325,7 @@ export class FakeUi {
 
   /** Changes when Atlas's slot `subscribe` fires: an `invalidate`, or a registration added or removed. */
   private slotState(): string {
-    return `${this.versions}:${this.entries.size}`;
+    return `${this.versions}:${this.entries.size}:${this.tabMenus.count}`;
   }
 
   /** Atlas's `isVisible` rule: only `true` shows the item; a throw hides it (logged once per item in Atlas). */

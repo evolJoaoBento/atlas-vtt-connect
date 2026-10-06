@@ -114,14 +114,18 @@ export class FakeAtlas implements AtlasApi {
       storeChanged: (viewId) => this.presentation.storeChanged(viewId),
       tabsChanged: (viewId) => this.presentation.tabsChanged(viewId),
       viewClosed: (viewId) => this.presentation.viewClosed(viewId),
-    });
-    this.presentation = new FakePresentation(this.views);
+      emitTabsChanged: (info) => this.emit('tabs-changed', info),
+    }, () => this.capabilities.has('scene-tabs'));
+    this.presentation = new FakePresentation(this.views, () => this.capabilities.has('scene-tabs'));
     this.rules = new FakeRules((collectionId) => this.emit('rules-changed', collectionId));
     this.dice = new FakeDice(this.rules, this.views, () => this.settings.diceDisplay);
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
-    this.slots = new FakeUi(this.views, (viewId) => this.remoteViews.ownerOf(viewId), options.before115 === true);
+    this.slots = new FakeUi(this.views, (viewId) => this.remoteViews.ownerOf(viewId), options.before115 === true, {
+      enabled: () => this.capabilities.has('scene-tabs'),
+      presented: () => this.presentation.current(),
+    });
     this.ui = this.capabilities.has('ui') ? this.slots : undefined;
     this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths(), options.scenesBefore113 === true);
     this.bundles = new FakeBundles();
@@ -130,6 +134,12 @@ export class FakeAtlas implements AtlasApi {
 
   has(capability: AtlasCapability): boolean {
     return this.capabilities.has(capability);
+  }
+
+  /** This Atlas without `capability`, as an older one (`scene-tabs`: no `tabId`, `tabs-changed`, `showTab`, eye menu or badge); before connecting. */
+  without(capability: AtlasCapability): this {
+    this.capabilities.delete(capability);
+    return this;
   }
 
   /** Atlas publishes the API (workspace `atlas-vtt:api-ready`). */

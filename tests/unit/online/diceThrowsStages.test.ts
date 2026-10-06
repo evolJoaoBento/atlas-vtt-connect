@@ -46,7 +46,7 @@ describe("the join page's dice stages", () => {
   });
 
   it('makes at most two, the stage on screen and one spare, drawn by one WebGL context, however many rolls come', async () => {
-    // Atlas's stages make their canvases through its DOM host (`vite/atlasDomHost.mts` gives the page's), so count what the document makes.
+    // Atlas's stages make their canvases through its DOM host (the page installs `browserDomHost`, as `tests/setup/atlasDomHost.ts` does), so count what the document makes.
     const canvases: HTMLCanvasElement[] = [];
     const create = document.createElement.bind(document) as (tag: string) => HTMLElement;
     vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {

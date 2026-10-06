@@ -175,6 +175,8 @@ export const SCENE_FIELD_COVERAGE: CoverageTable<keyof SceneSnapshot> = {
   viewId: gmOnly("names the GM's view; players get a scene id of their own"),
   loaded: gmOnly('whether the view has finished loading; nothing is sent about it'),
   mapPath: gmOnly("the vault path of the GM's map file; players get the map's image by its fingerprint"),
+  // API 1.17.0: which tab the scene is; it decides which players get it (split party), and is never sent.
+  tabId: gmOnly("names the GM's scene tab; players get a scene id of their own"),
 };
 
 /** The collection's measurement settings, which decide how the page labels distances (ruler, measure tool). */

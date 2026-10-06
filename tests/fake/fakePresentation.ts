@@ -23,9 +23,45 @@ export class FakePresentation {
   private waiting: number | null = null;
   private readonly listeners = new Set<PresentationListener>();
   private readonly added: PresentationTarget[] = [];
+  /** Each target's `tabBadge`, read once at `addTarget` with `scene-tabs` (1.17.0); the targets whose badge threw, logged once. */
+  private readonly badges = new Map<PresentationTarget, NonNullable<PresentationTarget['tabBadge']>>();
+  private readonly badgeFailed = new WeakSet<PresentationTarget>();
   private loading: { viewId: ViewId; tabId: string; resolve: (presented: boolean) => void } | null = null;
 
-  constructor(private readonly views: FakeViews) {}
+  constructor(private readonly views: FakeViews, private readonly tabsEnabled: () => boolean = () => false) {}
+
+  /**
+   * The mark after a tab's eye, as Atlas's `tabBadgeFor` (1.17.0): the first active target's non-null badge, control
+   * characters replaced, trimmed, cut to 23 characters and "…" past 24; a throw or a value that is not a string is none
+   * (logged once per target).
+   */
+  badgeFor(viewId: ViewId, tabId: string): string | null {
+    for (const target of this.added) {
+      const badge = this.badges.get(target);
+      if (!badge || !this.isActive(target)) continue;
+      let value: unknown;
+      try {
+        value = badge.call(target, { viewId, tabId });
+      } catch (error) {
+        if (!this.badgeFailed.has(target)) console.error('[Atlas API] A presentation target tabBadge threw:', error);
+        this.badgeFailed.add(target);
+        continue;
+      }
+      if (typeof value !== 'string') continue;
+      const text = [...value.replace(/\p{Cc}/gu, ' ').trim()];
+      if (text.length === 0) continue;
+      return text.length > 24 ? `${text.slice(0, 23).join('')}…` : text.join('');
+    }
+    return null;
+  }
+
+  private isActive(target: PresentationTarget): boolean {
+    try {
+      return target.isActive() === true;
+    } catch {
+      return false;
+    }
+  }
 
   /** The targets extensions hold now, in the order they were added. */
   get targets(): readonly PresentationTarget[] {
@@ -144,10 +180,16 @@ export class FakePresentation {
         if (!target || typeof target.id !== 'string' || typeof target.label !== 'string' || typeof target.isActive !== 'function') {
           throw new Error('[Atlas API] addTarget needs { id: string, label: string, isActive(): boolean }.');
         }
+        if (this.tabsEnabled()) {
+          const badge: unknown = target.tabBadge;
+          if (badge !== undefined && typeof badge !== 'function') throw new Error('[Atlas API] presentation.addTarget: "tabBadge" must be a function when given.');
+          if (typeof badge === 'function') this.badges.set(target, badge as NonNullable<PresentationTarget['tabBadge']>);
+        }
         this.added.push(target);
         return own(() => {
           const index = this.added.indexOf(target);
           if (index >= 0) this.added.splice(index, 1);
+          this.badges.delete(target);
         });
       },
     });

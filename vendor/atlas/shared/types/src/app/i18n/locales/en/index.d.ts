@@ -709,6 +709,7 @@ export declare const en: {
     readonly 'tabs.show': "Show {name} on the player view";
     readonly 'tabs.shown': "{name} is shown on the player view";
     readonly 'tabs.stopPresenting': "Stop presenting {name}";
+    readonly 'tabs.withBadge': "{label}, {badge}";
     readonly 'switcher.current': "Current";
     readonly 'switcher.jump': "Jump";
     readonly 'switcher.navigate': "Navigate";
