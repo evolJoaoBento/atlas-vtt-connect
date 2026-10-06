@@ -25,7 +25,7 @@ interface OnlinePresentingProps {
 export function OnlinePresenting({ env, ctx, actions }: OnlinePresentingProps): React.ReactElement {
   const { tabId, name } = usePresentedSceneSummary(env.summaries);
   useActiveTabId(env.views, ctx.viewId); // renders again when the view moves to another tab
-  useViewTabsKey(env.views, ctx.viewId); // and when a tab is renamed, added or closed
+  useViewTabsKey(env.views, ctx.viewId, env.tabsChanged); // and when a tab is renamed, added or closed
   const session = useOnlineSession();
   const view = useSplitView(env);
   const { present, stop } = presentingActions(env, ctx);

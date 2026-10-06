@@ -33,9 +33,19 @@ export function useActiveTabId(views: Pick<ViewsApi, 'list' | 'subscribe'>, view
   return useSyncExternalStore(subscribe, read);
 }
 
-/** The view's tabs (ids, names) and active tab, as one string: renders again when a tab is renamed, added or closed. */
-export function useViewTabsKey(views: Pick<ViewsApi, 'list' | 'subscribe'>, viewId: ViewId): string {
-  const subscribe = useCallback((onChange: () => void) => views.subscribe(viewId, onChange), [views, viewId]);
+/**
+ * The view's tabs (ids, names) and active tab, as one string: renders again when a tab is renamed, added or closed.
+ * A rename changes nothing `views.subscribe` reports, so `tabsChanged` (Atlas's 'tabs-changed') is heard too.
+ */
+export function useViewTabsKey(views: Pick<ViewsApi, 'list' | 'subscribe'>, viewId: ViewId, tabsChanged?: (listener: () => void) => () => void): string {
+  const subscribe = useCallback((onChange: () => void) => {
+    const stopStore = views.subscribe(viewId, onChange);
+    const stopTabs = tabsChanged?.(onChange);
+    return () => {
+      stopStore();
+      stopTabs?.();
+    };
+  }, [views, viewId, tabsChanged]);
   const read = useCallback(() => {
     const view = views.list().find((entry) => entry.viewId === viewId);
     return view ? JSON.stringify([view.activeTabId, view.tabs.map((tab) => [tab.tabId, tab.name])]) : '';

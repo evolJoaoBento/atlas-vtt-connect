@@ -55,7 +55,7 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
-  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views }, service, { presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app) }) : undefined;
+  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views, on: atlas.on.bind(atlas) }, service, { presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app) }) : undefined;
   const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), ...(gmUi ? { gmUi } : {}) });
   return {
     service,

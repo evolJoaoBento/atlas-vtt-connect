@@ -5,6 +5,8 @@ export interface PresentingEnv {
   presentation: Pick<PresentationApi, 'current' | 'present' | 'stop'>;
   views: Pick<ViewsApi, 'list' | 'subscribe'>;
   summaries: PresentedSceneSummaries;
+  /** Atlas's 'tabs-changed' (API 1.17.0): a tab renamed, added or closed, which `views.subscribe` does not tell. */
+  tabsChanged?: (listener: () => void) => () => void;
 }
 
 /** What the "Present to players" and "Stop presenting" entries of a view's menus and panel offer now. */

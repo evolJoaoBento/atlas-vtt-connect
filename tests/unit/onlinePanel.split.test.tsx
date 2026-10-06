@@ -176,6 +176,13 @@ describe('the panel\'s Present to (spec 3.2)', () => {
     expect(harness.service.everyoneBack).toHaveBeenCalledOnce();
   });
 
+  it('the scene chip follows a tab rename', async () => {
+    const panel = await hostSplit([anna, ben], { p2: 'dungeon' });
+    expect(within(panel.getByRole('listitem', { name: 'Ben' })).getByText('On Dungeon')).toBeTruthy();
+    await act(async () => { harness.atlas.views.renameTab(harness.scene.view, 'dungeon', 'Crypt'); await Promise.resolve(); });
+    expect(within(panel.getByRole('listitem', { name: 'Ben' })).getByText('On Crypt')).toBeTruthy();
+  });
+
   it('Everyone back in the popover is disabled with nothing presented (D9)', async () => {
     harness.host([anna, ben]);
     split({ p2: 'dungeon' });

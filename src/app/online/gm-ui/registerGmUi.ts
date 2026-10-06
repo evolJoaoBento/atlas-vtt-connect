@@ -20,7 +20,7 @@ import { onlineToolbarItem } from './onlineToolbar';
 import { revealView } from './revealView';
 import type { PanelService } from './OnlinePanel';
 
-type GmUiAtlas = Pick<AtlasExtension, 'ui' | 'presentation' | 'views'>;
+type GmUiAtlas = Pick<AtlasExtension, 'ui' | 'presentation' | 'views'> & Partial<Pick<AtlasExtension, 'on'>>;
 
 export interface GmUiOptions {
   /** The presented scene online play already reads (`sessionDeps`), so the panel shows the same presentation. */
@@ -41,7 +41,10 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
   let disposed = false;
   const invalidate = (): void => { if (!disposed) ui.invalidate(); };
 
-  const env = { service, summaries, presentation, views, ...(options.joinSession ? { joinSession: options.joinSession } : {}) };
+  const { on } = atlas;
+  // Tab renames reach the panel's scene names through 'tabs-changed' (API 1.17.0); an older Atlas never fires it.
+  const tabsChanged = on ? (listener: () => void): Disposer => on('tabs-changed', () => listener()) : undefined;
+  const env = { service, summaries, presentation, views, ...(tabsChanged ? { tabsChanged } : {}), ...(options.joinSession ? { joinSession: options.joinSession } : {}) };
   // The toolbar button follows the panel: Atlas reads it again when the panel opens or closes, however that happens.
   const panel: PanelHandle = ui.addPanel({
     id: 'online',

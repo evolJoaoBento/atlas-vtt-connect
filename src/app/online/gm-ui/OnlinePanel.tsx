@@ -12,7 +12,7 @@ import { OnlinePlayerList } from './OnlinePlayerList';
 import { OnlinePresenting } from './OnlinePresenting';
 import { tabNameIn, type PresentingEnv } from './presentingHere';
 import { sceneChip } from '../split/splitCopy';
-import { useInJoinedSession, useOnlineSession } from './useOnlineState';
+import { useInJoinedSession, useOnlineSession, useViewTabsKey } from './useOnlineState';
 
 export const START_HELP = 'Start a session to get a link your players can open in a browser. You approve each player who joins.';
 
@@ -61,6 +61,7 @@ function StartView({ session, env }: { session: OnlineSessionState; env: PanelEn
 
 function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: PanelEnv; ctx: ViewContext }): React.ReactElement {
   const url = session.joinUrl;
+  useViewTabsKey(env.views, ctx.viewId, env.tabsChanged); // renders again when a tab is renamed: chips and rows name tabs
   // The split party's chip on each assigned player's row: "On {scene}".
   const chips = Object.fromEntries(Object.entries(session.assignments).map(([playerId, tab]) => [playerId, sceneChip(tabNameIn(env.views, tab))]));
   return (
