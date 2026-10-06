@@ -1,0 +1,26 @@
+export declare const dashboard: {
+    readonly 'dashboard.linkNote': "Link a note to this map";
+    readonly 'dashboard.linkOther': "Link a different note";
+    readonly 'dashboard.loading': "Loading statblocks...";
+    readonly 'dashboard.openNote': "Open note in new tab";
+    readonly 'dashboard.pickNote': "Pick a note to keep beside the map";
+    readonly 'dashboard.justNow': "Just now";
+    readonly 'dashboard.minutesAgo': "{count}m ago";
+    readonly 'dashboard.hoursAgo': "{count}h ago";
+    readonly 'dashboard.daysAgo': "{count}d ago";
+    readonly 'dashboard.createScene': "Create Scene";
+    readonly 'dashboard.createSceneDesc': "Browse maps & build a scene";
+    readonly 'dashboard.assets': "Asset Manager";
+    readonly 'dashboard.assetsDesc': "Your scenes & assets";
+    readonly 'dashboard.tagline': "Gather your party and venture forth.";
+    readonly 'dashboard.continue': "Continue your adventure";
+    readonly 'dashboard.firstScene': "Create your first scene";
+    readonly 'dashboard.firstSceneMeta': "Choose a map and start your campaign";
+    readonly 'dashboard.recent': "Recent Scenes";
+    readonly 'dashboard.loadingScenes': "Loading scenes…";
+    readonly 'dashboard.noScenes': "No scenes yet. Create one to begin your journey.";
+    readonly 'dashboard.title': "Atlas dashboard";
+    readonly 'dashboard.failed': "Dashboard loading failed. Please check console for errors.";
+    readonly 'dashboard.openFailed': "Error opening scene";
+    readonly 'dashboard.addMapFirst': "Add a map image first, then create a scene from it.";
+};

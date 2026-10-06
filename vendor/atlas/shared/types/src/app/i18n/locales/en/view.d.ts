@@ -1,0 +1,20 @@
+export declare const view: {
+    readonly 'view.copyFailed': "Could not copy the file path";
+    readonly 'view.copyPath': "Copy file path";
+    readonly 'view.more': "More options";
+    readonly 'view.newWindow': "Move to new window";
+    readonly 'view.pathCopied': "File path copied to clipboard";
+    readonly 'view.rename': "Rename...";
+    readonly 'view.reveal': "Reveal in file explorer";
+    readonly 'view.splitDown': "Split down";
+    readonly 'view.splitRight': "Split right";
+    readonly 'view.initializing': "Initializing...";
+    readonly 'view.sceneNotFound': "Scene file not found: {path}";
+    readonly 'view.preparing': "Preparing...";
+    readonly 'view.canvas': "Atlas Canvas";
+    readonly 'view.player': "Player view";
+    readonly 'view.playerRestoreFailed': "Unable to restore player view. Send a scene to this window again.";
+    readonly 'view.connecting': "Connecting to game session…";
+    readonly 'view.playerTitle': "Player View: {name}";
+    readonly 'view.playerDefault': "Player View";
+};

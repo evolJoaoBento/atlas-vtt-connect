@@ -9,6 +9,7 @@
  * by the collection's rule.
  */
 import type { DiceRules } from '../types/diceRulesTypes';
+import type { ParsedFormula } from './parseFormula';
 export interface RolledDie {
     /** e.g. `d20`. */
     die: string;
@@ -18,18 +19,20 @@ export interface RolledDie {
     negative?: true;
     /** The die was rolled because the die before it exploded. */
     exploded?: true;
+    /** The colour the die was thrown in (`#rrggbb`), e.g. a physical die's or a dice plugin's; shown with its die, never counted. */
+    color?: string;
+    /** That colour's name, e.g. "Fire": plain text (no markup) of at most 32 characters, trimmed. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
+    colorName?: string;
 }
 export interface RolledFormula {
     rolls: RolledDie[];
     modifiers: number;
     total: number;
 }
-/** Whether the formula names any dice; a bare `+3` does not. */
-export declare function hasDiceTerm(formula: string): boolean;
 /**
- * Rolls every dice term of the formula and adds up the result. Dice with fewer
- * than two sides are skipped. `rules` are the collection's: its exploding rule
+ * Rolls an already validated formula and adds up the result. `rules` are the
+ * collection's: its exploding rule
  * and the default roll that says which dice a default-dice rule means, the
  * first added dice of its size, as many as it rolls (as for criticals).
  */
-export declare function rollFormula(formula: string, random?: () => number, rules?: Pick<DiceRules, 'defaultRoll' | 'explode'>): RolledFormula;
+export declare function rollFormula(formula: ParsedFormula, random?: () => number, rules?: Pick<DiceRules, 'defaultRoll' | 'explode'>): RolledFormula;

@@ -1,18 +1,19 @@
+import { t } from "./englishTexts-B44XM0o-.js";
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 function isHexColor(value) {
   return typeof value === "string" && HEX_COLOR.test(value);
 }
 const LASER_COLOR_SWATCHES = [
-  { value: "#ff0059", label: "Red" },
-  { value: "#ff9f2e", label: "Orange" },
-  { value: "#fff133", label: "Yellow" },
-  { value: "#66ffa9", label: "Mint" },
-  { value: "#00a9ff", label: "Sky blue" },
-  { value: "#3d6bff", label: "Blue" },
-  { value: "#e85aa8", label: "Pink" },
-  { value: "#ffffff", label: "White" }
+  { value: "#ff0059", label: t("laser.color.red") },
+  { value: "#ff9f2e", label: t("laser.color.orange") },
+  { value: "#fff133", label: t("laser.color.yellow") },
+  { value: "#66ffa9", label: t("laser.color.mint") },
+  { value: "#00a9ff", label: t("laser.color.sky") },
+  { value: "#3d6bff", label: t("laser.color.blue") },
+  { value: "#e85aa8", label: t("laser.color.pink") },
+  { value: "#ffffff", label: t("laser.color.white") }
 ];
-const LASER_COLOR_HINT = "Sky blue, blue and white stay clear for colour-blind players.";
+const LASER_COLOR_HINT = t("laser.colorHint");
 const LASER_SIZE_MIN = 8;
 const LASER_SIZE_MAX = 100;
 const DEFAULT_LASER_POINTER_SETTINGS = {

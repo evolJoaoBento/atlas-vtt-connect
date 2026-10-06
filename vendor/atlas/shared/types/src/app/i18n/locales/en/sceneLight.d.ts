@@ -1,0 +1,23 @@
+export declare const sceneLight: {
+    readonly 'sceneLight.day': "Day";
+    readonly 'sceneLight.dusk': "Dusk";
+    readonly 'sceneLight.night': "Night";
+    readonly 'sceneLight.dark': "Pitch black";
+    readonly 'sceneLight.dynamic': "Dynamic lighting";
+    readonly 'sceneLight.timeOfDay': "Time of day";
+    readonly 'sceneLight.ambient': "Ambient light";
+    readonly 'sceneLight.ambientColour': "Ambient colour";
+    readonly 'sceneLight.forgetExplored': "Forget explored areas";
+    readonly 'sceneLight.openSettings': "Lighting settings…";
+    readonly 'sceneLight.settings': "Lighting settings";
+    readonly 'sceneLight.closeSettings': "Close lighting settings";
+    readonly 'sceneLight.tokenVision': "Token vision";
+    readonly 'sceneLight.tokenVisionOn': "Players see only what their tokens see";
+    readonly 'sceneLight.tokenVisionOff': "Players see everything the light shows";
+    readonly 'sceneLight.memory': "Remember explored areas";
+    readonly 'sceneLight.memoryOn': "What tokens saw stays on the players' map";
+    readonly 'sceneLight.memoryOff': "Players see only what their tokens see now";
+    readonly 'sceneLight.exploredColour': "Explored colour";
+    readonly 'sceneLight.unexploredColour': "Unexplored colour";
+    readonly 'sceneLight.litFrom': "Counts as lit from";
+};

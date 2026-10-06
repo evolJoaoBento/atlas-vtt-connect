@@ -3,7 +3,7 @@
  * ruler show, using the collection's measurement settings or, for maps outside
  * a collection, the map's own grid units.
  */
-import type { GridState } from '../types/gridStateTypes';
+import type { GridState } from '../types/gridTypes';
 import type { CollectionGridDefaults, DiagonalRule, GridUnitType, MeasurementMode, RangeBand } from '../types/collectionSettingsTypes';
 export interface MeasurementSettings {
     mode: MeasurementMode;

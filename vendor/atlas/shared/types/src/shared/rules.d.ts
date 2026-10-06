@@ -4,6 +4,7 @@
  */
 export * from '../app/tools/diceRolling';
 export * from '../app/tools/diceFormula';
+export * from '../app/tools/parseFormula';
 export * from '../app/tools/diceCrit';
 export * from '../app/tools/diceExplosion';
 export * from '../app/tools/diceLabels';

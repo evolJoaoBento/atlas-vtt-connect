@@ -12,31 +12,31 @@ export interface LaserPointerSettings {
  */
 export declare const LASER_COLOR_SWATCHES: readonly [{
     readonly value: "#ff0059";
-    readonly label: "Red";
+    readonly label: string;
 }, {
     readonly value: "#ff9f2e";
-    readonly label: "Orange";
+    readonly label: string;
 }, {
     readonly value: "#fff133";
-    readonly label: "Yellow";
+    readonly label: string;
 }, {
     readonly value: "#66ffa9";
-    readonly label: "Mint";
+    readonly label: string;
 }, {
     readonly value: "#00a9ff";
-    readonly label: "Sky blue";
+    readonly label: string;
 }, {
     readonly value: "#3d6bff";
-    readonly label: "Blue";
+    readonly label: string;
 }, {
     readonly value: "#e85aa8";
-    readonly label: "Pink";
+    readonly label: string;
 }, {
     readonly value: "#ffffff";
-    readonly label: "White";
+    readonly label: string;
 }];
 /** Shown with the swatches, since colour-blind players cannot tell which ones work for them. */
-export declare const LASER_COLOR_HINT = "Sky blue, blue and white stay clear for colour-blind players.";
+export declare const LASER_COLOR_HINT: string;
 export declare const LASER_SIZE_MIN = 8;
 export declare const LASER_SIZE_MAX = 100;
 export declare const DEFAULT_LASER_POINTER_SETTINGS: LaserPointerSettings;

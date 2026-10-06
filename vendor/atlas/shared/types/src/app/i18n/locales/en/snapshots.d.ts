@@ -1,0 +1,24 @@
+export declare const snapshots: {
+    readonly 'snapshots.deleteBody': "The snapshot is removed from this map. The map itself does not change.";
+    readonly 'snapshots.deleteFailed': "Could not delete the snapshot";
+    readonly 'snapshots.deleteTitle': "Delete \"{name}\"?";
+    readonly 'snapshots.empty': "No snapshots yet. Save the map as it is now to reset it to this state later, for example before an encounter starts.";
+    readonly 'snapshots.name': "Snapshot name";
+    readonly 'snapshots.new': "New snapshot";
+    readonly 'snapshots.overwriteBody': "The snapshot is replaced with the map as it is now. Its previous state is lost.";
+    readonly 'snapshots.overwriteFailed': "Could not overwrite the snapshot";
+    readonly 'snapshots.overwriteTitle': "Overwrite \"{name}\"?";
+    readonly 'snapshots.overwriteWithCurrent': "Overwrite with current map";
+    readonly 'snapshots.renameFailed': "Could not rename the snapshot";
+    readonly 'snapshots.renameNamed': "Rename {name}";
+    readonly 'snapshots.restoreBody': "Tokens, pins, fog, drawings, initiative and everything else on this map return to how they were in this snapshot.";
+    readonly 'snapshots.restoreFailed': "Could not restore the snapshot";
+    readonly 'snapshots.restoreNamed': "Restore {name}";
+    readonly 'snapshots.restoreTitle': "Restore \"{name}\"?";
+    readonly 'snapshots.restoreWarning': "Changes made since then are lost and cannot be undone. Save a snapshot first to keep them.";
+    readonly 'snapshots.restored': "Restored \"{name}\"";
+    readonly 'snapshots.saveFailed': "Could not save the snapshot";
+    readonly 'snapshots.savedAt': "Saved {date}";
+    readonly 'snapshots.updatedAt': "Updated {date}";
+    readonly 'snapshots.defaultName': "Snapshot";
+};

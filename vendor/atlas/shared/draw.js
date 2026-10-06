@@ -1,10 +1,11 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { L as LASER_FADE_TIME } from "./laserPointerSettings-BMmA428j.js";
-import { i } from "./laserPointerSettings-BMmA428j.js";
-import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-DLGvLcYl.js";
-import { R, T, c, a, r, s, t, b, d } from "./measurementFormat-DLGvLcYl.js";
+import { t } from "./englishTexts-B44XM0o-.js";
+import { L as LASER_FADE_TIME } from "./laserPointerSettings-DurFCvN-.js";
+import { i } from "./laserPointerSettings-DurFCvN-.js";
+import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-YMAdwfMI.js";
+import { R, T, c, a, r, s, t as t2, b, d } from "./measurementFormat-YMAdwfMI.js";
 const MEASURE_SHADOW = 0;
 const MEASURE_PATH_STROKES = [
   { width: 6, alpha: 0.3, shadow: true },
@@ -29,8 +30,8 @@ function pathMidpoint(points) {
   let remaining = segments.reduce((sum, segment) => sum + segment.length, 0) / 2;
   for (const { start, end, length } of segments) {
     if (length > 0 && remaining <= length) {
-      const t2 = remaining / length;
-      return { x: start.x + (end.x - start.x) * t2, y: start.y + (end.y - start.y) * t2 };
+      const t3 = remaining / length;
+      return { x: start.x + (end.x - start.x) * t3, y: start.y + (end.y - start.y) * t3 };
     }
     remaining -= length;
   }
@@ -116,18 +117,18 @@ const MAP_ICON_SVG = {
   "circle-x": '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>'
 };
 const MAP_ICON_LABELS = {
-  "door-open": "Open Door",
-  "door-closed": "Closed Door",
-  "lock": "Locked",
-  "key-round": "Key",
-  "triangle-alert": "Trap",
-  "skull": "Danger",
-  "flame": "Fire",
-  "package": "Loot",
-  "gem": "Treasure",
-  "swords": "Combat",
-  "footprints": "Tracks",
-  "circle-x": "Blocked"
+  "door-open": t("mapIcon.doorOpen"),
+  "door-closed": t("mapIcon.doorClosed"),
+  "lock": t("mapIcon.lock"),
+  "key-round": t("mapIcon.key"),
+  "triangle-alert": t("mapIcon.trap"),
+  "skull": t("mapIcon.danger"),
+  "flame": t("mapIcon.fire"),
+  "package": t("mapIcon.loot"),
+  "gem": t("mapIcon.treasure"),
+  "swords": t("mapIcon.combat"),
+  "footprints": t("mapIcon.tracks"),
+  "circle-x": t("mapIcon.blocked")
 };
 const MAP_ICON_SIZE = 70;
 const MAX_TRAIL_SAMPLES = 100;
@@ -177,11 +178,11 @@ function smoothBeam(points, spacing2) {
     const p3 = points[Math.min(points.length - 1, i2 + 2)];
     const steps = Math.min(MAX_SUBDIVISIONS, Math.max(1, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / spacing2)));
     for (let step = 0; step < steps; step++) {
-      const t2 = step / steps;
+      const t3 = step / steps;
       smoothed.push({
-        x: catmullRom(p0.x, p1.x, p2.x, p3.x, t2),
-        y: catmullRom(p0.y, p1.y, p2.y, p3.y, t2),
-        life: p1.life + (p2.life - p1.life) * t2
+        x: catmullRom(p0.x, p1.x, p2.x, p3.x, t3),
+        y: catmullRom(p0.y, p1.y, p2.y, p3.y, t3),
+        life: p1.life + (p2.life - p1.life) * t3
       });
     }
   }
@@ -201,9 +202,9 @@ function writeLaserBeam(buffers, trail, dot, halfWidth) {
   if (dot) writer.capsule(dot, dot, halfWidth * DOT_SCALE, halfWidth * DOT_SCALE);
   return writer.finish();
 }
-function catmullRom(p0, p1, p2, p3, t2) {
-  const t22 = t2 * t2;
-  return 0.5 * (2 * p1 + (p2 - p0) * t2 + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t22 + (3 * p1 - p0 - 3 * p2 + p3) * t22 * t2);
+function catmullRom(p0, p1, p2, p3, t3) {
+  const t22 = t3 * t3;
+  return 0.5 * (2 * p1 + (p2 - p0) * t3 + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t22 + (3 * p1 - p0 - 3 * p2 + p3) * t22 * t3);
 }
 class CapsuleWriter {
   constructor(buffers) {
@@ -671,10 +672,11 @@ function getTokenRingCenterRadius(tokenSize, strokeWidth = 4, ringScale = 1) {
   const outerDiameter = getTokenRingOuterDiameter(safeTokenSize, strokeWidth, ringScale);
   return (outerDiameter + safeTokenSize) / 4;
 }
+const Q_SCALE = 8;
 const FOG_COLOR = "rgba(0, 0, 0, 1)";
 function renderBrush(ctx, op, bounds, scale, offsetX, offsetY) {
   const { points, brushRadius } = op;
-  if (points.length === 0) return;
+  if (points.length === 0 || Math.round(brushRadius * Q_SCALE) === 0) return;
   const r2 = brushRadius * scale;
   ctx.beginPath();
   if (points.length === 1) {
@@ -693,9 +695,9 @@ function renderBrush(ctx, op, bounds, scale, offsetX, offsetY) {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const steps = Math.max(1, Math.ceil(dist / (brushRadius * 0.4)));
     for (let s2 = 0; s2 <= steps; s2++) {
-      const t2 = s2 / steps;
-      const cx = (p0.x + dx * t2 + offsetX - bounds.x) * scale;
-      const cy = (p0.y + dy * t2 + offsetY - bounds.y) * scale;
+      const t3 = s2 / steps;
+      const cx = (p0.x + dx * t3 + offsetX - bounds.x) * scale;
+      const cy = (p0.y + dy * t3 + offsetY - bounds.y) * scale;
       ctx.moveTo(cx + r2, cy);
       ctx.arc(cx, cy, r2, 0, Math.PI * 2);
     }
@@ -730,20 +732,23 @@ function renderRectangle(ctx, op, bounds, scale, offsetX, offsetY) {
 }
 function renderOperation(ctx, op, bounds, scale, offsetX, offsetY) {
   ctx.save();
-  ctx.globalCompositeOperation = op.isErasing ? "destination-out" : "source-over";
-  ctx.fillStyle = FOG_COLOR;
-  switch (op.type) {
-    case "brush":
-      renderBrush(ctx, op, bounds, scale, offsetX, offsetY);
-      break;
-    case "lasso":
-      renderLasso(ctx, op, bounds, scale, offsetX, offsetY);
-      break;
-    case "rectangle":
-      renderRectangle(ctx, op, bounds, scale, offsetX, offsetY);
-      break;
+  try {
+    ctx.globalCompositeOperation = op.isErasing ? "destination-out" : "source-over";
+    ctx.fillStyle = FOG_COLOR;
+    switch (op.type) {
+      case "brush":
+        renderBrush(ctx, op, bounds, scale, offsetX, offsetY);
+        break;
+      case "lasso":
+        renderLasso(ctx, op, bounds, scale, offsetX, offsetY);
+        break;
+      case "rectangle":
+        renderRectangle(ctx, op, bounds, scale, offsetX, offsetY);
+        break;
+    }
+  } finally {
+    ctx.restore();
   }
-  ctx.restore();
 }
 function calculateOperationBounds(op) {
   const ox = op.offsetX ?? 0;
@@ -905,7 +910,7 @@ export {
   textFontWeight,
   textRotation,
   textScale,
-  t as tokenDiameterInCells,
+  t2 as tokenDiameterInCells,
   b as tokenSizeFromCreatureSize,
   d as tokenUIScale,
   transition,

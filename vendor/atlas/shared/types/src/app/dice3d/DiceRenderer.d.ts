@@ -20,6 +20,7 @@
  */
 import type { DiceGpu } from './DiceGpu';
 import type { DieSides } from './dieGeometry';
+import type { DieBody } from './dieBody';
 import type { DieAnim } from './dieMotion';
 import { type Crit } from './impactSparks';
 export interface StageDie {
@@ -57,7 +58,7 @@ export declare class DiceRenderer {
      * material. Each gets a chain of ghosts, shorter the more dice there are
      * (`chainLengthFor`).
      */
-    setPlan(sides: DieSides[]): void;
+    setPlan(bodies: readonly DieBody[]): void;
     /** The stage as the throw knows it: half width and half depth in world units. */
     stage(): readonly [number, number];
     /**

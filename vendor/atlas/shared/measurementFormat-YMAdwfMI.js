@@ -1,3 +1,4 @@
+import { t } from "./englishTexts-B44XM0o-.js";
 const REFERENCE_CELL_SIZE = 70;
 const REFERENCE_STROKE_WIDTH = 4;
 function computeTokenStrokeWidth(gridSize) {
@@ -7,10 +8,10 @@ function tokenDiameterInCells(sizeInCells) {
   return 2 * sizeInCells - 1;
 }
 const TOKEN_SIZE_OPTIONS = [
-  { label: "Medium (1×1)", size: 1 },
-  { label: "Large (2×2)", size: 1.5 },
-  { label: "Huge (3×3)", size: 2 },
-  { label: "Gargantuan (4×4)", size: 2.5 }
+  { label: t("token.size.medium"), size: 1 },
+  { label: t("token.size.large"), size: 1.5 },
+  { label: t("token.size.huge"), size: 2 },
+  { label: t("token.size.gargantuan"), size: 2.5 }
 ];
 const CREATURE_SIZE_MULTIPLIERS = { tiny: 1, small: 1, medium: 1, large: 1.5, huge: 2, gargantuan: 2.5 };
 function tokenSizeFromCreatureSize(value) {

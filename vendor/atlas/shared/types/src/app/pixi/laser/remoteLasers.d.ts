@@ -2,7 +2,7 @@
  * Other people's lasers as messages bring them: each a trail that fades like Atlas's own, its
  * newest point held at full strength until the laser is let go. A laser that hears nothing for
  * a second is let go, so a lost lift never leaves one hanging. Shared by the GM's view
- * (`RemoteLaserRenderer`) and the join page.
+ * (`RemoteLaserRenderer`) and code outside Obsidian (`@atlas-vtt/shared`).
  *
  * Messages arrive in bursts, unevenly. So a laser is played back, not drawn on arrival: its
  * points keep the spacing in time they were drawn with (the sender's `dt`, or an even spread

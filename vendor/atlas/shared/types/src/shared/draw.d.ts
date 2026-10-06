@@ -2,7 +2,7 @@
  * `@atlas-vtt/shared/draw`: pure drawing geometry, layout and colour helpers shared with extensions.
  * PIXI-, Obsidian- and React-free (tests/api/sharedBoundary.test.ts).
  */
-export * from '../app/pixi/measureGeometry';
+export * from '../app/pixi/utils/measureGeometry';
 export * from '../app/pixi/sceneLayerOrder';
 export * from '../app/pixi/textBoxLayout';
 export * from '../app/pixi/mapIcons';
@@ -18,4 +18,4 @@ export * from '../app/pixi/token-renderer/tokenRingMetrics';
 export * from '../app/pixi/fog/fogRenderUtils';
 export * from '../app/styles/designTokens';
 export * from '../app/utils/hexColor';
-export { insideSpans } from '../app/lighting/playerDarkness/spans';
+export { insideSpans } from '../app/pixi/lighting/playerDarkness/spans';

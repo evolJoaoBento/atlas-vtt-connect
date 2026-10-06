@@ -17,6 +17,7 @@
  */
 import * as THREE from 'three';
 import type { DiceFont } from './diceLook';
+import { type DieBody } from './dieBody';
 import { type DieSides } from './dieGeometry';
 /** Whether faces painted now would have their card stock and the numerals of `font`. */
 export declare function diceArtworkReady(font: DiceFont): boolean;
@@ -42,7 +43,8 @@ export interface DieTextures {
     redraw: () => void;
 }
 /**
- * The atlas of a body: one cell per face holding card and numeral. The last
+ * The atlas of a body: one cell per face holding card and numeral (or a dice
+ * look's art, `faceArt.ts`); the tens die of a d100 has its own. The last
  * cell stays bare card; it carries the chamfers and corners.
  *
  * Plus a relief. It comes from **the same two images**: the paper's grain is
@@ -50,4 +52,4 @@ export interface DieTextures {
  * Randomised separately, the relief would look like scratches on a photo of
  * paper.
  */
-export declare function buildTextures(sides: DieSides): DieTextures;
+export declare function buildTextures(body: DieBody): DieTextures;

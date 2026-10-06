@@ -3,9 +3,8 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { DIE_BODIES } from "./diceDisplay.js";
-import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS, DIE_ICONS, chainDepth, diceSceneToShow, isDiceDisplay, landsOnAFace, layoutDice, restingFrame, sceneFromRolls, throwStyle } from "./diceDisplay.js";
 import { d as diceSum } from "./diceLabels-DiaA4yev.js";
+import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS, DIE_BODIES, DIE_ICONS, chainDepth, diceSceneToShow, isDiceDisplay, landsOnAFace, layoutDice, loggedRollScene, restingFrame, sceneFromRolls, showAsCardOnly, throwStyle } from "./diceDisplay.js";
 const CELL = 256;
 function seededRandom(seed) {
   let s = (seed || 1) >>> 0;
@@ -18,7 +17,17 @@ function atlasLayout(sides) {
   const cols = Math.ceil(Math.sqrt(sides + 1));
   return { cols, rows: Math.ceil((sides + 1) / cols) };
 }
+function getDomHost() {
+  throw new Error("DOM host has not been installed");
+}
 const CARD_URL = "data:image/webp;base64,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";
+const LOOK_BODIES = [4, 6, 8, 10, 12, 20, 100];
+function bodySides(body) {
+  return body === 100 ? 10 : body;
+}
+function artKey(body, value) {
+  return body === 100 ? value % 10 * 10 : value;
+}
 const vAdd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const vSub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const vScale = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
@@ -404,9 +413,10 @@ const sheets = /* @__PURE__ */ new Map();
 const pending = /* @__PURE__ */ new Map();
 const scales = /* @__PURE__ */ new Map();
 let scratch = null;
-function loadImage(url) {
+function loadImage(url, anonymous = false) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    if (anonymous) img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Dice artwork failed to load"));
     img.src = url;
@@ -424,8 +434,8 @@ function loadNumerals(font) {
   return loading;
 }
 async function setScifiSheet() {
-  await activeDocument.fonts.load(scifiFont(SCIFI_PROBE_PX));
-  const canvas = createEl("canvas");
+  await getDomHost().activeDocument().fonts.load(scifiFont(SCIFI_PROBE_PX));
+  const canvas = getDomHost().createCanvas();
   canvas.width = SHEET_COLS * SHEET_CELL;
   canvas.height = SHEET_ROWS * SHEET_CELL;
   const ctx = canvas.getContext("2d");
@@ -458,7 +468,7 @@ function numeralsReady(font) {
   return sheets.has(font);
 }
 function measureInk(sheet) {
-  const canvas = createEl("canvas");
+  const canvas = getDomHost().createCanvas();
   canvas.width = sheet.width;
   canvas.height = sheet.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -504,7 +514,7 @@ function scaleFor(font, sides, mark, ink, pxPerSheetPx) {
 function numeralSource(sheet, cell, ink) {
   const { left: sx, top: sy } = cellOrigin(cell);
   if (ink === null) return { image: sheet.image, sx, sy };
-  scratch ?? (scratch = createEl("canvas", { attr: { width: SHEET_CELL, height: SHEET_CELL } }));
+  scratch ?? (scratch = getDomHost().createCanvas(void 0, { width: SHEET_CELL, height: SHEET_CELL }));
   const ctx = scratch.getContext("2d");
   if (!ctx) return { image: sheet.image, sx, sy };
   ctx.globalCompositeOperation = "source-over";
@@ -515,33 +525,30 @@ function numeralSource(sheet, cell, ink) {
   ctx.fillRect(0, 0, SHEET_CELL, SHEET_CELL);
   return { image: scratch, sx: 0, sy: 0 };
 }
-function paintNumeral(ctx, x, y, sides, value, font, ink) {
+function paintNumeralMark(ctx, x, y, sides, mark, font, ink) {
   var _a;
   const sheet = sheets.get(font);
   if (!sheet) return;
-  const geometry = dieGeometry(sides);
   const pxPerSheetPx = numeralSize(sides) / SHEET_FILL / SHEET_CELL;
-  for (const mark of faceMarks(geometry, faceIndexForValue(geometry, value), CELL)) {
-    const cell = numeralCell(sides, mark.value);
-    const box = ((_a = sheet.ink) == null ? void 0 : _a[cell]) ?? NOMINAL_INK;
-    const k = pxPerSheetPx * scaleFor(font, sides, mark, box, pxPerSheetPx);
-    const source = numeralSource(sheet, cell, ink);
-    ctx.save();
-    ctx.translate(x + mark.at[0], y - mark.at[1]);
-    ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
-    ctx.drawImage(
-      source.image,
-      source.sx,
-      source.sy,
-      SHEET_CELL,
-      SHEET_CELL,
-      -((box.x0 + box.x1) / 2) * k,
-      -((box.y0 + box.y1) / 2) * k,
-      SHEET_CELL * k,
-      SHEET_CELL * k
-    );
-    ctx.restore();
-  }
+  const cell = numeralCell(sides, mark.value);
+  const box = ((_a = sheet.ink) == null ? void 0 : _a[cell]) ?? NOMINAL_INK;
+  const k = pxPerSheetPx * scaleFor(font, sides, mark, box, pxPerSheetPx);
+  const source = numeralSource(sheet, cell, ink);
+  ctx.save();
+  ctx.translate(x + mark.at[0], y - mark.at[1]);
+  ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
+  ctx.drawImage(
+    source.image,
+    source.sx,
+    source.sy,
+    SHEET_CELL,
+    SHEET_CELL,
+    -((box.x0 + box.x1) / 2) * k,
+    -((box.y0 + box.y1) / 2) * k,
+    SHEET_CELL * k,
+    SHEET_CELL * k
+  );
+  ctx.restore();
 }
 const DEFAULT_DICE_LOOK = { colour: "light", font: "medieval" };
 const LIGHT_INK = "#e2e8f0";
@@ -565,12 +572,13 @@ function hex(rgb) {
   return `#${rgb.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 function resolveLook(look, accent) {
-  if (look.colour === "dark") return { ...look, body: DARK_BODY, ink: LIGHT_INK };
+  const own = { lookId: null, art: null };
+  if (look.colour === "dark") return { ...look, ...own, body: DARK_BODY, ink: LIGHT_INK };
   if (look.colour === "accent") {
     const colour = FALLBACK_ACCENT;
-    return { ...look, body: hex(colour), ink: readableInk(colour) };
+    return { ...look, ...own, body: hex(colour), ink: readableInk(colour) };
   }
-  return { ...look, body: null, ink: look.font === "medieval" ? null : DARK_INK };
+  return { ...look, ...own, body: null, ink: look.font === "medieval" ? null : DARK_INK };
 }
 function paintCard(ctx, x, y, seed, card, look) {
   ctx.fillStyle = look.body ?? CARD;
@@ -596,6 +604,48 @@ function paintWear(ctx, x, y, edge, look) {
   ctx.fillStyle = g;
   ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
 }
+function paintArt(ctx, x, y, mark, art) {
+  const fill = CELL / Math.max(art.width, art.height);
+  const k = fill * fitNumeral(mark.room, art.width * fill, art.height * fill);
+  const width = art.width * k;
+  const height = art.height * k;
+  ctx.save();
+  ctx.translate(x + mark.at[0], y - mark.at[1]);
+  ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
+  ctx.drawImage(art, -width / 2, -height / 2, width, height);
+  ctx.restore();
+}
+function paintFaceMarks(ctx, x, y, body, value, look) {
+  var _a;
+  const sides = bodySides(body);
+  const geometry = dieGeometry(sides);
+  const art = (_a = look.art) == null ? void 0 : _a.faces.get(body);
+  for (const mark of faceMarks(geometry, faceIndexForValue(geometry, value), CELL)) {
+    const image = art == null ? void 0 : art.get(artKey(body, mark.value));
+    if (image) paintArt(ctx, x, y, mark, image);
+    else paintNumeralMark(ctx, x, y, sides, mark, look.font, look.ink);
+  }
+}
+function paintFaceRelief(ctx, x, y, body, value, look) {
+  var _a, _b;
+  const sides = bodySides(body);
+  const geometry = dieGeometry(sides);
+  const relief = (_a = look.art) == null ? void 0 : _a.bump.get(body);
+  const art = (_b = look.art) == null ? void 0 : _b.faces.get(body);
+  for (const mark of faceMarks(geometry, faceIndexForValue(geometry, value), CELL)) {
+    const key = artKey(body, mark.value);
+    const own = relief == null ? void 0 : relief.get(key);
+    const image = own ?? (art == null ? void 0 : art.get(key));
+    if (!image) {
+      paintNumeralMark(ctx, x, y, sides, mark, look.font, null);
+      continue;
+    }
+    ctx.save();
+    ctx.filter = own ? "grayscale(1)" : "brightness(0)";
+    paintArt(ctx, x, y, mark, image);
+    ctx.restore();
+  }
+}
 let cardStock = null;
 let cardPending = null;
 function diceArtworkReady(font) {
@@ -609,7 +659,7 @@ function loadDiceArtwork(font = activeLook().font) {
 }
 function drawAtlas(sides, paint) {
   const { cols, rows } = atlasLayout(sides);
-  const canvas = createEl("canvas");
+  const canvas = getDomHost().createCanvas();
   canvas.width = cols * CELL;
   canvas.height = rows * CELL;
   const ctx = canvas.getContext("2d");
@@ -624,11 +674,12 @@ function drawAtlas(sides, paint) {
   }
   return canvas;
 }
-function buildTextures(sides) {
+function buildTextures(body) {
+  const sides = bodySides(body);
   const albedo = (look = activeLook()) => drawAtlas(sides, (ctx, { x, y, value }) => {
     paintCard(ctx, x, y, sides * 31 + (value ?? 0) * 7 + 5, cardStock, look);
     paintWear(ctx, x, y, value === null, look);
-    if (value !== null) paintNumeral(ctx, x, y, sides, value, look.font, look.ink);
+    if (value !== null) paintFaceMarks(ctx, x, y, body, value, look);
   });
   const bump = (look = activeLook()) => drawAtlas(sides, (ctx, { x, y, value }) => {
     ctx.fillStyle = "#8a8a8a";
@@ -641,7 +692,7 @@ function buildTextures(sides) {
     if (value === null) return;
     ctx.save();
     ctx.globalAlpha = 0.7;
-    paintNumeral(ctx, x, y, sides, value, look.font, null);
+    paintFaceRelief(ctx, x, y, body, value, look);
     ctx.restore();
   });
   const textures = {
@@ -761,10 +812,10 @@ function chamferedGeometry(sides) {
   geometry.computeVertexNormals();
   return geometry;
 }
-function dieAssets(sides) {
-  const cached = assetCache.get(sides);
+function dieAssets(body) {
+  const cached = assetCache.get(body);
   if (cached !== void 0) return cached;
-  const textures = buildTextures(sides);
+  const textures = buildTextures(body);
   const material = new THREE.MeshPhysicalMaterial({
     map: textures.map,
     bumpMap: textures.bumpMap,
@@ -774,11 +825,11 @@ function dieAssets(sides) {
     envMapIntensity: 0.2
   });
   const assets = {
-    geometry: chamferedGeometry(sides),
+    geometry: chamferedGeometry(bodySides(body)),
     material,
     redraw: textures.redraw
   };
-  assetCache.set(sides, assets);
+  assetCache.set(body, assets);
   const font = activeLook().font;
   if (!diceArtworkReady(font)) void loadDiceArtwork(font).then(() => assets.redraw());
   return assets;
@@ -1440,14 +1491,14 @@ class DiceRenderer {
    * material. Each gets a chain of ghosts, shorter the more dice there are
    * (`chainLengthFor`).
    */
-  setPlan(sides) {
+  setPlan(bodies) {
     for (const mesh of this.meshes) this.scene.remove(mesh);
     this.trails.clear();
-    this.landed = sides.map(() => false);
+    this.landed = bodies.map(() => false);
     this.shadow.bodiesChanged();
-    const chainLength = chainLengthFor(sides.length);
-    this.meshes = sides.map((s) => {
-      const assets = dieAssets(s);
+    const chainLength = chainLengthFor(bodies.length);
+    this.meshes = bodies.map((body) => {
+      const assets = dieAssets(body);
       const mesh = new THREE.Mesh(assets.geometry, assets.material);
       mesh.castShadow = true;
       mesh.visible = false;
@@ -1821,7 +1872,7 @@ function diceOf(doc) {
 }
 function gpuOf(doc, dice) {
   if (dice.gpu !== void 0) return dice.gpu;
-  const canvas = doc.adoptNode(createEl("canvas"));
+  const canvas = getDomHost().createCanvas(doc);
   canvas.addEventListener("webglcontextlost", () => {
     dice.lost = true;
   });
@@ -1841,7 +1892,9 @@ function canShowDice(doc) {
 }
 function buildStage(doc, dice) {
   const gpu = gpuOf(doc, dice);
-  const canvas = doc.adoptNode(createEl("canvas", { cls: "atlas-dice-stage__canvas", attr: { "aria-hidden": "true" } }));
+  const canvas = getDomHost().createCanvas(doc);
+  canvas.className = "atlas-dice-stage__canvas";
+  canvas.setAttribute("aria-hidden", "true");
   return { canvas, renderer: gpu ? new DiceRenderer(gpu, canvas) : null };
 }
 function borrowStage(doc) {
@@ -1884,8 +1937,8 @@ function whenQuiet(doc, run) {
 function warmUp(renderer, win) {
   const rem = parseFloat(win.getComputedStyle(win.document.documentElement).fontSize) || 16;
   renderer.setSize(Math.ceil(WARM_REM[0] * rem), Math.ceil(WARM_REM[1] * rem), stagePixelRatio(win));
-  renderer.setPlan(DIE_BODIES);
-  renderer.render(DIE_BODIES.map((sides) => ({ sides, anim: { ...makeDie(Math.random), w: [...WARM_SPIN] } })), 0);
+  renderer.setPlan(LOOK_BODIES);
+  renderer.render(LOOK_BODIES.map((body) => ({ sides: bodySides(body), anim: { ...makeDie(Math.random), w: [...WARM_SPIN] } })), 0);
   renderer.reset();
 }
 function warmNext(doc, dice) {
@@ -1991,6 +2044,7 @@ export {
   landsOnAFace,
   layoutDice,
   loadDiceArtwork,
+  loggedRollScene,
   lyingHeight,
   makeDie,
   planTour,
@@ -2005,6 +2059,7 @@ export {
   rollBreakdown,
   rollLabel,
   sceneFromRolls,
+  showAsCardOnly,
   stagePixelRatio,
   stepDie,
   throwRandom,

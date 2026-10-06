@@ -1,6 +1,7 @@
 import { r as rollFace, a as rollExplosions, M as MAX_EXPLOSIONS } from "./diceLabels-DiaA4yev.js";
 import { d, b, e, c } from "./diceLabels-DiaA4yev.js";
-import { D, a, b as b2, L, c as c2, d as d2, r } from "./laserPointerSettings-BMmA428j.js";
+import { t } from "./englishTexts-B44XM0o-.js";
+import { D, a, b as b2, L, c as c2, d as d2, r } from "./laserPointerSettings-DurFCvN-.js";
 const DEFAULT_DICE_RULES = { defaultRoll: "1d20", crit: "natural" };
 const CRIT_RULES = ["natural", "roll-under", "doubles", "high-total", "none"];
 const EXPLODE_SCOPES = ["default", "all"];
@@ -65,14 +66,6 @@ function extremeCrit(values, best, worst) {
   if (values.includes(best)) return "high";
   return values.includes(worst) ? "low" : null;
 }
-const TERM = /([+-]?)\s*(?:(\d*)d(\d+)(?:!{1,2}(i|\d+)?)?|(\d+))/gi;
-function hasDiceTerm(formula) {
-  return /\d*d\d+/i.test(formula);
-}
-function notedExplosion(times) {
-  const limit = times === "i" ? MAX_EXPLOSIONS : Number(times ?? "1");
-  return { highFaces: 1, lowFaces: 0, limit };
-}
 function ruledExplosion({ repeats, highFaces, lowFaces }) {
   return { highFaces, lowFaces, limit: repeats ? MAX_EXPLOSIONS : 1 };
 }
@@ -82,24 +75,22 @@ function rollFormula$1(formula, random = Math.random, rules) {
   const explode = rules == null ? void 0 : rules.explode;
   const defaultRoll = (explode == null ? void 0 : explode.dice) === "default" ? parseDefaultRoll((rules == null ? void 0 : rules.defaultRoll) ?? "") : null;
   let defaultDiceLeft = (defaultRoll == null ? void 0 : defaultRoll.count) ?? 0;
-  for (const [term, sign, count, sides, times, constant] of formula.matchAll(TERM)) {
-    const factor = sign === "-" ? -1 : 1;
-    if (constant !== void 0) {
-      modifiers += factor * Number(constant);
+  for (const term of formula.terms) {
+    if (term.kind === "constant") {
+      modifiers += term.value;
       continue;
     }
-    const faces = Number(sides);
-    if (faces < 2) continue;
-    const noted = term.includes("!") ? notedExplosion(times) : null;
-    for (let i = 0; i < Number(count || "1"); i++) {
+    const { faces, negative } = term;
+    const noted = term.explosions === void 0 ? null : { highFaces: 1, lowFaces: 0, limit: term.explosions };
+    for (let i = 0; i < term.count; i++) {
       const die = {
         die: `d${faces}`,
         value: rollFace(faces, random),
         max: faces,
-        ...factor < 0 && { negative: true }
+        ...negative && { negative: true }
       };
       rolls.push(die);
-      const isDefaultDie = factor > 0 && faces === (defaultRoll == null ? void 0 : defaultRoll.sides) && defaultDiceLeft > 0;
+      const isDefaultDie = !negative && faces === (defaultRoll == null ? void 0 : defaultRoll.sides) && defaultDiceLeft > 0;
       if (isDefaultDie) defaultDiceLeft -= 1;
       const ruled = explode && (explode.dice === "all" || isDefaultDie) ? ruledExplosion(explode) : null;
       const explosion = noted ?? ruled;
@@ -109,8 +100,41 @@ function rollFormula$1(formula, random = Math.random, rules) {
   const dice = rolls.reduce((sum, die) => sum + (die.negative ? -die.value : die.value), 0);
   return { rolls, modifiers, total: dice + modifiers };
 }
+const FORMULA_LIMITS = { characters: 64, terms: 10, dice: 100, faces: 1e3 };
+const TERM = /([+-]?)[ \t]*(?:(\d{0,3})[dD](\d{1,4})(!{1,2}(i|\d{1,2})?)?|(\d{1,4}))[ \t]*/y;
+function parseFormula(formula) {
+  var _a;
+  if (formula.length > FORMULA_LIMITS.characters) return { ok: false, code: "length" };
+  const terms = [];
+  let dice = 0;
+  let cursor = ((_a = /^[ \t]*/.exec(formula)) == null ? void 0 : _a[0].length) ?? 0;
+  while (cursor < formula.length) {
+    TERM.lastIndex = cursor;
+    const match = TERM.exec(formula);
+    if (!match || terms.length > 0 && !match[1]) return { ok: false, code: "syntax" };
+    cursor = TERM.lastIndex;
+    const [, sign, count, sides, explosion, times, constant] = match;
+    if (constant !== void 0) {
+      terms.push({ kind: "constant", value: (sign === "-" ? -1 : 1) * Number(constant) });
+    } else {
+      const faces = Number(sides);
+      const amount = Number(count || "1");
+      dice += amount;
+      terms.push({
+        kind: "dice",
+        count: amount,
+        faces,
+        negative: sign === "-",
+        ...explosion !== void 0 && { explosions: times === "i" ? MAX_EXPLOSIONS : Number(times ?? "1") }
+      });
+    }
+    if (terms.length > FORMULA_LIMITS.terms) return { ok: false, code: "terms" };
+  }
+  if (terms.some((term) => term.kind === "dice" && (term.faces < 2 || term.faces > FORMULA_LIMITS.faces))) return { ok: false, code: "faces" };
+  if (dice > FORMULA_LIMITS.dice) return { ok: false, code: "dice" };
+  return terms.length ? { ok: true, terms } : { ok: false, code: "syntax" };
+}
 const DICE_TYPES = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
-const DICE_ROLLED_EVENT = "atlas-dice-rolled";
 function isDieType(value) {
   return typeof value === "string" && DICE_TYPES.includes(value);
 }
@@ -122,8 +146,21 @@ function diceFormula(selection, modifier = 0) {
   if (!dice || modifier === 0) return dice;
   return `${dice}${modifier > 0 ? "+" : "-"}${Math.abs(modifier)}`;
 }
-function rollFormula(formula, random = Math.random, now = Date.now(), rules) {
-  const { rolls, modifiers, total } = rollFormula$1(formula, random, rules);
+class DiceFormulaError extends Error {
+  constructor(formula, code) {
+    super(`Atlas does not roll "${formula.slice(0, 80)}" (${code}): at most 64 characters, 10 terms, 100 dice and 1,000 faces.`);
+    this.formula = formula;
+    this.code = code;
+    this.name = "DiceFormulaError";
+  }
+}
+function parsedFormula(formula) {
+  const parsed = parseFormula(formula);
+  if (!parsed.ok) throw new DiceFormulaError(formula, parsed.code);
+  return parsed;
+}
+function rollParsed(formula, parsed, random, now, rules) {
+  const { rolls, modifiers, total } = rollFormula$1(parsed, random, rules);
   return {
     id: `roll_${now}_${Math.random().toString(36).slice(2, 11)}`,
     timestamp: now,
@@ -132,8 +169,11 @@ function rollFormula(formula, random = Math.random, now = Date.now(), rules) {
     modifiers,
     total,
     ...rules && { crit: getDiceCrit(rolls, rules) },
-    player: "Player"
+    player: t("dice.player")
   };
+}
+function rollFormula(formula, random = Math.random, now = Date.now(), rules) {
+  return rollParsed(formula, parsedFormula(formula), random, now, rules);
 }
 function withoutHiddenToken(result, isTokenHidden) {
   const source = result.source;
@@ -155,7 +195,9 @@ function withDefaultRoll(modifier, defaultRoll) {
   return bonus === "" || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
 }
 function rollByRules(formula, rules, random = Math.random, now = Date.now()) {
-  return rollFormula(hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll), random, now, rules);
+  const input = parsedFormula(formula === "" ? rules.defaultRoll : formula);
+  const complete = input.terms.some((term) => term.kind === "dice") && formula !== "" ? formula : withDefaultRoll(formula, rules.defaultRoll);
+  return rollParsed(complete, parsedFormula(complete), random, now, rules);
 }
 const DEFAULT_INITIATIVE_RULES = { mode: "turn-order", roll: "1d20", firstSide: "players" };
 const INITIATIVE_MODES = ["turn-order", "sides"];
@@ -250,7 +292,7 @@ function restedResources(token, definitions) {
 const FIRST_BARS = ["hp", "stress"];
 function resetLabel(definitions) {
   const onlyFirstBars = definitions.every(({ key }) => FIRST_BARS.includes(key));
-  return onlyFirstBars ? "Reset (Full HP, Clear Status)" : "Reset (Restore Resources, Clear Status)";
+  return onlyFirstBars ? t("token.reset") : "Reset (Restore Resources, Clear Status)";
 }
 function isSocket(slot) {
   return typeof slot === "number" && Number.isInteger(slot) && slot >= 0 && slot < MAX_RESOURCES;
@@ -355,9 +397,10 @@ export {
   DEFAULT_EXPLODE_RULE,
   DEFAULT_INITIATIVE_RULES,
   D as DEFAULT_LASER_POINTER_SETTINGS,
-  DICE_ROLLED_EVENT,
   DICE_TYPES,
+  DiceFormulaError,
   EXPLODE_SCOPES,
+  FORMULA_LIMITS,
   INITIATIVE_MODES,
   INITIATIVE_SIDES,
   a as LASER_COLOR_HINT,
@@ -388,7 +431,6 @@ export {
   e as explodes,
   c as explodingFaces,
   getDiceCrit,
-  hasDiceTerm,
   isDefeated,
   isDieType,
   isFaceCount,
@@ -401,6 +443,7 @@ export {
   otherSide,
   parseDefaultRoll,
   parseExplodeRule,
+  parseFormula,
   parseInitiativeRules,
   persistableDiceLog,
   remainingShare,

@@ -1,11 +1,3 @@
-/**
- * Shared token sizing derived from the grid cell size.
- *
- * A size-1 token fills one cell minus a stroke inset on each side. On hex grids
- * the cell size is the flat-to-flat distance, so the same formula fits the
- * hex's inscribed circle. Larger tokens span (2n - 1) cells so they stay
- * centered on a cell.
- */
 /** Stroke inset in pixels, proportional to the grid size (4px at a 70px cell). */
 export declare function computeTokenStrokeWidth(gridSize: number): number;
 /** Diameter in cells covered by a token of the given size multiplier. */

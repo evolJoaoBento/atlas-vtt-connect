@@ -4,7 +4,7 @@
  * place, size and colours. Pure and PIXI-free; `utils/measureDrawing.ts` and `MeasureRenderer.ts`
  * draw them with Graphics. Lengths are world units unless they say screen pixels.
  */
-import type { Point } from '../grid/hexGeometry';
+import type { Point } from '../../grid/hexGeometry';
 export type MeasureShape = 'line' | 'cone' | 'circle' | 'sphere';
 /** Black, for the soft shadows under paths and points. */
 export declare const MEASURE_SHADOW = 0;

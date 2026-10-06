@@ -1,0 +1,20 @@
+export declare const picker: {
+    readonly 'picker.none.bases': "No bases match “{query}”";
+    readonly 'picker.none.notes': "No notes match “{query}”";
+    readonly 'picker.recent': "Recently modified";
+    readonly 'picker.results': "Results";
+    readonly 'picker.search.bases': "Search bases";
+    readonly 'picker.search.notes': "Search notes";
+    readonly 'picker.searchPlaceholder.bases': "Search bases...";
+    readonly 'picker.searchPlaceholder.notes': "Search notes...";
+    readonly 'picker.token.title': "Select Token for {name}";
+    readonly 'picker.token.failed': "Failed to load token picker";
+    readonly 'picker.token.search': "Search tokens...";
+    readonly 'picker.token.removeCurrent': "Remove current token assignment";
+    readonly 'picker.token.current': "Currently assigned:";
+    readonly 'picker.token.loading': "Loading tokens...";
+    readonly 'picker.token.noMatch': "No tokens found matching your search.";
+    readonly 'picker.token.none': "No tokens available.";
+    readonly 'picker.token.select': "Select a token to assign:";
+    readonly 'picker.token.reassign': "Select a different token to reassign:";
+};

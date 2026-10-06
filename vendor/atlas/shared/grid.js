@@ -1,5 +1,5 @@
-import { h as hexOriginCenter, e as axialToPixel, g as hexCircumradius, i as isHexGridType, j as hexCellExtent, k as pixelToAxial, t as tokenDiameterInCells, l as hexOrientationForGridType, m as createHexLayout } from "./measurementFormat-DLGvLcYl.js";
-import { D, n, o, q, u, f, v, w, x, y, z, p, A, B, C, E, F } from "./measurementFormat-DLGvLcYl.js";
+import { h as hexOriginCenter, e as axialToPixel, g as hexCircumradius, i as isHexGridType, j as hexCellExtent, k as pixelToAxial, t as tokenDiameterInCells, l as hexOrientationForGridType, m as createHexLayout } from "./measurementFormat-YMAdwfMI.js";
+import { D, n, o, q, u, f, v, w, x, y, z, p, A, B, C, E, F } from "./measurementFormat-YMAdwfMI.js";
 function isCellNumberFormat(value) {
   return value === "column-row" || value === "sequential" || value === "letter-number";
 }
@@ -60,6 +60,22 @@ function cellNumberAnchor(size, center) {
 function cellNumberFontSize(size) {
   return 0.16 * size;
 }
+const SQRT3 = Math.sqrt(3);
+function withinPeriod(value, period) {
+  if (!(period > 0) || !Number.isFinite(value)) return value;
+  const rest = value % period;
+  return rest < 0 ? rest + period : rest;
+}
+function squareOffset(offset, size) {
+  return withinPeriod(offset, size);
+}
+function hexLayoutNearZero(layout) {
+  const along = layout.size;
+  const across = SQRT3 * layout.size;
+  const [periodX, periodY] = layout.orientation === "pointy" ? [along, across] : [across, along];
+  return { ...layout, originX: withinPeriod(layout.originX, periodX), originY: withinPeriod(layout.originY, periodY) };
+}
+const MAX_GRID_OFFSET = 1e5;
 function axialKey(coord) {
   return `${coord.q},${coord.r}`;
 }
@@ -71,7 +87,8 @@ function hexLattice(layout) {
     }
   };
 }
-function hexesOnMap(layout, map) {
+function hexesOnMap(given, map) {
+  const layout = Math.abs(given.originX) > MAX_GRID_OFFSET || Math.abs(given.originY) > MAX_GRID_OFFSET ? hexLayoutNearZero(given) : given;
   const isPointy = layout.orientation === "pointy";
   const size = layout.size;
   const lineSpacing = 1.5 * hexCircumradius(size);
@@ -112,7 +129,7 @@ function squareLattice(size, offsetX, offsetY) {
   return {
     size,
     cellsOnMap(map) {
-      return squaresOnMap(size, offsetX, offsetY, map);
+      return squaresOnMap(size, squareOffset(offsetX, size), squareOffset(offsetY, size), map);
     }
   };
 }

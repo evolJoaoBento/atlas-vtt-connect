@@ -1,0 +1,67 @@
+export declare const loot: {
+    readonly 'loot.card.openNote': "Open the note of {name}";
+    readonly 'loot.close': "Close loot roller";
+    readonly 'loot.closeWindow': "Close loot window";
+    readonly 'loot.count': "Number of items";
+    readonly 'loot.draws': {
+        readonly one: "Draws {items} from {count} item, each with the same chance.";
+        readonly other: "Draws {items} from {count} items, each with the same chance.";
+    };
+    readonly 'loot.empty.basesOff': "Bases are turned off";
+    readonly 'loot.empty.basesOffBody': "The loot roller reads items from Obsidian Bases. Turn on the Bases core plugin in Obsidian’s settings, then reload Obsidian.";
+    readonly 'loot.empty.noBases': "No loot bases yet";
+    readonly 'loot.empty.noBasesBody': "Gather your items as notes in an Obsidian base and add it to this collection. Every note its views list becomes loot you can roll.";
+    readonly 'loot.empty.noCollection': "This map is not in a collection";
+    readonly 'loot.empty.noCollectionBody': "Loot comes from the bases of a collection. Move the map into one to roll loot on it.";
+    readonly 'loot.empty.noItems': "No items in the loot bases";
+    readonly 'loot.empty.noItemsBody': "The views of the collection’s loot bases list no notes. Every note a view lists is an item the roller can draw.";
+    readonly 'loot.empty.setUp': "Set up loot";
+    readonly 'loot.empty.settings': "Loot settings";
+    readonly 'loot.fewer': "Roll fewer items";
+    readonly 'loot.history.empty': "Rolls from every map of this collection are kept here";
+    readonly 'loot.history.remove': "Remove this roll";
+    readonly 'loot.items': {
+        readonly one: "{count} item";
+        readonly other: "{count} items";
+    };
+    readonly 'loot.more': "Roll more items";
+    readonly 'loot.noteGone': "The note of {name} no longer exists";
+    readonly 'loot.nothingToRoll': "Tick a view, or switch a rarity back on, to have items to roll.";
+    readonly 'loot.openFailed': "Could not open the note";
+    readonly 'loot.panel': "Loot roller";
+    readonly 'loot.rarities': "Rarities to roll";
+    readonly 'loot.rarity.common': "Common";
+    readonly 'loot.rarity.epic': "Epic";
+    readonly 'loot.rarity.legendary': "Legendary";
+    readonly 'loot.rarity.rare': "Rare";
+    readonly 'loot.rarity.uncommon': "Uncommon";
+    readonly 'loot.rarityOff': {
+        readonly one: "{count} {rarity} item left out of rolls. Click to roll them again.";
+        readonly other: "{count} {rarity} items left out of rolls. Click to roll them again.";
+    };
+    readonly 'loot.rarityOn': {
+        readonly one: "{count} {rarity} item in the ticked views. Click to leave them out of rolls.";
+        readonly other: "{count} {rarity} items in the ticked views. Click to leave them out of rolls.";
+    };
+    readonly 'loot.received': "Loot received";
+    readonly 'loot.results.empty': "Rolled items appear here";
+    readonly 'loot.roll': "Roll loot";
+    readonly 'loot.tabs.clear': "Clear history";
+    readonly 'loot.tabs.clearHint': "Removes every roll of this collection, for all its maps.";
+    readonly 'loot.tabs.history': "History";
+    readonly 'loot.tabs.historyHint': "Every roll in this collection, from all its maps.";
+    readonly 'loot.tabs.latest': "Latest roll";
+    readonly 'loot.tabs.latestHint': "The last roll on this map.";
+    readonly 'loot.tabs.list': "Loot list";
+    readonly 'loot.title': "Loot";
+    readonly 'loot.tree.all': "All";
+    readonly 'loot.tree.hideViews': "Hide the views of {name}";
+    readonly 'loot.tree.none': "None";
+    readonly 'loot.tree.rollFrom': "Roll from";
+    readonly 'loot.tree.showViews': "Show the views of {name}";
+    readonly 'loot.tree.tickAll': "Tick every view of every base.";
+    readonly 'loot.tree.untickAll': "Untick every view.";
+    readonly 'loot.openPlayerView': "Open the player view to show loot to your players.";
+    readonly 'loot.query.note': "Atlas reads this view for its loot roller. Open the loot roller on a map to roll on it.";
+    readonly 'loot.query.name': "Atlas loot";
+};

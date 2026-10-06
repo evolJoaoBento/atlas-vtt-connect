@@ -1,0 +1,26 @@
+export declare const sbImport: {
+    readonly 'sbImport.status.ready': "Ready";
+    readonly 'sbImport.status.imported': "Already imported";
+    readonly 'sbImport.status.missingImage': "Missing image";
+    readonly 'sbImport.status.remoteImage': "Remote image";
+    readonly 'sbImport.status.conflict': "Conflict";
+    readonly 'sbImport.scanFailed': "Could not scan statblocks.";
+    readonly 'sbImport.loadFailed': "Could not load statblock images.";
+    readonly 'sbImport.unspecified': "Unspecified";
+    readonly 'sbImport.intro': "Choose a system or layout, then add creatures to your import. Edit their tags, crop and rings in the preview cards.";
+    readonly 'sbImport.layout': "System / layout";
+    readonly 'sbImport.allLayouts': "All layouts";
+    readonly 'sbImport.search': "Search statblocks";
+    readonly 'sbImport.searchPlaceholder': "Search creatures or folders…";
+    readonly 'sbImport.selectShown': "Select all shown";
+    readonly 'sbImport.list': "Statblocks";
+    readonly 'sbImport.added': "Added to import";
+    readonly 'sbImport.noMatch': "No statblocks match your search.";
+    readonly 'sbImport.noneFound': "No statblock notes found. Enable frontmatter parsing in Fantasy Statblocks, or add a statblock code block to a note.";
+    readonly 'sbImport.scanAgain': "Scan again";
+    readonly 'sbImport.back': "Back to previews";
+    readonly 'sbImport.loadingImages': "Loading images…";
+    readonly 'sbImport.addN': "Add {count} to import";
+    readonly 'sbImport.scanningNotes': "Scanning notes";
+    readonly 'sbImport.loadingImagesStatus': "Loading images";
+};

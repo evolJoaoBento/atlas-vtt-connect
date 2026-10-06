@@ -3,6 +3,7 @@
  * and shared by every die of that kind.
  */
 import * as THREE from 'three';
+import { type DieBody } from './dieBody';
 import { type DieSides } from './dieGeometry';
 export interface DieAssets {
     geometry: THREE.BufferGeometry;
@@ -20,7 +21,7 @@ export declare function cellCenter(sides: DieSides, index: number): Uv;
  * differently from the face at every turn, where a lighter tone would not.
  */
 export declare function chamferedGeometry(sides: DieSides): THREE.BufferGeometry;
-export declare function dieAssets(sides: DieSides): DieAssets;
+export declare function dieAssets(body: DieBody): DieAssets;
 /** Redraws the faces of every cached body, or of one: when the artwork arrives or the look changes. */
-export declare function refreshDieArtwork(sides?: DieSides): void;
+export declare function refreshDieArtwork(body?: DieBody): void;
 export {};
