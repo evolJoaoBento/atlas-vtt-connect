@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtlasCapability } from '@atlas-vtt/api-types';
+import type { SceneHub } from '../../../src/app/online/scene/SceneHub';
 import { OnlineSessionService } from '../../../src/app/online/OnlineSessionService';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
 import { tabScene, TABS } from '../online/splitFixtures';
@@ -44,6 +45,22 @@ describe('the split party while hosting', () => {
     await vi.advanceTimersByTimeAsync(60);
     expect(onlineSessionStore.getState().assignedCount).toBe(0);
     expect(ben.received.slice(from).map((message) => message.type).filter((type) => type.startsWith('scene-')).slice(0, 2)).toEqual(['scene-clear', 'scene-snapshot']);
+  });
+
+  // Review I1: nothing else happens after the kick; the hub hears it from the session.
+  it('a kicked player\'s assignment, scene and store entries go at once', async () => {
+    const { atlas, service, idOf } = await hosting();
+    const benId = idOf('Ben');
+    service.assign(benId, { viewId: VIEW, tabId: 'b' });
+    await vi.advanceTimersByTimeAsync(60);
+    const hub = (service as unknown as { hosted: { scenes: SceneHub } }).hosted.scenes;
+    expect(hub.scenes().map((scene) => scene.tab.tabId)).toEqual(['a', 'b']);
+    expect(onlineSessionStore.getState()).toMatchObject({ assignedCount: 1, scenesInUse: 2 });
+    service.kick(benId);
+    expect(onlineSessionStore.getState()).toMatchObject({ assignedCount: 0, scenesInUse: 1, assignments: {} });
+    expect(hub.scenes().map((scene) => scene.tab.tabId)).toEqual(['a']);
+    expect(hub.splitActive()).toBe(false);
+    expect(atlas.presentation.badgeFor(VIEW, 'b')).toBeNull();
   });
 
   it('stays off on an Atlas without scene tabs: no command, assigning does nothing', async () => {

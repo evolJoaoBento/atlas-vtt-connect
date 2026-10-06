@@ -119,6 +119,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   }
   const table = identity ? hostedTable(env.identityCrypto, identity, host.id, () => normalizePlayerName(env.settings.get().playerName) ?? 'GM') : null;
   let current: GmSession | null = null;
+  // The scene hub, once made; the session tells it of player changes.
+  let hubRef: SceneHub | null = null;
   const requests = new HostIdentity({
     desk: table && env.people ? new IdentityDesk({ people: env.people, table }) : null,
     session: () => current,
@@ -144,6 +146,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     onRequestClosed: (playerId) => requests.requestClosed(playerId),
     onPlayersChanged: (players) => {
       log.event('players', { players: players.map((player) => `${player.name}: ${player.status}`).join(', ') });
+      // The hub first: a kicked player's assignment and scene go before the parts and the store hear of it.
+      hubRef?.playersChanged(players);
       for (const part of parts) part.playersChanged?.(players);
       onlineSessionStore.setState({ players, error: null });
     },
@@ -161,7 +165,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const scenes = loggedSession(session, log);
   const { tabScenes, ...sceneOptions } = env.scene;
   const tabs = tabScenes?.() ?? null;
-  const hub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
+  const hub: SceneHub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
+  hubRef = hub;
   const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });

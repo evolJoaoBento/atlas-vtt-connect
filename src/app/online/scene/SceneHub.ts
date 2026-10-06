@@ -116,6 +116,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
   splitSupported(): boolean { return this.options.tabs !== null; }
   assignedTabs(): Record<string, TabKey> { return this.options.assignments.entries(); }
   wouldExceedCap(playerId: string, tab: TabKey): boolean { return this.options.assignments.wouldExceedCap(playerId, tab, this.presentedTab()); }
+  /** The session's players changed: a kicked player's assignment goes (spec 4); only a drop changes anything (I1). */
+  playersChanged(players: readonly SessionPlayer[]): void { this.options.assignments.retainPlayers(new Set(players.map((player) => player.playerId))); }
 
   /** Pins a player to a tab of the GM's view (`assignToTab`); needs Atlas's scene tabs. */
   assign(playerId: string, tab: TabKey): Promise<AssignResult | 'couldnt-open'> {
