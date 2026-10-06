@@ -1,21 +1,21 @@
 /**
- * Applies the drops players send (`token-move`) to the presented scene. A move goes through only when
- * the sender controls the token, it is for the scene players have, that scene is live (not held, not
- * loading: a held view's store shows another map), the token is in the projection (not hidden, not under
- * fog) and the coordinates are finite. The point is clamped to the scene players see, then Atlas's
- * `tokens.move` snaps it as the GM's drag snaps, keeps it on the map and writes it as one undo step. A
- * move that fails a check, or that Atlas refuses, gets `token-move-refused`; more than `MOVES_PER_SECOND`
- * from one player in a second are ignored. A `GmSession` handler; `GmSession` delivers only admitted
- * players' messages.
+ * Applies the drops players send (`token-move`) to the sender's own scene. A move goes through only when the sender
+ * controls the token, it is for the scene the sender has (`slotOf`), that scene is the one the GM's view shows now
+ * (`shownSnapshot`: live, loaded, its tab's; a parked or loading scene's store holds another map, D5), the token is in
+ * the sender's projection (not hidden, not under fog) and the coordinates are finite. The point is clamped to the
+ * scene the sender sees, then Atlas's `tokens.move` on that scene's view snaps it as the GM's drag snaps, keeps it on
+ * the map and writes it as one undo step. A move that fails a check, or that Atlas refuses, gets
+ * `token-move-refused`; more than `MOVES_PER_SECOND` from one player in a second are ignored. A `GmSession` handler;
+ * `GmSession` delivers only admitted players' messages.
  */
 import type { TokensApi } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import { sceneWorldBounds, type PreviewRect } from '../preview/previewLayout';
 import type { ControlMessage } from '../protocol';
 import { RateLimit } from '../rateLimit';
-import type { CameraProjection } from '../scene/CameraSender';
-import type { PresentedSceneSource, SceneSession } from '../scene/sceneSources';
+import type { SceneSession } from '../scene/sceneSources';
 import type { ScenePoint } from '../scene/sceneTypes';
+import type { SlotProjection } from '../scene/slotViews';
 import type { TokenControl } from './TokenControl';
 
 export const MOVES_PER_SECOND = 10;
@@ -24,9 +24,8 @@ type TokenMove = Extract<ControlMessage, { type: 'token-move' }>;
 
 export interface TokenMoveHandlerOptions {
   session: SceneSession;
-  presented: PresentedSceneSource;
-  /** The scene players have: moves are checked against it. */
-  projection: Pick<CameraProjection, 'currentProjection'>;
+  /** The scene each player has, and the one the GM's view shows: moves are checked against both. */
+  projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot'>;
   control: TokenControl;
   /** Atlas's token moves: the snapping, the map edge and the undo step are its. */
   tokens: Pick<TokensApi, 'move'>;
@@ -68,18 +67,19 @@ export class TokenMoveHandler implements SessionHandler {
 
   /** Whether the move passed every check and Atlas wrote it. */
   private apply(playerId: string, move: TokenMove): boolean {
-    const { control, presented, projection, tokens } = this.options;
+    const { control, projection, tokens } = this.options;
     if (!control.controls(playerId, move.tokenId)) return false;
-    const scene = projection.currentProjection();
-    const live = presented.current();
-    if (!scene || scene.sceneId !== move.sceneId || !live || presented.isHeld()) return false;
-    const snapshot = live.snapshot();
-    if (!snapshot?.loaded || !Object.hasOwn(scene.tokens, move.tokenId) || !Object.hasOwn(snapshot.objects.tokens, move.tokenId)) return false;
+    const slot = projection.slotOf(playerId);
+    const scene = slot?.lastSent;
+    if (!slot || !scene || scene.sceneId !== move.sceneId) return false;
     // Checked before the clamp: a clamp would turn an infinite coordinate into a point on the map's edge.
     if (!Number.isFinite(move.x) || !Number.isFinite(move.y)) return false;
-    // Atlas refuses a hidden token itself (no `allowHidden`), also one hidden since the broadcaster's last tick.
     const { x, y } = clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene));
-    return tokens.move(live.info.viewId, [{ tokenId: move.tokenId, x, y }], { snap: true, clampToMap: true }).ok;
+    // Read right before the move: the GM may have switched tabs since the player's scene was read (P2).
+    const snapshot = projection.shownSnapshot(slot.sceneId);
+    if (!snapshot || !Object.hasOwn(scene.tokens, move.tokenId) || !Object.hasOwn(snapshot.objects.tokens, move.tokenId)) return false;
+    // Atlas refuses a hidden token itself (no `allowHidden`), also one hidden since the hub's last tick.
+    return tokens.move(slot.tab.viewId, [{ tokenId: move.tokenId, x, y }], { snap: true, clampToMap: true }).ok;
   }
 }
 

@@ -86,7 +86,7 @@ export function controlWorld(options: { scene?: ControlScene } = {}) {
   gm.start();
   const scene = presentedScene(gm, options.scene ?? {});
   const { tokens } = scene.presented.extension;
-  const controlHost = new TokenControlHost({ session: gm, presented: scene.presented, projection: scene.broadcaster, tokens });
+  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens });
   host = controlHost;
   controlHost.start();
   const players: ControlPlayer[] = [];

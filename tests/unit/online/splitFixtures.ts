@@ -86,7 +86,7 @@ export const IMAGES: Record<string, Uint8Array> = Object.fromEntries([
 ].map((path, index) => [path, imageBytes(64 + index, index + 1)]));
 
 export async function splitWorld(options: { lighting?: boolean; visibility?: PlayerVisibility; images?: boolean } = {}): Promise<SplitWorld> {
-  const capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'scene-tabs', ...(options.lighting ? ['lighting' as const] : [])];
+  const capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'scene-tabs', 'tokens', 'dice', 'lasers', ...(options.lighting ? ['lighting' as const] : [])];
   const atlas = new FakeAtlas({ capabilities });
   atlas.views.open(VIEW, TABS.map((entry) => ({ ...entry })));
   atlas.views.setActive(VIEW);

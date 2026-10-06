@@ -7,7 +7,7 @@ import { LaserRelay } from '../tools/LaserRelay';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
-  return ({ session, presented, projection }) => new TokenControlHost({ session, presented, projection, tokens });
+  return ({ session, projection }) => new TokenControlHost({ session, projection, tokens });
 }
 
 /** Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log. */

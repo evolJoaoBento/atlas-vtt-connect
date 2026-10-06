@@ -81,7 +81,7 @@ export class SceneHub extends SlotReads implements SessionHandler {
       assets.onChange(scheduleLive),
       // A collection's resources or initiative rules changed: the live tick, and parked scenes too (D8).
       this.options.watchResources?.(() => this.rulesChanged()) ?? (() => undefined),
-      assignments.onChange(() => this.update()),
+      assignments.onChange(() => { this.update(); this.changes.emit({ kind: 'assignments' }); }),
       tabs?.subscribeLive(() => this.update()) ?? (() => undefined),
       tabs?.subscribeTabs((closed) => this.tabsClosed(closed)) ?? (() => undefined),
     );

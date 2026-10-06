@@ -25,7 +25,9 @@ export type SlotChange =
   /** A player now has another scene (or none). */
   | { kind: 'moved'; playerId: string; from: SlotView | null; to: SlotView | null }
   /** The scene is no longer in use. */
-  | { kind: 'freed'; slot: SlotView };
+  | { kind: 'freed'; slot: SlotView }
+  /** The split party's assignments changed (`splitActive`, `scenesInUse`); every move they made was told first. */
+  | { kind: 'assignments' };
 
 /** Replaces `CameraProjection`: what a player has, and every change of it. */
 export interface SlotProjection {

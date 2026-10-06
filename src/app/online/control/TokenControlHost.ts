@@ -1,13 +1,13 @@
 /**
  * Everything one online session needs to let players move their own tokens: the
- * assignments (`TokenControl`), each player's list (`ControlLists`), the moves
- * (`TokenMoveHandler`, through Atlas's `tokens.move`) and dropping tokens deleted from the
- * presented scene. Started after the broadcaster and the camera sender, so its messages follow theirs.
+ * assignments (`TokenControl`), each player's list (`ControlLists`, per scene while split), the moves
+ * (`TokenMoveHandler`, through Atlas's `tokens.move`, on the sender's scene) and dropping tokens deleted from the
+ * scene the GM's view shows. Started after the scene hub and the camera sender, so its messages follow theirs.
  */
 import type { TokensApi } from '@atlas-vtt/api-types';
 import type { SessionPlayer } from '../GmSession';
-import type { CameraProjection } from '../scene/CameraSender';
-import type { PresentedSceneSource, SceneSession } from '../scene/sceneSources';
+import type { SceneSession } from '../scene/sceneSources';
+import type { SlotProjection } from '../scene/slotViews';
 import { ControlLists } from './ControlLists';
 import { watchDeletedTokens } from './deletedTokens';
 import { TokenControl } from './TokenControl';
@@ -15,9 +15,8 @@ import { TokenMoveHandler } from './TokenMoveHandler';
 
 export interface TokenControlHostOptions {
   session: SceneSession;
-  presented: PresentedSceneSource;
-  /** The scene players have; moves are checked against it. */
-  projection: Pick<CameraProjection, 'currentProjection'>;
+  /** The scene each player has (the scene hub): lists and moves are worked out against it. */
+  projection: SlotProjection;
   tokens: Pick<TokensApi, 'move'>;
 }
 
@@ -31,7 +30,7 @@ export class TokenControlHost {
   private stopWatching: (() => void) | null = null;
 
   constructor(private readonly options: TokenControlHostOptions) {
-    this.lists = new ControlLists({ session: options.session, control: this.control });
+    this.lists = new ControlLists({ session: options.session, control: this.control, projection: options.projection });
     this.moves = new TokenMoveHandler({ ...options, control: this.control });
   }
 
@@ -39,7 +38,7 @@ export class TokenControlHost {
     if (this.stopWatching) return;
     this.lists.start();
     this.moves.start();
-    this.stopWatching = watchDeletedTokens(this.options.presented, this.control);
+    this.stopWatching = watchDeletedTokens(this.options.projection, this.control);
   }
 
   stop(): void {

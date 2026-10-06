@@ -5,7 +5,8 @@
  */
 import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import { decodeAsset, encodeAsset, type AssetMessage } from '../../../src/app/online/assets/assetProtocol';
-import type { ControlMessage } from '../../../src/app/online/protocol';
+import { TokenControlHost } from '../../../src/app/online/control/TokenControlHost';
+import { encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { CameraSender } from '../../../src/app/online/scene/CameraSender';
 import { fingerprintOf } from './assetFixtures';
 import type { RawPlayer, SplitWorld } from './splitFixtures';
@@ -63,4 +64,20 @@ export function assetClient(player: RawPlayer): AssetClient {
       return 'id' in message ? `${message.type}:${pathOf(message.id)}` : message.type;
     }),
   };
+}
+
+export function tokenPart(w: SplitWorld): TokenControlHost {
+  const host = new TokenControlHost({ session: w.gm, projection: w.hub, tokens: w.extension.tokens });
+  host.start();
+  return host;
+}
+
+/** The token lists a player got, from `from` on. */
+export function listsOf(player: RawPlayer, from = 0): string[][] {
+  return player.received.slice(from).flatMap((message) => (message.type === 'token-control' ? [message.tokenIds] : []));
+}
+
+/** The player drops `tokenId` at `x`, stamped with `sceneId`. */
+export function dropToken(player: RawPlayer, sceneId: string, tokenId: string, x: number): void {
+  player.link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId, x, y: 140 }));
 }
