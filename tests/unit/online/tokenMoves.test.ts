@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
 import { CONFIRM_TIMEOUT_MS, MOVE_REFUSED_TEXT, REFUSED_NOTICE_MS, TokenMoves } from '../../../src/app/online/view/TokenMoves';
+import { PAUSED_BANNER } from '../../../src/app/online/split/splitCopy';
 import { playerScene, playerToken } from './sceneFixtures';
 
 const scene = playerScene({ tokens: { t1: playerToken(), t2: playerToken({ x: 300 }) } });
@@ -137,5 +138,18 @@ describe('TokenMoves', () => {
     moves.cancel();
     moves.setScene({ ...scene, sceneId: 'scene-2' });
     expect(positions(moves)).toEqual({});
+  });
+
+  it('while paused shows the paused banner, and a refusal snaps back without the refusal notice', () => {
+    const { moves } = setup();
+    moves.setPaused(true);
+    expect(moves.notice()).toBe(PAUSED_BANNER);
+    dragT1(moves);
+    moves.drop({ x: 190, y: 95 });
+    moves.refused('t1');
+    expect(positions(moves)).toEqual({});
+    expect(moves.notice()).toBe(PAUSED_BANNER);
+    moves.setPaused(false);
+    expect(moves.notice()).toBeNull();
   });
 });

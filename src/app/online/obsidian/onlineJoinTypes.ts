@@ -13,6 +13,8 @@ export interface OnlineSceneSink {
   camera(camera: SceneCamera): void;
   control(tokenIds: readonly string[]): void;
   moveRefused(tokenId: string): void;
+  /** The scene shown was paused (the GM is on another scene) or is live again. */
+  paused?(paused: boolean): void;
   /** The shared dice log, newest first, whole. */
   diceLog(entries: readonly DiceLogEntry[]): void;
   /** A roll this player made just now (`mine`), after the log that lists it: shown as the player's own result. */

@@ -15,6 +15,7 @@ import type { OnlineSceneSink } from '../onlineJoinTypes';
 import { diceLogResult, diceLogResults, traySelection } from '../onlineDice';
 import { rollRefusal } from '../onlineRollRefusal';
 import { onlineSceneStatus } from '../onlineSceneStatus';
+import { PAUSED_BANNER } from '../../split/splitCopy';
 import { SHARED_WITH_ME_BUTTON } from '../../ui/onlineCopy';
 import { shownUrls } from '../objectUrlImages';
 import { RemoteFollower } from './remoteFollower';
@@ -93,6 +94,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
   private detachSession: (() => void) | null = null;
   private imagesFrame: number | null = null;
   private disposed = false;
+  /** The scene shown is paused: the GM is on another scene. */
+  private isPaused = false;
 
   constructor(private readonly options: RemoteSceneClientOptions) {
     const { view, service } = options;
@@ -164,6 +167,13 @@ export class RemoteSceneClient implements OnlineSceneSink {
 
   moveRefused(tokenId: string): void {
     if (!this.disposed) this.moves.refused(tokenId);
+  }
+
+  /** The scene is paused (the GM is on another scene) or live again: the status bar says so while paused. */
+  paused(paused: boolean): void {
+    if (this.disposed || paused === this.isPaused) return;
+    this.isPaused = paused;
+    this.showStatus();
   }
 
   diceLog(entries: readonly DiceLogEntry[]): void {
@@ -245,8 +255,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
       title: status.title,
       connection: status.connection,
       tone: status.tone,
-      // A refused move says so for a while, as the fork's bar did beside the message.
-      message: this.moves.notice ?? status.message,
+      // Paused says why moves are refused, so a refusal adds nothing; otherwise a refused move says so for a while.
+      message: this.isPaused && status.message === null ? PAUSED_BANNER : this.moves.notice ?? status.message,
       ...(status.reconnect ? { action: { label: RECONNECT_LABEL, run: (): void => { service.reconnect(); } } } : {}),
       ...(actions.length > 0 ? { actions } : {}),
     }));

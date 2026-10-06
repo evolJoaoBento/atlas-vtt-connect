@@ -144,6 +144,11 @@ export class MapView {
     this.moves.refused(tokenId);
   }
 
+  /** The scene is paused (the GM is on another scene) or live again: the move notice shows the paused banner while paused. */
+  setPaused(paused: boolean): void {
+    this.moves.setPaused(paused);
+  }
+
   /** Chooses a tool; the active one again returns to Move. */
   selectTool(tool: PlayerTool): void {
     this.tools.select(tool);

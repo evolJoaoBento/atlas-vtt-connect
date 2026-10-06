@@ -271,6 +271,10 @@ if (!target) {
         log.event('move refused', { tokenId });
         map.moveRefused(tokenId);
       },
+      onSceneState: (paused) => {
+        log.event('scene state', { paused });
+        map.setPaused(paused);
+      },
       onDiceLog: (entries, replay) => {
         log.event('dice log', { entries: entries.length, replay });
         diceLog.receive(entries, replay);

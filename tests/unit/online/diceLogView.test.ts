@@ -99,4 +99,11 @@ describe('the join page dice log', () => {
     expect(element('dice-log').hidden).toBe(true);
     expect(heard).toEqual([]);
   });
+
+  it('shows Anna \u00b7 Cave in the log and no label without a scene', () => {
+    const { view, element } = setup();
+    view.receive([{ ...entry('b'), scene: 'Cave' }, entry('a', 'GM')], true);
+    const names = [...element('dice-log-list').querySelectorAll('.dice-entry-name')].map((name) => name.textContent);
+    expect(names).toEqual(['Anna \u00b7 Cave', 'GM']);
+  });
 });

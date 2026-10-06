@@ -5,6 +5,7 @@ import {
   ROLL_CONNECTION_LOST_TEXT, ROLL_NOT_SENT_TEXT, ROLL_RECONNECTING_TEXT, ROLL_SESSION_ENDED_TEXT,
 } from '../../../../src/app/online/obsidian/onlineRollRefusal';
 import { shownUrls } from '../../../../src/app/online/obsidian/objectUrlImages';
+import { PAUSED_BANNER } from '../../../../src/app/online/split/splitCopy';
 import { laserColor } from '../../../../src/app/online/tools/laserColors';
 import { playerScene } from '../sceneFixtures';
 import { admitted, remoteSceneSetup } from './remoteSceneFixtures';
@@ -276,5 +277,21 @@ describe('RemoteSceneClient', () => {
     t.atlas.ui!.clickToolbar(FIT_MAP_ITEM, t.view.viewId);
     expect(t.handle.count('setCamera')).toBe(asked);
     expect(t.atlas.ui!.drawToolbar(t.view.viewId).find((item) => item.id === FOLLOW_GM_ITEM)?.active).toBe(true);
+  });
+
+  it('the remote view status says the scene is paused', async () => {
+    const t = await setup();
+    t.sink().session(admitted());
+    t.sink().scene(playerScene());
+    t.sink().paused?.(true);
+    expect(t.handle.status?.message).toBe(PAUSED_BANNER);
+    t.sink().paused?.(false);
+    expect(t.handle.status?.message).toBeNull();
+  });
+
+  it('labels a roll with its scene in Atlas\'s dice log', async () => {
+    const t = await setup();
+    t.sink().diceLog([{ id: 'r1', name: 'Anna', formula: 'd20', dice: [{ die: 'd20', value: 11 }], modifier: 0, total: 11, at: 1000, scene: 'Cave' }]);
+    expect((t.handle.diceLog[0] as { rolledBy: string }).rolledBy).toBe('Anna · Cave');
   });
 });

@@ -61,6 +61,8 @@ export interface PlayerSessionOptions {
   onControl?(tokenIds: readonly string[]): void;
   /** The GM refused this player's move of the token. */
   onMoveRefused?(tokenId: string): void;
+  /** The scene shown was paused (the GM is on another scene) or is live again. */
+  onSceneState?(paused: boolean): void;
   /** Dice log entries from the GM, newest first; `replay` replaces the log (sent on every admission). */
   onDiceLog?(entries: readonly DiceLogEntry[], replay: boolean): void;
   /** Someone else's laser: its new points, for the scene `sceneId`. */
@@ -93,7 +95,13 @@ export class PlayerSession {
       sendResync: (seq) => this.link?.send('control', encodeControl({ v: 1, type: 'scene-resync', seq })),
       onScene: (scene) => this.options.onScene?.(scene),
       onCamera: (camera) => this.options.onCamera?.(camera),
+      onPaused: (paused) => this.options.onSceneState?.(paused),
     });
+  }
+
+  /** Whether the scene shown is paused: the GM is on another scene, so moves are refused. */
+  get paused(): boolean {
+    return this.inbox.paused;
   }
 
   /** The presented scene as this player has it; null while the GM shows none. */

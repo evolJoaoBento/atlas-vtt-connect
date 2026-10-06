@@ -5,7 +5,13 @@
  * `online-client/diceLogView.mts`.
  */
 import type { RolledDie } from '@atlas-vtt/shared/rules';
+import { diceRollerLabel } from '../split/splitCopy';
 import { DICE_LIMITS, type DiceLogEntry } from '../tools/toolMessages';
+
+/** Who rolled, as the log shows it: "Anna · Cave" while the roll carries its roller's scene (D7), else the name. */
+export function rollerLabel(entry: DiceLogEntry): string {
+  return entry.scene ? diceRollerLabel(entry.name, entry.scene) : entry.name;
+}
 
 /** How long a roll's toast shows: Atlas's toast time. */
 export const DICE_TOAST_MS = 7000;

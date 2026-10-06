@@ -26,6 +26,8 @@ export interface Joined {
   camera: SceneCamera | null;
   control: readonly string[];
   dice: readonly DiceLogEntry[];
+  /** The scene shown is paused: the GM is on another scene. */
+  paused: boolean;
   ids: JoinIdentity;
 }
 
@@ -71,6 +73,11 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       host.sink()?.control(tokenIds);
     },
     onMoveRefused: (tokenId) => { if (current()) host.sink()?.moveRefused(tokenId); },
+    onSceneState: (paused) => {
+      if (!current()) return;
+      joined.paused = paused;
+      host.sink()?.paused?.(paused);
+    },
     onDiceLog: (entries, replay) => {
       if (!current()) return;
       const { list, fresh } = mergeDiceLog(joined.dice, entries, replay);
@@ -96,6 +103,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.control(joined.control),
     () => sink.diceLog(joined.dice),
     () => sink.scene(joined.scene),
+    () => sink.paused?.(joined.paused),
     () => { if (joined.camera) sink.camera(joined.camera); },
     () => sink.images(),
   ];

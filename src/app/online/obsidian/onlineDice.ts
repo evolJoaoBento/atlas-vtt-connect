@@ -1,10 +1,10 @@
 /**
  * The shared dice log in Atlas's dice log panel: each entry as one of Atlas's rolls, under the
- * roller's name. These rolls live only in the online scene's store, which is never saved, and
+ * roller's name ("Anna · Cave" while it carries a scene). These rolls live only in the online scene's store, which is never saved, and
  * never go through Atlas's document-wide dice event, which every open map would record.
  */
 import { isDieType, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
-import { entryRolls } from '../page/diceLogModel';
+import { entryRolls, rollerLabel } from '../page/diceLogModel';
 import { DICE_LIMITS, type DiceLogEntry } from '../tools/toolMessages';
 
 export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult[] {
@@ -22,7 +22,7 @@ export function diceLogResult(entry: DiceLogEntry): DiceRollResult {
     total: entry.total,
     crit: entry.crit ?? null,
     ...(entry.unlisted !== undefined && { unlistedDice: entry.unlisted }),
-    rolledBy: entry.name,
+    rolledBy: rollerLabel(entry),
   };
 }
 

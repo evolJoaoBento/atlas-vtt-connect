@@ -89,4 +89,38 @@ describe('PlayerSession scenes', () => {
     expect(player.camera).toBeNull();
     expect(fromPlayer).toEqual([]);
   });
+
+  it('shows the paused banner for the shown scene and hides it when live again', async () => {
+    const { gm, player, playerId } = await admittedPlayer();
+    const scene = playerScene();
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 1, scene: sceneBody(scene), fogParts: 0, drawingParts: 0 });
+    expect(player.paused).toBe(false);
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: scene.sceneId, paused: true });
+    expect(player.paused).toBe(true);
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: scene.sceneId, paused: false });
+    expect(player.paused).toBe(false);
+  });
+
+  it('ignores a scene-state for another sceneId', async () => {
+    const { gm, player, playerId } = await admittedPlayer();
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: 'aaaaaaaaaaaaaaaaaaaaaa', paused: true });
+    expect(player.paused).toBe(false);
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 1, scene: sceneBody(playerScene()), fogParts: 0, drawingParts: 0 });
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: 'aaaaaaaaaaaaaaaaaaaaaa', paused: true });
+    expect(player.paused).toBe(false);
+  });
+
+  it('a new scene clears the banner', async () => {
+    const { gm, player, playerId } = await admittedPlayer();
+    const first = playerScene();
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 1, scene: sceneBody(first), fogParts: 0, drawingParts: 0 });
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: first.sceneId, paused: true });
+    gm.send(playerId, { v: 1, type: 'scene-clear', seq: 2 });
+    expect(player.paused).toBe(false);
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 3, scene: sceneBody(first), fogParts: 0, drawingParts: 0 });
+    gm.send(playerId, { v: 1, type: 'scene-state', sceneId: first.sceneId, paused: true });
+    const second = { ...first, sceneId: 'bbbbbbbbbbbbbbbbbbbbbb' };
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 4, scene: sceneBody(second), fogParts: 0, drawingParts: 0 });
+    expect(player.paused).toBe(false);
+  });
 });

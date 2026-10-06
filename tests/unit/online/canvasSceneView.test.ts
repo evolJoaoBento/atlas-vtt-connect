@@ -5,6 +5,7 @@ import { CanvasSceneView } from '../../../src/app/online/obsidian/CanvasSceneVie
 import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessionStore';
 import { OnlineJoinService, type OnlineSceneSink } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { ONLINE_SCENE_VIEW_TYPE } from '../../../src/app/online/obsidian/onlineSceneTab';
+import { PAUSED_BANNER } from '../../../src/app/online/split/splitCopy';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 import { memorySettings } from '../connect/memorySettings';
@@ -90,6 +91,23 @@ describe('CanvasSceneView', () => {
     expect(view.contentEl.querySelector('.session-name')?.textContent).toBe('Vault');
     expect(view.contentEl.querySelector('.connection')?.textContent).toBe('Connected');
     expect(leaf.detach).not.toHaveBeenCalled();
+  });
+
+  it('shows the paused banner over the map while the scene is paused', async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const sink = w.sinks[0]!;
+    sink.session(admitted);
+    sink.scene(playerScene());
+    sink.paused?.(true);
+    w.frames.run();
+    const notice = view.contentEl.querySelector<HTMLElement>('.move-notice');
+    expect(notice?.textContent).toBe(PAUSED_BANNER);
+    expect(notice?.hidden).toBe(false);
+    sink.paused?.(false);
+    w.frames.run();
+    expect(notice?.hidden).toBe(true);
   });
 
   it('closing the tab leaves the session', async () => {

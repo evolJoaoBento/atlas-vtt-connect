@@ -9,6 +9,7 @@
  * the connection, and by `cancel` (Escape, pointer cancel, a second finger). Shared with
  * the web page.
  */
+import { PAUSED_BANNER } from '../split/splitCopy';
 import type { PlayerScene, PlayerToken, ScenePoint } from '../scene/sceneTypes';
 import type { ScreenPoint } from './camera';
 import type { TokenOverlay } from './layers/layerTypes';
@@ -56,6 +57,8 @@ export class TokenMoves implements TokenGrab {
   private held: Held | null = null;
   private readonly pending = new Map<string, Pending>();
   private noticeText: string | null = null;
+  /** The GM is on another scene: the paused banner shows, and refusals say nothing more. */
+  private paused = false;
   private noticeTimer: number | null = null;
 
   constructor(private readonly options: TokenMovesOptions) {}
@@ -90,9 +93,20 @@ export class TokenMoves implements TokenGrab {
     this.options.onChange();
   }
 
-  /** The GM refused a move: the token shows its scene position, and the notice shows. */
+  /** The scene is paused or live again (`scene-state`): while paused the notice is the paused banner. */
+  setPaused(paused: boolean): void {
+    if (paused === this.paused) return;
+    this.paused = paused;
+    this.options.onChange();
+  }
+
+  /** The GM refused a move: the token shows its scene position, and the notice shows (not while paused: the banner says why). */
   refused(tokenId: string): void {
     this.settle(tokenId);
+    if (this.paused) {
+      this.options.onChange();
+      return;
+    }
     this.noticeText = MOVE_REFUSED_TEXT;
     if (this.noticeTimer !== null) window.clearTimeout(this.noticeTimer);
     this.noticeTimer = window.setTimeout(() => {
@@ -163,7 +177,7 @@ export class TokenMoves implements TokenGrab {
   }
 
   notice(): string | null {
-    return this.noticeText;
+    return this.paused ? PAUSED_BANNER : this.noticeText;
   }
 
   overlay(): TokenOverlay {

@@ -7,7 +7,7 @@
  * a critical roll marked, and "+N more" for dice a large roll does not list. The log's rules live
  * in `PlayerDiceLog` (`src/app/online/page/diceLogModel.ts`).
  */
-import { dieExtreme, entryRolls, PlayerDiceLog, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
+import { dieExtreme, entryRolls, PlayerDiceLog, rollerLabel, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
 import { dieLabel } from '@atlas-vtt/shared/rules';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import { dieTagOf, dieTagText } from '../src/app/online/tools/diceTags';
@@ -74,7 +74,7 @@ function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
     dice.append(badge);
   });
   if (entry.unlisted) dice.append(text('die-badge is-more', `+${entry.unlisted} more`));
-  item.append(text('dice-entry-name', entry.name), summary, dice);
+  item.append(text('dice-entry-name', rollerLabel(entry)), summary, dice);
   return item;
 }
 

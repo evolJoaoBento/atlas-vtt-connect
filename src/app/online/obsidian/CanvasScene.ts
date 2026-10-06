@@ -142,6 +142,11 @@ export class CanvasScene implements OnlineSceneSink {
     this.map?.moveRefused(tokenId);
   }
 
+  /** The paused banner shows over the map in the move notice, as on the join page. */
+  paused(paused: boolean): void {
+    this.map?.setPaused(paused);
+  }
+
   /** The whole shared log; a roll by someone else that tops it shows as a toast while the log is closed. */
   diceLog(entries: readonly DiceLogEntry[]): void {
     const newest = entries[0];
