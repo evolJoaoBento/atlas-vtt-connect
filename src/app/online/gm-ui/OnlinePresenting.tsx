@@ -5,21 +5,13 @@ import { SPLIT_LIMITS } from '../split/splitLimits';
 import { EVERYONE_BACK_LABEL, PRESENT_TO_NO_SCENE, UPDATE_ATLAS_NOTE, capPanelNote, splitStatus } from '../split/splitCopy';
 import { PRESENT_LABEL, STOP_PRESENTING_LABEL } from '../ui/onlineCopy';
 import { PresentToButton } from './PresentToButton';
-import { presentToButtonLabel, presentToMenu, type SplitActions, type SplitView } from './presentToRows';
+import { presentToButtonLabel, presentToMenu, splitViewOf, type SplitActions, type SplitView } from './presentToRows';
 import { presentingActions, presentingHere, tabNameIn, type PresentingEnv } from './presentingHere';
 import { useActiveTabId, useOnlineSession, usePresentedSceneSummary, useViewTabsKey } from './useOnlineState';
 
 /** The split party as the panel reads it: the store's players and assignments, Atlas's presented tab, the tab names. */
-export function useSplitView(env: PresentingEnv): SplitView {
-  const session = useOnlineSession();
-  const current = env.presentation.current();
-  return {
-    players: session.players,
-    assignments: session.assignments,
-    assignedCount: session.assignedCount,
-    presented: current ? { viewId: current.viewId, tabId: current.tabId } : null,
-    nameOf: (tab) => tabNameIn(env.views, tab),
-  };
+function useSplitView(env: PresentingEnv): SplitView {
+  return splitViewOf(useOnlineSession(), env.presentation, (tab) => tabNameIn(env.views, tab));
 }
 
 interface OnlinePresentingProps {

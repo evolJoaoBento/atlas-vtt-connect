@@ -2,6 +2,7 @@ import type { Plugin } from 'obsidian';
 import type { Disposer, PresentationApi } from '@atlas-vtt/api-types';
 import { onlineSessionStore, type OnlineSessionState } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
+import { tabBadge } from './gm-ui/tabBadge';
 import { EVERYONE_BACK_COMMAND } from './split/splitCopy';
 import { canBringEveryoneBack } from './splitStore';
 import { ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
@@ -88,6 +89,8 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
     });
   }
 
+  // With scene tabs the eye of each tab players see is badged while the party is split ("2 players").
+  const target = options.splitParty ? { ...ONLINE_TARGET, tabBadge: tabBadge(options.presentation) } : ONLINE_TARGET;
   const status = statusItemOf(plugin);
   const { item } = status;
   const open = (): void => openOnlineSession(plugin.app, options.gmUi);
@@ -98,7 +101,7 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
     item.toggle(state.status === 'hosting');
     item.setText(statusText(state));
     // Held while hosting, so Atlas's eye presents to online players; otherwise it opens the player window.
-    if (state.status === 'hosting') stopTarget ??= options.presentation.addTarget(ONLINE_TARGET);
+    if (state.status === 'hosting') stopTarget ??= options.presentation.addTarget(target);
     else {
       stopTarget?.();
       stopTarget = null;

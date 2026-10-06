@@ -3,7 +3,9 @@
  * 3.4), plus what both read of who sees a tab: the button's label and the eye's badge. Pure: the caller passes the
  * store's copy of the assignments, the presented tab and the actions; `resolveScene` is the one rule of where a player is.
  */
+import type { PresentationApi } from '@atlas-vtt/api-types';
 import type { SessionPlayer } from '../GmSession';
+import type { OnlineSessionState } from '../onlineSessionStore';
 import { resolveScene } from '../split/SceneAssignments';
 import {
   CAP_NOTE, EVERYONE_BACK_LABEL, PRESENT_TO_HEADING, badge, presentSceneToHeading, presentToLabel, rowLabel, type RowPlace,
@@ -26,6 +28,23 @@ export interface SplitView {
   assignedCount: number;
   presented: TabKey | null;
   nameOf(tab: TabKey): string;
+}
+
+/** The split party in `state`, with Atlas's presented tab and `nameOf` for the scene names: what every reader builds on. */
+export function splitViewOf(state: OnlineSessionState, presentation: Pick<PresentationApi, 'current'>, nameOf: (tab: TabKey) => string): SplitView {
+  const current = presentation.current();
+  return {
+    players: state.players,
+    assignments: state.assignments,
+    assignedCount: state.assignedCount,
+    presented: current ? { viewId: current.viewId, tabId: current.tabId } : null,
+    nameOf,
+  };
+}
+
+/** Whether the split party's menus and badges show: hosting, on an Atlas with scene tabs. */
+export function splitShown(state: OnlineSessionState): boolean {
+  return state.status === 'hosting' && state.split === 'on';
 }
 
 /** A tab the rows are for: the GM's active tab (panel) or the right-clicked one (eye). */

@@ -14,6 +14,8 @@ import { controlledByProvider } from './controlledByMenu';
 import { mountPanel } from './mountPanel';
 import { onlinePaletteSection } from './onlinePalette';
 import { presentingActions } from './presentingHere';
+import { splitShown } from './presentToRows';
+import { presentToSection } from './sceneTabMenu';
 import { onlineToolbarItem } from './onlineToolbar';
 import { revealView } from './revealView';
 import type { PanelService } from './OnlinePanel';
@@ -70,6 +72,19 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
     () => panel.dispose(),
   ];
 
+  // The eye's "Present to" section, only while hosting with a split party (Atlas's `scene-tabs`): a stopped session
+  // leaves no section behind (Review Focus B12).
+  let stopSection: Disposer | null = null;
+  const syncSection = (): void => {
+    const wanted = !disposed && splitShown(onlineSessionStore.getState()) && typeof ui.addSceneTabMenuSection === 'function';
+    if (wanted && !stopSection) stopSection = ui.addSceneTabMenuSection!(presentToSection({ actions: service, presentation, views }));
+    else if (!wanted && stopSection) {
+      stopSection();
+      stopSection = null;
+    }
+  };
+  syncSection();
+
   // Atlas reads the slots again after every change of the session, of who controls which token, and of what is presented.
   let stopControl: Disposer | null = null;
   const watchControl = (): void => {
@@ -79,6 +94,7 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
   watchControl();
   const stopStore = onlineSessionStore.subscribe((state, before) => {
     if (state.tokenControl !== before.tokenControl) watchControl();
+    syncSection();
     invalidate();
   });
   const stopPresentation = presentation.subscribe({ presented: invalidate, held: invalidate, cleared: invalidate });
@@ -87,6 +103,7 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
     if (disposed) return;
     disposed = true;
     stopStore();
+    syncSection();
     stopPresentation();
     stopControl?.();
     for (const dispose of stops.splice(0).reverse()) dispose();

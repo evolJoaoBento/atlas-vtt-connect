@@ -55,3 +55,39 @@ describe('the split party while hosting', () => {
     expect(onlineSessionStore.getState().assignedCount).toBe(0);
   });
 });
+
+describe('the eye while hosting', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { resetOnlineSessionStore(); vi.useRealTimers(); });
+
+  it('ticking on a never-live tab switches the GM view and the row turns checked after invalidate', async () => {
+    const { atlas, ben } = await hosting();
+    const menu = atlas.ui!.openSceneTabMenu(VIEW, 'c');
+    const from = ben.received.length;
+    expect(menu.choose('Ben · on Ambush')).toBe(true);
+    await vi.advanceTimersByTimeAsync(60);
+    expect(atlas.views.tabsOf(VIEW)?.activeTabId).toBe('c');
+    expect(atlas.presentation.current()).toMatchObject({ tabId: 'a' });
+    expect(menu.isOpen).toBe(true);
+    expect(menu.items.find((item) => item.label === 'Ben')).toMatchObject({ checked: true });
+    expect(menu.items.find((item) => item.label === 'Ana · on Ambush')).toMatchObject({ checked: false });
+    const sent = ben.received.slice(from).filter((message) => message.type === 'scene-snapshot');
+    expect(sent.length).toBeGreaterThan(0);
+    expect(JSON.stringify(sent)).toContain('cavebat');
+  });
+
+  it('badges the tabs players see while split, and leaves no section and no badge once hosting stops', async () => {
+    const { atlas, connect, service, idOf } = await hosting();
+    expect(atlas.ui!.sceneTabSectionCount()).toBe(1);
+    expect(atlas.presentation.badgeFor(VIEW, 'a')).toBeNull();
+    service.assign(idOf('Ben'), { viewId: VIEW, tabId: 'b' });
+    await vi.advanceTimersByTimeAsync(60);
+    expect(atlas.presentation.badgeFor(VIEW, 'a')).toBe('1 player');
+    expect(atlas.presentation.badgeFor(VIEW, 'b')).toBe('1 player');
+    expect(atlas.presentation.badgeFor(VIEW, 'c')).toBeNull();
+    expect(connect.run('stop-online-session')).toBe(true);
+    expect(atlas.ui!.sceneTabSectionCount()).toBe(0);
+    expect(atlas.presentation.badgeFor(VIEW, 'b')).toBeNull();
+    expect(atlas.ui!.sceneTabMenu(VIEW, 'b')).toEqual([]);
+  });
+});
