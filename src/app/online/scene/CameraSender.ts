@@ -12,14 +12,8 @@ import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
 import { CAMERA_INTERVAL_MS, roundedCamera, sameCamera, type SceneCamera } from './sceneCamera';
 import type { PresentedSceneSource, SceneSession } from './sceneSources';
-import type { PlayerScene } from './sceneTypes';
 import { isSceneCamera } from './sceneValidation';
 import type { SlotChange, SlotProjection, SlotView } from './slotViews';
-
-/** What the parts that still serve the presented scene only need of the hub (until B8 and B9). */
-export interface CameraProjection {
-  currentProjection(): PlayerScene | null;
-}
 
 export interface CameraSenderOptions {
   session: SceneSession;

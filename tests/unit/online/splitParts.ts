@@ -3,9 +3,12 @@
  * its order, after the scene hub: the camera sender, then the token control host, the dice host and the laser relay.
  * Each helper starts its part and gives it back.
  */
+import type { DiceRollRequest } from '@atlas-vtt/api-types';
+import { diceHostPart, laserRelayPart } from '../../../src/app/online/atlas/toolParts';
 import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import { decodeAsset, encodeAsset, type AssetMessage } from '../../../src/app/online/assets/assetProtocol';
 import { TokenControlHost } from '../../../src/app/online/control/TokenControlHost';
+import type { HostedContext, HostedPart } from '../../../src/app/online/hostedSession';
 import { encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { CameraSender } from '../../../src/app/online/scene/CameraSender';
 import { fingerprintOf } from './assetFixtures';
@@ -80,4 +83,31 @@ export function listsOf(player: RawPlayer, from = 0): string[][] {
 /** The player drops `tokenId` at `x`, stamped with `sceneId`. */
 export function dropToken(player: RawPlayer, sceneId: string, tokenId: string, x: number): void {
   player.link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId, x, y: 140 }));
+}
+
+type Laser = Extract<ControlMessage, { type: 'laser' }>;
+type DiceLog = Extract<ControlMessage, { type: 'dice-log' }>;
+
+/** The player tools as the hosted session builds them: the dice host, then the laser relay. `rolls` records every request. */
+export function toolParts(w: SplitWorld, rolls: DiceRollRequest[] = []): { dice: HostedPart; lasers: HostedPart } {
+  const context: HostedContext = { session: w.gm, presented: w.presented, projection: w.hub };
+  const atlasDice = w.extension.dice;
+  const dice = diceHostPart({ ...atlasDice, roll: (request) => { rolls.push(request); return atlasDice.roll(request); } })(context);
+  const lasers = laserRelayPart(w.extension.lasers, w.extension.settings)(context);
+  dice.start();
+  lasers.start();
+  return { dice, lasers };
+}
+
+export const lasersOf = (player: RawPlayer, from = 0): Laser[] => player.received.slice(from).filter((message): message is Laser => message.type === 'laser');
+export const logsOf = (player: RawPlayer, from = 0): DiceLog[] => player.received.slice(from).filter((message): message is DiceLog => message.type === 'dice-log');
+
+/** The player's laser at `x`, stamped with `sceneId`. */
+export function sendLaser(player: RawPlayer, sceneId: string, x: number, lifted = false): void {
+  player.link.send('control', encodeControl({ v: 1, type: 'laser', sceneId, points: [{ x, y: 10 }], lifted }));
+}
+
+/** The player rolls one d6 from the tray. */
+export function rollD6(player: RawPlayer): void {
+  player.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice: { d6: 1 }, modifier: 0 }));
 }

@@ -12,17 +12,17 @@ export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['
 
 /** Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log. */
 export function diceHostPart(dice: DiceApi): NonNullable<OptionalParts['dice']> {
-  return ({ session, presented, projection }) => new DiceHost({
-    session, presented, projection,
+  return ({ session, projection }) => new DiceHost({
+    session, projection,
     roll: (request) => dice.roll(request),
     feed: { subscribe: (listener) => dice.onRolled(listener), publish: (result) => { dice.publish(result); } },
   });
 }
 
-/** Lasers are heard from and shown in the presented view; the GM's own is the colour set in Atlas. */
+/** Lasers are heard from and shown in the view of the scene the GM's view shows; the GM's own is the colour set in Atlas. */
 export function laserRelayPart(lasers: LasersApi, settings: Pick<SettingsApi, 'get'>): NonNullable<OptionalParts['laser']> {
-  return ({ session, presented, projection }) => new LaserRelay({
-    session, presented, projection,
+  return ({ session, projection }) => new LaserRelay({
+    session, projection,
     laser: { onLocal: (viewId, listener) => lasers.onLocal(viewId, listener), show: (viewId, laser) => { lasers.show(viewId, laser); } },
     gmColor: () => settings.get('laserPointer').color,
   });

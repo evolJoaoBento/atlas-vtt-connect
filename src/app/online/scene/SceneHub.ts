@@ -21,7 +21,7 @@ import { SceneSlot, type SlotHost, type SlotSource } from './SceneSlot';
 import type { PlayerScene } from './sceneTypes';
 import { assignToTab, dropClosedTabs, scenesInUse, slotSource, type SplitActionDeps } from './splitActions';
 import { SlotReads } from './slotReads';
-import { ProjectionWatch, viewOf, type SceneUse } from './slotViews';
+import { viewOf, type SceneUse } from './slotViews';
 
 export { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE } from './sceneSources';
 export type { PlayerViewSettingsSource, PresentedSceneSource, SceneProjectionOptions, SceneSession } from './sceneSources';
@@ -36,7 +36,6 @@ export class SceneHub extends SlotReads implements SessionHandler {
   private readonly stops: Array<() => void> = [];
   private readonly channels: PlayerChannels;
   protected readonly places: PlayerPlaces;
-  private readonly projections = new ProjectionWatch(() => this.currentProjection());
   private readonly host: SlotHost<SceneSlot>;
   private presentedSlot: SceneSlot | null = null;
   /** The presentation the presented slot shows: a new one is a new scene (`sceneId`). */
@@ -57,10 +56,7 @@ export class SceneHub extends SlotReads implements SessionHandler {
       audience: (slot) => this.places.audience(slot),
       sendSequenced: (playerId, message) => this.channels.sendSequenced(playerId, message),
       send: (playerId, message) => options.session.send(playerId, message),
-      projected: (slot) => {
-        this.changes.emit({ kind: 'projected', slot: viewOf(slot) });
-        this.projections.check();
-      },
+      projected: (slot) => this.changes.emit({ kind: 'projected', slot: viewOf(slot) }),
       observed: (slot, snapshot) => this.liveChanges.emit({ sceneId: slot.sceneId, snapshot }),
       caughtUp: (slot) => this.changes.emit({ kind: 'state', slot: viewOf(slot) }),
     };
@@ -99,14 +95,12 @@ export class SceneHub extends SlotReads implements SessionHandler {
     this.stops.splice(0).forEach((stop) => stop());
   }
 
-  /** What the presented scene's followers have now; null when none was sent or it was cleared. */
+  /**
+   * What the presented scene's followers have now; null when none was sent or it was cleared. A read for the GM's side:
+   * nothing sent to players comes from it (each part reads `slotOf`, per player).
+   */
   currentProjection(): PlayerScene | null {
     return this.presentedSlot?.lastSent ?? null;
-  }
-
-  /** Tells `listener` each change of `currentProjection()`, for the parts that serve the presented scene only. */
-  onProjection(listener: (scene: PlayerScene | null) => void): () => void {
-    return this.projections.add(listener);
   }
 
   splitActive(): boolean {
@@ -222,7 +216,6 @@ export class SceneHub extends SlotReads implements SessionHandler {
     } finally {
       this.updating = false;
     }
-    this.projections.check();
   }
 
   private reconcile(): void {

@@ -864,10 +864,13 @@ describe('SceneHub', () => {
     });
   });
 
-  it('tells projection listeners each change of what players have', async () => {
+  it('tells slot listeners each change of what players have', async () => {
     const h = setup();
     const seen: Array<string[] | null> = [];
-    const stop = h.broadcaster.onProjection((scene) => seen.push(scene ? Object.keys(scene.tokens) : null));
+    const stop = h.broadcaster.onSlotChange((change) => {
+      if (change.kind === 'projected') seen.push(change.slot.lastSent ? Object.keys(change.slot.lastSent.tokens) : null);
+      else if (change.kind === 'freed') seen.push(null);
+    });
     const { view, store, tavern } = fakeView(sceneState({ hero: character('hero', 140) }));
     h.presented.present(view, tavern);
     expect(seen).toEqual([['hero']]);

@@ -29,7 +29,7 @@ export type SlotChange =
   /** The split party's assignments changed (`splitActive`, `scenesInUse`); every move they made was told first. */
   | { kind: 'assignments' };
 
-/** Replaces `CameraProjection`: what a player has, and every change of it. */
+/** What the hub tells the session's other parts: what each player has, the scene the GM's view shows, and every change. */
 export interface SlotProjection {
   /** The scene `playerId` was sent (or is waiting for); null when they have none. */
   slotOf(playerId: string): SlotView | null;
@@ -84,25 +84,5 @@ export class SlotChanges<T = SlotChange> {
         console.error('[Atlas VTT Connect] A scene change listener failed:', error);
       }
     }
-  }
-}
-
-/** Tells listeners each change (by reference) of what `current` gives: the presented scene's followers' projection. */
-export class ProjectionWatch {
-  private readonly listeners = new Set<(scene: PlayerScene | null) => void>();
-  private last: PlayerScene | null = null;
-
-  constructor(private readonly current: () => PlayerScene | null) {}
-
-  add(listener: (scene: PlayerScene | null) => void): () => void {
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
-  }
-
-  check(): void {
-    const scene = this.current();
-    if (scene === this.last) return;
-    this.last = scene;
-    for (const listener of [...this.listeners]) listener(scene);
   }
 }

@@ -45,8 +45,7 @@ describe('DiceHost with a roll Atlas refuses', () => {
   function host(roll: () => never): DiceHost {
     return new DiceHost({
       session: { use: () => () => {}, send: () => {}, getPlayers: () => [] } as never,
-      presented: { current: () => null, isHeld: () => false } as never,
-      projection: { currentProjection: () => null },
+      projection: { slotOf: () => null, shownSlot: () => null, scenesInUse: () => 0 },
       roll,
       feed: { subscribe: () => () => {}, publish: () => {} },
     });
