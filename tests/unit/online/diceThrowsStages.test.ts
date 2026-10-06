@@ -46,21 +46,20 @@ describe("the join page's dice stages", () => {
   });
 
   it('makes at most two, the stage on screen and one spare, drawn by one WebGL context, however many rolls come', async () => {
-    const stages = new Set<HTMLCanvasElement>();
-    const make = (globalThis as unknown as { createEl: (tag: string, info?: { cls?: string }) => HTMLElement }).createEl;
-    Object.assign(globalThis, {
-      createEl: (tag: string, info?: { cls?: string }): HTMLElement => {
-        const element = make(tag, info);
-        if (info?.cls === 'atlas-dice-stage__canvas') stages.add(element as HTMLCanvasElement);
-        return element;
-      },
-    });
+    // Atlas's stages make their canvases through its DOM host (`vite/atlasDomHost.mts` gives the page's), so count what the document makes.
+    const canvases: HTMLCanvasElement[] = [];
+    const create = document.createElement.bind(document) as (tag: string) => HTMLElement;
+    vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+      const element = create(tag);
+      if (tag === 'canvas') canvases.push(element as HTMLCanvasElement);
+      return element;
+    }) as typeof document.createElement);
     for (let i = 0; i < 6; i++) {
       expect(diceThrows.throwRoll(document.body, roll(`r${i}`))).toBe(true);
       await vi.advanceTimersByTimeAsync(4000);
     }
     expect(PAGE_STAGES).toBe(2);
-    expect(stages.size).toBe(PAGE_STAGES);
+    expect(canvases.filter((canvas) => canvas.className === 'atlas-dice-stage__canvas')).toHaveLength(PAGE_STAGES);
     expect(contexts.count).toBe(1);
     expect(document.querySelectorAll('.dice-throw').length).toBeLessThanOrEqual(1);
   });

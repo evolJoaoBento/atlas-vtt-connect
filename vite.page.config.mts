@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import { atlasAliases } from './vite/atlasAliases.mts';
+import { atlasDomHost } from './vite/atlasDomHost.mts';
 
 /** The web page players open to join an online session; deployed to GitHub Pages (pages.yml). */
 export default defineConfig({
   root: 'online-client',
   base: './',
+  plugins: [atlasDomHost],
   resolve: { alias: atlasAliases },
   build: {
     outDir: '../dist-page',

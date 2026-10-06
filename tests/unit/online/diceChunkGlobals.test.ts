@@ -16,7 +16,7 @@ const SHIMMED_OPTIONS = new Set(['cls', 'attr']);
 /** Obsidian members that share their name with the browser's or the language's own, so the page has them too. */
 const STANDARD = new Set([
   'contains', 'remove', 'find', 'findIndex', 'findLast', 'findLastIndex', 'includes', 'clamp', 'isNumber', 'assign',
-  'first', 'last', 'unique', 'empty', 'show', 'hide', 'toggle', 'on', 'off', 'onClickEvent', 'win', 'doc', 'indexOf',
+  'activeDocument', 'first', 'last', 'unique', 'empty', 'show', 'hide', 'toggle', 'on', 'off', 'onClickEvent', 'win', 'doc', 'indexOf',
 ]);
 
 function sourceOf(path: string): string {
