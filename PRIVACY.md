@@ -23,7 +23,9 @@ Players open the join page from `evoljoaobento.github.io/atlas-vtt-connect` (Git
 
 ## What players receive
 
-The players you let in receive the scene you present, filtered on your computer before it is sent, with file paths replaced by fingerprints of the files' contents (which only tell whether two images are the same file). They also receive the map and token images of that scene, as the original files, and no other file from your vault.
+The players you let in receive the scene they are on, filtered on your computer before it is sent, with file paths replaced by fingerprints of the files' contents (which only tell whether two images are the same file). They also receive the map and token images of that scene, as the original files, and no other file from your vault.
+
+That scene is the one you present, unless you assigned the player to another tab (split party, see the README). Each player receives only their own scene: its records, images, token ids and names, your view and lasers on it. Images are checked per player, so a page that asks for another scene's image is refused. A scene you are not on is paused: its players keep what they already have and get nothing new from it, except that a change you make to what players may see (the player view settings, or a collection's resources and rules) is applied to it at once. Who is on which scene is never sent to players; they see everyone's names in the session, as before. The one thing about another scene a player can receive is its name, in the dice log (see below).
 
 What players never receive:
 
@@ -38,8 +40,8 @@ The map image is sent whole, so the parts of the picture under fog of war are vi
 Players also receive:
 
 - the initiative list as your player window shows it: for a collection that fights by sides, the combatants under their side and no initiative numbers, and a number only where the window shows one. A creature is marked as downed when a resource that defeats it is spent, even one you keep from players;
-- where your view of the presented scene is (its centre and how much of the map it shows), so their view can follow yours. Nothing about your view is sent while you look at another scene;
-- where your laser pointer is, while you point on the presented scene;
+- where your view of their scene is (its centre and how much of the map it shows), so their view can follow yours. Nothing about your view is sent while you look at another scene;
+- where your laser pointer is, while you point on their scene;
 - your game system's cone angle with your measurement settings;
 - the widgets (timers, counters and the like) that players can see, with their label, icon and value;
 - the ids of their own tokens, and nothing else about them;
@@ -51,9 +53,9 @@ Players can move the tokens you assign to them under **Controlled by**. For each
 
 ### Dice and lasers
 
-While a session runs, players receive every dice roll Atlas makes: the formula, each die (and whether it was rolled for an exploding die or subtracts), the total, whether it was a critical success or failure by your collection's dice rules, and who rolled it. That is the player's name, or a statblock token's name only when players can see that token with its name on the presented scene, or "GM". Only the player who made a roll receives it marked as their own. Players' rolls use your collection's dice rules. The join page keeps the player's **Roll display** choice in that browser.
+While a session runs, players receive every dice roll Atlas makes: the formula, each die (and whether it was rolled for an exploding die or subtracts), the total, whether it was a critical success or failure by your collection's dice rules, and who rolled it. That is the player's name, or a statblock token's name only to players who can see that token with its name on their own scene (everyone else reads "GM"), or "GM". While more than one scene is in use, a player's roll also carries the name of the roller's scene, as its tab is named, to every player, including players on other scenes. Only the player who made a roll receives it marked as their own. Players' rolls use your collection's dice rules. The join page keeps the player's **Roll display** choice in that browser.
 
-Players' measurements and drag rulers stay on their device. Their lasers and dice rolls go to you and to the other players in the session. Lasers are not stored. Players' rolls show in your dice log for as long as the map stays open, and are not saved into your map files.
+Players' measurements and drag rulers stay on their device. Their lasers go to the other players on the same scene, and to you while you have that scene open; their dice rolls go to everyone in the session. Lasers are not stored. Players' rolls show in your dice log for as long as the map stays open, and are not saved into your map files.
 
 ## Joining a session from Obsidian
 

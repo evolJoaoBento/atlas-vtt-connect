@@ -1,10 +1,10 @@
 # Present to players (split party): design
 
 - **Date:** 2026-10-06
-- **Status:** design, ready for planning
+- **Status:** implemented. Atlas: API batch 16 (API 1.17.0, `scene-tabs`) at `api-pr-16-end` (`bc7bccc6`). Connect: plan tasks B1–B13, for Connect 0.1.0-beta.4 with the Atlas API build 0.6.0-beta.5. This document describes what was built; section 12 lists where it differs from the first draft.
 - **Plan:** `docs/plans/2026-10-06-present-to-players.md`
 - **Repos:**
-  - Atlas: `C:\Users\joaoo\2075\atlas-vtt-upstream-wt`, branch `api/extension-api`. Read at `api-pr-15-end` (12e9b106), three commits after `api-merge-beta-e8b9`. Batch 15 (API 1.16.0) is still open in the worktree.
+  - Atlas: `C:\Users\joaoo\2075\atlas-vtt-upstream-wt`, branch `api/extension-api`. The findings were read at `api-pr-15-end` (12e9b106). Batch 16 ends at `api-pr-16-end` (`bc7bccc6`), which Connect vendors.
   - Connect: `C:\Users\joaoo\2075\atlas-vtt-connect`, branch `main`.
 - **User requirements (binding, 2026-10-06):**
   - The GM can use any number of scenes at once, each assigned to any set of the online players, and can move players between them.
@@ -107,8 +107,9 @@ All wording is sentence case. Player names and scene (tab) names are shown as gi
 - The popover is Connect's own React checklist inside the panel, not an Obsidian `Menu`. An Obsidian menu closes on every pick, and the GM ticks several players in a row (decision D11).
 - Contents, top to bottom:
   1. A heading: "Present {scene} to".
-  2. One checkbox row per admitted or disconnected player, in the panel's player order. The rows behave as in 3.4.
-  3. A separator, then "Everyone back to the presented scene" (3.5).
+  2. While a row is disabled by the cap, the note "At most 4 scenes at once" under the heading.
+  3. One checkbox row per admitted or disconnected player, in the panel's player order. The rows behave as in 3.4.
+  4. A separator, then "Everyone back to the presented scene" (3.5).
 - No admitted or disconnected players: one disabled row, "No players connected".
 - No GM map view or no active tab: the button is disabled and reads "Present to: no scene open".
 
@@ -120,7 +121,8 @@ All wording is sentence case. Player names and scene (tab) names are shown as gi
   1. Atlas's own "Open player window", while a presentation target is active, as today.
   2. A separator, then Connect's section:
      - heading row "Present to";
-     - the player rows of 3.4 for **that** tab;
+     - while a row is disabled by the cap, a disabled first row "At most 4 scenes at once". Atlas reads a section's heading once, when the section is added, so the note cannot go into the heading;
+     - the player rows of 3.4 for **that** tab, or one disabled row "No players connected";
      - "Everyone back to the presented scene".
 - Connect adds its section only while it is hosting. Not hosting: the menu has only Atlas's own entry, and it opens only while a target is active, as before.
 - The rows are top-level checkable items with `keepOpen`, so the GM ticks several in a row. The batch 16 menu re-reads its sections after `ui.invalidate()`, so the checkmarks follow (A2).
@@ -136,7 +138,7 @@ For a tab T and a player P:
 | Assigned to T | `Anna` | yes | unassign: Anna follows the presented scene again |
 | Assigned to another tab U | `Anna · on {U}` | no | assign Anna to T (moves her from U), or, when T is presented, unassign her |
 | Disconnected | the same, with ` · disconnected` | as above | as above; the assignment applies when she returns |
-| Would open a 5th scene in use | as above | no, disabled | nothing; the heading row gains "At most 4 scenes at once" |
+| Would open a 5th scene in use | as above | no, disabled | nothing; the menu gains the note "At most 4 scenes at once" (3.2, 3.3) |
 
 - Rows that change something run at once. They need no confirmation, because every step can be undone with one more click.
 - **Choosing a row for a tab that has never been live** in this session (no parked projection) first switches the GM's view to that tab with `views.showTab`, the batch 16 addition. Connect can only project the active tab, and the GM sees what they hand out (decision D4). The menu stays open while its tab becomes active (A2 pins this).
@@ -146,7 +148,7 @@ For a tab T and a player P:
 - **Where:**
   - the last row of both menus;
   - a button in the panel's presenting block, shown only while at least one player is assigned;
-  - the command "Bring all players back to the presented scene" (palette and Obsidian commands).
+  - the command "Bring all players back to the presented scene": in Atlas's palette, and as an Obsidian command registered only on an Atlas with `scene-tabs`.
 - **Effect:** clears every assignment. Every player then follows the presented scene and gets its snapshot.
 - **Disabled** when nothing is assigned, or when no scene is presented. In the second case it would blank every screen, and the GM can untick players one by one instead (decision D9).
 
@@ -155,14 +157,14 @@ For a tab T and a player P:
 - With at least one assignment, the presenting block reads "Players see {scene}. 2 players are on other scenes." Singular: "1 player is on another scene."
 - Each assigned player's row in `OnlinePlayerList` gains a chip "On {scene}". Followers get no chip, as today.
 - At the cap: "Players are on 4 scenes, the most at once. Bring players back to free one."
-- Older Atlas (no `scene-tabs` capability): one line in the presenting block, "Update Atlas VTT to show different scenes to different players.", and no "Present to:" button. This matches the existing tokens note.
+- Older Atlas (no `scene-tabs` capability): one line in the presenting block, "Update Atlas VTT to show different scenes to different players.", and no "Present to:" button, eye section, badge or Obsidian command.
 
 ### 3.7 The eye's marker
 
 - While at least one player is assigned, every tab with players on it shows a short badge after its eye: "1 player" or "3 players", the count of players who see that tab (followers count for the presented tab).
 - A tab with a badge draws its eye in the "shown" style even when it is not the presented tab.
 - With no assignments there are no badges, as today.
-- The badge comes from `PresentationTarget.tabBadge`, the batch 16 addition. Atlas also reads it into the eye's accessible name.
+- The badge comes from `PresentationTarget.tabBadge`, the batch 16 addition, on Connect's online target. It reads the session store when Atlas calls it, and Connect calls `ui.invalidate()` on every store change. Atlas draws it in an `atlas-scene-tab__badge` span and also reads it into the eye's accessible name.
 
 ### 3.8 What players see
 
@@ -186,31 +188,43 @@ For a tab T and a player P:
 ```ts
 /** A tab of a GM map view. Tab ids are unique per view and survive renames. */
 interface TabKey { viewId: string; tabId: string }
-const keyOf = (tab: TabKey): string => `${tab.viewId}\u0000${tab.tabId}`;
+function tabKeyOf(tab: TabKey): string;                 // `${viewId}\u0000${tabId}`
+function sameTab(a: TabKey | null, b: TabKey | null): boolean;
+
+/** The one rule of where a player is: their tab, else the presented one, else none. */
+function resolveScene(assigned: TabKey | null | undefined, presented: TabKey | null): TabKey | null;
+
+type AssignResult = 'ok' | 'follows' | 'cap';           // 'follows': the presented tab, stored as follow
 
 /** Who is pinned where. Absent: follows the presented scene. Never holds the presented tab. */
 class SceneAssignments {
-  assign(playerId: string, tab: TabKey): AssignResult;   // 'ok' | 'cap' | 'presented' (stored as follow)
+  assign(playerId: string, tab: TabKey, presented: TabKey | null): AssignResult;
   unassign(playerId: string): void;
-  clear(): void;                                         // Everyone back
+  clear(): string[];                                      // Everyone back: who was assigned
   tabOf(playerId: string): TabKey | null;
-  dropTab(tab: TabKey): string[];                        // a closed tab: the players sent back
-  retainPlayers(known: ReadonlySet<string>): void;       // drops kicked players
-  scenesInUse(presented: TabKey | null): number;
+  sceneOf(playerId: string, presented: TabKey | null): TabKey | null;   // resolveScene
+  dropTab(tab: TabKey): string[];                         // a closed tab: the players sent back
+  dropView(viewId: string): string[];
+  presentedChanged(presented: TabKey | null): string[];   // D15
+  retainPlayers(known: ReadonlySet<string>): void;        // drops kicked players
+  scenesInUse(presented: TabKey | null): TabKey[];        // the presented one first
+  wouldExceedCap(playerId: string, tab: TabKey, presented: TabKey | null): boolean;
+  assignedCount(): number;
+  entries(): Record<string, TabKey>;                      // a copy, for the GM's store
   onChange(listener: (playerIds: string[]) => void): () => void;
 }
 
-/** One scene in use: the presented scene's slot, or an assigned tab's slot. */
-interface SceneSlot {
-  tab: TabKey;
-  sceneId: string;                    // random; kept while the slot lives (parked included)
+/** One scene in use (`SceneSlot`): the presented scene's slot, or an assigned tab's slot. */
+class SceneSlot {
+  readonly tab: TabKey;
+  readonly sceneId: string;           // random; kept while the slot lives (parked included)
   state: 'waiting' | 'live' | 'parked';
   lastSent: PlayerScene | null;       // what its players have
-  snapshot: SceneSnapshot | null;     // the last loaded snapshot, kept to re-project on a rules change
-  lighting: LightingFrame | null;     // the last frame, kept while parked
-  memo: ProjectionMemo;               // kept while the slot lives
-  snapshots: SnapshotCache;           // cached snapshot messages for reassignment and resync
-  camera: SceneCamera | null;         // the last camera sent
+  name: string;                       // the tab's name and map path, kept current on tabs-changed
+  mapPath: string;
+  // Private: the kept snapshot and lighting frame (to re-project while parked, D8), the projection memo, the cached
+  // snapshot messages, the fog coverage and the lighting watcher (both dropped while parked), and the sight wait (P8).
+  shownSnapshot(): SceneSnapshot | null;   // live, attributed (P2), caught up, not waiting for sight (P8)
 }
 ```
 
@@ -218,7 +232,10 @@ interface SceneSlot {
   - A slot's **audience** is the admitted players who resolve to its tab.
   - The presented slot lives while something is presented. Its `sceneId` is new for every `presentationId`, exactly as today.
   - An assigned slot lives while it has at least one assigned player, connected or not. When the last one leaves it, its memory is freed.
-- **Live attribution.** Data belongs to a tab only when the snapshot is `loaded` and its `tabId` (batch 16, `SceneSnapshot.tabId`) equals the tab's id.
+- **Live attribution.** Data belongs to a tab only when the snapshot is `loaded` and its `tabId` (batch 16, `SceneSnapshot.tabId`) equals the tab's id (`TabScenes.liveSnapshot`).
+  - `TabScenes` (`src/app/online/atlas/tabScenes.ts`) also has `isActive(tab)`, `watch(viewId)`, `camera(viewId)` and `watchCamera(viewId)`. `isActive` reads `activeTabId` only to decide whether a slot is live or parked, never to attribute data. It is the only Connect file that reads `activeTabId`.
+  - The hub's read side (`SlotProjection`: `slotOf`, `liveSlot`, `shownSlot`, `shownSnapshot`, `audience`, `splitActive`, `scenesInUse`, `onSlotChange`, `watchLive`) is what the camera, assets, control, lasers and dice read.
+  - An admitted player whom the hub has not placed yet resolves to the scene their admission sends. So an asset request that arrives before the admission's snapshot is checked against the player's own scene.
   - Without `scene-tabs` (an older Atlas) there is only the presented slot, attributed as today (by presentation and `loaded`), and the split feature is hidden (decision D12).
   - `activeTabId` alone never attributes anything, because it changes before the store reloads.
 - **Persistence.** None. Assignments live in the hosted session. Player ids are per session, and a new session starts with everyone following (decision D10).
@@ -227,7 +244,11 @@ interface SceneSlot {
   - Presenting a tab with the eye (a new presentation) turns every player assigned to it into a follower.
   - A tab that closes drops its assignments.
   - A kicked player is dropped. A disconnected one is kept.
-- **GM state for the UI:** `onlineSessionStore` gains `scenes: { tab: TabKey; name: string; presented: boolean; playerIds: string[]; state }[]` and `assignedCount`. Both menus, the panel and the eye badge read this.
+- **GM state for the UI:** `onlineSessionStore` gains `split: 'on' | 'unsupported'`, `assignments: Record<playerId, TabKey>`, `assignedCount` and `scenesInUse` (`src/app/online/splitStore.ts`).
+  - They are written from the hub's slot changes, never from `projected` (every live tick), and only when they differ by value: every store change makes Atlas read its slots again.
+  - The menus, the panel and the badge resolve each player with `resolveScene`, over the store's `assignments` and Atlas's `presentation.current()`. Tab names come from `views.list()`, so a rename or an admission shows at once.
+  - Both menus share one row builder (`gm-ui/presentToRows.ts`). The cap comes from the hub (`wouldExceedCap`) and is never worked out again in the UI.
+  - `SceneHub.scenes()` (`SceneUse[]`: tab, name, presented, player ids and state) stays available as a read. The UI does not use it.
 
 ---
 
@@ -264,6 +285,7 @@ interface SceneSlot {
 5. **`token-control.tokenIds`, while a split exists** (at least one assignment), lists only tokens in the recipient's current scene projection. It is sent again on reassignment, and whenever that scene's projected token set gains or loses one of the player's tokens.
    - With no assignment it is today's list (every assigned id, sent when control changes), so an unsplit session is unchanged.
    - When the last assignment goes, every player gets today's list once.
+   - A player moved to a tab that was never live gets an empty list before that tab's first snapshot. The real list follows the snapshot.
 6. **Player → GM is unchanged.**
    - `token-move` and `laser` already carry `sceneId`. The GM now checks each against **the sender's** slot.
    - `scene-resync` resends the sender's slot.
@@ -291,7 +313,7 @@ These rulings are binding and each has a test in the plan.
 - **P4, assets per player.** The `AssetServer` allow-set becomes `allowedFor(playerId) = sceneAssetIds(slotOf(playerId).lastSent)`. On reassignment, the player's in-flight transfers outside the new set are cancelled (`asset-cancel` handling already exists per transfer), and further requests get `asset-denied`.
 - **P5, token ids and names.** While a split exists, `token-control` and dice-log token names are worked out per recipient against their slot's projection, as in 5.1. A player never learns the id or name of a token in another scene. Dice names are always per recipient, which gives today's result for a single scene.
 - **P6, lasers and camera.** A player's laser is relayed only to their own slot's audience, and only if the laser's `sceneId` is that slot's. The GM's laser and camera feed only the live slot. A parked slot's camera is its last one.
-- **P7, parked is not new.** A parked slot keeps only what its audience already has. On a rules or settings change it is re-projected from its kept snapshot and lighting frame, which can only apply the GM's new rules (decision D8).
+- **P7, parked is not new.** A parked slot keeps only what its audience already has. On a change of the player view settings, or of a collection's resources or initiative rules, it is re-projected from its kept snapshot and lighting frame. That can only apply the GM's new rules (decision D8).
 - **P8, fail closed under lighting.** Going live on a lit scene, Connect keeps the parked projection and sends nothing new until `playerVisibility` is `ready` or `unlit`. After 2 seconds it projects with `closedFrame`, as today. A lit scene without the `lighting` capability is closed, as today.
 - **P9, names only, as asked.** The dice label carries a scene's tab name to players on other scenes. That is the only cross-scene datum (decision D7). The privacy note in `PRIVACY.md` and the README says so.
 - **P10, presence is unchanged.** `presence` lists every player's name, as today. It says nothing about who is on which scene.
@@ -441,7 +463,7 @@ interface PresentationTarget {
   - New `ContextMenuEntry` type `'label'` for the heading row: not focusable, with `aria-hidden` off and role `presentation` on its text.
 - **`tabBadge`:**
   - `SceneTabBar` asks every active target, first non-null wins, through the existing `useSyncExternalStore(subscribePresentationTargets…)`.
-  - It renders the text in a `scene-tab__badge` span after the eye.
+  - It renders the text in an `atlas-scene-tab__badge` span after the eye.
   - It adds the text to the eye's `aria-label`. There is no `title` attribute, per Atlas's rules.
   - The text is truncated with CSS at 24 characters.
 
@@ -485,7 +507,7 @@ interface PresentationTarget {
 | D5 | Moves on a parked scene are refused, and the page says why. | Atlas can only move tokens of the active tab. This matches hold. |
 | D6 | `PROTOCOL_VERSION` stays 1, and everything is additive. | A bump locks every older page out with `denied 'version'`. |
 | D7 | The dice log stays shared, and player rolls carry the roller's scene name only while more than one scene is in use. | The user asked for it. A tab name is GM-chosen metadata, not scene data. A single scene shows nothing new. |
-| D8 | A parked slot is re-projected from its kept snapshot and frame on a rules or settings change. | A GM who hides something expects it hidden everywhere. This tightens today's hold, which waits for resume. |
+| D8 | A parked slot is re-projected from its kept snapshot and frame on a change of the player view settings or of a collection's resources or initiative rules. Image changes reach only the live slot. | A GM who hides something expects it hidden everywhere. This tightens today's hold, which waits for resume. |
 | D9 | "Everyone back" is disabled while nothing is presented. | It would blank every screen at once. |
 | D10 | Assignments are session memory only. | Player ids are per hosted session. |
 | D11 | The panel's "Present to:" opens Connect's own popover, not an Obsidian `Menu`. | An Obsidian menu closes on every pick, and the GM ticks several players in a row. |
@@ -497,3 +519,23 @@ interface PresentationTarget {
 | D17 | Only the eye gets the menu slot, not the whole tab. | That is what was asked, and it is the smallest slot. |
 | D18 | Dice token names are always per recipient. `token-control` is filtered per scene only while a split exists. | P5: no ids or names from another scene. Without a split there is one scene, so today's list stays and opt-in holds. |
 | D19 | `scene-state` is unsequenced and scoped by `sceneId`. | An older page ignores it. A sequenced message it never applies would read as a gap and force a resync. |
+
+---
+
+## 12. Differences from the first draft
+
+The sections above describe what was built. It differs from the first draft in these places:
+
+1. **`SceneAssignments`** follows the plan's shape (section 4).
+   - `assign` takes the presented tab and answers `'follows'` for it.
+   - `clear` and `dropView` return who went back, and `scenesInUse` returns the tabs.
+   - `entries` and `resolveScene` were added for the GM's store.
+2. **The GM's store** holds `split`, `assignments`, `assignedCount` and `scenesInUse`, not a `scenes` list (section 4).
+3. **The cap note** is a disabled first row in the eye menu, because Atlas reads a section's heading once (3.3). In the panel it is a line under the heading.
+4. **D8** covers a collection's resources and initiative rules, as well as the player view settings.
+5. **`TabScenes`** gained `isActive`, `watch`, `camera` and `watchCamera`. `LiveLighting` and the presentation lighting gained `pending()` for the P8 wait, instead of keeping a last frame.
+6. **Before placement,** an admitted player resolves to the scene their admission sends (section 4).
+7. **On a never-live tab,** a player gets an empty `token-control` first (5.1).
+8. **The badge class** is `atlas-scene-tab__badge`, following Atlas's naming (9.2).
+9. **The Obsidian command** "Bring all players back to the presented scene" is registered only on an Atlas with `scene-tabs` (3.5).
+10. **`SceneHub.currentProjection()`** stays as an `@internal` read for tests. No part of the session sends from it.

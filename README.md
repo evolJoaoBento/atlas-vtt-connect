@@ -11,7 +11,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against the API build's 1.15.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). Without the API, or with another major version, Connect shows a notice and stays off.
+- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against the API build's 1.17.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). Without the API, or with another major version, Connect shows a notice and stays off.
 - **The Atlas API build.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, version **0.6.0-beta.4**. Pin that version in BRAT: BRAT's "latest" in that repository is the online-play fork, not the API build. You can also build Atlas from the branch `api/extension-api` (see Developing).
 - TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
@@ -29,6 +29,22 @@ If you use the online play preview (the fork's built-in online play, Atlas VTT 0
 - **Host.** Open a map in Atlas, present it, then run **Online session** from the command palette or the Atlas toolbar. Start the session, copy the join link and send it to your players. Players open it in a browser, or paste it into **Join online session…** in Obsidian.
 - **Settings.** Settings, Atlas VTT Connect: Signaling server (and My own server), Relay (TURN) servers, Player page, Shared note properties, Keep online images on this device and Log online play events.
 - **Players** can move the tokens you assign under **Controlled by**, point with a laser and roll dice.
+
+## Split party
+
+Players can be on different scenes. This is opt-in: until you assign someone, every player sees the scene you present, as before.
+
+- **Assign players** in either of two places:
+  - **Present to:** in the Online session panel. Hover over it or click it to open a list of players for the tab you are on, and tick or untick them.
+  - **Right-click the eye** of any scene tab (or focus it and press the menu key or Shift+F10). Its **Present to** section lists the players for that tab.
+- Ticking a player shows them that tab. Unticking them sends them back to the presented scene. A player you never assigned follows the presented scene, and presenting a tab with the eye brings its assigned players to it as followers.
+- Assigning a tab that has not been open in this session switches your view to it first, because Connect can only send the tab you have open.
+- **Everyone back to the presented scene** clears every assignment. It is the last row of both lists, a button in the panel while anyone is assigned, and a command. It is off while nothing is presented, so it never blanks every screen.
+- **At most 4 scenes at once**, the presented one included. The panel says so at the limit, and the rows that would open a fifth scene are off.
+- **One scene is live: the tab you have open.** Every other scene in use is paused. Its players keep what they last saw, their page says the GM is on another scene, and their token moves snap back until you return. Their dice and lasers still work. A tab with players on it shows a badge after its eye ("2 players").
+- While more than one scene is in use, each player roll in the shared dice log shows the roller's scene: "Anna · Cave".
+- Closing a tab sends its players back to the presented scene, and Connect tells you who went back. Assignments last only while the session runs.
+- Split party needs the Atlas API build with scene tabs (API 1.17.0). On an older Atlas the panel says to update Atlas instead.
 
 ## Sharing
 

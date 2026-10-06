@@ -47,10 +47,15 @@ export function tabScene(tabId: TabId, tokens: Record<string, Character> = {}, l
   };
 }
 
+/** One frame as it reached a player's link, either channel, before any decoding. */
+export interface RawFrame { channel: string; data: unknown }
+
 export interface RawPlayer {
   key: string;
   playerId: string;
   received: ControlMessage[];
+  /** Every frame from the moment the link opened, the assets channel's binary chunks included. */
+  frames: RawFrame[];
   link: PeerLink;
 }
 
@@ -66,6 +71,7 @@ export interface SplitWorld {
   tabs: TabScenes;
   assignments: SceneAssignments;
   gm: GmSession;
+  network: MemoryNetwork;
   notices: string[];
   join(key: string): Promise<RawPlayer>;
   /** The GM presents a tab (it must be the active, loaded one to be presented at once). */
@@ -120,11 +126,13 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   });
   hub.start();
   return {
-    atlas, extension, presented, hub, registry, files, tabs, assignments, gm, notices,
+    atlas, extension, presented, hub, registry, files, tabs, assignments, gm, network, notices,
     join: async (key) => {
       const link = await network.client().connect('gm');
       const received: ControlMessage[] = [];
+      const frames: RawFrame[] = [];
       link.onMessage((channel, data) => {
+        frames.push({ channel, data });
         if (channel !== 'control' || typeof data !== 'string') return;
         const decoded = decodeControl(data);
         if (decoded.kind === 'message') received.push(decoded.message);
@@ -133,7 +141,7 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
       const request = requests.at(-1)!;
       if (request.status !== 'admitted') gm.allow(request.playerId);
       await vi.advanceTimersByTimeAsync(0);
-      return { key, playerId: request.playerId, received, link };
+      return { key, playerId: request.playerId, received, frames, link };
     },
     present: async (tabId) => {
       await atlas.presentation.present(VIEW, tabId);
