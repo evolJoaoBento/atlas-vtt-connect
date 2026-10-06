@@ -2,6 +2,8 @@ import type { Plugin } from 'obsidian';
 import type { Disposer, PresentationApi } from '@atlas-vtt/api-types';
 import { onlineSessionStore, type OnlineSessionState } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
+import { EVERYONE_BACK_COMMAND } from './split/splitCopy';
+import { canBringEveryoneBack } from './splitStore';
 import { ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
 import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
 
@@ -9,7 +11,9 @@ import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
 export const ONLINE_TARGET = { id: 'atlas-vtt-connect', label: 'online players', isActive: (): boolean => true } as const;
 
 export interface RegisterOnlineOptions {
-  presentation: Pick<PresentationApi, 'addTarget'>;
+  presentation: Pick<PresentationApi, 'addTarget' | 'current'>;
+  /** Atlas has scene tabs (`scene-tabs`): the split party's command, and the target badges the tabs players see. */
+  splitParty?: boolean;
   /** Atlas's UI slots, when it has them: "Online session…" then opens the panel in a map view. */
   gmUi?: PanelOpener;
 }
@@ -70,6 +74,19 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
       return true;
     },
   });
+
+  if (options.splitParty) {
+    commands.push('everyone-back');
+    plugin.addCommand({
+      id: 'everyone-back',
+      name: EVERYONE_BACK_COMMAND,
+      checkCallback: (checking) => {
+        if (!canBringEveryoneBack(options.presentation)) return false;
+        if (!checking) service.everyoneBack();
+        return true;
+      },
+    });
+  }
 
   const status = statusItemOf(plugin);
   const { item } = status;

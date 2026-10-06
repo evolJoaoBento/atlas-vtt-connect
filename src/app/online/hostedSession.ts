@@ -20,6 +20,7 @@ import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
 import type { TabScenes } from './atlas/tabScenes';
 import { SceneAssignments } from './split/SceneAssignments';
+import { syncSplitState } from './splitStore';
 import type { IdentityCrypto, TableIdentity } from './sharing/identity/identityCrypto';
 import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
 import { HostIdentity } from './sharing/people/hostIdentity';
@@ -173,7 +174,10 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
   let stopSharing: (() => void) | null = null;
   let stopLog: (() => void) | null = null;
+  let stopSplit: (() => void) | null = null;
   const stop = (): void => {
+    stopSplit?.();
+    stopSplit = null;
     stopSharing?.();
     stopSharing = null;
     stopErrors();
@@ -192,6 +196,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   try {
     stopLog = logPresentedScene(env.scene.presented, env.views, log);
     hub.start();
+    // The GM's panel, eye menu and badges read who is assigned where from the store.
+    stopSplit = syncSplitState(hub);
     cameraSender.start();
     assetServer.start();
     for (const part of given([tokenControl, dice, laser])) {

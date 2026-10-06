@@ -19,3 +19,8 @@ export function presentingHere(env: { presentation: Pick<PresentationApi, 'curre
   const current = env.presentation.current();
   return { activeTabId, presentedHere: current?.viewId === viewId ? current.tabId : null };
 }
+
+/** A tab's name as its tab bar shows it; empty for a tab no longer open. */
+export function tabNameIn(views: Pick<ViewsApi, 'list'>, tab: { viewId: string; tabId: string }): string {
+  return views.list().find((view) => view.viewId === tab.viewId)?.tabs.find((entry) => entry.tabId === tab.tabId)?.name ?? '';
+}

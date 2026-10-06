@@ -98,6 +98,7 @@ export class SceneHub extends SlotReads implements SessionHandler {
   /**
    * What the presented scene's followers have now; null when none was sent or it was cleared. A read for the GM's side:
    * nothing sent to players comes from it (each part reads `slotOf`, per player).
+   * @internal Tests read it; no part of the session does.
    */
   currentProjection(): PlayerScene | null {
     return this.presentedSlot?.lastSent ?? null;
@@ -110,6 +111,11 @@ export class SceneHub extends SlotReads implements SessionHandler {
   scenesInUse(): number {
     return this.options.assignments.scenesInUse(this.presentedTab()).length;
   }
+
+  /** For the GM's UI: whether players can be assigned (D12), who is assigned where, and the cap (D13). */
+  splitSupported(): boolean { return this.options.tabs !== null; }
+  assignedTabs(): Record<string, TabKey> { return this.options.assignments.entries(); }
+  wouldExceedCap(playerId: string, tab: TabKey): boolean { return this.options.assignments.wouldExceedCap(playerId, tab, this.presentedTab()); }
 
   /** Pins a player to a tab of the GM's view (`assignToTab`); needs Atlas's scene tabs. */
   assign(playerId: string, tab: TabKey): Promise<AssignResult | 'couldnt-open'> {

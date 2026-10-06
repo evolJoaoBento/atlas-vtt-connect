@@ -10,12 +10,14 @@ import type { OnlineSessionState } from '../onlineSessionStore';
 import { JOIN_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../ui/onlineCopy';
 import { OnlinePlayerList } from './OnlinePlayerList';
 import { OnlinePresenting } from './OnlinePresenting';
-import type { PresentingEnv } from './presentingHere';
+import { tabNameIn, type PresentingEnv } from './presentingHere';
+import { sceneChip } from '../split/splitCopy';
 import { useInJoinedSession, useOnlineSession } from './useOnlineState';
 
 export const START_HELP = 'Start a session to get a link your players can open in a browser. You approve each player who joins.';
 
-export type PanelService = Pick<OnlineSessionService, 'start' | 'stop' | 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder'>;
+export type PanelService = Pick<OnlineSessionService, 'start' | 'stop' | 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder'
+  | 'assign' | 'unassign' | 'everyoneBack' | 'wouldExceedCap'>;
 
 /** What the panel needs besides the view it is open in. */
 export interface PanelEnv extends PresentingEnv {
@@ -59,6 +61,8 @@ function StartView({ session, env }: { session: OnlineSessionState; env: PanelEn
 
 function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: PanelEnv; ctx: ViewContext }): React.ReactElement {
   const url = session.joinUrl;
+  // The split party's chip on each assigned player's row: "On {scene}".
+  const chips = Object.fromEntries(Object.entries(session.assignments).map(([playerId, tab]) => [playerId, sceneChip(tabNameIn(env.views, tab))]));
   return (
     <>
       <section className="atlas-connect-panel__section" aria-label="Session status">
@@ -84,8 +88,8 @@ function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: 
           </div>
         )}
       </section>
-      <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={env.service} summaries={env.summaries} />
-      <OnlinePresenting env={env} ctx={ctx} />
+      <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={env.service} summaries={env.summaries} sceneChips={chips} />
+      <OnlinePresenting env={env} ctx={ctx} actions={env.service} />
     </>
   );
 }

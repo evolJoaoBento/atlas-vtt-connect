@@ -11,6 +11,11 @@ export type AssignResult = 'ok' | 'follows' | 'cap';
 
 type ChangeListener = (playerIds: string[]) => void;
 
+/** The one rule of where a player is: their tab, else the presented one, else none. The GM's UI applies it to the store's copy. */
+export function resolveScene(assigned: TabKey | null | undefined, presented: TabKey | null): TabKey | null {
+  return assigned ?? presented;
+}
+
 export class SceneAssignments {
   private readonly tabs = new Map<string, TabKey>();
   private readonly listeners = new Set<ChangeListener>();
@@ -46,7 +51,12 @@ export class SceneAssignments {
 
   /** The scene `playerId` sees: their tab, else the presented one, else none. */
   sceneOf(playerId: string, presented: TabKey | null): TabKey | null {
-    return this.tabOf(playerId) ?? presented;
+    return resolveScene(this.tabOf(playerId), presented);
+  }
+
+  /** Every pinned player and their tab, a copy: what the GM's UI keeps in its store. */
+  entries(): Record<string, TabKey> {
+    return Object.fromEntries([...this.tabs].map(([playerId, tab]) => [playerId, { viewId: tab.viewId, tabId: tab.tabId }]));
   }
 
   /** A closed tab: its players follow again; returns who went back. */

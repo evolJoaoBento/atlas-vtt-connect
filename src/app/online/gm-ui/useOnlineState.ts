@@ -32,3 +32,13 @@ export function useActiveTabId(views: Pick<ViewsApi, 'list' | 'subscribe'>, view
   const read = useCallback(() => views.list().find((view) => view.viewId === viewId)?.activeTabId ?? null, [views, viewId]);
   return useSyncExternalStore(subscribe, read);
 }
+
+/** The view's tabs (ids, names) and active tab, as one string: renders again when a tab is renamed, added or closed. */
+export function useViewTabsKey(views: Pick<ViewsApi, 'list' | 'subscribe'>, viewId: ViewId): string {
+  const subscribe = useCallback((onChange: () => void) => views.subscribe(viewId, onChange), [views, viewId]);
+  const read = useCallback(() => {
+    const view = views.list().find((entry) => entry.viewId === viewId);
+    return view ? JSON.stringify([view.activeTabId, view.tabs.map((tab) => [tab.tabId, tab.name])]) : '';
+  }, [views, viewId]);
+  return useSyncExternalStore(subscribe, read);
+}

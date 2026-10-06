@@ -170,3 +170,84 @@ $connect-mark-size: 8px;
   color: var(--text-warning);
   font-size: var(--font-ui-smaller);
 }
+
+// An assigned player's scene ("On Cave"), at the end of their row.
+.atlas-connect-panel__scene-chip {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// "Present to:" and its checklist, which opens below the button over the panel's content (spec 3.2).
+.atlas-connect-present-to {
+  position: relative;
+  align-self: flex-start;
+  max-width: 100%;
+
+  > .atlas-connect-button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.atlas-connect-present-to__popover {
+  position: absolute;
+  z-index: var(--layer-popover);
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 8px;
+  @include atlas-elevated-surface;
+  @include atlas-corner-shape;
+}
+
+.atlas-connect-present-to__heading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+}
+
+.atlas-connect-present-to__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.atlas-connect-present-to__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-s);
+  cursor: var(--cursor);
+  overflow-wrap: anywhere;
+
+  &:hover:not(.is-disabled) {
+    background: var(--background-modifier-hover);
+  }
+
+  &.is-disabled {
+    color: var(--text-muted);
+  }
+
+  input {
+    flex-shrink: 0;
+    margin: 0;
+  }
+}
+
+.atlas-connect-present-to__separator {
+  height: var(--border-width);
+  margin: 4px 0;
+  background: var(--background-modifier-border);
+}

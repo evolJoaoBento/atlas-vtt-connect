@@ -14,6 +14,7 @@ import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sh
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
 import type { PeopleBook } from './sharing/people/PeopleBook';
+import type { TabKey } from './split/tabKey';
 import { createPeerHost, type PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
@@ -168,4 +169,21 @@ export class OnlineSessionService {
   linkPlaceholder(playerId: string, placeholderId: string): void { this.hosted?.requests.linkPlaceholder(playerId, placeholderId); }
   deny(playerId: string): void { this.hosted?.requests.deny(playerId); }
   kick(playerId: string): void { this.hosted?.session.kick(playerId); }
+
+  /**
+   * Split party (the panel's "Present to:" and the eye's menu): shows `tab` to the player, switching the GM's view to
+   * a tab never shown yet (D4). The hub refuses a fifth scene and tells the GM when a tab couldn't be opened.
+   */
+  assign(playerId: string, tab: TabKey): void {
+    const scenes = this.hosted?.scenes;
+    if (!scenes?.splitSupported()) return;
+    scenes.assign(playerId, tab).catch((error: unknown) => console.error('[Atlas VTT Connect] Could not assign the player to the scene:', error));
+  }
+
+  /** The player follows the presented scene again. */
+  unassign(playerId: string): void { this.hosted?.scenes.unassign(playerId); }
+  /** Everyone follows the presented scene again; nothing while nothing is presented (D9). */
+  everyoneBack(): void { this.hosted?.scenes.everyoneBack(); }
+  /** Whether assigning would put a fifth scene in use; the menus disable that row. */
+  wouldExceedCap(playerId: string, tab: TabKey): boolean { return this.hosted?.scenes.wouldExceedCap(playerId, tab) ?? false; }
 }

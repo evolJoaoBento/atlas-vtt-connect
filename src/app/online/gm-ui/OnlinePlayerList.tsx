@@ -21,6 +21,8 @@ interface OnlinePlayerListProps {
   control: TokenControl | null;
   service: PlayerListService;
   summaries: PresentedSceneSummaries;
+  /** "On {scene}" for each player assigned to another scene, by player id; followers have none. */
+  sceneChips?: Readonly<Record<string, string>>;
 }
 
 type SameName = { personId: string | null; name: string; placeholder?: string };
@@ -62,7 +64,7 @@ function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLi
  * Players waiting to join, and the players in the session with the tokens they control.
  * Tokens are given on the map, with a token's "Controlled by" menu.
  */
-export function OnlinePlayerList({ players, requests, control, service, summaries }: OnlinePlayerListProps): React.ReactElement {
+export function OnlinePlayerList({ players, requests, control, service, summaries, sceneChips = {} }: OnlinePlayerListProps): React.ReactElement {
   const scene = usePresentedSceneSummary(summaries);
   useTokenControlVersion(control);
 
@@ -110,6 +112,7 @@ export function OnlinePlayerList({ players, requests, control, service, summarie
                     <span className="atlas-connect-panel__name">{player.name}</span>
                     {player.client === 'obsidian' && <ObsidianMark />}
                     {player.status === 'gone' && <span className="atlas-connect-panel__note">Disconnected</span>}
+                    {sceneChips[player.playerId] && <span className="atlas-connect-panel__chip atlas-connect-panel__scene-chip">{sceneChips[player.playerId]}</span>}
                     <LabelTooltip label={`${REMOVE_PLAYER_LABEL} ${player.name}`}>
                       <Button variant="ghost" size="sm" aria-label={`${REMOVE_PLAYER_LABEL} ${player.name}`} onClick={() => service.kick(player.playerId)}>
                         <X />

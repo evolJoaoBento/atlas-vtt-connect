@@ -5,7 +5,7 @@
  */
 import { act } from '@testing-library/react';
 import { vi } from 'vitest';
-import type { Character, TokenEntity } from '@atlas-vtt/api-types';
+import type { AtlasCapability, Character, TokenEntity } from '@atlas-vtt/api-types';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import type { SessionPlayer } from '../../../src/app/online/GmSession';
 import { registerGmUi, type GmUi } from '../../../src/app/online/gm-ui/registerGmUi';
@@ -23,10 +23,13 @@ export const ben: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitt
 export const cy: SessionPlayer = { playerId: 'p3', name: 'Cy', status: 'pending' };
 export const dan: SessionPlayer = { playerId: 'p4', name: 'Dan', status: 'gone' };
 
-/** The service as the panel and the palette call it. */
-export function serviceStub(): Record<'start' | 'stop' | 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder', ReturnType<typeof vi.fn>> {
+type StubbedCall = 'start' | 'stop' | 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder' | 'assign' | 'unassign' | 'everyoneBack' | 'wouldExceedCap';
+
+/** The service as the panel and the palette call it; `wouldExceedCap` answers false unless a test says otherwise. */
+export function serviceStub(): Record<StubbedCall, ReturnType<typeof vi.fn>> {
   return {
     start: vi.fn(() => Promise.resolve()), stop: vi.fn(), allow: vi.fn(), deny: vi.fn(), kick: vi.fn(), link: vi.fn(), linkPlaceholder: vi.fn(),
+    assign: vi.fn(), unassign: vi.fn(), everyoneBack: vi.fn(), wouldExceedCap: vi.fn(() => false),
   };
 }
 
@@ -42,9 +45,12 @@ export interface GmUiHarness extends Presenter {
   openPanel(): Promise<HTMLElement>;
 }
 
-/** Atlas with the `ui` capability, a map view (active) holding `tokens`, and Connect's GM UI registered in it. */
-export function gmUiHarness(options: { tokens?: Record<string, TokenEntity>; join?: boolean } = {}): GmUiHarness {
-  const atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage', 'tokens', 'ui'] });
+/**
+ * Atlas with the `ui` capability, a map view (active) holding `tokens`, and Connect's GM UI registered in it.
+ * `capabilities`: more of them (`scene-tabs` for the split party).
+ */
+export function gmUiHarness(options: { tokens?: Record<string, TokenEntity>; join?: boolean; capabilities?: AtlasCapability[] } = {}): GmUiHarness {
+  const atlas = new FakeAtlas({ capabilities: ['views', 'presentation', 'rules', 'settings', 'storage', 'tokens', 'ui', ...(options.capabilities ?? [])] });
   const presenting = presenter(atlas);
   const state = emptySceneState();
   const scene = sceneView(presenting, { ...state, objects: { ...state.objects, tokens: options.tokens ?? { hero, goblin, crate } } });
