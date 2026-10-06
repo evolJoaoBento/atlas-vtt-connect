@@ -8,6 +8,8 @@
  * call, so this keeps one `LiveScene` per presentation and gives the same object until it ends.
  */
 import type { AtlasExtension, Disposer, PresentedSceneInfo, SceneSnapshot, ViewCamera } from '@atlas-vtt/api-types';
+import type { TabKey } from '../split/tabKey';
+import { activeTabOf } from './tabScenes';
 
 /** The presented scene as online play reads it: everything through the API, nothing of Atlas's store. */
 export interface LiveScene {
@@ -65,8 +67,7 @@ export function presentedSource(atlas: Atlas): PresentedSceneSource {
     return known.scene;
   };
   /** A hold while the view shows the presented tab is a presentation that starts held (its map not loaded): a new one. */
-  const browsedAway = (info: PresentedSceneInfo): boolean =>
-    atlas.views.list().find((view) => view.viewId === info.viewId)?.activeTabId !== info.tabId;
+  const browsedAway = (info: PresentedSceneInfo): boolean => activeTabOf(atlas.views, info.viewId) !== info.tabId;
   const emit = (call: (listener: PresentedSceneListener) => void): void => {
     for (const listener of [...listeners]) {
       try {
@@ -115,4 +116,10 @@ export function presentedSource(atlas: Atlas): PresentedSceneSource {
       };
     },
   };
+}
+
+/** The presented tab (held or not) as split party keys scenes; null while nothing is presented. */
+export function presentedTab(source: Pick<PresentedSceneSource, 'current'>): TabKey | null {
+  const info = source.current()?.info;
+  return info ? { viewId: info.viewId, tabId: info.tabId } : null;
 }

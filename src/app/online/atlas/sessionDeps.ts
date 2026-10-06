@@ -3,6 +3,7 @@ import type { AtlasExtension, DiceApi, LasersApi, LightingApi, TokensApi } from 
 import type { Deps } from '../OnlineSessionService';
 import { liveLighting } from '../scene/sceneLighting';
 import { presentedSource } from './presentedSource';
+import { createTabScenes } from './tabScenes';
 import { diceHostPart, laserRelayPart, tokenControlPart } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
@@ -13,10 +14,13 @@ export interface OptionalNamespaces {
   lasers: LasersApi | null;
   lighting: LightingApi | null;
   tokens: TokensApi | null;
+  /** Whether this Atlas has `scene-tabs` (API 1.17.0): the GM's tabs and which one is live, for a split party. */
+  sceneTabs?: boolean;
 }
 
 export type AtlasSessionDeps = Pick<Deps,
   'presented' | 'views' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
+  | 'tabScenes'
 >;
 
 /**
@@ -24,8 +28,9 @@ export type AtlasSessionDeps = Pick<Deps,
  * there only when this Atlas has the `tokens`, `dice` and `lasers` capabilities; without them the session hosts without
  * (without `tokens` nobody controls a token and no control list is sent).
  * Without `lighting` a scene saved lit shows players only the dark map, and the GM is told (`noLightingCapability`).
+ * Without `scene-tabs` there is no split party: every player follows the presented scene.
  */
-export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens }: OptionalNamespaces): AtlasSessionDeps {
+export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs }: OptionalNamespaces): AtlasSessionDeps {
   return {
     presented: presentedSource(atlas),
     views: atlas.views,
@@ -42,5 +47,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
+    // One per hosted session, disposed with it.
+    ...(sceneTabs === true && typeof atlas.views.showTab === 'function' ? { tabScenes: () => createTabScenes(atlas) } : {}),
   };
 }

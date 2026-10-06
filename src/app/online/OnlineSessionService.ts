@@ -6,6 +6,7 @@ import { hostSession, type HostedSession, type HostedSharingHooks, type Optional
 import { onlineSessionStore, resetOnlineSessionStore } from './onlineSessionStore';
 import type { OnlineSettings } from './onlineSettings';
 import type { PresentedSceneSource } from './atlas/presentedSource';
+import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
 import type { PlayerViewSettingsSource } from './scene/sceneSources';
@@ -50,6 +51,8 @@ export interface Deps extends OptionalParts {
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Tells when those resources or rules may have changed. */
   watchResources?: (listener: () => void) => () => void;
+  /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
+  tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
   table?: () => Promise<TableIdentity | null>;
   identityCrypto?: IdentityCrypto;

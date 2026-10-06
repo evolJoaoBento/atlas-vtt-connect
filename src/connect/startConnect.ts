@@ -51,7 +51,7 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
   if (!paths || gone()) return { service: null, stop: () => undefined };
   const people = PeopleBook.forApp(plugin.app, paths);
-  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens') }), people, isJoined: () => isInSession(joinedSessionStore.getState()), ...options.hosting };
+  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs') }), people, isJoined: () => isInSession(joinedSessionStore.getState()), ...options.hosting };
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
