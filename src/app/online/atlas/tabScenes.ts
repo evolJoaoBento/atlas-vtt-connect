@@ -4,7 +4,7 @@
  * P2): Atlas makes the next tab active before its store reloads, so `activeTabId` alone never says whose scene the store
  * holds. This is the only Connect file that reads `activeTabId` (`activeTabOf`), and never to attribute a scene.
  */
-import type { AtlasExtension, Disposer, SceneSnapshot, ViewId, ViewInfo, ViewsApi } from '@atlas-vtt/api-types';
+import type { AtlasExtension, Disposer, SceneSnapshot, ViewCamera, ViewId, ViewInfo, ViewsApi } from '@atlas-vtt/api-types';
 import { sameTab, type TabKey } from '../split/tabKey';
 
 /** A tab of a GM map view, as its tab bar names it. */
@@ -31,6 +31,9 @@ export interface TabScenes {
   isActive(key: TabKey): boolean;
   /** Calls `listener` after each change of `viewId`'s store (`views.subscribe`); only the live scene is watched so. */
   watch(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
+  /** The view's camera now (`views.camera`), and each frame it moves (`views.watchCamera`): the GM's camera for the shown scene. */
+  camera(viewId: ViewId): ViewCamera | null;
+  watchCamera(viewId: ViewId, listener: () => void): Disposer;
   /** Called when a view's live tab or active tab changes (to another tab, or to none), with `liveTab()` then. */
   subscribeLive(listener: (live: TabKey | null) => void): Disposer;
   /** Called when the tabs change ('tabs-changed', a view opening or closing), with the tabs that went (none for a rename). */
@@ -146,6 +149,8 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
     },
     isActive: (key) => watched.has(key.viewId) && activeTabOf(views, key.viewId) === key.tabId,
     watch: (viewId, listener) => views.subscribe(viewId, listener),
+    camera: (viewId) => views.camera(viewId),
+    watchCamera: (viewId, listener) => views.watchCamera(viewId, () => listener()),
     subscribeLive: (listener) => {
       liveListeners.add(listener);
       return () => { liveListeners.delete(listener); };

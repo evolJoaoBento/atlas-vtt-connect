@@ -31,6 +31,8 @@ function stubSlot(): { slot: SceneSlot; sent: Array<[string, ControlMessage]>; s
     sendSequenced: (playerId, message) => { sent.push([playerId, message as ControlMessage]); },
     send: (playerId, message) => { sent.push([playerId, message]); },
     projected: () => undefined,
+    observed: () => undefined,
+    caughtUp: () => undefined,
   };
   const slot = new SceneSlot({ viewId: 'gm', tabId: 'a' }, 'scene-a', {
     snapshot: () => current,

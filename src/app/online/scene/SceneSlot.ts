@@ -120,6 +120,11 @@ export class SceneSlot {
     });
   }
 
+  /** The scene the GM's view holds for it now, once live and caught up (P2, P8): what the GM's camera, laser and moves act on. */
+  shownSnapshot(): SceneSnapshot | null {
+    return this.state === 'live' && this.awaiting === null && !this.sight ? this.source.snapshot() : null;
+  }
+
   /** Whether it holds a fog coverage (only while live). */
   hasFogCoverage(): boolean { return this.fogCache !== null; }
 
@@ -149,6 +154,7 @@ export class SceneSlot {
     if (this.state !== 'live') return;
     // Read anew (P2): the listener's snapshot may be another tab's, loading, or already stale.
     const snapshot = this.source.snapshot();
+    this.host.observed(this, snapshot);
     if (!snapshot) {
       // Writes made by loading are not edits: nothing is sent until the map is ready.
       this.awaiting ??= 'reload';
@@ -187,9 +193,11 @@ export class SceneSlot {
     if (!prepared) return;
     this.awaiting = null;
     this.send(prepared);
-    if (!this.pausedSent) return;
-    this.pausedSent = false;
-    for (const playerId of this.host.audience(this)) this.host.send(playerId, sceneStateMessage(this.sceneId, false));
+    if (this.pausedSent) {
+      this.pausedSent = false;
+      for (const playerId of this.host.audience(this)) this.host.send(playerId, sceneStateMessage(this.sceneId, false));
+    }
+    this.host.caughtUp(this);
   }
 
   private lightingDue(): void {

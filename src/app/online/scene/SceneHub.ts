@@ -20,7 +20,8 @@ import type { SceneProjectionOptions } from './sceneSources';
 import { SceneSlot, type SlotHost, type SlotSource } from './SceneSlot';
 import type { PlayerScene } from './sceneTypes';
 import { assignToTab, dropClosedTabs, scenesInUse, slotSource, type SplitActionDeps } from './splitActions';
-import { ProjectionWatch, SlotChanges, viewOf, type SceneUse, type SlotChange, type SlotProjection, type SlotView } from './slotViews';
+import { SlotReads } from './slotReads';
+import { ProjectionWatch, viewOf, type SceneUse } from './slotViews';
 
 export { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE } from './sceneSources';
 export type { PlayerViewSettingsSource, PresentedSceneSource, SceneProjectionOptions, SceneSession } from './sceneSources';
@@ -31,12 +32,10 @@ export interface SceneHubOptions extends SceneProjectionOptions {
   assignments: SceneAssignments;
 }
 
-export class SceneHub implements SessionHandler, SlotProjection {
+export class SceneHub extends SlotReads implements SessionHandler {
   private readonly stops: Array<() => void> = [];
   private readonly channels: PlayerChannels;
-  private readonly slots = new Map<string, SceneSlot>();
-  private readonly changes = new SlotChanges();
-  private readonly places: PlayerPlaces;
+  protected readonly places: PlayerPlaces;
   private readonly projections = new ProjectionWatch(() => this.currentProjection());
   private readonly host: SlotHost<SceneSlot>;
   private presentedSlot: SceneSlot | null = null;
@@ -47,6 +46,7 @@ export class SceneHub implements SessionHandler, SlotProjection {
   private again = false;
 
   constructor(private readonly options: SceneHubOptions) {
+    super();
     this.channels = new PlayerChannels(options.session);
     this.places = new PlayerPlaces(this.channels, this.changes, () => options.session.getPlayers(), options.assignments, () => this.presentedTab());
     this.rules = pickPlayerViewRules(options.settings.getLocalPlayerViewSettings());
@@ -61,6 +61,8 @@ export class SceneHub implements SessionHandler, SlotProjection {
         this.changes.emit({ kind: 'projected', slot: viewOf(slot) });
         this.projections.check();
       },
+      observed: (slot, snapshot) => this.liveChanges.emit({ sceneId: slot.sceneId, snapshot }),
+      caughtUp: (slot) => this.changes.emit({ kind: 'state', slot: viewOf(slot) }),
     };
   }
 
@@ -107,18 +109,12 @@ export class SceneHub implements SessionHandler, SlotProjection {
     return this.projections.add(listener);
   }
 
-  slotOf(playerId: string): SlotView | null {
-    const slot = this.places.slotOf(playerId);
-    return slot ? viewOf(slot) : null;
+  splitActive(): boolean {
+    return this.options.assignments.assignedCount() > 0;
   }
 
-  liveSlot(): SlotView | null {
-    const live = [...this.slots.values()].find((slot) => slot.state === 'live');
-    return live ? viewOf(live) : null;
-  }
-
-  onSlotChange(listener: (change: SlotChange) => void): () => void {
-    return this.changes.add(listener);
+  scenesInUse(): number {
+    return this.options.assignments.scenesInUse(this.presentedTab()).length;
   }
 
   /** Pins a player to a tab of the GM's view (`assignToTab`); needs Atlas's scene tabs. */

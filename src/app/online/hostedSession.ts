@@ -162,8 +162,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const tabs = tabScenes?.() ?? null;
   const hub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
   const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
-  // The GM's view of the presented scene, which players follow by default; started after the scene hub.
-  const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub });
+  // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
+  const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
   // Serves the images of the scene players have, over each player's assets channel.
   const assetServer = new AssetServer({ session, projection: hub, files: registry });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.

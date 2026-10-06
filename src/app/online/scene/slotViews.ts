@@ -2,6 +2,7 @@
  * What the scene hub tells the rest of the session about its scenes (B6–B9 read it): which scene each player has, the
  * live one, and every change. Also the shape the GM's panel reads (`SceneUse`).
  */
+import type { SceneSnapshot } from '@atlas-vtt/api-types';
 import type { TabKey } from '../split/tabKey';
 import type { SceneSlot, SlotState } from './SceneSlot';
 import type { PlayerScene } from './sceneTypes';
@@ -28,9 +29,26 @@ export type SlotChange =
 
 /** Replaces `CameraProjection`: what a player has, and every change of it. */
 export interface SlotProjection {
+  /** The scene `playerId` was sent (or is waiting for); null when they have none. */
   slotOf(playerId: string): SlotView | null;
+  /** The slot of the GM's active tab, its map loaded or loading. */
   liveSlot(): SlotView | null;
+  /**
+   * The live slot while the GM's view holds its scene and it is caught up (P2: a loaded snapshot naming its tab; P8:
+   * not waiting for sight); null otherwise. The GM's camera, laser and moves act only on this one.
+   */
+  shownSlot(): SlotView | null;
+  /** The snapshot of the shown slot with this `sceneId`, read now; null for any other. */
+  shownSnapshot(sceneId: string): SceneSnapshot | null;
+  /** The admitted players who have the scene `sceneId` now (P1); none for a scene no longer in use. */
+  audience(sceneId: string): string[];
+  /** Whether a split exists: at least one player is assigned to a tab. */
+  splitActive(): boolean;
+  /** How many scenes are in use, the presented one included. */
+  scenesInUse(): number;
   onSlotChange(listener: (change: SlotChange) => void): () => void;
+  /** Each change of the GM's store while a scene is live, with the snapshot it holds for that scene (null while loading). */
+  watchLive(listener: (sceneId: string, snapshot: SceneSnapshot | null) => void): () => void;
 }
 
 /** A scene in use for the GM's UI: who sees it and whether it is live. */
@@ -47,16 +65,16 @@ export function viewOf(slot: SceneSlot): SlotView {
   return { tab: { ...slot.tab }, sceneId: slot.sceneId, state: slot.state, lastSent: slot.lastSent, mapPath: slot.mapPath, name: slot.name };
 }
 
-/** Listeners of slot changes, each guarded: one that throws does not stop the others. */
-export class SlotChanges {
-  private readonly listeners = new Set<(change: SlotChange) => void>();
+/** Listeners of slot changes (or of `T`), each guarded: one that throws does not stop the others. */
+export class SlotChanges<T = SlotChange> {
+  private readonly listeners = new Set<(change: T) => void>();
 
-  add(listener: (change: SlotChange) => void): () => void {
+  add(listener: (change: T) => void): () => void {
     this.listeners.add(listener);
     return () => { this.listeners.delete(listener); };
   }
 
-  emit(change: SlotChange): void {
+  emit(change: T): void {
     for (const listener of [...this.listeners]) {
       try {
         listener(change);

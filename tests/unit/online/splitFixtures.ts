@@ -4,8 +4,8 @@
  * the `SceneHub` with `TabScenes` and `SceneAssignments`, and raw players that record every control message.
  */
 import { vi } from 'vitest';
-import type { AtlasCapability, Character, PlayerVisibility, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
-import { presentedSource } from '../../../src/app/online/atlas/presentedSource';
+import type { AtlasCapability, AtlasExtension, Character, PlayerVisibility, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
+import { presentedSource, type PresentedSceneSource } from '../../../src/app/online/atlas/presentedSource';
 import { createTabScenes, type TabScenes } from '../../../src/app/online/atlas/tabScenes';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
@@ -56,6 +56,9 @@ export interface RawPlayer {
 
 export interface SplitWorld {
   atlas: FakeAtlas;
+  /** The extension's API and its presented scene, for the session's other parts (`splitParts`). */
+  extension: AtlasExtension;
+  presented: PresentedSceneSource;
   hub: SceneHub;
   tabs: TabScenes;
   assignments: SceneAssignments;
@@ -94,9 +97,10 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   const resourceListeners = new Set<() => void>();
   const notices: string[] = [];
   const tabs = createTabScenes(extension);
+  const presented = presentedSource(extension);
   const assignments = new SceneAssignments();
   const hub = new SceneHub({
-    session: gm, presented: presentedSource(extension), tabs, assignments,
+    session: gm, presented, tabs, assignments,
     settings: { getLocalPlayerViewSettings: () => rules, onChange: (listener) => { ruleListeners.add(listener); return () => { ruleListeners.delete(listener); }; } },
     assets: new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash }),
     notify: (message) => notices.push(message),
@@ -106,7 +110,7 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   });
   hub.start();
   return {
-    atlas, hub, tabs, assignments, gm, notices,
+    atlas, extension, presented, hub, tabs, assignments, gm, notices,
     join: async (key) => {
       const link = await network.client().connect('gm');
       const received: ControlMessage[] = [];

@@ -28,4 +28,8 @@ export interface SlotHost<S> {
   send(playerId: string, message: ControlMessage): void;
   /** What its players have changed. */
   projected(slot: S): void;
+  /** A change of the GM's store while it is live, with what it holds for it now (`SlotSource.snapshot`). */
+  observed(slot: S, snapshot: SceneSnapshot | null): void;
+  /** It is live and caught up (its scene loaded, sight known, P8): what follows the GM's view can follow it now. */
+  caughtUp(slot: S): void;
 }
