@@ -4,7 +4,7 @@
  * the `SceneHub` with `TabScenes` and `SceneAssignments`, and raw players that record every control message.
  */
 import { vi } from 'vitest';
-import type { AtlasCapability, Character, PlayerVisibility, SceneSnapshot } from '@atlas-vtt/api-types';
+import type { AtlasCapability, Character, PlayerVisibility, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import { presentedSource } from '../../../src/app/online/atlas/presentedSource';
 import { createTabScenes, type TabScenes } from '../../../src/app/online/atlas/tabScenes';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
@@ -69,6 +69,8 @@ export interface SplitWorld {
   /** The GM edits the active tab's tokens. */
   editTokens(tokens: Record<string, Character>): void;
   setRules(next: Partial<PlayerViewRules>): void;
+  /** The GM edits the collection's resources; the hub is told, as the collection settings event does. */
+  setResources(next: readonly ResourceDefinition[]): void;
   tick(): Promise<void>;
 }
 
@@ -88,6 +90,8 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
   gm.start();
   let rules: PlayerViewRules = { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true };
   const ruleListeners = new Set<() => void>();
+  let resources: readonly ResourceDefinition[] = [];
+  const resourceListeners = new Set<() => void>();
   const notices: string[] = [];
   const tabs = createTabScenes(extension);
   const assignments = new SceneAssignments();
@@ -96,6 +100,8 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
     settings: { getLocalPlayerViewSettings: () => rules, onChange: (listener) => { ruleListeners.add(listener); return () => { ruleListeners.delete(listener); }; } },
     assets: new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash }),
     notify: (message) => notices.push(message),
+    resources: () => resources,
+    watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
     ...(options.lighting ? { lighting: liveLighting(extension.lighting) } : {}),
   });
   hub.start();
@@ -132,6 +138,10 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
     setRules: (next) => {
       rules = { ...rules, ...next };
       ruleListeners.forEach((listener) => listener());
+    },
+    setResources: (next) => {
+      resources = next;
+      resourceListeners.forEach((listener) => listener());
     },
     tick: async () => { await vi.advanceTimersByTimeAsync(SCENE_TICK_MS); },
   };

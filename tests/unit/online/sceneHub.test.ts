@@ -492,15 +492,18 @@ describe('SceneHub', () => {
     tabs.getState().setActiveTab(dungeon);
     store.setState({ isMapLoading: true });
     store.setState(sceneState({ villain: character('villain', 600) }));
-    h.setResources([SHOWN_HP]);
     await tick();
     // Split party (spec Goal 2): the held scene's players are told it is paused, unsequenced.
     expect(sceneTypes(raw.received)).toEqual(['scene-snapshot', 'scene-state']);
     expect(raw.received.at(-1)).toEqual({ v: 1, type: 'scene-state', sceneId: heldId, paused: true });
+    // D8: a rules change re-projects the held scene from what it kept, and its players get the patch.
+    h.setResources([SHOWN_HP]);
+    await tick();
+    expect(sceneTypes(raw.received)).toEqual(['scene-snapshot', 'scene-state', 'scene-patch']);
 
     const late = await join(h, 'key-late');
     expect(Object.keys(late.scene?.tokens ?? {})).toEqual(['hero']);
-    expect(late.scene?.tokens.hero?.resources).toEqual([]);
+    expect(late.scene?.tokens.hero?.resources).toEqual([HP_BAR]);
     raw.link.send('control', encodeControl({ v: 1, type: 'scene-resync', seq: 1 }));
     const resent = raw.received.at(-1);
     expect(resent?.type === 'scene-snapshot' ? Object.keys(resent.scene.tokens) : []).toEqual(['hero']);

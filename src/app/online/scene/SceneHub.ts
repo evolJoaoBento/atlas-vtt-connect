@@ -75,9 +75,10 @@ export class SceneHub implements SessionHandler, SlotProjection {
         cleared: () => this.clearPresentation(),
       }),
       settings.onChange(() => this.settingsChanged()),
-      // A fingerprint became known or was forgotten, a collection's resources or initiative rules changed: the live tick.
+      // A fingerprint became known or was forgotten: the live tick.
       assets.onChange(scheduleLive),
-      this.options.watchResources?.(scheduleLive) ?? (() => undefined),
+      // A collection's resources or initiative rules changed: the live tick, and parked scenes too (D8).
+      this.options.watchResources?.(() => this.rulesChanged()) ?? (() => undefined),
       assignments.onChange(() => this.update()),
       tabs?.subscribeLive(() => this.update()) ?? (() => undefined),
       tabs?.subscribeTabs((closed) => this.tabsClosed(closed)) ?? (() => undefined),
@@ -198,7 +199,11 @@ export class SceneHub implements SessionHandler, SlotProjection {
     const rules = pickPlayerViewRules(this.options.settings.getLocalPlayerViewSettings());
     if (samePlayerViewRules(rules, this.rules)) return;
     this.rules = rules;
-    // D8: parked scenes too, from what they kept: a GM who hides something expects it hidden everywhere.
+    this.rulesChanged();
+  }
+
+  /** D8: parked scenes too, from what they kept: a GM who hides something expects it hidden everywhere. */
+  private rulesChanged(): void {
     for (const slot of this.slots.values()) slot.rulesChanged();
   }
 

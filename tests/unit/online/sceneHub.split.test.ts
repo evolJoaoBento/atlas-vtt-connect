@@ -167,6 +167,28 @@ describe('SceneHub with a split party', () => {
     expect(JSON.stringify(annaPatch)).not.toContain(TOKEN.b);
   });
 
+  it('a resource the GM newly hides reaches parked players hidden (D8)', async () => {
+    const hp = { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true } as const;
+    const { w, anna, ben } = await annaOnAmbushBenOnBridge();
+    w.setResources([hp]);
+    w.editTokens({ [TOKEN.b]: character(TOKEN.b, 140, 140, { resources: { hp: { current: 7, max: 10 } } }) });
+    await w.tick();
+    const bar = (): unknown => {
+      const scene = w.hub.slotOf(ben.playerId)?.lastSent;
+      return scene?.tokens[TOKEN.b]?.resources;
+    };
+    expect(bar()).toEqual([{ color: '#22c55e', share: 0.7, spent: false }]);
+    await w.switchTo('a');
+    const [annaBefore, benBefore] = [anna.received.length, ben.received.length];
+    w.setResources([{ ...hp, visibleToPlayers: false }]);
+    await w.tick();
+    const benPatch = ben.received.slice(benBefore);
+    expect(benPatch.map((message) => message.type)).toEqual(['scene-patch']);
+    expect(bar()).toEqual([]);
+    // Ambush is live and its token has no resources: nothing changes for Anna.
+    expect(anna.received.slice(annaBefore)).toEqual([]);
+  });
+
   it('drops the fog coverage of a parked slot', async () => {
     const { w } = await annaOnAmbushBenOnBridge();
     expect(slotsOf(w).map((slot) => [slot.tab.tabId, slot.state, slot.hasFogCoverage()])).toEqual([['a', 'parked', false], ['b', 'live', true]]);
