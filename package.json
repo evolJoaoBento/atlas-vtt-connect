@@ -1,6 +1,6 @@
 {
   "name": "atlas-vtt-connect",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0-beta.5",
   "private": true,
   "description": "Online play and sharing for Atlas VTT: host a session, the web join page, the player tab, and note and map sharing.",
   "main": "dist/main.js",

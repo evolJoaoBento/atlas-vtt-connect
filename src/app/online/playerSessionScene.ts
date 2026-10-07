@@ -19,6 +19,11 @@ export interface PlayerSceneInboxOptions {
   onCamera(camera: SceneCamera): void;
   /** The shown scene was paused or is live again; a new scene, or none, is never paused. */
   onPaused?(paused: boolean): void;
+  /**
+   * The dice look the GM's collection throws in for the scene shown (a full look id), or null: none, or no scene shown.
+   * Called when it changes; the web page does not read it.
+   */
+  onDiceLook?(look: string | null): void;
   /** Where a dropped grid is told, once per session; `console.warn` by default. */
   warn?(message: string, grid: unknown): void;
 }
@@ -30,6 +35,9 @@ export class PlayerSceneInbox {
   private lastCamera: SceneCamera | null = null;
   /** The scene the GM said is paused; only while it is the one shown. */
   private pausedScene: string | null = null;
+  /** The latest `scene-look`: held until the scene it names is the one shown. */
+  private lookMessage: { sceneId: string; look: string | null } | null = null;
+  private lookShown: string | null = null;
   /** Every scene leaves here through this, so no drawer gets a grid it would loop over (`drawableGrid`). */
   private readonly drawable: (scene: PlayerScene | null) => PlayerScene | null;
 
@@ -46,6 +54,7 @@ export class PlayerSceneInbox {
         // A new scene (another `sceneId`), or none, is not paused until the GM says so.
         if (this.pausedScene !== null && scene?.sceneId !== this.pausedScene) this.setPaused(null);
         options.onScene(this.drawable(scene));
+        this.showLook();
       },
     });
   }
@@ -88,13 +97,30 @@ export class PlayerSceneInbox {
         // For the scene shown only: one the player does not have is another scene's.
         if (message.sceneId === this.mirror.scene?.sceneId) this.setPaused(message.paused ? message.sceneId : null);
         return true;
+      case 'scene-look':
+        this.lookMessage = { sceneId: message.sceneId, look: message.look };
+        this.showLook();
+        return true;
       default:
         return false;
     }
   }
 
+  /** The dice look of the scene shown: the GM's, only while the scene it was sent for is the one shown. */
+  get diceLook(): string | null {
+    const sceneId = this.mirror.scene?.sceneId;
+    return this.lookMessage && sceneId !== undefined && this.lookMessage.sceneId === sceneId ? this.lookMessage.look : null;
+  }
+
   dispose(): void {
     this.mirror.dispose();
+  }
+
+  private showLook(): void {
+    const look = this.diceLook;
+    if (look === this.lookShown) return;
+    this.lookShown = look;
+    this.options.onDiceLook?.(look);
   }
 
   private setPaused(sceneId: string | null): void {

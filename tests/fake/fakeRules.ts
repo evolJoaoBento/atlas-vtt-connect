@@ -26,6 +26,11 @@ export class FakeRules {
 
   constructor(private readonly changed: (collectionId: string | null) => void) {}
 
+  /** Whether the asset index holds a collection of that id. */
+  hasCollection(id: string): boolean {
+    return this.collections.has(id);
+  }
+
   /** The GM saves a collection's settings. */
   saveCollection(id: string, collection: FakeCollection): void {
     this.collections.set(id, structuredClone(collection));

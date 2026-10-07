@@ -2,6 +2,7 @@
 import type { AtlasExtension, DiceApi, LasersApi, LightingApi, TokensApi } from '@atlas-vtt/api-types';
 import type { Deps } from '../OnlineSessionService';
 import { liveLighting } from '../scene/sceneLighting';
+import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { createTabScenes } from './tabScenes';
 import { diceHostPart, laserRelayPart, tokenControlPart } from './toolParts';
@@ -19,9 +20,32 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
   | 'tabScenes'
 >;
+
+/**
+ * The dice look of a map's collection, over Atlas's `dice.lookFor` (API 1.18, `dice-look-choice`); null on an Atlas without it,
+ * so no look is sent. A map outside every collection throws in the GM's default, which `lookFor()` answers.
+ */
+export function diceLookSource(atlas: Pick<AtlasExtension, 'rules' | 'on'>, dice: DiceApi | null): DiceLookSource | null {
+  if (!dice || typeof dice.lookFor !== 'function') return null;
+  return {
+    lookFor: async (mapPath) => {
+      const collectionId = atlas.rules.forMap(mapPath).collectionId;
+      const answer = await dice.lookFor?.(collectionId);
+      return answer?.lookId ?? null;
+    },
+    watch: (listener) => {
+      const stops = [
+        atlas.on('collections-changed', () => listener()),
+        atlas.on('settings-changed', (key) => { if (key === 'diceLook') listener(); }),
+        atlas.on('rules-changed', () => listener()),
+      ];
+      return () => { for (const stop of stops) stop(); };
+    },
+  };
+}
 
 /**
  * Connect's own settings are not among these: the service takes them itself. Players' tokens, dice and lasers are
@@ -31,6 +55,7 @@ export type AtlasSessionDeps = Pick<Deps,
  * Without `scene-tabs` there is no split party: every player follows the presented scene.
  */
 export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs }: OptionalNamespaces): AtlasSessionDeps {
+  const diceLooks = diceLookSource(atlas, dice);
   return {
     presented: presentedSource(atlas),
     views: atlas.views,
@@ -43,6 +68,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
       getLocalPlayerViewSettings: () => atlas.settings.get('playerView'),
       onChange: (cb) => atlas.on('settings-changed', (key) => { if (key === 'playerView') cb(); }),
     },
+    ...(diceLooks ? { diceLook: diceLooks } : {}),
     ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),

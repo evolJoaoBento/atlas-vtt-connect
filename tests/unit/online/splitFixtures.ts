@@ -6,11 +6,13 @@
 import { vi } from 'vitest';
 import type { AtlasCapability, AtlasExtension, Character, PlayerVisibility, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import { presentedSource, type PresentedSceneSource } from '../../../src/app/online/atlas/presentedSource';
+import { diceLookSource } from '../../../src/app/online/atlas/sessionDeps';
 import { createTabScenes, type TabScenes } from '../../../src/app/online/atlas/tabScenes';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
+import type { DiceLookSource } from '../../../src/app/online/scene/sceneSources';
 import { SCENE_TICK_MS, SceneHub } from '../../../src/app/online/scene/SceneHub';
 import { liveLighting } from '../../../src/app/online/scene/sceneLighting';
 import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
@@ -91,8 +93,8 @@ export const IMAGES: Record<string, Uint8Array> = Object.fromEntries([
   ...TABS.map(({ tabId }) => `maps/${tabId}.png`), ...TABS.map(({ tabId }) => `art/${TOKEN[tabId]}.png`), 'art/shared.png',
 ].map((path, index) => [path, imageBytes(64 + index, index + 1)]));
 
-export async function splitWorld(options: { lighting?: boolean; visibility?: PlayerVisibility; images?: boolean } = {}): Promise<SplitWorld> {
-  const capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'scene-tabs', 'tokens', 'dice', 'lasers', ...(options.lighting ? ['lighting' as const] : [])];
+export async function splitWorld(options: { lighting?: boolean; visibility?: PlayerVisibility; images?: boolean; diceLook?: boolean | DiceLookSource } = {}): Promise<SplitWorld> {
+  const capabilities: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'scene-tabs', 'tokens', 'dice', 'lasers', ...(options.lighting ? ['lighting' as const] : []), ...(options.diceLook ? ['collections' as const, 'dice-look-choice' as const] : [])];
   const atlas = new FakeAtlas({ capabilities });
   atlas.views.open(VIEW, TABS.map((entry) => ({ ...entry })));
   atlas.views.setActive(VIEW);
@@ -123,6 +125,7 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
     resources: () => resources,
     watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
     ...(options.lighting ? { lighting: liveLighting(extension.lighting) } : {}),
+    ...(options.diceLook ? { diceLook: options.diceLook === true ? diceLookSource(extension, extension.dice)! : options.diceLook } : {}),
   });
   hub.start();
   return {

@@ -1,5 +1,5 @@
 /** Scene messages before each player's `seq` is set, kept under the control channel's size limit. */
-import { MAX_CONTROL_MESSAGE_BYTES, type ControlMessage, type SceneStateMessage } from '../protocol';
+import { MAX_CONTROL_MESSAGE_BYTES, type ControlMessage, type SceneLookMessage, type SceneStateMessage } from '../protocol';
 import { sortedByOrder, type PlayerScene, type ScenePatchBody } from './sceneTypes';
 
 type SceneMessage = Extract<
@@ -75,4 +75,9 @@ export function patchMessage(patch: ScenePatchBody): SceneOutgoing | null {
 /** Tells a scene's players it is paused or live again. Unsequenced: send it with `session.send`, never on a sequenced channel. */
 export function sceneStateMessage(sceneId: string, paused: boolean): SceneStateMessage {
   return { v: 1, type: 'scene-state', sceneId, paused };
+}
+
+/** Tells a scene's players the dice look of its collection (null: none). Unsequenced, like `sceneStateMessage`. */
+export function sceneLookMessage(sceneId: string, look: string | null): SceneLookMessage {
+  return { v: 1, type: 'scene-look', sceneId, look };
 }

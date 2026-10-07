@@ -72,6 +72,21 @@ export function isSceneState(message: Fields): boolean {
   return isSceneId(message.sceneId) && typeof message.paused === 'boolean';
 }
 
+/**
+ * A dice look id as Atlas names one (`<extension id>:<look id>`): short, plain letters, digits and `. _ : -`, no markup.
+ * `lookFor(...).lookId` answers `''` for Atlas's own dice, which is no look to send: players keep their own.
+ */
+const DICE_LOOK_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/;
+export const isDiceLookId = (value: unknown): value is string => typeof value === 'string' && DICE_LOOK_ID.test(value);
+
+/** The look to send for what Atlas answered: a valid look id, else null (`''` is Atlas's own dice, and players keep their own look). */
+export const diceLookToSend = (value: unknown): string | null => (isDiceLookId(value) ? value : null);
+
+/** A `scene-look`: a scene id and the dice look of its collection, or null for none (the player's own look). */
+export function isSceneLook(message: Fields): boolean {
+  return isSceneId(message.sceneId) && (message.look === null || isDiceLookId(message.look));
+}
+
 function isPoint(value: unknown): boolean {
   return isFields(value) && isCoordinate(value.x) && isCoordinate(value.y);
 }

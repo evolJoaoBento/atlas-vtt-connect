@@ -77,7 +77,7 @@ Connect replaces the online play preview (the fork of Atlas VTT with online play
 
 1. In BRAT, select `evolJoaoBento/atlas-vtt`, unfreeze it if you pinned a version, and update it to the latest version (0.6.2-beta.1 or newer). That is Atlas with the extension API; the built-in online play is gone and Connect replaces it.
 2. Restart Obsidian, or turn Atlas VTT off and on.
-3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.4**) and enable it.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.5**) and enable it.
 
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
 - **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.

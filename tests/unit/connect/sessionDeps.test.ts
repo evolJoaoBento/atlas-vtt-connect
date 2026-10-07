@@ -65,4 +65,42 @@ describe('sessionDeps', () => {
     expect(deps(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting']).deps.lighting).toBeDefined();
     expect(deps().deps).not.toHaveProperty('lighting');
   });
+
+  describe("the scenes' dice look", () => {
+    const LOOKS: AtlasCapability[] = ['views', 'presentation', 'rules', 'settings', 'storage', 'dice', 'collections', 'dice-look-choice'];
+
+    it("reads a map's look from its collection, and the default's outside one", async () => {
+      const { atlas, deps: d } = deps(LOOKS);
+      atlas.rules.saveCollection('c1', { maps: [MAP] });
+      expect(await d.diceLook!.lookFor(MAP)).toBe('');
+      const dice = atlas.connect(connectingPlugin('bones-ext')).dice;
+      await dice.useLook?.('runes');
+      expect(await d.diceLook!.lookFor(MAP)).toBe('bones-ext:runes');
+      await dice.useLook?.('coins', { collectionId: 'c1' });
+      expect(await d.diceLook!.lookFor(MAP)).toBe('bones-ext:coins');
+      expect(await d.diceLook!.lookFor('maps/elsewhere.atlasmap')).toBe('bones-ext:runes');
+      expect(await d.diceLook!.lookFor(null)).toBe('bones-ext:runes');
+    });
+
+    it("hears a collection's choice, the default's and a rules change, until stopped", async () => {
+      const { atlas, deps: d } = deps(LOOKS);
+      atlas.rules.saveCollection('c1', { maps: [MAP] });
+      const heard = vi.fn();
+      const stop = d.diceLook!.watch(heard);
+      const dice = atlas.connect(connectingPlugin('bones-ext')).dice;
+      await dice.useLook?.('coins', { collectionId: 'c1' });
+      await dice.useLook?.('runes');
+      atlas.rules.indexLoaded();
+      atlas.setSetting('laserPointer', { color: '#00ff00', size: 3 });
+      expect(heard).toHaveBeenCalledTimes(3);
+      stop();
+      await dice.useLook?.('claws');
+      expect(heard).toHaveBeenCalledTimes(3);
+    });
+
+    it('is left out on an Atlas without dice-look-choice, and without dice', () => {
+      expect(deps().deps).not.toHaveProperty('diceLook');
+      expect(deps(['views', 'presentation', 'rules', 'settings', 'storage']).deps).not.toHaveProperty('diceLook');
+    });
+  });
 });

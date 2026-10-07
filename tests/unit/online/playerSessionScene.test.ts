@@ -13,6 +13,7 @@ interface Harness {
   playerId: string;
   fromPlayer: ControlMessage[];
   scenes: Array<PlayerScene | null>;
+  looks: Array<string | null>;
 }
 
 async function admittedPlayer(): Promise<Harness> {
@@ -25,15 +26,16 @@ async function admittedPlayer(): Promise<Harness> {
   const fromPlayer: ControlMessage[] = [];
   gm.use({ onMessage: (_player, message) => fromPlayer.push(message) });
   const scenes: Array<PlayerScene | null> = [];
+  const looks: Array<string | null> = [];
   const player = new PlayerSession({
     hostId: 'gm', name: 'Anna', playerKey: 'key-a', clientVersion: '1', transport: network.client(),
-    onChange: () => {}, onScene: (scene) => scenes.push(scene),
+    onChange: () => {}, onScene: (scene) => scenes.push(scene), onDiceLook: (look) => looks.push(look),
   });
   player.start();
   await vi.advanceTimersByTimeAsync(0);
   const playerId = requests[0]!.playerId;
   gm.allow(playerId);
-  return { gm, player, playerId, fromPlayer, scenes };
+  return { gm, player, playerId, fromPlayer, scenes, looks };
 }
 
 describe('PlayerSession scenes', () => {
@@ -122,5 +124,30 @@ describe('PlayerSession scenes', () => {
     const second = { ...first, sceneId: 'bbbbbbbbbbbbbbbbbbbbbb' };
     gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 4, scene: sceneBody(second), fogParts: 0, drawingParts: 0 });
     expect(player.paused).toBe(false);
+  });
+
+  it("hands the GM's dice look on once the scene it was sent for is shown, and drops it with that scene", async () => {
+    const { gm, playerId, looks } = await admittedPlayer();
+    const scene = playerScene();
+    // The look may come before the snapshot it belongs to.
+    gm.send(playerId, { v: 1, type: 'scene-look', sceneId: scene.sceneId, look: 'bones-ext:bones' });
+    expect(looks).toEqual([]);
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 1, scene: sceneBody(scene), fogParts: 0, drawingParts: 0 });
+    expect(looks).toEqual(['bones-ext:bones']);
+    gm.send(playerId, { v: 1, type: 'scene-patch', seq: 2, set: {}, upsert: { tokens: { t1: playerToken({ x: 9 }) } }, remove: {} });
+    expect(looks).toEqual(['bones-ext:bones']);
+    gm.send(playerId, { v: 1, type: 'scene-look', sceneId: scene.sceneId, look: null });
+    expect(looks).toEqual(['bones-ext:bones', null]);
+    gm.send(playerId, { v: 1, type: 'scene-look', sceneId: scene.sceneId, look: 'bones-ext:bones' });
+    gm.send(playerId, { v: 1, type: 'scene-clear', seq: 3 });
+    expect(looks).toEqual(['bones-ext:bones', null, 'bones-ext:bones', null]);
+  });
+
+  it('ignores a dice look sent for another scene', async () => {
+    const { gm, player, playerId, looks } = await admittedPlayer();
+    gm.send(playerId, { v: 1, type: 'scene-snapshot', seq: 1, scene: sceneBody(playerScene()), fogParts: 0, drawingParts: 0 });
+    gm.send(playerId, { v: 1, type: 'scene-look', sceneId: 'aaaaaaaaaaaaaaaaaaaaaa', look: 'bones-ext:bones' });
+    expect(looks).toEqual([]);
+    expect(player.scene).not.toBeNull();
   });
 });

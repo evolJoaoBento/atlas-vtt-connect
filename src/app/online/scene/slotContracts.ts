@@ -24,7 +24,7 @@ export interface SlotHost<S> {
   /** The players who see this slot now. */
   audience(slot: S): string[];
   sendSequenced(playerId: string, message: SceneOutgoing): void;
-  /** Unsequenced: `scene-state` (D19). */
+  /** Unsequenced: `scene-state` (D19), `scene-look`. */
   send(playerId: string, message: ControlMessage): void;
   /** What its players have changed. */
   projected(slot: S): void;

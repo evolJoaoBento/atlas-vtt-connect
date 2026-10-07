@@ -8,7 +8,7 @@ import { shownUrls } from '../../../../src/app/online/obsidian/objectUrlImages';
 import { PAUSED_BANNER } from '../../../../src/app/online/split/splitCopy';
 import { laserColor } from '../../../../src/app/online/tools/laserColors';
 import { playerScene } from '../sceneFixtures';
-import { admitted, remoteSceneSetup } from './remoteSceneFixtures';
+import { admitted, REMOTE_CAPABILITIES, remoteSceneSetup } from './remoteSceneFixtures';
 
 const setup = remoteSceneSetup;
 
@@ -293,5 +293,38 @@ describe('RemoteSceneClient', () => {
     const t = await setup();
     t.sink().diceLog([{ id: 'r1', name: 'Anna', formula: 'd20', dice: [{ die: 'd20', value: 11 }], modifier: 0, total: 11, at: 1000, scene: 'Cave' }]);
     expect((t.handle.diceLog[0] as { rolledBy: string }).rolledBy).toBe('Anna · Cave');
+  });
+
+  describe("the GM's dice look", () => {
+    const WITH_LOOKS = [...REMOTE_CAPABILITIES, 'dice-look-choice' as const];
+
+    it('sets it on the remote view once, and null again when the GM has none', async () => {
+      const t = await setup({ capabilities: WITH_LOOKS });
+      t.sink().diceLook?.(null);
+      expect(t.handle.count('setDiceLook')).toBe(0);
+      t.sink().diceLook?.('bones-ext:bones');
+      t.sink().diceLook?.('bones-ext:bones');
+      expect(t.handle.diceLook).toBe('bones-ext:bones');
+      expect(t.handle.count('setDiceLook')).toBe(1);
+      t.sink().diceLook?.(null);
+      expect(t.handle.diceLook).toBeNull();
+      expect(t.handle.count('setDiceLook')).toBe(2);
+    });
+
+    it("leaves the player's own look on an Atlas without setDiceLook", async () => {
+      const t = await setup();
+      expect(t.view.setDiceLook).toBeUndefined();
+      expect(() => t.sink().diceLook?.('bones-ext:bones')).not.toThrow();
+      expect(t.handle.diceLook).toBeNull();
+    });
+
+    it('logs a look Atlas refuses and goes on', async () => {
+      const t = await setup({ capabilities: WITH_LOOKS });
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      t.sink().diceLook?.('x'.repeat(301));
+      expect(logged).toHaveBeenCalled();
+      t.sink().diceLook?.('bones-ext:bones');
+      expect(t.handle.diceLook).toBe('bones-ext:bones');
+    });
   });
 });

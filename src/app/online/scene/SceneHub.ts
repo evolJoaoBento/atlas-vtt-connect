@@ -77,6 +77,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
       assets.onChange(scheduleLive),
       // A collection's resources or initiative rules changed: the live tick, and parked scenes too (D8).
       this.options.watchResources?.(() => this.rulesChanged()) ?? (() => undefined),
+      // A collection's dice look (or the default's) changed: every scene in use reads its own again.
+      this.options.diceLook?.watch(() => { for (const slot of this.slots.values()) slot.readLook(); }) ?? (() => undefined),
       assignments.onChange(() => { this.update(); this.changes.emit({ kind: 'assignments' }); }),
       tabs?.subscribeLive(() => this.update()) ?? (() => undefined),
       tabs?.subscribeTabs((closed) => this.tabsClosed(closed)) ?? (() => undefined),
@@ -246,6 +248,7 @@ export class SceneHub extends SlotReads implements SessionHandler {
         slot.name = info.name;
         slot.mapPath = info.mapPath;
       }
+      slot.mapSeen();
       const before = slot.state;
       if (this.isActive(slot)) slot.goLive();
       else slot.park();

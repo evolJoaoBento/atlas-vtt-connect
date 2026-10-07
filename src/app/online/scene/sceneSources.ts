@@ -42,6 +42,16 @@ export interface SceneProjectionOptions {
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Calls `listener` when a collection's rules change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
   watchResources?: (listener: () => void) => () => void;
+  /** The dice look of each scene's collection, sent to its players; without it (an Atlas before API 1.18) none is sent. */
+  diceLook?: DiceLookSource;
+}
+
+/** The dice look of a map's collection, as the GM's Atlas has it (`dice.lookFor`, API 1.18); players are sent it with the scene. */
+export interface DiceLookSource {
+  /** The look the collection holding `mapPath` throws in (a full look id), `''` or null for Atlas's own dice or none. */
+  lookFor(mapPath: string | null): Promise<string | null>;
+  /** Calls `listener` when a look choice may have changed (a collection's, or the default); returns the stop. */
+  watch(listener: () => void): () => void;
 }
 
 export type Slice = readonly unknown[];

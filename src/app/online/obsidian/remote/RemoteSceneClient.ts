@@ -96,6 +96,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
   private disposed = false;
   /** The scene shown is paused: the GM is on another scene. */
   private isPaused = false;
+  /** The dice look Atlas has for this view: the same again is not sent. */
+  private sentLook: string | null = null;
 
   constructor(private readonly options: RemoteSceneClientOptions) {
     const { view, service } = options;
@@ -174,6 +176,16 @@ export class RemoteSceneClient implements OnlineSceneSink {
     if (this.disposed || paused === this.isPaused) return;
     this.isPaused = paused;
     this.showStatus();
+  }
+
+  /**
+   * The GM's dice look for this scene: the view throws every roll in it (`RemoteView.setDiceLook`, API 1.18), and
+   * Atlas shows the player's own look where it has not that look registered. An Atlas without the call keeps its own.
+   */
+  diceLook(look: string | null): void {
+    if (this.disposed || look === this.sentLook || typeof this.view.setDiceLook !== 'function') return;
+    const { view } = this;
+    if (guarded('the dice look', () => view.setDiceLook?.(look))) this.sentLook = look;
   }
 
   diceLog(entries: readonly DiceLogEntry[]): void {

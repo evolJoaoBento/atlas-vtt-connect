@@ -13,13 +13,14 @@ import { projectForPlayers } from './projectForPlayers';
 import { createProjectionMemo } from './projectRecords';
 import { diffScenes } from './sceneDiff';
 import type { PresentationLighting } from './sceneLighting';
-import { patchMessage, sceneStateMessage, type SceneOutgoing } from './sceneMessages';
+import { patchMessage, sceneLookMessage, sceneStateMessage, type SceneOutgoing } from './sceneMessages';
 import {
   FOG_TRUNCATED_NOTICE, FogCoverageCache, type FogCoverages, sameSlice, sceneContext, sliceOf, type Slice,
 } from './sceneSources';
 import type { SlotHost, SlotSource, SlotState } from './slotContracts';
 import { MapSizeWait, SnapshotCache, TickTimer } from './sceneTicks';
 import type { PlayerScene } from './sceneTypes';
+import { diceLookToSend } from './sceneValidation';
 
 export type { SlotHost, SlotSource, SlotState } from './slotContracts';
 
@@ -38,6 +39,11 @@ export class SceneSlot {
   /** The tab's name and map, as its tab shows them; the hub follows renames. */
   name = '';
   mapPath = '';
+  /** The dice look of its map's collection, as its players were last told (`scene-look`); null for none. */
+  look: string | null = null;
+  /** The map path `look` was read for, and which read is the latest: an older answer that arrives late is dropped. */
+  private lookMap: string | null = null;
+  private lookRead = 0;
   private readonly snapshots: SnapshotCache;
   /** Per slot: a memo shared between scenes would hand one scene's records to another's projection as unchanged. */
   private readonly memo = createProjectionMemo();
@@ -111,9 +117,11 @@ export class SceneSlot {
   sendCurrentTo(playerId: string): void {
     if (!this.lastSent) {
       this.host.sendSequenced(playerId, CLEAR);
+      this.sendLookTo(playerId);
       return;
     }
     this.sendSnapshotTo(playerId);
+    this.sendLookTo(playerId);
     if (this.state !== 'parked') return;
     void Promise.resolve().then(() => {
       if (this.state === 'parked' && this.host.audience(this).includes(playerId)) this.host.send(playerId, sceneStateMessage(this.sceneId, true));
@@ -123,6 +131,25 @@ export class SceneSlot {
   /** The scene the GM's view holds for it now, once live and caught up (P2, P8): what the GM's camera, laser and moves act on. */
   shownSnapshot(): SceneSnapshot | null {
     return this.state === 'live' && this.awaiting === null && !this.sight ? this.source.snapshot() : null;
+  }
+
+  /** Its map may have changed (a tab's rename or map): the dice look of the map's collection is read again when it did. */
+  mapSeen(): void {
+    if (this.lookMap !== this.mapPath) this.readLook();
+  }
+
+  /** A look choice may have changed anywhere: read this scene's again, and tell its players when it differs. */
+  readLook(): void {
+    const source = this.host.options.diceLook;
+    if (!source || this.gone) return;
+    this.lookMap = this.mapPath;
+    const read = ++this.lookRead;
+    new Promise<string | null>((resolve) => { resolve(source.lookFor(this.mapPath || null)); }).then((answer) => {
+      if (this.gone || read !== this.lookRead) return;
+      this.setLook(diceLookToSend(answer));
+    }, (error: unknown) => {
+      console.error('[Atlas VTT Connect] The dice look of a scene could not be read; players keep their own:', error);
+    });
   }
 
   /** Whether it holds a fog coverage (only while live). */
@@ -241,7 +268,21 @@ export class SceneSlot {
       return;
     }
     this.setSent(this.project(prepared));
-    for (const playerId of this.host.audience(this)) this.sendSnapshotTo(playerId);
+    for (const playerId of this.host.audience(this)) {
+      this.sendSnapshotTo(playerId);
+      this.sendLookTo(playerId);
+    }
+  }
+
+  private setLook(look: string | null): void {
+    if (look === this.look) return;
+    this.look = look;
+    for (const playerId of this.host.audience(this)) this.host.send(playerId, sceneLookMessage(this.sceneId, look));
+  }
+
+  /** What its players are told of the look: nothing while it is none, which is what a player starts with. */
+  private sendLookTo(playerId: string): void {
+    if (this.look !== null) this.host.send(playerId, sceneLookMessage(this.sceneId, this.look));
   }
 
   /** A fresh snapshot of this slot's scene (P2), what its lighting hides now and the coverage; null when it holds none. */

@@ -1,4 +1,4 @@
-import type { DiceApi, DiceRollRequest, DiceRollResult, Disposer, ViewId } from '@atlas-vtt/api-types';
+import type { DiceApi, DiceLookInEffect, DiceRollRequest, DiceRollResult, Disposer, ViewId } from '@atlas-vtt/api-types';
 import { rollByRules } from '@atlas-vtt/shared/rules';
 import type { FakeRules } from './fakeRules';
 import type { FakeViews, Own } from './fakeViews';
@@ -38,6 +38,8 @@ function seeded(seed: number): () => number {
 /**
  * Atlas's dice log as the test drives it. `roll` rolls by the rules of the map's collection and logs the roll;
  * every extension's `onRolled` listeners hear a roll, `publish` included, before the call returns. Results are deep-frozen copies.
+ * `useLook` and `lookFor` (1.18.0, `dice-look-choice`) keep the choice per collection and the GM's default by full id
+ * (`<extension id>:<look id>`), as Atlas does: a look is `loaded` once `registerLookId` made it so; `''` is Atlas's own dice.
  * `throw` (1.13.0) throws a given roll in a loaded view once per roll id (`thrownIn`), and answers false with the
  * user's dice shown as result cards, for a view not open or not loaded, or for a roll whose dice do not land on a face.
  */
@@ -47,9 +49,30 @@ export class FakeDice {
   /** The `mapPath` of each `roll` request, in order: what the rules were asked for. */
   readonly rolledFor: Array<string | null> = [];
   private readonly thrown = new Map<ViewId, DiceRollResult[]>();
+  /** The look each collection chose, and the GM's default, as full ids; `''` is Atlas's own dice. */
+  private readonly chosen = new Map<string, string>();
+  private defaultLook = '';
+  private readonly registered = new Set<string>();
 
-  /** `display`: the user's dice display setting (Atlas's `diceDisplay`). */
-  constructor(private readonly rules: FakeRules, private readonly views?: FakeViews, private readonly display: () => string = () => 'full') {}
+  /**
+   * `display`: the user's dice display setting (Atlas's `diceDisplay`). `lookChanged`: a collection's choice changed
+   * (`collections-changed`) or the default's (`settings-changed` for `diceLook`).
+   */
+  constructor(
+    private readonly rules: FakeRules, private readonly views?: FakeViews, private readonly display: () => string = () => 'full',
+    private readonly lookChanged: (scope: 'collection' | 'default') => void = () => undefined,
+  ) {}
+
+  /** The look `id` (a full id) is registered by some extension now, so a choice of it is `loaded`. */
+  registerLookId(id: string, registered = true): void {
+    if (registered) this.registered.add(id);
+    else this.registered.delete(id);
+  }
+
+  /** The collections' choices by id, and the default: what the asset index and the settings hold. */
+  choices(): { collections: Readonly<Record<string, string>>; default: string } {
+    return { collections: Object.fromEntries(this.chosen), default: this.defaultLook };
+  }
 
   /** The rolls `throw` threw in the view, in order. */
   thrownIn(viewId: ViewId): readonly DiceRollResult[] {
@@ -66,8 +89,10 @@ export class FakeDice {
     return this.listeners.size;
   }
 
-  api(own: Own): DiceApi {
+  /** `extensionId`: whose looks `useLook` chooses; `lookChoice`: this Atlas has `dice-look-choice` (1.18.0). */
+  api(own: Own, extensionId = 'atlas-vtt-connect', lookChoice = false): DiceApi {
     return Object.freeze({
+      ...(lookChoice ? this.lookApi(extensionId) : {}),
       roll: (request: DiceRollRequest): DiceRollResult => {
         const given = request as Partial<DiceRollRequest> | null;
         const valid = typeof given === 'object' && given !== null && isText(given.formula)
@@ -96,6 +121,33 @@ export class FakeDice {
         return true;
       },
     });
+  }
+
+  private lookApi(extensionId: string): Pick<DiceApi, 'useLook' | 'lookFor'> {
+    return {
+      useLook: (lookId: unknown, options?: unknown): Promise<void> => {
+        const given = options as { collectionId?: unknown } | undefined;
+        const optionsOk = options === undefined || (typeof options === 'object' && options !== null && (given?.collectionId === undefined || isText(given.collectionId)));
+        if (!(lookId === null || isText(lookId)) || !optionsOk) return Promise.reject(new Error('[Atlas API] dice.useLook: a look id or null, and { collectionId? }.'));
+        const full = lookId === null || lookId === '' ? lookId : `${extensionId}:${lookId}`;
+        const collectionId = given?.collectionId;
+        if (collectionId === undefined) {
+          this.defaultLook = full ?? '';
+          this.lookChanged('default');
+          return Promise.resolve();
+        }
+        if (!this.rules.hasCollection(collectionId as string)) return Promise.reject(new Error(`[Atlas API] dice.useLook: there is no collection "${String(collectionId)}".`));
+        if (full === null) this.chosen.delete(collectionId as string);
+        else this.chosen.set(collectionId as string, full);
+        this.lookChanged('collection');
+        return Promise.resolve();
+      },
+      lookFor: (collectionId?: string | null): Promise<DiceLookInEffect> => {
+        const own = collectionId == null ? undefined : this.chosen.get(collectionId);
+        const lookId = own ?? this.defaultLook;
+        return Promise.resolve(Object.freeze({ lookId, from: own === undefined ? 'default' : 'collection', loaded: lookId === '' || this.registered.has(lookId) }));
+      },
+    };
   }
 
   private emit(result: DiceRollResult): void {

@@ -9,7 +9,7 @@ import type { PresentedSceneSource } from './atlas/presentedSource';
 import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
-import type { PlayerViewSettingsSource } from './scene/sceneSources';
+import type { DiceLookSource, PlayerViewSettingsSource } from './scene/sceneSources';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
@@ -52,6 +52,8 @@ export interface Deps extends OptionalParts {
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Tells when those resources or rules may have changed. */
   watchResources?: (listener: () => void) => () => void;
+  /** The dice look of a map's collection (Atlas's `dice.lookFor`, API 1.18), sent to players; without it none is. */
+  diceLook?: DiceLookSource;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -133,6 +135,7 @@ export class OnlineSessionService {
           ...(deps.resources ? { resources: deps.resources } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
           ...(deps.watchResources ? { watchResources: deps.watchResources } : {}),
+          ...(deps.diceLook ? { diceLook: deps.diceLook } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,

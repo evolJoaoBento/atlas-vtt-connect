@@ -32,6 +32,8 @@ export class FakeRemoteHandle {
   player: RemotePlayerState | null = null;
   status: RemoteStatus | null = null;
   diceLog: readonly unknown[] = [];
+  /** The dice look the owner set (`setDiceLook`, 1.18.0): a full id, `''` for Atlas's dice, null for the player's own. */
+  diceLook: string | null = null;
   readonly thrown: string[] = [];
   readonly cameras: Array<{ camera: ViewCamera; animate: boolean; padded: boolean }> = [];
   closed = false;
@@ -42,7 +44,7 @@ export class FakeRemoteHandle {
   private readonly statusChoices = new Set<(id: string) => void>();
   readonly api: RemoteView;
 
-  constructor(readonly viewId: string, readonly owner: string, readonly options: ReturnType<typeof checkedOptions>, private readonly views: FakeViews, private readonly onClosed: () => void, readonly before115 = false) {
+  constructor(readonly viewId: string, readonly owner: string, readonly options: ReturnType<typeof checkedOptions>, private readonly views: FakeViews, private readonly onClosed: () => void, readonly before115 = false, lookChoice = false) {
     views.openRemote(viewId);
     const live = <A extends unknown[]>(method: string, run: (...args: A) => void) => (...args: A): void => {
       this.calls.push({ method, args });
@@ -62,6 +64,13 @@ export class FakeRemoteHandle {
         if (!Array.isArray(entries) || !entries.every(isRoll)) throw new Error('RemoteView.setDiceLog: the entries must be dice roll results.');
         this.diceLog = structuredClone(entries.slice(0, 100));
       }),
+      // API 1.18.0 (`dice-look-choice`): a string of at most 300 characters, or null; anything else throws.
+      ...(lookChoice ? {
+        setDiceLook: live('setDiceLook', (lookId: unknown) => {
+          if (lookId !== null && !(typeof lookId === 'string' && lookId.length <= 300)) throw new Error('RemoteView.setDiceLook: a look id of at most 300 characters, or null.');
+          this.diceLook = lookId;
+        }),
+      } : {}),
       throwRoll: live('throwRoll', (result: unknown) => {
         if (!isRoll(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
         if (!this.thrown.includes(result.id)) this.thrown.push(result.id);
@@ -167,7 +176,7 @@ export class FakeRemoteViews {
   /** `open` fails (the workspace refused the view), as `open` rejects in Atlas. */
   failOpen = false;
 
-  constructor(private readonly views: FakeViews, private readonly before115 = false) {}
+  constructor(private readonly views: FakeViews, private readonly before115 = false, private readonly lookChoice: () => boolean = () => false) {}
 
   /** The extension that opened the remote view, while it is open (Atlas's `RemoteControls` owner); undefined for any other view. */
   ownerOf(viewId: string): string | undefined {
@@ -200,7 +209,7 @@ export class FakeRemoteViews {
         const shown = checked.reuse ? this.handles.find((handle) => handle.owner === owner && !handle.closed) : undefined;
         if (shown) return Promise.resolve(shown.api);
         let release: Disposer = () => undefined;
-        const handle = new FakeRemoteHandle(`remote-${++this.next}`, owner, checked, this.views, () => release(), this.before115);
+        const handle = new FakeRemoteHandle(`remote-${++this.next}`, owner, checked, this.views, () => release(), this.before115, this.lookChoice());
         release = own(() => handle.close());
         this.handles.push(handle);
         return Promise.resolve(handle.api);

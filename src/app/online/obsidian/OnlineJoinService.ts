@@ -147,7 +147,7 @@ export class OnlineJoinService {
     });
     const joined: Joined = {
       target, name: cleaned, playerKey: this.playerKeyFor(target.hostId), loader, session: null,
-      opened: false, scene: null, camera: null, control: [], dice: [], paused: false,
+      opened: false, scene: null, camera: null, control: [], dice: [], paused: false, diceLook: null,
       ids: new JoinIdentity(target, this.identityCrypto, this.deviceKeys),
     };
     this.joined = joined;

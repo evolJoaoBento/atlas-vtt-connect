@@ -119,7 +119,7 @@ export class FakeAtlas implements AtlasApi {
     }, () => this.capabilities.has('scene-tabs'));
     this.presentation = new FakePresentation(this.views, () => this.capabilities.has('scene-tabs'));
     this.rules = new FakeRules((collectionId) => this.emit('rules-changed', collectionId));
-    this.dice = new FakeDice(this.rules, this.views, () => this.settings.diceDisplay);
+    this.dice = new FakeDice(this.rules, this.views, () => this.settings.diceDisplay, (scope) => this.emit(scope === 'collection' ? 'collections-changed' : 'settings-changed', ...(scope === 'collection' ? [] : ['diceLook'])));
     this.lasers = new FakeLasers(this.views);
     this.lighting = new FakeLighting(this.views);
     this.tokens = new FakeTokens(this.views);
@@ -130,7 +130,7 @@ export class FakeAtlas implements AtlasApi {
     this.ui = this.capabilities.has('ui') ? this.slots : undefined;
     this.scenes = new FakeScenes(() => this.emit('scenes-changed'), options.vault, () => this.views.openMapPaths(), options.scenesBefore113 === true);
     this.bundles = new FakeBundles();
-    this.remoteViews = new FakeRemoteViews(this.views, options.before115 === true);
+    this.remoteViews = new FakeRemoteViews(this.views, options.before115 === true, () => this.capabilities.has('dice-look-choice'));
   }
 
   has(capability: AtlasCapability): boolean {
@@ -203,7 +203,7 @@ export class FakeAtlas implements AtlasApi {
       views: gate('views', this.views.api(own)),
       presentation: gate('presentation', this.presentation.api(own)),
       rules: gate('rules', this.rules.api()),
-      dice: gate('dice', this.dice.api(own)),
+      dice: gate('dice', this.dice.api(own, id, this.capabilities.has('dice-look-choice'))),
       lasers: gate('lasers', this.lasers.api(own)),
       lighting: gate('lighting', this.lighting.api(own)),
       tokens: gate('tokens', this.tokens.api()),

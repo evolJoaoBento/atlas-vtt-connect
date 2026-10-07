@@ -63,6 +63,8 @@ export interface PlayerSessionOptions {
   onMoveRefused?(tokenId: string): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
+  /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
+  onDiceLook?(look: string | null): void;
   /** Dice log entries from the GM, newest first; `replay` replaces the log (sent on every admission). */
   onDiceLog?(entries: readonly DiceLogEntry[], replay: boolean): void;
   /** Someone else's laser: its new points, for the scene `sceneId`. */
@@ -96,6 +98,7 @@ export class PlayerSession {
       onScene: (scene) => this.options.onScene?.(scene),
       onCamera: (camera) => this.options.onCamera?.(camera),
       onPaused: (paused) => this.options.onSceneState?.(paused),
+      onDiceLook: (look) => this.options.onDiceLook?.(look),
     });
   }
 

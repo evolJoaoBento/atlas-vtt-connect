@@ -28,6 +28,8 @@ export interface Joined {
   dice: readonly DiceLogEntry[];
   /** The scene shown is paused: the GM is on another scene. */
   paused: boolean;
+  /** The GM's dice look for the scene shown (`scene-look`); null for none. */
+  diceLook: string | null;
   ids: JoinIdentity;
 }
 
@@ -78,6 +80,11 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.paused = paused;
       host.sink()?.paused?.(paused);
     },
+    onDiceLook: (look) => {
+      if (!current()) return;
+      joined.diceLook = look;
+      host.sink()?.diceLook?.(look);
+    },
     onDiceLog: (entries, replay) => {
       if (!current()) return;
       const { list, fresh } = mergeDiceLog(joined.dice, entries, replay);
@@ -104,6 +111,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.diceLog(joined.dice),
     () => sink.scene(joined.scene),
     () => sink.paused?.(joined.paused),
+    () => sink.diceLook?.(joined.diceLook),
     () => { if (joined.camera) sink.camera(joined.camera); },
     () => sink.images(),
   ];

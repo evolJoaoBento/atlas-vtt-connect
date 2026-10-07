@@ -6,7 +6,7 @@ import type { SceneCamera } from './scene/sceneCamera';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
 import {
-  isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isScenePatchBody, isSceneSeq, isSceneState,
+  isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
@@ -65,6 +65,13 @@ export interface PresencePlayer {
  */
 export interface SceneStateMessage { v: 1; type: 'scene-state'; sceneId: string; paused: boolean }
 
+/**
+ * GM to the players of one scene: the dice look of that scene's collection (a full look id, as Atlas's
+ * `dice.lookFor` answers it), or null for none. Unsequenced, like `scene-state`, and scoped by `sceneId`. A page or
+ * player that does not know it ignores it; the web page has no extension looks, and ignores the id.
+ */
+export interface SceneLookMessage { v: 1; type: 'scene-look'; sceneId: string; look: string | null }
+
 export type ControlMessage =
   | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
   | { v: 1; type: 'admitted'; playerId: string; session: { title: string }; table?: TableProof }
@@ -84,6 +91,7 @@ export type ControlMessage =
   | { v: 1; type: 'scene-resync'; seq: number }
   | ({ v: 1; type: 'scene-camera' } & SceneCamera)
   | SceneStateMessage
+  | SceneLookMessage
   /** GM to one player: the tokens that player may move, for this session. */
   | { v: 1; type: 'token-control'; tokenIds: string[] }
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
@@ -151,6 +159,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'scene-resync': (m) => isLastSeq(m.seq),
   'scene-camera': (m) => isSceneCamera(m),
   'scene-state': (m) => isSceneState(m),
+  'scene-look': (m) => isSceneLook(m),
   'token-control': (m) => Array.isArray(m.tokenIds) && m.tokenIds.length <= MAX_CONTROLLED_TOKENS
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
