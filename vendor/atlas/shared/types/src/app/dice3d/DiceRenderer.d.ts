@@ -21,6 +21,7 @@
 import type { DiceGpu } from './DiceGpu';
 import type { DieSides } from './dieGeometry';
 import type { DieBody } from './dieBody';
+import { type LookVariant } from './dieMesh';
 import type { DieAnim } from './dieMotion';
 import { type Crit } from './impactSparks';
 export interface StageDie {
@@ -56,9 +57,13 @@ export declare class DiceRenderer {
     /**
      * One mesh per planned die; dice of the same kind share geometry and
      * material. Each gets a chain of ghosts, shorter the more dice there are
-     * (`chainLengthFor`).
+     * (`chainLengthFor`). A die with a tint (`#rrggbb`, by plan index) or a stage
+     * in a look of its own (`look`) is painted with its own material (`dieVariantAssets`).
      */
-    setPlan(bodies: readonly DieBody[]): void;
+    setPlan(bodies: readonly DieBody[], options?: {
+        tints?: ReadonlyArray<string | null | undefined>;
+        look?: LookVariant | null;
+    }): void;
     /** The stage as the throw knows it: half width and half depth in world units. */
     stage(): readonly [number, number];
     /**

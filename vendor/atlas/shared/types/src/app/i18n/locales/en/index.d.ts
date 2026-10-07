@@ -1093,6 +1093,9 @@ export declare const en: {
     readonly 'dice.unpin': "Unpin panel";
     readonly 'dice.player': "Player";
     readonly 'dice.rollFormula': "Roll {formula}";
+    readonly 'dice.colour.label': "Colour of the next dice";
+    readonly 'dice.colour.none': "No colour";
+    readonly 'dice.colour.group': "{name}: {dice}";
     readonly 'dice.look.name': "Dice look";
     readonly 'dice.look.desc': "Atlas's dice in the colour and numbers below, or a look another plugin added. A look's numbers that it has no art for use the numbers below.";
     readonly 'dice.look.atlas': "Atlas dice";

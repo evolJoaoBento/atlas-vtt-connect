@@ -1,7 +1,7 @@
 import { r as rollFace, a as rollExplosions, M as MAX_EXPLOSIONS } from "./diceLabels-DiaA4yev.js";
 import { d, b, e, c } from "./diceLabels-DiaA4yev.js";
-import { t } from "./englishTexts-B44XM0o-.js";
-import { D, a, b as b2, L, c as c2, d as d2, r } from "./laserPointerSettings-DurFCvN-.js";
+import { t } from "./englishTexts-4g_ZrbBk.js";
+import { D, a, b as b2, L, c as c2, d as d2, r } from "./laserPointerSettings-D-5w9OQS.js";
 const DEFAULT_DICE_RULES = { defaultRoll: "1d20", crit: "natural" };
 const CRIT_RULES = ["natural", "roll-under", "doubles", "high-total", "none"];
 const EXPLODE_SCOPES = ["default", "all"];

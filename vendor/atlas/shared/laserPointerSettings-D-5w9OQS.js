@@ -1,8 +1,5 @@
-import { t } from "./englishTexts-B44XM0o-.js";
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-function isHexColor(value) {
-  return typeof value === "string" && HEX_COLOR.test(value);
-}
+import { t } from "./englishTexts-4g_ZrbBk.js";
+import { i as isHexColor } from "./hexColor-BorPG-zU.js";
 const LASER_COLOR_SWATCHES = [
   { value: "#ff0059", label: t("laser.color.red") },
   { value: "#ff9f2e", label: t("laser.color.orange") },
@@ -33,6 +30,5 @@ export {
   LASER_COLOR_SWATCHES as b,
   LASER_SIZE_MAX as c,
   LASER_SIZE_MIN as d,
-  isHexColor as i,
   resolveLaserPointerSettings as r
 };

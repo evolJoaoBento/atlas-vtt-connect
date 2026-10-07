@@ -17,6 +17,11 @@ const dice = {
   "dice.player": "Player",
   "dice.rollFormula": "Roll {formula}",
   /** The dice look setting: Atlas's own dice, or a look another plugin added (`dice.registerLook`). */
+  /** The dice tray's colour picker (`dice.registerColours`). */
+  "dice.colour.label": "Colour of the next dice",
+  "dice.colour.none": "No colour",
+  /** What the tray holds in one colour, e.g. "Fire: 2d6 + 1d20". */
+  "dice.colour.group": "{name}: {dice}",
   "dice.look.name": "Dice look",
   "dice.look.desc": "Atlas's dice in the colour and numbers below, or a look another plugin added. A look's numbers that it has no art for use the numbers below.",
   "dice.look.atlas": "Atlas dice",

@@ -32,9 +32,13 @@ export interface DiePlan {
     follows?: number;
     /** The die of an explosion downwards: it subtracts. */
     subtracts?: true;
+    /** The colour the die was rolled in (its tag's `color`, `#rrggbb` in lower case): its body is painted in it. */
+    tint?: string;
 }
 export interface DiceScene {
     plan: DiePlan[];
+    /** The dice look of the roll's map (a collection's choice, else the GM's): a full look id, `''` for Atlas's own; unset paints the look in effect. */
+    lookId?: string;
     /** Face each die lands on, in plan order. */
     faces: number[];
 }
@@ -53,7 +57,7 @@ export declare function landsOnAFace(die: Pick<RolledDie, 'max' | 'value'>): boo
  * A mimicked die lands on the highest face of its band (a d2's 2 shows the
  * d6's 6), so the face always reads back as the value everyone sees.
  */
-export declare function sceneFromRolls(rolls: readonly Pick<RolledDie, 'max' | 'value' | 'negative' | 'exploded'>[]): DiceScene | null;
+export declare function sceneFromRolls(rolls: readonly Pick<RolledDie, 'max' | 'value' | 'negative' | 'exploded' | 'color'>[]): DiceScene | null;
 /** How many dice the longest chain of explosions throws after its first die; 0 when nothing exploded. */
 export declare function chainDepth(plan: readonly DiePlan[]): number;
 /**

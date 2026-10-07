@@ -7,7 +7,29 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.17.0";
+export declare const API_VERSION = "1.18.0";
+
+/** 1.18.0 (`asset-tabs`): what an asset manager tab is told: the collection the asset manager shows. */
+export declare interface AssetTabContext {
+    collectionId: string;
+}
+
+/** 1.18.0 (`asset-tabs`): a tab of an extension's own beside the asset manager's Scenes, Maps, Encounters and Tokens. */
+export declare interface AssetTabSpec {
+    /** Unique among this extension's asset tabs. */
+    id: string;
+    /** The tab's name, as given. */
+    title: string;
+    /** Lucide name, shown before the title. */
+    icon: string;
+    /**
+     * Runs when the tab is shown, with the collection the asset manager shows; the returned disposer runs when the tab is
+     * left, the asset manager closes, the tab is removed, or the GM picks another collection, which mounts it again with
+     * that collection. Render inside `container`: keys pressed there (all but Escape) stay with it, and a press outside
+     * the asset manager closes it. A mount or disposer that throws is logged.
+     */
+    mount(container: HTMLElement, ctx: AssetTabContext): Disposer;
+}
 
 /**
  * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
@@ -22,7 +44,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs' | 'collections' | 'dice-colours' | 'dice-look-choice';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -42,6 +64,11 @@ export declare interface AtlasEvents {
      * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
      */
     'tabs-changed': (view: ViewInfo) => void;
+    /**
+     * 1.18.0 (`collections`): collections were added, removed or renamed, or an extension's data on one changed
+     * (`collections.setData`, by any extension). Read `collections.list` or `getData` again.
+     */
+    'collections-changed': () => void;
 }
 
 export declare interface AtlasExtension {
@@ -61,6 +88,8 @@ export declare interface AtlasExtension {
     readonly bundles: BundlesApi;
     /** Only when `has('remote-view')`. */
     readonly remoteViews?: RemoteViewsApi;
+    /** 1.18.0: only when `has('collections')`. */
+    readonly collections?: CollectionsApi;
     /**
      * Hears an Atlas event. The listener runs guarded (a throw is logged and the other listeners still run) and is dropped
      * when this extension or Atlas unloads. A listener that is not a function, or an event Atlas does not have, registers
@@ -191,6 +220,51 @@ export declare interface CollectionGridDefaults {
     coneAngle?: number;
 }
 
+/** 1.18.0 (`collections`): a collection of the asset index; its id is its folder's name, and so is its name. */
+export declare interface CollectionRecord {
+    id: string;
+    name: string;
+}
+
+/**
+ * 1.18.0 (`collections`): the collections of the asset index, and an extension's own data on each. The data lives in
+ * the asset index alone, as `scenes.setData`'s does: never in the collection's `collection.json`, an export, an
+ * install or a copied folder, and it stays on the device that wrote it. A renamed collection keeps it; a deleted one
+ * takes it along. Changes: `collections-changed`. Every call rejects when the asset index could not load.
+ */
+export declare interface CollectionsApi {
+    /** Every collection, as frozen copies. */
+    list(): Promise<CollectionRecord[]>;
+    /** This extension's data on collection `collectionId`: a frozen copy, undefined when unset or there is no such collection. */
+    getData(collectionId: string): Promise<Json | undefined>;
+    /**
+     * Sets or (null) clears it; `value` must be plain JSON and is copied. No edit of the collection: its record, its file
+     * and `modifiedAt` stay as they were. Rejects for a collection that does not exist.
+     */
+    setData(collectionId: string, value: Json | null): Promise<void>;
+}
+
+/** 1.18.0 (`collections`): what a collection settings tab is told: the collection whose settings are open. */
+export declare interface CollectionSettingsTabContext {
+    collectionId: string;
+}
+
+/** 1.18.0 (`collections`): a tab of an extension's own in a collection's settings dialog. */
+export declare interface CollectionSettingsTabSpec {
+    /** Unique among this extension's collection settings tabs. */
+    id: string;
+    /** The tab's name, as given. */
+    title: string;
+    /** Lucide name, shown before the title; default `puzzle`. */
+    icon?: string;
+    /**
+     * Runs when the tab is shown; the returned disposer runs when another tab is chosen, the dialog closes or the tab is
+     * removed. What it changes is the extension's to save, at once (`collections.setData`): the dialog's Save button saves
+     * Atlas's own settings only. Keys pressed inside the container (all but Escape) stay with it. A throw is logged.
+     */
+    mount(container: HTMLElement, ctx: CollectionSettingsTabContext): Disposer;
+}
+
 /** A user-defined token condition, shown as a coloured badge on the token */
 export declare interface ConditionDefinition {
     id: string;
@@ -296,11 +370,44 @@ export declare interface DiceApi {
      * Adds a dice look the GM can choose in Atlas's dice settings, after Atlas's own; only when `has('dice-looks')`. It
      * paints Atlas's 3D dice everywhere they are thrown (the dice tray, the player window, remote views, `throw`). The
      * spec is read once. Throws for an `id` or `name` that is not a non-empty string, an `id` this extension already
-     * registered, a `faces` that is not a function, or a `body` colour that is not `#rrggbb`. The GM's choice is kept by
+     * registered, a `faces` that is not a function, a `body` colour that is not `#rrggbb`, or a `fill` other than `'numeral'` or `'face'`. The GM's choice is kept by
      * full id: while this extension is not loaded, or after the disposer ran, Atlas paints its own look and keeps the choice,
      * so the look returns when it is registered again.
      */
     registerLook?(spec: DiceLookSpec): Disposer;
+    /**
+     * 1.18.0 (`dice-colours`): colours the GM can roll dice in from Atlas's dice tray, by collection. `provider` is asked
+     * with the collection of the map whose tray opens (never for a map outside a collection), guarded, and again after
+     * `ui.invalidate()`. When any provider answers colours, the tray shows a colour picker (Atlas's "No colour" first,
+     * chosen at first); dice added while a colour is picked carry it as their tag (`color`, `colorName`), in the log,
+     * the toasts and Atlas's 3D dice. An entry whose `color` is not `#rrggbb` or whose `name` is not plain text of 1 to
+     * 32 characters is left out, so is one equal to an earlier one; the tray shows at most 12. Throws for a provider
+     * that is not a function.
+     */
+    registerColours?(provider: (collectionId: string) => readonly DiceColour[]): Disposer;
+    /**
+     * 1.18.0 (`dice-look-choice`): chooses the dice look. `lookId` is one of this extension's look ids (as given to
+     * `registerLook`), `''` for Atlas's own dice, or null. With `options.collectionId` it is that collection's choice:
+     * Atlas throws the rolls of its maps in it, wherever they are shown (the GM's map views, the player window,
+     * `dice.throw`), and null clears it, so the collection follows the GM's default again. Without a collection it sets
+     * the GM's default, the dice look in Atlas's settings (null: Atlas's own dice). The choice is kept by full id while
+     * the look is not registered, and the default's look shows meanwhile. A collection's choice lives in the asset index
+     * alone, as `collections.setData` does, and `collections-changed` tells it; the default's, `settings-changed`.
+     * Rejects for a collection that does not exist; throws for a malformed `lookId` or options.
+     */
+    useLook?(lookId: string | null, options?: {
+        collectionId?: string;
+    }): Promise<void>;
+    /** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in (its own choice, else the default), or (no collection) the default; frozen. */
+    lookFor?(collectionId?: string | null): Promise<DiceLookInEffect>;
+}
+
+/** 1.18.0 (`dice-colours`): a colour dice can be rolled in, as the dice tray offers it: the shape of a die's tag. */
+export declare interface DiceColour {
+    /** Plain text (no markup), trimmed, at most 32 characters, e.g. "Fire". */
+    name: string;
+    /** `#rrggbb` */
+    color: string;
 }
 
 declare type DiceCrit = 'high' | 'low' | null;
@@ -318,6 +425,16 @@ export declare type DiceFaceArt = CanvasImageSource | string;
  * die is a d10). A d2 and a d3 are thrown as a d6 and wear its faces.
  */
 export declare type DiceLookDie = 4 | 6 | 8 | 10 | 12 | 20 | 100;
+
+/** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in, or the GM's default. */
+export declare interface DiceLookInEffect {
+    /** A full look id (`<extension id>:<look id>`), or `''` for Atlas's own dice. */
+    lookId: string;
+    /** `collection`: the collection chose it (`useLook` with `collectionId`); `default`: it follows the GM's choice. */
+    from: 'collection' | 'default';
+    /** False while the look's extension has not registered it: Atlas's dice in the GM's colour show meanwhile, and the choice stays. */
+    loaded: boolean;
+}
 
 /**
  * A dice look an extension adds (`dice.registerLook`). Atlas keeps its own dice, throw, sounds and result: only the
@@ -349,6 +466,14 @@ export declare interface DiceLookSpec {
     };
     /** An image of the look for the dice settings: a URL as in `DiceFaceArt`. */
     preview?: string;
+    /**
+     * 1.18.0: how a face's art is drawn. `'numeral'` (the default, as before 1.18.0): where Atlas prints the numeral, on
+     * Atlas's card with its grain and worn rim. `'face'`: the art covers the whole face cell, scaled to fill it and turned
+     * as the numeral reads, with no card, numeral or wear of Atlas's, so a pack's own face design shows as it is; its
+     * relief is the look's `bump` art, else flat. The chamfers and corners, and faces without art, keep `body.colour`
+     * (faces without art also keep Atlas's numeral). Anything else throws.
+     */
+    fill?: 'numeral' | 'face';
 }
 
 /** How `dice.publish` shows a roll (1.16.0). */
@@ -1089,6 +1214,13 @@ export declare interface RemoteView {
     /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
     throwRoll(result: DiceRollResult): void;
     /**
+     * 1.18.0: the dice look the view's rolls are thrown in, for a scene whose collection chose one on the owner's side (its
+     * `dice.lookFor(collectionId).lookId`): a full look id, `''` for Atlas's own dice, or null (the default) for the
+     * player's own look. A look the player's Atlas has not registered shows the player's own meanwhile. Throws for anything
+     * but a string of at most 300 characters or null.
+     */
+    setDiceLook?(lookId: string | null): void;
+    /**
      * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
      * resizes until the player moves the camera. `padded` leaves the margin the remote view's Fit map (Shift+1) leaves around the map (16 screen
      * pixels), for a Fit button of your own. Throws when `camera` is not finite numbers with a size above 0.
@@ -1181,7 +1313,7 @@ declare interface RolledDie {
     negative?: true;
     /** The die was rolled because the die before it exploded. */
     exploded?: true;
-    /** The colour the die was thrown in (`#rrggbb`), e.g. a physical die's or a dice plugin's; shown with its die, never counted. */
+    /** The colour the die was thrown in (`#rrggbb`), e.g. a physical die's, a dice plugin's, or one picked in Atlas's dice tray (`dice.registerColours`); shown with its die, never counted. */
     color?: string;
     /** That colour's name, e.g. "Fire": plain text (no markup) of at most 32 characters, trimmed. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
     colorName?: string;
@@ -1616,6 +1748,16 @@ export declare interface UiApi {
      * items. The menu opens whenever it has something to show. `heading` must be non-empty once trimmed and `items` a function.
      */
     addSceneTabMenuSection?(section: SceneTabMenuSection): Disposer;
+    /**
+     * 1.18.0 (`asset-tabs`): a tab in the asset manager after Atlas's own, which shows what `mount` renders in place of
+     * the asset grid. `id`, `title` and `icon` must be non-empty and `mount` a function.
+     */
+    addAssetTab?(tab: AssetTabSpec): Disposer;
+    /**
+     * 1.18.0 (`collections`): a tab in a collection's settings dialog, after Atlas's own. `id` and `title` must be
+     * non-empty, `icon` non-empty when given, and `mount` a function.
+     */
+    addCollectionSettingsTab?(tab: CollectionSettingsTabSpec): Disposer;
     /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
     invalidate(): void;
 }

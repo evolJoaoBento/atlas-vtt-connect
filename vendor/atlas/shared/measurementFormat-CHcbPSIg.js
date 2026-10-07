@@ -1,4 +1,4 @@
-import { t } from "./englishTexts-B44XM0o-.js";
+import { t } from "./englishTexts-4g_ZrbBk.js";
 const REFERENCE_CELL_SIZE = 70;
 const REFERENCE_STROKE_WIDTH = 4;
 function computeTokenStrokeWidth(gridSize) {

@@ -569,6 +569,10 @@ const LIGHT_BODY = 150;
 function readableInk(body) {
   return brightness(body) > LIGHT_BODY ? DARK_INK : LIGHT_INK;
 }
+function parseHex(hex2) {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex2.trim());
+  return match ? [parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)] : null;
+}
 const CARD = "#a98f66";
 const DARK_BODY = "#1f1e21";
 const GRAIN_ALPHA = 0.55;
@@ -623,6 +627,52 @@ function paintArt(ctx, x, y, mark, art) {
   ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
   ctx.drawImage(art, -width / 2, -height / 2, width, height);
   ctx.restore();
+}
+function fillArt(body, value, look) {
+  var _a, _b;
+  return look.fill === "face" ? ((_b = (_a = look.art) == null ? void 0 : _a.faces.get(body)) == null ? void 0 : _b.get(artKey(body, value))) ?? null : null;
+}
+function paintCover(ctx, x, y, body, value, art) {
+  const geometry = dieGeometry(bodySides(body));
+  const marks = faceMarks(geometry, faceIndexForValue(geometry, value), CELL);
+  const mark = marks.find((candidate) => candidate.value === value) ?? marks[0];
+  const k = CELL / Math.min(art.width, art.height);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  ctx.clip();
+  ctx.translate(x, y);
+  if (mark && marks.length === 1) ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
+  ctx.drawImage(art, -art.width * k / 2, -art.height * k / 2, art.width * k, art.height * k);
+  ctx.restore();
+}
+function paintFaceFill(ctx, x, y, body, value, look) {
+  const art = fillArt(body, value, look);
+  if (!art) return false;
+  if (look.body !== null) {
+    ctx.fillStyle = look.body;
+    ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  }
+  paintCover(ctx, x, y, body, value, art);
+  return true;
+}
+function paintFaceFillRelief(ctx, x, y, body, value, look) {
+  var _a, _b;
+  if (!fillArt(body, value, look)) return false;
+  const relief = (_b = (_a = look.art) == null ? void 0 : _a.bump.get(body)) == null ? void 0 : _b.get(artKey(body, value));
+  if (relief) {
+    ctx.save();
+    ctx.filter = "grayscale(1)";
+    paintCover(ctx, x, y, body, value, relief);
+    ctx.restore();
+  }
+  return true;
+}
+function paintBareFill(ctx, x, y, look) {
+  if (look.fill !== "face" || look.body === null) return false;
+  ctx.fillStyle = look.body;
+  ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  return true;
 }
 function paintFaceMarks(ctx, x, y, body, value, look) {
   var _a;
@@ -683,16 +733,18 @@ function drawAtlas(sides, paint) {
   }
   return canvas;
 }
-function buildTextures(body) {
+function buildTextures(body, lookOf = activeLook) {
   const sides = bodySides(body);
-  const albedo = (look = activeLook()) => drawAtlas(sides, (ctx, { x, y, value }) => {
+  const albedo = (look = lookOf()) => drawAtlas(sides, (ctx, { x, y, value }) => {
+    if (value === null ? paintBareFill(ctx, x, y, look) : paintFaceFill(ctx, x, y, body, value, look)) return;
     paintCard(ctx, x, y, sides * 31 + (value ?? 0) * 7 + 5, cardStock, look);
     paintWear(ctx, x, y, value === null, look);
     if (value !== null) paintFaceMarks(ctx, x, y, body, value, look);
   });
-  const bump = (look = activeLook()) => drawAtlas(sides, (ctx, { x, y, value }) => {
+  const bump = (look = lookOf()) => drawAtlas(sides, (ctx, { x, y, value }) => {
     ctx.fillStyle = "#8a8a8a";
     ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+    if (value === null ? look.fill === "face" && look.body !== null : paintFaceFillRelief(ctx, x, y, body, value, look)) return;
     ctx.save();
     ctx.globalAlpha = 0.8;
     ctx.filter = "grayscale(1) contrast(2.1)";
@@ -843,6 +895,49 @@ function dieAssets(body) {
   if (!diceArtworkReady(font)) void loadDiceArtwork(font).then(() => assets.redraw());
   return assets;
 }
+const MAX_VARIANTS = 32;
+const variantCache = /* @__PURE__ */ new Map();
+function tintedLook(look, tint) {
+  const rgb = tint === null ? null : parseHex(tint);
+  return rgb ? { ...look, body: tint, ink: readableInk(rgb) } : look;
+}
+function disposeVariant(assets) {
+  assets.material.dispose();
+  assets.textures.map.dispose();
+  assets.textures.bumpMap.dispose();
+}
+function dieVariantAssets(body, variant, tint) {
+  if (variant === null && tint === null) return dieAssets(body);
+  const key = `${(variant == null ? void 0 : variant.key) ?? ""}|${body}|${tint ?? ""}`;
+  const cached = variantCache.get(key);
+  if (cached) {
+    variantCache.delete(key);
+    variantCache.set(key, cached);
+    return cached;
+  }
+  const lookOf = () => tintedLook(variant ? variant.look() : activeLook(), tint);
+  const base = dieAssets(body);
+  const textures = buildTextures(body, lookOf);
+  const material = base.material.clone();
+  material.map = textures.map;
+  material.bumpMap = textures.bumpMap;
+  const assets = { geometry: base.geometry, material, redraw: textures.redraw, textures };
+  variantCache.set(key, assets);
+  for (const [oldKey, old] of variantCache) {
+    if (variantCache.size <= MAX_VARIANTS) break;
+    variantCache.delete(oldKey);
+    disposeVariant(old);
+  }
+  const font = lookOf().font;
+  if (!diceArtworkReady(font)) void loadDiceArtwork(font).then(() => {
+    if (variantCache.get(key) === assets) assets.redraw();
+  });
+  return assets;
+}
+function releaseDieVariants() {
+  for (const assets of variantCache.values()) disposeVariant(assets);
+  variantCache.clear();
+}
 const FLOOR_Y = -0.72;
 const STAGE_X = 3.25;
 const STAGE_Z = 2.1;
@@ -957,9 +1052,16 @@ class GhostTrail {
       for (const ghost of chain) {
         this.scene.remove(ghost);
         const source = ghost.userData.source;
-        const waiting = this.spare.get(source) ?? [];
+        let waiting = this.spare.get(source);
+        if (!waiting) {
+          waiting = [];
+          this.spare.set(source, waiting);
+          source.addEventListener("dispose", () => {
+            for (const copy of this.spare.get(source) ?? []) copy.dispose();
+            this.spare.delete(source);
+          });
+        }
         waiting.push(ghost.material);
-        this.spare.set(source, waiting);
       }
     }
     this.chains = [];
@@ -1498,16 +1600,18 @@ class DiceRenderer {
   /**
    * One mesh per planned die; dice of the same kind share geometry and
    * material. Each gets a chain of ghosts, shorter the more dice there are
-   * (`chainLengthFor`).
+   * (`chainLengthFor`). A die with a tint (`#rrggbb`, by plan index) or a stage
+   * in a look of its own (`look`) is painted with its own material (`dieVariantAssets`).
    */
-  setPlan(bodies) {
+  setPlan(bodies, options = {}) {
     for (const mesh of this.meshes) this.scene.remove(mesh);
     this.trails.clear();
     this.landed = bodies.map(() => false);
     this.shadow.bodiesChanged();
     const chainLength = chainLengthFor(bodies.length);
-    this.meshes = bodies.map((body) => {
-      const assets = dieAssets(body);
+    this.meshes = bodies.map((body, index) => {
+      var _a;
+      const assets = dieVariantAssets(body, options.look ?? null, ((_a = options.tints) == null ? void 0 : _a[index]) ?? null);
       const mesh = new THREE.Mesh(assets.geometry, assets.material);
       mesh.castShadow = true;
       mesh.visible = false;
@@ -1929,6 +2033,7 @@ function releaseStagePool(doc) {
 }
 function releaseStagePools() {
   for (const doc of [...documents.keys()]) releaseStagePool(doc);
+  releaseDieVariants();
 }
 const WARM_STAGES = 4;
 const WARM_PAUSE_MS = 500;

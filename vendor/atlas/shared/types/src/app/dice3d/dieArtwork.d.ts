@@ -19,6 +19,7 @@ import * as THREE from 'three';
 import type { DiceFont } from './diceLook';
 import { type DieBody } from './dieBody';
 import { type DieSides } from './dieGeometry';
+import { type ResolvedLook } from './dieSkin';
 /** Whether faces painted now would have their card stock and the numerals of `font`. */
 export declare function diceArtworkReady(font: DiceFont): boolean;
 /**
@@ -52,4 +53,4 @@ export interface DieTextures {
  * Randomised separately, the relief would look like scratches on a photo of
  * paper.
  */
-export declare function buildTextures(body: DieBody): DieTextures;
+export declare function buildTextures(body: DieBody, lookOf?: () => ResolvedLook): DieTextures;

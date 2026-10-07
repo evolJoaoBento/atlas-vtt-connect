@@ -1,11 +1,11 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { t } from "./englishTexts-B44XM0o-.js";
-import { L as LASER_FADE_TIME } from "./laserPointerSettings-DurFCvN-.js";
-import { i } from "./laserPointerSettings-DurFCvN-.js";
-import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-YMAdwfMI.js";
-import { R, T, c, a, r, s, t as t2, b, d } from "./measurementFormat-YMAdwfMI.js";
+import { t } from "./englishTexts-4g_ZrbBk.js";
+import { L as LASER_FADE_TIME } from "./laserPointerSettings-D-5w9OQS.js";
+import { N as NAMEPLATE_HEIGHT, f as formatDistance, p as pathLengthInCells } from "./measurementFormat-CHcbPSIg.js";
+import { R, T, c, a, r, s, t as t2, b, d } from "./measurementFormat-CHcbPSIg.js";
+import { i } from "./hexColor-BorPG-zU.js";
 const MEASURE_SHADOW = 0;
 const MEASURE_PATH_STROKES = [
   { width: 6, alpha: 0.3, shadow: true },
