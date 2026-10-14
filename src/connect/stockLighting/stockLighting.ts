@@ -198,35 +198,46 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
     return built.raster;
   };
 
+  /** The last reason each view was pending for: said once when it changes, so a dark scene can be explained. */
+  const reasons = new Map<string, string>();
+  const pending = (view: LightingView, reason: string): PlayerVisibility => {
+    if (reasons.get(view.viewId) !== reason) {
+      reasons.set(view.viewId, reason);
+      console.debug(`[Atlas VTT Connect] players see nothing of a lit scene: ${reason}`);
+    }
+    return PENDING;
+  };
+
   const visibility = (view: LightingView, options: PlayerVisibilityOptions | undefined): PlayerVisibility => {
     const state = view.atlasStore.getState();
-    if (!state.mapLoaded || state.isMapLoading) return PENDING;
+    if (!state.mapLoaded || state.isMapLoading) return pending(view, 'the map is loading');
     const switchedOn = deps.dynamicLighting();
     // With the experiment off, Atlas builds no lighting: its player window shows the scene unlit, whatever the scene says.
     if (switchedOn === false) return UNLIT;
     const savedLit = state.lighting.enabled === true;
     const controller = switchedOn === true ? controllerOf(view) : null;
     // Never unlit for a scene saved lit: whatever cannot be read now is not known, and unknown is dark.
-    if (!controller) return savedLit ? PENDING : UNLIT;
+    if (!controller) return savedLit ? pending(view, 'Atlas shows no lighting yet for a scene saved lit') : UNLIT;
     const lighting = controller.renderer;
     const lit = lighting.isEnabled();
-    if (lit !== savedLit) return PENDING; // the GM is switching lighting on or off: the window is not settled
+    if (lit !== savedLit) return pending(view, 'the scene and its lighting disagree (switching on or off)'); // the GM is switching lighting on or off: the window is not settled
     if (!lit) return UNLIT;
-    if (!lighting.sightIsCurrent()) return PENDING;
+    if (!lighting.sightIsCurrent()) return pending(view, "the sight is not the scene's yet");
     const map = deps.mapSize(view);
-    if (!(map.width > 0) || !(map.height > 0)) return PENDING;
+    if (!(map.width > 0) || !(map.height > 0)) return pending(view, 'the map has no size');
     const sight = readSight(lighting.currentSight());
     const ambient = readAmbient(lighting.ambientLight());
     const reaches = readReaches(lighting.lightReaches());
-    if (!sight || !ambient || !reaches) return PENDING;
+    if (!sight || !ambient || !reaches) return pending(view, 'the sight, light or ambient could not be read');
     const perceive = perceptionOf(view, controller);
-    if (!perceive) return PENDING;
+    if (!perceive) return pending(view, "the players' frame perception could not be read");
     const tokens: Record<string, Perception> = {};
     for (const id of Object.keys(state.objects.tokens)) {
       const seen = perceive(id);
       tokens[id] = typeof seen === 'string' && PERCEPTIONS.has(seen) ? (seen as Perception) : 'unseen';
     }
     const grid = raster(view.viewId, cellsPerSide(options?.maxCellsPerSide), { sight, ambient, reaches }, map);
+    reasons.delete(view.viewId);
     // A fresh buffer on every call: the raster is kept between calls, and no caller may change it for another.
     const shown = new Uint8Array(grid.dark.length);
     for (let i = 0; i < shown.length; i++) shown[i] = grid.dark[i] ? 0 : 1;
