@@ -56,7 +56,7 @@ function setup(options: { submenus?: boolean; selected?: Array<{ id: string; kin
     setActive: (next: DockView | null) => { active = next; notify(); },
     root: () => document.querySelector<HTMLElement>('.atlas-connect-dock'),
     buttons: () => [...document.querySelectorAll<HTMLElement>('.atlas-connect-dock__button')],
-    labels: () => [...document.querySelectorAll('.atlas-connect-dock__button .atlas-connect-dock__label')].map((label) => label.textContent),
+    labels: () => [...document.querySelectorAll('.atlas-connect-dock__button')].map((button) => button.getAttribute('aria-label')),
   };
 }
 
@@ -237,7 +237,7 @@ describe('the stock stand-in\'s ui namespace', () => {
       const one = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       one.ui.addTokenMenuItems((ctx) => (ctx.tokenKind === 'character' ? [{ label: `Controlled by ${ctx.tokenId}`, onClick: () => undefined }] : []));
       const button = one.buttons().find((entry) => entry.dataset.icon === 'user')!;
-      expect(button.textContent).toBe('Token: Ana');
+      expect(button.getAttribute('aria-label')).toBe('Token: Ana');
       button.click();
       expect(one.shown[0]!.menu.titles()).toEqual(['Controlled by k1']);
 

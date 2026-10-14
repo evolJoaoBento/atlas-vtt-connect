@@ -60,6 +60,10 @@ export interface DockEnv {
 const LABEL_PRIORITY = 50;
 const DEFAULT_MARGIN = 16;
 const DEFAULT_TOP = 72;
+const PANEL_WIDTH = 320;
+const PANEL_GAP = 12;
+/** When a panel is placed again, until its owner moves it: what it renders may follow its mount by a moment. */
+const SETTLE_MS = [60, 400];
 
 interface OpenPanel {
   element: HTMLElement;
@@ -179,16 +183,30 @@ export class FloatingDock implements PanelHost {
     element.append(header, container);
     doc.body.appendChild(element);
     const win = doc.defaultView ?? window;
-    const saved = this.env.memory.get(`panel.${spec.id}`);
-    const size = { width: element.offsetWidth || 320, height: element.offsetHeight || 240 };
-    const start = isPlace(saved) ? saved : { x: win.innerWidth - size.width - DEFAULT_MARGIN - 56, y: DEFAULT_TOP };
-    placeAt(element, clampToWindow(start, size, win));
     const stopDrag = makeDraggable(element, grip, (place) => this.env.memory.set(`panel.${spec.id}`, place));
     const ctx: ViewContext = { viewId: view.viewId, kind: 'map', isPlayerView: false };
     const unmount = guarded('A panel mount', null as Disposer | null, () => spec.mount(container, ctx));
+    // Placed once its content is there, so its real size decides: beside the dock, so neither hides the other.
+    // What the panel draws a moment later (its React) can make it larger, so it is placed again shortly after.
+    const saved = this.env.memory.get(`panel.${spec.id}`);
+    const place = (): void => {
+      const size = { width: element.offsetWidth || PANEL_WIDTH, height: element.offsetHeight || 240 };
+      const dock = this.root?.getBoundingClientRect();
+      const beside = { x: (dock?.left ?? win.innerWidth - DEFAULT_MARGIN) - size.width - PANEL_GAP, y: dock?.top || DEFAULT_TOP };
+      placeAt(element, clampToWindow(isPlace(saved) ? saved : beside, size, win));
+    };
+    let moved = false;
+    place();
+    const timers = SETTLE_MS.map((wait) => win.setTimeout(() => { if (!moved) place(); }, wait));
+    // Pressed, a panel comes to the front, and stays where its owner put it.
+    element.addEventListener('pointerdown', () => {
+      moved = true;
+      if (element.nextElementSibling) doc.body.appendChild(element);
+    });
     const open: OpenPanel = {
       element,
       dispose: () => {
+        for (const timer of timers) win.clearTimeout(timer);
         stopDrag();
         unmount?.();
       },
@@ -266,8 +284,8 @@ export class FloatingDock implements PanelHost {
     const button = make('button', 'atlas-connect-dock__button');
     const label = item.shortcut ? `${item.label} (${item.shortcut})` : item.label;
     button.setAttribute('aria-label', label);
+    button.setAttribute('data-tooltip-position', 'bottom');
     this.env.setIcon(button, item.icon);
-    button.append(make('span', 'atlas-connect-dock__label', item.label));
     if (guarded(`Toolbar item ${item.id} isActive`, false, () => item.isActive?.(ctx) === true)) button.classList.add('is-active');
     const badge = guarded<string | number | true | null>(`Toolbar item ${item.id} badge`, null, () => item.badge?.(ctx) ?? null);
     if (badge !== null) button.append(make('span', badge === true ? 'atlas-connect-dock__dot' : 'atlas-connect-dock__badge', badge === true ? '' : String(badge)));
@@ -281,8 +299,8 @@ export class FloatingDock implements PanelHost {
   private menuButton(doc: Document, icon: string, label: string, items: () => MenuItem[]): HTMLElement {
     const button = make('button', 'atlas-connect-dock__button');
     button.setAttribute('aria-label', label);
+    button.setAttribute('data-tooltip-position', 'bottom');
     this.env.setIcon(button, icon);
-    button.append(make('span', 'atlas-connect-dock__label', label));
     button.addEventListener('click', () => this.showMenu(button, items));
     return button;
   }

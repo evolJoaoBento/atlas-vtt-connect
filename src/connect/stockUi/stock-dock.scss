@@ -129,6 +129,7 @@ $connect-dock-z: 1000;
   display: flex;
   flex-wrap: wrap;
   gap: $connect-dock-gap;
+  padding: 0 2px 2px;
 }
 
 .atlas-connect-dock.is-collapsed .atlas-connect-dock__body {
@@ -139,9 +140,10 @@ $connect-dock-z: 1000;
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 8px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   background: var(--background-secondary);
   color: var(--text-normal);
 
@@ -155,7 +157,11 @@ $connect-dock-z: 1000;
   }
 }
 
+// A count or a dot sits on the button's corner, as on Atlas's own toolbar.
 .atlas-connect-dock__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
   min-width: 16px;
   padding: 0 4px;
   border-radius: 8px;
@@ -167,10 +173,14 @@ $connect-dock-z: 1000;
 }
 
 .atlas-connect-dock__dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--text-success, currentColor);
+  box-shadow: 0 0 0 2px var(--background-primary);
 }
 
 .atlas-connect-window__content {
