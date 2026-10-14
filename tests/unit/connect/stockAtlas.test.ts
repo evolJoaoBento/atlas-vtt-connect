@@ -15,11 +15,12 @@ describe('stock Atlas stand-in', () => {
     expect(canShimStockAtlas(setup().atlas)).toBe(true);
   });
 
-  it('offers what hosting needs, and lighting, but no tokens, dice or lasers', () => {
+  it('offers what hosting needs, lighting and the floating ui, but no tokens, dice or lasers', () => {
     const { app, atlas } = setup();
     const api = stockAtlasApi(app, atlas);
     expect(api.has('views') && api.has('presentation') && api.has('rules') && api.has('settings') && api.has('storage')).toBe(true);
     expect(api.has('lighting')).toBe(true);
+    expect(api.has('ui')).toBe(true);
     expect(api.has('dice') || api.has('lasers')).toBe(false);
     expect(api.has('scene-tabs')).toBe(false);
     expect(api.has('tokens')).toBe(false);

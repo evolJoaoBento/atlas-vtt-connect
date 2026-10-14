@@ -15,6 +15,7 @@ import type {
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
+import { stockUi } from './stockUi/stockUi';
 
 export const STOCK_API_VERSION = '1.0.0';
 
@@ -53,6 +54,7 @@ interface StockViewport {
 }
 interface StockView {
   readonly viewId: string;
+  readonly containerEl?: HTMLElement;
   readonly atlasStore: Store<StockSceneState>;
   readonly tabMetaStore: Store<{ tabs: StockTab[]; activeTabId: string | null }>;
   readonly renderer?: {
@@ -441,7 +443,7 @@ function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
 
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -473,11 +475,27 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         }
         return path;
       };
+      // The floating dock stands in for the toolbar, palette, menus and panels stock Atlas has no slots for.
+      const ui = stockUi(app, {
+        views: () => mapViews(app),
+        active: () => {
+          const recent = app.workspace.getMostRecentLeaf?.()?.view;
+          if (isStockView(recent) && recent.atlasStore.getState().remoteView == null) return recent;
+          return mapViews(app)[0] ?? null;
+        },
+        presentedTabId: () => presented.get()?.tabId ?? null,
+        onViewsChanged: (listener) => {
+          const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, listener as never));
+          return () => { for (const stop of stops) stop(); };
+        },
+      });
+      disposers.add(ui.dispose);
       return Object.freeze({
         id: extensionId,
         views: viewsApi(app, disposers),
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
+        ui: ui.api,
         lighting: stockLightingApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
