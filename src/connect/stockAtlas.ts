@@ -1,12 +1,15 @@
 /**
- * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7.x) that has none.
+ * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7.x and 0.8.x) that has none.
  *
  * It reads what stock Atlas leaves reachable at runtime: the map views in the workspace (`viewId`, `atlasStore`,
- * `tabMetaStore`, `renderer`), the plugin's `settingsService` and its `presentedScene`. It is hacky by design: it
- * depends on private shapes of those objects, so every member is checked before use and a failed check turns that
- * capability off (`has()` is false) rather than throwing. Only what hosting needs is provided: `views`,
- * `presentation`, `rules`, `settings`, `storage` and `lighting` (`stockLighting/`, which fails closed: a lit scene
- * whose lighting cannot be read shows players nothing).
+ * `tabMetaStore`, `renderer`, `serviceManager`), the plugin's `settingsService` and its `presentedScene`. It is hacky by
+ * design: it depends on private shapes of those objects, so every member is checked before use and a failed check turns
+ * that capability off (`has()` is false) or makes the call fail closed, rather than throwing. What it provides:
+ * `views` (with `showTab`, so `scene-tabs`), `presentation`, `rules` (the defaults), `settings`, `storage`, `lighting`
+ * (`stockLighting/`, which fails closed: a lit scene whose lighting cannot be read shows players nothing), `tokens`
+ * (`stockTokens/`: players' moves, stopped at walls on a lit scene), `dice` (`stockDice/`), `lasers` (`stockLasers/`)
+ * and `ui` (`stockUi/`: a floating dock and panels, in place of the slots stock Atlas does not have). Not provided:
+ * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
