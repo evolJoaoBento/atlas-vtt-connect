@@ -15,6 +15,7 @@ import type {
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
+import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
 
 export const STOCK_API_VERSION = '1.0.0';
@@ -441,9 +442,15 @@ function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
   });
 }
 
+/** Whether Atlas's dynamic lighting experiment is on; null when its settings cannot be read. */
+function dynamicLighting(service: StockSettings): boolean | null {
+  const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
+  return typeof on === 'boolean' ? on : null;
+}
+
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -496,13 +503,15 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
         ui: ui.api,
+        tokens: stockTokensApi({
+          view: (viewId) => trackedView(app, viewId),
+          mapSize,
+          dynamicLighting: () => dynamicLighting(service),
+        }),
         lighting: stockLightingApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
-          dynamicLighting: () => {
-            const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
-            return typeof on === 'boolean' ? on : null;
-          },
+          dynamicLighting: () => dynamicLighting(service),
           add: (dispose) => {
             disposers.add(dispose);
             return () => { disposers.delete(dispose); dispose(); };
