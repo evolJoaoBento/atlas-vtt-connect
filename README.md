@@ -15,6 +15,16 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 - **Atlas VTT with the extension API.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, choosing the latest version (0.6.2-beta.1 or newer). You can also build Atlas from the branch `api/extension-api` (see Developing).
 - TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
+## Stock Atlas (no extension API)
+
+On an Atlas without the extension API, such as upstream 0.7.x and 0.8.x, Connect stands in for the API after about 3 seconds (`src/connect/stockAtlas.ts`). It reads the views, settings, lighting and presented scene that stock Atlas leaves reachable, so it can break with any Atlas release. It covers hosting and joining only, with no account and no relay: it is a separate plugin and works beside Atlas's own online play (0.8.0 and later), not through it. Use one of the two for a table at a time.
+
+- **Works:** host a session, join it, present scenes, and the player page, with tokens, fog and widgets limited to what players may see.
+- **Dynamic lighting** works as in Atlas's own player window: players see the map where the sight of your vision tokens and the light reach, and the tokens Atlas shows them. It needs Atlas's dynamic lighting experiment switched on, as Atlas itself does; with it off, Atlas shows lit scenes unlit and so does Connect. Whatever Connect cannot read at that moment (a map loading, a tab switch, an Atlas it does not know) shows players nothing rather than a guess.
+- **Lighting gaps:** Connect shows players less than Atlas's window, never more. Left out for now: the explored memory (areas seen earlier stay dark for players), and the footprint of a token seen in the dark. The map shows in 8 pixel cells, so edges of sight are slightly rougher than Atlas's.
+- **Known gaps:** a map with a stretch-fit grid shows players an unstretched image, so its grid may not line up; running timers show their last saved value.
+- **Missing:** players moving tokens, shared dice and lasers, Atlas toolbar and menu entries (use the commands), split party, sharing notes and maps, and per-collection rules (defaults are used).
+
 ## Install with BRAT
 
 If you use the online play preview (the fork's built-in online play, Atlas VTT 0.5.x or 0.6.1-beta.x from `evolJoaoBento/atlas-vtt`), see [Moving from the online preview](#moving-from-the-online-preview) first.
@@ -77,7 +87,7 @@ Connect replaces the online play preview (the fork of Atlas VTT with online play
 
 1. In BRAT, select `evolJoaoBento/atlas-vtt`, unfreeze it if you pinned a version, and update it to the latest version (0.6.2-beta.1 or newer). That is Atlas with the extension API; the built-in online play is gone and Connect replaces it.
 2. Restart Obsidian, or turn Atlas VTT off and on.
-3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.5**) and enable it.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.6**) and enable it.
 
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
 - **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.

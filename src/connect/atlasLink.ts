@@ -1,5 +1,6 @@
 import { Notice, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
+import { canShimStockAtlas, stockAtlasApi } from './stockAtlas';
 
 /**
  * The API major Connect is written against. Minors are never compared: what Connect uses comes from `has()` and from
@@ -10,6 +11,11 @@ const SUPPORTED_MAJOR = 1;
 
 /** How long after layout ready Atlas gets to publish its API before Connect says it is missing (Atlas publishes it after its own start-up work). */
 export const ATLAS_GRACE_MS = 10_000;
+
+/** How long a stock Atlas (one that never publishes an API) gets before Connect stands in for the API. */
+export const STOCK_GRACE_MS = 3_000;
+/** How long after load the wait for Atlas starts even if Obsidian never calls the layout-ready callback. */
+export const LAYOUT_READY_FALLBACK_MS = 5_000;
 
 /** Every notice about a missing or wrong Atlas ends here: the README names the Atlas build to install. */
 const SEE_README = "See Connect's README for the Atlas build to install.";
@@ -33,6 +39,8 @@ export class AtlasLink {
   /** The "missing" notice while it is showing: it goes away the moment Atlas's API arrives. */
   private missingNotice: Notice | null = null;
   private graceTimer: number | null = null;
+  /** Starts the wait for Atlas when Obsidian never calls the layout-ready callback. */
+  private fallbackTimer: number | null = null;
   /** Disposes what Atlas registered for the current connection (it would otherwise wait for Connect to unload). */
   private release: (() => void) | null = null;
 
@@ -52,16 +60,39 @@ export class AtlasLink {
     this.plugin.registerEvent(workspace.on('atlas-vtt:api-unload', () => this.detach()));
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
-    workspace.onLayoutReady(() => {
-      if (this.atlasSeen) return;
+    // Obsidian calls layout-ready callbacks in turn: one that throws (another plugin's) stops the rest, so the wait for
+    // Atlas also starts by itself a little after load rather than depending on that callback alone.
+    let begun = false;
+    const begin = (): void => {
+      if (this.fallbackTimer !== null) window.clearTimeout(this.fallbackTimer);
+      this.fallbackTimer = null;
+      if (begun || this.atlasSeen) return;
+      begun = true;
       this.graceTimer = window.setTimeout(() => this.warnMissing(), ATLAS_GRACE_MS);
-      this.plugin.register(() => this.stopGrace());
-    });
+      // A stock Atlas never publishes an API: no reason to wait the whole grace for it.
+      const stockTimer = window.setTimeout(() => { this.useStockAtlas(); }, STOCK_GRACE_MS);
+      this.plugin.register(() => window.clearTimeout(stockTimer));
+    };
+    workspace.onLayoutReady(begin);
+    if (!begun && !this.atlasSeen) this.fallbackTimer = window.setTimeout(begin, LAYOUT_READY_FALLBACK_MS);
+    this.plugin.register(() => this.stopGrace());
+  }
+
+  /** A stock Atlas has no API, but its views, settings and presented scene can be read: stand in for the API. */
+  private useStockAtlas(): boolean {
+    if (this.extension || this.atlasSeen) return false;
+    const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
+    if (!atlas || !canShimStockAtlas(atlas)) return false;
+    console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in (hosting and joining only).');
+    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    return true;
   }
 
   private stopGrace(): void {
     if (this.graceTimer !== null) window.clearTimeout(this.graceTimer);
+    if (this.fallbackTimer !== null) window.clearTimeout(this.fallbackTimer);
     this.graceTimer = null;
+    this.fallbackTimer = null;
   }
 
   /** Atlas has had its grace period and published nothing: say why, unless the API arrived meanwhile. */
@@ -69,6 +100,7 @@ export class AtlasLink {
     if (this.extension || this.atlasSeen || this.warnedMissing) return;
     this.warnedMissing = true;
     // Atlas loaded but offering no API (an Atlas without the extension API) is not the same as Atlas missing or disabled.
+    if (this.useStockAtlas()) return;
     const shown = this.notify(this.plugin.app.plugins?.plugins['atlas-vtt'] ? NO_API_NOTICE : MISSING_ATLAS_NOTICE);
     this.missingNotice = shown instanceof Notice ? shown : null;
   }
