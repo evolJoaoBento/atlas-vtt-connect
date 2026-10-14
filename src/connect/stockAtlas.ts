@@ -449,6 +449,49 @@ function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
       viewport.on('frame-end', frame);
       return add(() => { if (!viewport.destroyed) viewport.off('frame-end', frame); });
     },
+    // The GM's view does show the tab while it loads, as it does on any switch; the presented scene holds meanwhile.
+    showTab: (viewId: string, tabId: string): Promise<boolean> => showTab(app, viewId, tabId, disposers),
+  });
+}
+
+/** How long a tab may take to load before `showTab` gives up. */
+const SHOW_TAB_TIMEOUT_MS = 60_000;
+/** How often a waiting `showTab` looks for its view having closed. */
+const SHOW_TAB_POLL_MS = 500;
+
+/**
+ * Makes a tab of a map view active without presenting it, and answers true once its map is loaded in the view's store
+ * (`snapshotTabId`). False for an unknown view or tab, when another switch (a later `showTab`, or the GM's own click)
+ * overtakes this one (the view then shows another tab), when the view closes meanwhile, and after 60 seconds. Never throws.
+ */
+async function showTab(app: App, viewId: string, tabId: string, disposers: Set<Disposer>): Promise<boolean> {
+  const view = trackedView(app, viewId);
+  if (!view || typeof tabId !== 'string' || !view.tabMetaStore.getState().tabs.some((tab) => tab.id === tabId)) return false;
+  try {
+    await view.switchToTab(tabId);
+  } catch (error) {
+    console.error('[Atlas VTT Connect] Atlas could not switch tabs:', error);
+    return false;
+  }
+  return new Promise<boolean>((resolve) => {
+    const stops: Disposer[] = [];
+    const finish = (ok: boolean): void => {
+      for (const stop of stops.splice(0)) stop();
+      resolve(ok);
+    };
+    const check = (): void => {
+      const now = trackedView(app, viewId);
+      if (!now || now.tabMetaStore.getState().activeTabId !== tabId) finish(false);
+      else if (snapshotTabId(now) === tabId) finish(true);
+    };
+    stops.push(view.atlasStore.subscribe(check), view.tabMetaStore.subscribe(check));
+    const poll = window.setInterval(check, SHOW_TAB_POLL_MS);
+    const timeout = window.setTimeout(() => finish(false), SHOW_TAB_TIMEOUT_MS);
+    // Atlas unloading ends the wait.
+    const unload = (): void => finish(false);
+    disposers.add(unload);
+    stops.push(() => { window.clearInterval(poll); window.clearTimeout(timeout); disposers.delete(unload); });
+    check();
   });
 }
 
@@ -460,7 +503,7 @@ function dynamicLighting(service: StockSettings): boolean | null {
 
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice', 'lasers']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice', 'lasers', 'scene-tabs']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
