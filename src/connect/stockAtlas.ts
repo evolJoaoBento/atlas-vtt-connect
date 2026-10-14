@@ -15,6 +15,7 @@ import type {
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
+import { stockDiceApi } from './stockDice/stockDice';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
 
@@ -56,6 +57,7 @@ interface StockViewport {
 interface StockView {
   readonly viewId: string;
   readonly containerEl?: HTMLElement;
+  readonly serviceManager?: unknown;
   readonly atlasStore: Store<StockSceneState>;
   readonly tabMetaStore: Store<{ tabs: StockTab[]; activeTabId: string | null }>;
   readonly renderer?: {
@@ -117,6 +119,13 @@ function mapViews(app: App): StockView[] {
     if (isStockView(view) && view.atlasStore.getState().remoteView == null) found.push(view);
   }
   return found;
+}
+
+/** The map view the GM works in: the most recent leaf when it is one, else the first open. */
+function activeMapView(app: App): StockView | null {
+  const recent = app.workspace.getMostRecentLeaf?.()?.view;
+  if (isStockView(recent) && recent.atlasStore.getState().remoteView == null) return recent;
+  return mapViews(app)[0] ?? null;
 }
 
 const loaded = (state: Pick<StockSceneState, 'mapLoaded' | 'isMapLoading'>): boolean => state.mapLoaded && !state.isMapLoading;
@@ -450,7 +459,7 @@ function dynamicLighting(service: StockSettings): boolean | null {
 
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -485,11 +494,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       // The floating dock stands in for the toolbar, palette, menus and panels stock Atlas has no slots for.
       const ui = stockUi(app, {
         views: () => mapViews(app),
-        active: () => {
-          const recent = app.workspace.getMostRecentLeaf?.()?.view;
-          if (isStockView(recent) && recent.atlasStore.getState().remoteView == null) return recent;
-          return mapViews(app)[0] ?? null;
-        },
+        active: () => activeMapView(app),
         presentedTabId: () => presented.get()?.tabId ?? null,
         onViewsChanged: (listener) => {
           const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, listener as never));
@@ -503,6 +508,23 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
         ui: ui.api,
+        dice: stockDiceApi({
+          views: () => {
+            const first = activeMapView(app);
+            const open = mapViews(app);
+            return [...(first ? [first] : []), ...open.filter((view) => view !== first)].map((view) => ({
+              viewId: view.viewId, mapPath: () => view.atlasStore.getState().mapPath, serviceManager: view.serviceManager,
+            }));
+          },
+          onViewsChanged: (listener) => {
+            const stops = (['map-loaded', 'map-closed'] as const).map((event) => events.on(event, listener as never));
+            return () => { for (const stop of stops) stop(); };
+          },
+          add: (dispose) => {
+            disposers.add(dispose);
+            return () => { disposers.delete(dispose); dispose(); };
+          },
+        }),
         tokens: stockTokensApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
