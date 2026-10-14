@@ -188,3 +188,11 @@ $connect-dock-z: 1000;
   max-height: calc(100vh - 140px);
   overflow: auto;
 }
+
+// Other people's lasers, drawn over a map view's canvas: it takes no pointer and sits under the dock.
+.atlas-connect-lasers {
+  position: fixed;
+  z-index: 20;
+  display: none;
+  pointer-events: none;
+}

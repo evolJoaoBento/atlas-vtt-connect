@@ -16,6 +16,7 @@ import type {
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
 import { stockDiceApi } from './stockDice/stockDice';
+import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
 
@@ -459,7 +460,7 @@ function dynamicLighting(service: StockSettings): boolean | null {
 
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice', 'lasers']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -508,6 +509,13 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
         ui: ui.api,
+        lasers: stockLasersApi({
+          view: (viewId) => trackedView(app, viewId),
+          add: (dispose) => {
+            disposers.add(dispose);
+            return () => { disposers.delete(dispose); dispose(); };
+          },
+        }),
         dice: stockDiceApi({
           views: () => {
             const first = activeMapView(app);
