@@ -12,7 +12,8 @@
  * What is left out shows players less, never more: the footprints of tokens seen in the dark and the explored memory.
  */
 import type { Disposer, LightingApi, Perception, PlayerVisibility, PlayerVisibilityOptions } from '@atlas-vtt/api-types';
-import { darknessRaster, MAX_DARKNESS_CELLS_PER_SIDE, type DarknessRaster, type Lighting, type MapSize } from './darknessRaster';
+import { darknessRaster, MAX_DARKNESS_CELLS_PER_SIDE, type DarknessRaster, type ExploredImage, type Lighting, type MapSize } from './darknessRaster';
+import { ExploredFollower, type ExploredDecoder } from './exploredMemory';
 import type { AmbientLight, LightReach, Point, Polygon, SenseRules, Sight, SightRegion } from './visionRules';
 
 /** The cells per side a caller may ask for, and what it gets when it asks for none. */
@@ -34,7 +35,11 @@ interface Store<T> {
 export interface LightingScene {
   mapLoaded: boolean;
   isMapLoading: boolean;
-  lighting: { enabled: boolean };
+  mapPath?: string | null | undefined;
+  /** The scene's explored memory as saved (a PNG data URL), and the count of edits made to it. */
+  exploredMask?: string | null | undefined;
+  exploredEdits?: number | undefined;
+  lighting: { enabled: boolean; exploredMemory?: boolean | undefined };
   objects: { tokens: Record<string, unknown>; fog?: unknown; walls?: unknown; lights?: unknown };
 }
 
@@ -53,6 +58,8 @@ export interface StockLightingDeps {
   dynamicLighting(): boolean | null;
   /** Registers a disposer to run when the extension unloads; returns a function that runs and forgets it. */
   add(dispose: Disposer): Disposer;
+  /** Replaces the decoding of explored masks and the clock; tests pass their own. */
+  explored?: { decode?: ExploredDecoder; now?: () => number };
 }
 
 /** The view's lighting as the controller hands it out. */
@@ -135,6 +142,16 @@ function readReaches(value: unknown): LightReach[] | null {
   return value as LightReach[];
 }
 
+/**
+ * Whether the engine's explored memory holds the scene's mask and was not lost with a graphics context
+ * (`LightingRenderer.memory`: `ready`, `texture`, `contextLost`). The line-of-sight fallback has none, and shows none.
+ */
+function memoryIsIn(controller: Controller): boolean {
+  const inner = field(controller.renderer, 'view');
+  const memory = field(inner, 'memory');
+  return isObject(memory) && memory.ready === true && Boolean(memory.texture) && memory.contextLost === false;
+}
+
 function cellsPerSide(asked: unknown): number {
   return isNumber(asked) ? Math.min(CELLS.max, Math.max(CELLS.min, Math.round(asked))) : CELLS.default;
 }
@@ -186,16 +203,37 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
   const rasters = new Map<string, Built>();
   const hooks = new SightHooks();
 
-  const raster = (viewId: string, cells: number, lighting: Lighting, map: MapSize): DarknessRaster => {
+  const raster = (viewId: string, cells: number, lighting: Lighting, map: MapSize, explored: ExploredImage | null): DarknessRaster => {
     const key = `${viewId}:${cells}`;
-    const inputs = [lighting.sight, lighting.ambient, lighting.reaches, map.width, map.height];
+    const inputs = [lighting.sight, lighting.ambient, lighting.reaches, map.width, map.height, explored];
     const last = rasters.get(key);
     if (last && last.inputs.length === inputs.length && last.inputs.every((input, index) => input === inputs[index])) return last.raster;
-    const built = { inputs, raster: darknessRaster(lighting, map, cells) };
+    const built = { inputs, raster: darknessRaster(lighting, map, cells, explored) };
     rasters.delete(key);
     rasters.set(key, built);
     if (rasters.size > KEPT_RASTERS) rasters.delete(rasters.keys().next().value!);
     return built.raster;
+  };
+
+  /** Who is told when what a view's players see may have changed without the store saying so (a mask decoded, memory settled). */
+  const watchers = new Map<string, Set<() => void>>();
+  const followers = new Map<string, ExploredFollower>();
+  let followersRegistered = false;
+  const followerOf = (viewId: string): ExploredFollower => {
+    let follower = followers.get(viewId);
+    if (!follower) {
+      if (!followersRegistered) {
+        followersRegistered = true;
+        deps.add(() => {
+          for (const each of followers.values()) each.dispose();
+          followers.clear();
+          followersRegistered = false;
+        });
+      }
+      follower = new ExploredFollower(() => { for (const call of [...(watchers.get(viewId) ?? [])]) call(); }, deps.explored?.now, deps.explored?.decode);
+      followers.set(viewId, follower);
+    }
+    return follower;
   };
 
   /** The last reason each view was pending for: said once when it changes, so a dark scene can be explained. */
@@ -236,7 +274,14 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
       const seen = perceive(id);
       tokens[id] = typeof seen === 'string' && PERCEPTIONS.has(seen) ? (seen as Perception) : 'unseen';
     }
-    const grid = raster(view.viewId, cellsPerSide(options?.maxCellsPerSide), { sight, ambient, reaches }, map);
+    // Explored memory shows where the scene keeps it and the engine's memory is in; the line-of-sight fallback has none.
+    // Read also while no token has vision: the follower must see every erase, undo and map change.
+    const memory = followerOf(view.viewId).read({
+      keeps: state.lighting.exploredMemory !== false, isMemory: memoryIsIn(controller),
+      mask: typeof state.exploredMask === 'string' ? state.exploredMask : null, edits: isNumber(state.exploredEdits) ? state.exploredEdits : 0, mapPath: state.mapPath ?? null,
+    });
+    const explored = sight.all ? null : memory;
+    const grid = raster(view.viewId, cellsPerSide(options?.maxCellsPerSide), { sight, ambient, reaches }, map, explored);
     reasons.delete(view.viewId);
     // A fresh buffer on every call: the raster is kept between calls, and no caller may change it for another.
     const shown = new Uint8Array(grid.dark.length);
@@ -245,7 +290,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
       status: 'ready',
       tokens: Object.freeze(tokens),
       darkness: Object.freeze({ cellSize: grid.cellSize, cols: grid.cols, rows: grid.rows, shown }),
-      showsExplored: false,
+      showsExplored: explored !== null,
     });
   };
 
@@ -271,7 +316,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
         const controller = switchedControllerOf(view);
         const lighting = controller?.renderer;
         return [
-          state.lighting, state.mapLoaded, state.isMapLoading, state.objects.fog, state.objects.walls, state.objects.lights, deps.dynamicLighting(),
+          state.lighting, state.mapLoaded, state.isMapLoading, state.objects.fog, state.objects.walls, state.objects.lights, state.exploredEdits, state.exploredMask, deps.dynamicLighting(),
           controller, lighting?.isEnabled(), lighting?.sightIsCurrent(), lighting?.currentSight(), lighting?.lightReaches(), lighting?.ambientLight(),
         ];
       };
@@ -304,10 +349,14 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
         call();
       }
       const stopStore = view.atlasStore.subscribe(check);
+      const set = watchers.get(viewId) ?? new Set<() => void>();
+      watchers.set(viewId, set);
+      set.add(call);
       const timer = window.setInterval(check, WATCH_POLL_MS);
       hookCurrent();
       const remove = deps.add(() => {
         active = false;
+        set.delete(call);
         stopStore();
         window.clearInterval(timer);
         hooked?.stop();

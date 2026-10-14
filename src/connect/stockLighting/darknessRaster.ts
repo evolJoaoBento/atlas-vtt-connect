@@ -1,13 +1,13 @@
 /**
  * Where the players' window of a lit scene shows the map, on a coarse cell grid, by the window's own rules. Ported
  * from the darkness raster of the Atlas VTT extension API branch (AGPL-3.0, the same rules as Atlas VTT 0.8.0's
- * player window), without its two additions that only ever show more: the footprints of tokens seen in the dark,
- * and the explored memory. Leaving them out hides more and never less.
+ * player window), without its footprints of tokens seen in the dark, which only ever show more.
  *
  * Cells are sampled at their centres, on cells of at least `DARKNESS_MIN_CELL`; a cell shows only when every sample
  * within it does, so a coarse cell hides more, never shows more. The map shows where a precise sense of a vision
  * token that shows the map perceives it, in the light there; with no vision token, wherever normal sight sees by the
- * light. Everything else is dark. Before the window's sight belongs to the scene the caller does not ask.
+ * light; and where the explored memory the window shows holds it, while some token has vision. Everything else is
+ * dark. Before the window's sight belongs to the scene the caller does not ask.
  */
 import { ambientLevel, lightLevelAt, NORMAL_SIGHT, perceivedLevel, showsMap, type AmbientLight, type LightLevel, type LightReach, type Point, type Polygon, type Sight } from './visionRules';
 
@@ -22,6 +22,16 @@ export const DARKNESS_MIN_CELL = 8;
 export const MAX_DARKNESS_CELLS_PER_SIDE = 384;
 /** The rules are sampled on cells this many to the map's long side at most. */
 const DARKNESS_SAMPLES_PER_SIDE = 512;
+
+/** A texel of the explored memory counts as explored from this coverage (0–255) on: more than half. */
+export const EXPLORED_COVERAGE = 128;
+
+/** The scene's explored memory as saved, one coverage byte per texel, over the map. */
+export interface ExploredImage {
+  width: number;
+  height: number;
+  coverage: Uint8Array;
+}
 
 /** Dark cells (1) over the map, `cellSize` world pixels square from the map's top-left corner. */
 export interface DarknessRaster {
@@ -46,9 +56,9 @@ export function darknessCellSize(map: MapSize, maxCellsPerSide = MAX_DARKNESS_CE
   return size;
 }
 
-export function darknessRaster(lighting: Lighting, map: MapSize, maxCellsPerSide = MAX_DARKNESS_CELLS_PER_SIDE): DarknessRaster {
+export function darknessRaster(lighting: Lighting, map: MapSize, maxCellsPerSide = MAX_DARKNESS_CELLS_PER_SIDE, explored: ExploredImage | null = null): DarknessRaster {
   const cellSize = darknessCellSize(map, maxCellsPerSide);
-  const samples = sampledRaster(lighting, map, Math.min(cellSize, darknessCellSize(map, DARKNESS_SAMPLES_PER_SIDE)));
+  const samples = sampledRaster(lighting, explored, map, Math.min(cellSize, darknessCellSize(map, DARKNESS_SAMPLES_PER_SIDE)));
   return samples.cellSize === cellSize ? samples : coarsened(samples, cellSize);
 }
 
@@ -58,9 +68,9 @@ function emptyRaster(map: MapSize, cellSize: number): DarknessRaster {
   return { cols, rows, cellSize, map, dark: new Uint8Array(cols * rows).fill(1) };
 }
 
-function sampledRaster(lighting: Lighting, map: MapSize, cellSize: number): DarknessRaster {
+function sampledRaster(lighting: Lighting, explored: ExploredImage | null, map: MapSize, cellSize: number): DarknessRaster {
   const grid = emptyRaster(map, cellSize);
-  showMap(lighting, grid);
+  showMap(lighting, explored, grid);
   return grid;
 }
 
@@ -83,7 +93,7 @@ const MAGICAL_DARK = 3;
 const levelOf = (code: number): LightLevel => (code === MAGICAL_DARK ? 'magical-dark' : LEVELS[code]!);
 const codeOf = (level: LightLevel): number => (level === 'magical-dark' ? MAGICAL_DARK : LEVELS.indexOf(level));
 
-function showMap({ sight, ambient, reaches }: Lighting, grid: DarknessRaster): void {
+function showMap({ sight, ambient, reaches }: Lighting, explored: ExploredImage | null, grid: DarknessRaster): void {
   const levels = lightLevels(grid, ambient, reaches);
   const show = (index: number): void => { grid.dark[index] = 0; };
   if (sight.all) {
@@ -95,6 +105,11 @@ function showMap({ sight, ambient, reaches }: Lighting, grid: DarknessRaster): v
     if (!polygon || !showsMap(sense) || !sense.precise) continue;
     forCentresInside(grid, polygon, (index, x, y) => {
       if (Math.hypot(x - origin.x, y - origin.y) <= radius && perceivedLevel(sense, levelOf(levels[index]!)) !== null) show(index);
+    });
+  }
+  if (explored) {
+    forEveryCentre(grid, (index, x, y) => {
+      if (isExplored(explored, grid.map, x, y)) show(index);
     });
   }
 }
@@ -127,6 +142,19 @@ function lightLevels(grid: DarknessRaster, ambient: AmbientLight, reaches: reado
 }
 
 type CellVisit = (index: number, x: number, y: number) => void;
+
+function forEveryCentre({ cols, rows, cellSize }: DarknessRaster, visit: CellVisit): void {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) visit(row * cols + col, (col + 0.5) * cellSize, (row + 0.5) * cellSize);
+  }
+}
+
+function isExplored(explored: ExploredImage, map: MapSize, x: number, y: number): boolean {
+  if (!(map.width > 0) || !(map.height > 0)) return false;
+  const tx = Math.min(explored.width - 1, Math.floor((x / map.width) * explored.width));
+  const ty = Math.min(explored.height - 1, Math.floor((y / map.height) * explored.height));
+  return tx >= 0 && ty >= 0 && (explored.coverage[ty * explored.width + tx] ?? 0) >= EXPLORED_COVERAGE;
+}
 
 /** The cells whose centre lies inside `polygon` (nonzero winding). */
 function forCentresInside({ cols, rows, cellSize }: DarknessRaster, polygon: Polygon, visit: CellVisit): void {
