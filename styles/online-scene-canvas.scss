@@ -53,11 +53,20 @@
     background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
   }
   .top-info { padding-inline: 16px; min-height: calc(var(--tool-size) + 2 * var(--inset) + 2 * var(--panel-border)); }
-  /* The dice log opener is a bare, see-through icon, not a pill: it stays quiet until it is pointed at. */
-  .top-actions { margin-left: auto; padding: 0; background: none; border: 0; box-shadow: none; }
-  .top-actions .icon-button { width: 44px; height: 44px; opacity: 0.55; transition: opacity 120ms; }
-  .top-actions .icon-button:hover, .top-actions .icon-button:focus-visible, .top-actions .icon-button[aria-expanded="true"] { opacity: 1; background: transparent; }
-  .top-actions .icon-button .tool-icon { width: 28px; height: 28px; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+  /* The dice log opener is a bare, glowing icon in the middle of the right edge, not a pill. It sits against the table
+     itself (the bar is no containing block), so the middle is the table's. */
+  .top-bar { position: static; }
+  .top-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); padding: 0; background: none; border: 0; box-shadow: none;
+  }
+  .top-actions .icon-button {
+    width: 48px; height: 48px; color: #f4f1ff; opacity: 0.85; transition: opacity 120ms, filter 120ms;
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 14px var(--accent));
+  }
+  .top-actions .icon-button:hover, .top-actions .icon-button:focus-visible, .top-actions .icon-button[aria-expanded="true"] {
+    opacity: 1; background: transparent; filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 18px var(--accent));
+  }
+  .top-actions .icon-button .tool-icon { width: 30px; height: 30px; }
   .session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
   .connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .connection[data-tone]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d29922; }
@@ -223,7 +232,6 @@
   .dice-log:not([hidden]) { animation: atlas-connect-log-in 220ms cubic-bezier(0.23, 1, 0.32, 1); }
   @keyframes atlas-connect-log-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
   @keyframes atlas-connect-log-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  @media (prefers-reduced-motion: reduce) { .dice-log:not([hidden]) { animation: none; } }
   .dice-log-header { display: flex; align-items: center; gap: 12px; }
   .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
   .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }

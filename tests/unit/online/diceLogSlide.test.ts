@@ -10,7 +10,14 @@ describe("the player tab's dice log", () => {
     expect(css).toMatch(/@keyframes atlas-connect-log-in \{ from \{ transform: translateX\(100%\)/);
   });
 
-  it('is opened by a bare, see-through icon rather than a pill', () => {
-    expect(css).toMatch(/\.top-actions \{[^}]*background: none; border: 0; box-shadow: none;/);
+  it('slides in whatever the system says of motion: it is the panel arriving, not decoration', () => {
+    expect(css).not.toMatch(/prefers-reduced-motion.*dice-log/);
+  });
+
+  it('is opened by a bare, glowing icon in the middle of the right edge rather than a pill', () => {
+    expect(css).toMatch(/\.top-actions \{[^}]*top: 50%; transform: translateY\(-50%\);[^}]*background: none; border: 0; box-shadow: none;/);
+    expect(css).toMatch(/\.top-actions \.icon-button \{[^}]*filter: drop-shadow\(0 0 5px/);
+    // The bar is no containing block, so 50% is the table's middle, not the bar's.
+    expect(css).toMatch(/\.top-bar \{ position: static; \}/);
   });
 });
