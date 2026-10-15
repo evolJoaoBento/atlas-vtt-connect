@@ -30,12 +30,15 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const root = parent.createDiv({ cls: 'atlas-connect-scene table', attr: { role: 'region', 'aria-label': 'Scene' } });
   const canvas = root.createEl('canvas', { cls: 'atlas-connect-scene__map', attr: { role: 'img', 'aria-label': 'Map' } });
   const bar = root.createEl('header', { cls: 'top-bar' });
-  const sessionName = bar.createSpan({ cls: 'session-name' });
-  const connection = bar.createSpan({ cls: 'connection', attr: { role: 'status' } });
-  const message = bar.createSpan({ cls: 'connection scene-message' });
-  const reconnect = bar.createEl('button', { cls: 'secondary', text: 'Reconnect', attr: { type: 'button' } });
+  // Two floating pills over the map, as Atlas's own toolbar floats: what the session is, and the dice log.
+  const info = bar.createDiv({ cls: 'top-pill top-info' });
+  const connection = info.createSpan({ cls: 'connection', attr: { role: 'status' } });
+  const sessionName = info.createSpan({ cls: 'session-name' });
+  const message = info.createSpan({ cls: 'connection scene-message' });
+  const reconnect = info.createEl('button', { cls: 'secondary', text: 'Reconnect', attr: { type: 'button' } });
   reconnect.hidden = true;
-  const diceLogButton = bar.createEl('button', {
+  const actions = bar.createDiv({ cls: 'top-pill top-actions' });
+  const diceLogButton = actions.createEl('button', {
     cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Dice log', 'aria-expanded': 'false' },
   });
   const viewButtons = root.createDiv({ cls: 'view-buttons' });
