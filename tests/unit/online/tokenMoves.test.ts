@@ -58,11 +58,14 @@ describe('TokenMoves', () => {
     expect(changes()).toBeGreaterThan(before);
     expect(moves.isDragging()).toBe(true);
     expect(positions(moves)).toEqual({ t1: { x: 200, y: 100 } });
+    // The held token follows the pointer; once dropped, its moves glide again.
+    expect(moves.overlay().held).toBe('t1');
     moves.move({ x: 240, y: 145 });
     expect(sent).toEqual([]);
     moves.drop({ x: 240, y: 145 });
     expect(sent).toEqual([['t1', 250, 150]]);
     expect(moves.isDragging()).toBe(false);
+    expect(moves.overlay().held).toBeNull();
     expect(positions(moves)).toEqual({ t1: { x: 250, y: 150 } });
     expect(moves.overlay().controlled).toEqual(new Set(['t1']));
   });

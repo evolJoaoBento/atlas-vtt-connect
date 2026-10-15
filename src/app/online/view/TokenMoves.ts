@@ -184,7 +184,7 @@ export class TokenMoves implements TokenGrab {
     const positions = new Map<string, ScenePoint>();
     for (const [tokenId, entry] of this.pending) positions.set(tokenId, entry.position);
     if (this.held?.position) positions.set(this.held.tokenId, this.held.position);
-    return { controlled: this.controlled, positions };
+    return { controlled: this.controlled, positions, held: this.held?.position ? this.held.tokenId : null };
   }
 
   dispose(): void {
