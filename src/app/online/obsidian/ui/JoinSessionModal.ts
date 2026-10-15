@@ -134,6 +134,7 @@ export class JoinSessionModal extends Modal {
 
   private setBusy(busy: boolean): void {
     if (this.joinButton) this.joinButton.disabled = busy;
+    this.statusEl?.toggleClass('is-loading', busy);
   }
 }
 

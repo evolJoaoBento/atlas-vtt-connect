@@ -44,6 +44,7 @@ const form = element<HTMLFormElement>('join');
 const nameInput = element<HTMLInputElement>('name');
 const rememberName = element<HTMLInputElement>('remember-name');
 const status = element<HTMLParagraphElement>('status');
+const waitingLoader = element<HTMLElement>('loader');
 const table = element<HTMLElement>('table');
 const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
@@ -176,6 +177,8 @@ function show(view: PageScreen): void {
   table.hidden = view.kind !== 'table';
   form.hidden = view.kind !== 'form' || started;
   if (view.kind === 'message') status.textContent = view.text;
+  // A spinner while the page waits on the GM or the connection, so it does not look stuck.
+  waitingLoader.hidden = !(view.kind === 'message' && view.loading === true);
   if (view.kind === 'table') {
     sessionName.textContent = view.title;
     connection.textContent = view.connection;
@@ -184,6 +187,9 @@ function show(view: PageScreen): void {
     if (!tableShown) {
       map?.measure();
       toolbar.fit();
+      // Measured again once the page has laid the table out: a browser that was not painting while the GM answered must
+      // still show the table by itself, with no click needed to wake it.
+      for (const wait of [150, 600, 1500]) window.setTimeout(() => { map?.measure(); toolbar.fit(); }, wait);
     }
   }
   tableShown = view.kind === 'table';
@@ -227,6 +233,10 @@ function renderScene(): void {
   // Read-only, for checking in the developer tools what this page received.
   (window as unknown as { atlasScene: PlayerScene | null }).atlasScene = shown;
 }
+
+// Back in front after being behind another window: draw what arrived meanwhile.
+window.addEventListener('focus', () => { map?.measure(); });
+window.addEventListener('pageshow', () => { map?.measure(); });
 
 const target = parseJoinFragment(location.hash);
 if (!target) {

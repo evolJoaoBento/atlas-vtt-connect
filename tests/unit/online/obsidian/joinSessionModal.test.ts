@@ -63,6 +63,7 @@ describe('Join online session dialog', () => {
     expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna', true);
     joinedSessionStore.setState({ session: state('waiting') });
     expect(status()).toBe('Waiting for the GM to let you in…');
+    expect(modal.contentEl.querySelector('[role="status"]')?.classList.contains('is-loading')).toBe(true);
     expect(button('Join').disabled).toBe(true);
     joinedSessionStore.setState({ session: state('admitted') });
     expect(close).toHaveBeenCalled();
