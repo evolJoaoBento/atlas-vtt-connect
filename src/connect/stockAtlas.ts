@@ -577,7 +577,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       // A map's rules are read from its view's token renderer and the asset index (`stockRules.ts`), neither of which
       // says when it is ready: a loaded map and a loaded index are when the rules may read differently.
       const rulesMayChange = (): void => { events.emit('rules-changed', null); };
-      disposers.add(events.on('map-loaded', rulesMayChange as never));
+      disposers.add(events.on('map-loaded', rulesMayChange));
       let indexAsked = false;
       const askIndex = (): void => {
         if (indexAsked) return;
@@ -588,7 +588,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         assets.initialize().then(rulesMayChange, () => undefined);
       };
       askIndex();
-      disposers.add(events.on('map-loaded', askIndex as never));
+      disposers.add(events.on('map-loaded', askIndex));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
       const extensionId = plugin.manifest.id;
       // Asked for by Connect and by the player character links at once: made once.

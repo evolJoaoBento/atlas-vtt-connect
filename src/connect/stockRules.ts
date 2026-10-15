@@ -37,7 +37,7 @@ function call(target: unknown, method: string, ...args: unknown[]): unknown {
 /** Atlas's HP: what a collection without stored resources tracks (`HP_RESOURCE`). Not shown to players. */
 const HP_RESOURCE: ResourceDefinition = Object.freeze({
   key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false,
-}) as ResourceDefinition;
+});
 
 const DIRECTIONS = new Set(['drains', 'fills', 'static']);
 const MAX_RESOURCES = 6;
@@ -78,7 +78,7 @@ function readInitiative(value: unknown): InitiativeRules | null {
     mode: value.mode,
     roll: typeof value.roll === 'string' && value.roll !== '' ? value.roll : '1d20',
     firstSide: value.firstSide === 'opponents' ? 'opponents' : 'players',
-  }) as InitiativeRules;
+  });
 }
 
 /** The collection sync of a view's token renderer: Atlas's own resources and conditions for the map it shows. */
