@@ -70,6 +70,7 @@ const map = surface
     laserColor: loadLaserColor(() => localStorage),
     onLaserColor: (color) => saveLaserColor(color, () => localStorage),
     notice: element('move-notice'),
+    hoverCard: element('hover-card'),
     onToolsChange: () => syncToolbar(),
   })
   : null;

@@ -19,6 +19,7 @@ export interface SceneDom {
   followButton: HTMLButtonElement;
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
+  hoverCard: HTMLElement;
   diceToast: HTMLButtonElement;
   diceTray: HTMLElement;
   toolbar: HTMLElement;
@@ -71,6 +72,9 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceTray = root.createDiv({ cls: 'dice-tray', attr: { role: 'group', 'aria-label': 'Dice tray' } });
   diceTray.hidden = true;
   const toolbar = root.createEl('nav', { cls: 'toolbar', attr: { 'aria-label': 'Tools' } });
+  // The token card under the mouse (`HoverCardView`), placed in the window's coordinates.
+  const hoverCard = root.createDiv({ cls: 'hover-card' });
+  hoverCard.hidden = true;
   const diceLog = root.createEl('aside', { cls: 'dice-log', attr: { 'aria-label': 'Dice log' } });
   diceLog.hidden = true;
   const header = diceLog.createDiv({ cls: 'dice-log-header' });
@@ -82,6 +86,6 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
-    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList,
+    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard,
   };
 }

@@ -274,3 +274,26 @@
     .dice-log[hidden] { transform: translateY(105%); }
   }
 }
+
+// The token card under the mouse (`HoverCardView`): name, conditions and the player's own numbers, in the window's coordinates.
+.atlas-connect-scene .hover-card {
+  position: fixed;
+  left: var(--hover-x, 0);
+  top: var(--hover-y, 0);
+  z-index: var(--layer-tooltip);
+  max-width: 260px;
+  padding: var(--size-4-2);
+  display: grid;
+  gap: var(--size-4-1);
+  pointer-events: none;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-small);
+  box-shadow: var(--shadow-s);
+}
+.atlas-connect-scene .hover-card[hidden] { display: none; }
+.atlas-connect-scene .hover-card-title { font-weight: var(--font-semibold); }
+.atlas-connect-scene .hover-card-line { display: flex; align-items: center; gap: var(--size-4-1); color: var(--text-muted); }
+.atlas-connect-scene .hover-card-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hover-dot); }

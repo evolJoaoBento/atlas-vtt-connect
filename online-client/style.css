@@ -342,3 +342,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 #initiative li.side[aria-current="true"] { color: var(--accent); }
 #initiative li.sitting-out { opacity: 0.45; }
 #initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }
+
+/* The token card under the mouse: name, conditions and the player's own numbers. Placed by `HoverCardView`. */
+.hover-card {
+  position: fixed; left: var(--hover-x, 0); top: var(--hover-y, 0); z-index: 5; max-width: 260px;
+  padding: var(--gap); display: grid; gap: 4px; pointer-events: none;
+  background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; line-height: 1.35; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+.hover-card-title { font-weight: 600; }
+.hover-card-line { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.hover-card-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hover-dot); }

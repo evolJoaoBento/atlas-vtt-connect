@@ -24,6 +24,8 @@ import { ViewInput } from '../src/app/online/view/ViewInput';
 import type { ViewSurface } from '../src/app/online/view/ViewSurface';
 import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
+import { HoverCardView } from './hoverCardView.mts';
+import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
 
 /** What the toolbar shows of the tools. */
 export interface ToolState {
@@ -60,6 +62,8 @@ export interface MapViewOptions {
   active?: () => boolean;
   /** The document whose keys the map takes; the page's by default. */
   doc?: Document;
+  /** The card shown while the mouse rests on a token (its name, conditions and, for the player's own, numbers); without it none shows. */
+  hoverCard?: HTMLElement;
 }
 
 export class MapView {
@@ -69,6 +73,10 @@ export class MapView {
   private readonly tools: PlayerTools;
   private readonly input: ViewInput;
   private hasScene = false;
+  private scene: PlayerScene | null = null;
+  private readonly hoverCard: HoverCardView | null;
+  /** Exact numbers of the tokens this player controls, from the GM's `token-stats`. */
+  private numbers: ReadonlyMap<string, TokenNumbers> = new Map();
   /** Where the mouse is over the canvas, for the grab cursor; null when it is elsewhere. */
   private hover: ScreenPoint | null = null;
   /** What the toolbar was last told. */
@@ -110,6 +118,7 @@ export class MapView {
       onChange: () => this.toolsChanged(),
     });
     this.input = new ViewInput(this.camera, this.tools);
+    this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
     this.measure();
@@ -121,11 +130,19 @@ export class MapView {
   /** The scene to show; null shows nothing and resets the camera. */
   setScene(scene: PlayerScene | null): void {
     this.hasScene = scene !== null;
+    this.scene = scene;
     this.camera.setScene(scene);
     this.renderer.setScene(scene);
     this.moves.setScene(scene);
     this.tools.setScene(scene);
     this.updateButtons();
+    this.updateHoverCard();
+  }
+
+  /** Exact numbers of the tokens this player controls (`token-stats`): the card of each shows them. */
+  setTokenNumbers(numbers: ReadonlyMap<string, TokenNumbers>): void {
+    this.numbers = numbers;
+    this.updateHoverCard();
   }
 
   setGmCamera(camera: SceneCamera | null): void {
@@ -250,6 +267,7 @@ export class MapView {
     this.options.notice.textContent = notice ?? '';
     this.options.notice.hidden = notice === null;
     this.updateCursor();
+    this.updateHoverCard();
   }
 
   /** Draws again; the toolbar hears only of a new tool or shape, never of every move. */
@@ -273,6 +291,20 @@ export class MapView {
     canvas.classList.toggle('can-grab', canGrab);
   }
 
+  /** The card for the token under the mouse, or none: not while dragging or with no token there. */
+  private updateHoverCard(): void {
+    const card = this.hoverCard;
+    if (!card) return;
+    const scene = this.scene;
+    if (!scene || !this.hover || this.moves.isDragging()) {
+      card.hide();
+      return;
+    }
+    const id = tokenAt(scene, this.moves.overlay().positions, this.camera.toWorld(this.hover));
+    const rect = this.options.canvas.getBoundingClientRect();
+    card.show(id ? hoverCardFor(scene, id, this.numbers.get(id) ?? null) : null, rect.left + this.hover.x, rect.top + this.hover.y);
+  }
+
   private updateButtons(): void {
     this.options.viewButtons.hidden = !this.hasScene || this.camera.isFollowing();
   }
@@ -287,6 +319,7 @@ export class MapView {
       onHover: (point) => {
         this.hover = point;
         this.updateCursor();
+        this.updateHoverCard();
       },
     });
     followButton.addEventListener('click', () => this.camera.followGm(), { signal });
