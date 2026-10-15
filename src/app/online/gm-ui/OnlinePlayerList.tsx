@@ -7,7 +7,7 @@ import type { SessionPlayer } from '../GmSession';
 import type { OnlineSessionService } from '../OnlineSessionService';
 import type { JoinIdentity } from '../sharing/people/IdentityDesk';
 import {
-  KNOWN_PERSON_MARK, NEW_PERSON_MARK, OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL, linkToLabel, sameNameWarning,
+  KNOWN_PERSON_MARK, NEW_PERSON_MARK, OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL, linkToLabel, otherClientWarning, sameNameWarning,
 } from '../ui/onlineCopy';
 import type { PresentedSceneSummaries } from '../ui/presentedSceneSummary';
 import { usePresentedSceneSummary, useTokenControlVersion } from './useOnlineState';
@@ -87,6 +87,11 @@ export function OnlinePlayerList({ players, requests, control, service, summarie
                   <Button variant="cta" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
                   <Button size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
                 </div>
+                {player.sameNameAs && (
+                  <div className="atlas-connect-panel__player-row atlas-connect-panel__same-name">
+                    <span className="atlas-connect-panel__warning" role="note">{otherClientWarning(player.name, player.sameNameAs === 'connected')}</span>
+                  </div>
+                )}
                 <SameNameRow identity={requests[player.playerId] ?? null} onLink={(same) => linkTo(service, player.playerId, same)} />
               </li>
             ))}

@@ -15,14 +15,16 @@ describe('stock Atlas stand-in', () => {
     expect(canShimStockAtlas(setup().atlas)).toBe(true);
   });
 
-  it('offers what hosting needs, and lighting, but no tokens, dice or lasers', () => {
+  it('offers what hosting needs, lighting, the floating ui, tokens, dice and lasers, but no scenes or bundles', () => {
     const { app, atlas } = setup();
     const api = stockAtlasApi(app, atlas);
     expect(api.has('views') && api.has('presentation') && api.has('rules') && api.has('settings') && api.has('storage')).toBe(true);
     expect(api.has('lighting')).toBe(true);
-    expect(api.has('dice') || api.has('lasers')).toBe(false);
-    expect(api.has('scene-tabs')).toBe(false);
-    expect(api.has('tokens')).toBe(false);
+    expect(api.has('ui')).toBe(true);
+    expect(api.has('dice')).toBe(true);
+    expect(api.has('lasers')).toBe(true);
+    expect(api.has('scene-tabs')).toBe(true);
+    expect(api.has('tokens')).toBe(true);
   });
 
   it('lists views, reads a snapshot with its tab, and follows store changes', () => {
@@ -113,5 +115,76 @@ describe('stock Atlas stand-in', () => {
     expect(started).toEqual([]);
     vi.advanceTimersByTime(LAYOUT_READY_FALLBACK_MS);
     expect(started).toEqual(['atlas-vtt-connect']);
+  });
+  describe('showTab (the split party shows a tab without presenting it)', () => {
+    /** A view whose tab switch is followed by a load that the test finishes. */
+    function loading() {
+      const t = setup();
+      const extension = stockAtlasApi(t.app, t.atlas).connect(fakeConnectPlugin(t.app));
+      t.a.view.switchToTab.mockImplementation(async (tabId: string) => {
+        const tab = t.a.tabMeta.getState().tabs.find((entry) => entry.id === tabId);
+        t.a.tabMeta.set({ activeTabId: tabId });
+        t.a.scene.set({ mapPath: tab?.filePath ?? null, isMapLoading: true } as never);
+      });
+      return { ...t, extension, finish: () => t.a.scene.set({ isMapLoading: false } as never) };
+    }
+
+    it("answers true once the tab's map is loaded, and not before", async () => {
+      const t = loading();
+      let answer: boolean | null = null;
+      void t.extension.views.showTab!('view-a', 't2').then((value) => { answer = value; });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(answer).toBeNull();
+      expect(t.a.tabMeta.getState().activeTabId).toBe('t2');
+      expect(t.extension.views.snapshot('view-a')?.tabId).toBeNull();
+      t.finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(answer).toBe(true);
+      expect(t.extension.views.snapshot('view-a')?.tabId).toBe('t2');
+    });
+
+    it('answers true at once for a tab already shown, and false for an unknown view or tab', async () => {
+      const { app, atlas } = setup();
+      const extension = stockAtlasApi(app, atlas).connect(fakeConnectPlugin(app));
+      await expect(extension.views.showTab!('view-a', 't1')).resolves.toBe(true);
+      await expect(extension.views.showTab!('view-a', 'nope')).resolves.toBe(false);
+      await expect(extension.views.showTab!('nope', 't1')).resolves.toBe(false);
+      await expect(extension.views.showTab!('view-a', 5 as never)).resolves.toBe(false);
+    });
+
+    it('answers false when another switch overtakes it, when the GM clicks elsewhere, and after a minute', async () => {
+      const t = loading();
+      const first = t.extension.views.showTab!('view-a', 't2');
+      await vi.advanceTimersByTimeAsync(10);
+      const second = t.extension.views.showTab!('view-a', 't1');
+      await vi.advanceTimersByTimeAsync(10);
+      await expect(first).resolves.toBe(false);
+      t.finish();
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(second).resolves.toBe(true);
+
+      const clicked = loading();
+      const waiting = clicked.extension.views.showTab!('view-a', 't2');
+      await vi.advanceTimersByTimeAsync(10);
+      clicked.a.tabMeta.set({ activeTabId: 't1' });
+      await expect(waiting).resolves.toBe(false);
+
+      const slow = loading();
+      const never = slow.extension.views.showTab!('view-a', 't2');
+      await vi.advanceTimersByTimeAsync(60_001);
+      await expect(never).resolves.toBe(false);
+      expect(vi.getTimerCount()).toBeLessThan(5);
+    });
+
+    it('ends the wait when Connect unloads, leaving no timer behind', async () => {
+      const t = loading();
+      const plugin = fakeConnectPlugin(t.app);
+      const extension = stockAtlasApi(t.app, t.atlas).connect(plugin);
+      t.a.view.switchToTab.mockImplementation(async () => { t.a.scene.set({ isMapLoading: true } as never); });
+      const waiting = extension.views.showTab!('view-a', 't2');
+      await vi.advanceTimersByTimeAsync(10);
+      (plugin as unknown as { unload(): void }).unload();
+      await expect(waiting).resolves.toBe(false);
+    });
   });
 });

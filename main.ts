@@ -16,8 +16,8 @@ export default class AtlasVttConnectPlugin extends Plugin {
   /** Connect's own settings; narrows the base class's `settings?: unknown`. */
   declare settings: ConnectSettingsStore;
 
-  /** One key per GM host for the plugin's lifetime: a join after an Atlas reload is recognised by the GM. */
-  private readonly playerKeys = keyPerHost();
+  /** One key per GM host, kept in local storage: a join after an Atlas or Obsidian reload is recognised by the GM. */
+  private readonly playerKeys = keyPerHost(obsidianLocalStore(this.app));
   /** Whether the bound Atlas can share notes and maps; null while none is bound. */
   private canShare: boolean | null = null;
 

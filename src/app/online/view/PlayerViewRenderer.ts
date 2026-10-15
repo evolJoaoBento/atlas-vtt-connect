@@ -153,6 +153,7 @@ export class PlayerViewRenderer {
   }
 
   private animating(): boolean {
-    return (this.options.overlays ?? []).some((overlay) => overlay.animating());
+    return (this.options.overlays ?? []).some((overlay) => overlay.animating())
+      || SCENE_LAYER_ORDER.some((name) => this.options.layers[name].animating?.() === true);
   }
 }

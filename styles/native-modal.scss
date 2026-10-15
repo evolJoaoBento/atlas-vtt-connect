@@ -47,3 +47,32 @@
     > .modal-title { flex: 1 1 auto; min-width: 0; }
   }
 }
+
+// The Join dialog while it waits on the GM or the connection: a ring turning before the words, on their line.
+.atlas-join-modal__status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .atlas-join-modal__status {
+    margin: 0;
+  }
+}
+
+.atlas-join-modal__spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: atlas-join-spin 800ms linear infinite;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+@keyframes atlas-join-spin {
+  to { transform: rotate(360deg); }
+}

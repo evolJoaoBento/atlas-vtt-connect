@@ -3,15 +3,17 @@
  * to its circle (a marker until it has loaded) and turned by the token's rotation, the
  * ring when the token has one, a grey veil and a skull when it is downed, then its bars, nameplate and condition badges. On this
  * player's view only (`frame.overlay`), the tokens they control get a highlight ring, and
- * a token they drag or just dropped is drawn where they put it.
+ * a token they drag or just dropped is drawn where they put it. A token whose place
+ * changes glides there as in Atlas (`tokenGlides.ts`).
  */
 import { DOWNED_LOOK } from '@atlas-vtt/shared/draw';
-import { getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';
+import { getTokenRingCenterRadius, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
 import { computeTokenPixelSize, computeTokenStrokeWidth } from '@atlas-vtt/shared/draw';
 import type { PlayerToken } from '../../scene/sceneTypes';
 import { intersects } from '../camera';
 import type { ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
+import { TokenGlides } from './tokenGlides';
 import { drawTokenUi } from './tokenUiDrawing';
 
 /** The stand-in drawn until a token's art has loaded. */
@@ -23,21 +25,25 @@ const SKULL_GLYPH_SHARE = 20 / 24;
 /** The ring around the tokens this player controls. */
 export const CONTROLLED_RING_COLOR = '#facc15';
 
-export function createTokensLayer(): PlayerLayer {
+export function createTokensLayer(options: { now?: () => number } = {}): PlayerLayer {
   // Sorted once per change of the tokens, not on every frame; ids kept for the overlay.
   let sorted: { tokens: Readonly<Record<string, PlayerToken>>; list: Array<[string, PlayerToken]> } | null = null;
   const byLayer = (tokens: Readonly<Record<string, PlayerToken>>): Array<[string, PlayerToken]> => {
     if (sorted === null || sorted.tokens !== tokens) sorted = { tokens, list: Object.entries(tokens).sort(([, a], [, b]) => a.layer - b.layer) };
     return sorted.list;
   };
+  // Moves glide as Atlas's do, instead of jumping (a drop snapping to the grid, the GM moving a token).
+  const glides = new TokenGlides(options.now ?? (() => performance.now()));
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
       const stroke = computeTokenStrokeWidth(cellSize);
-      const { controlled, positions } = frame.overlay;
+      const { controlled, positions, held } = frame.overlay;
+      glides.begin(frame.scene.sceneId);
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
-        const at = positions.get(id);
-        const token = at ? { ...inScene, x: at.x, y: at.y } : inScene;
+        const target = positions.get(id) ?? inScene;
+        const at = glides.position(id, { x: target.x, y: target.y }, id === held);
+        const token = at.x === inScene.x && at.y === inScene.y ? inScene : { ...inScene, x: at.x, y: at.y };
         // Never 0 or negative: Atlas's formula gives nothing at half a cell or less.
         const size = Math.max(1, computeTokenPixelSize(cellSize, token.size));
         // The art, its rings, and the bars and badges around it.
@@ -51,7 +57,9 @@ export function createTokensLayer(): PlayerLayer {
         }
         drawTokenUi(surface, token, { size, cellSize, ringRadius });
       }
+      glides.end();
     },
+    animating: () => glides.animating(),
   };
 }
 
@@ -68,7 +76,8 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
   } else {
     surface.circle(0, 0, radius, { fill: TOKEN_MARKER_COLOR });
   }
-  if (token.ring !== null) surface.circle(0, 0, ringRadius, { stroke: token.ring, lineWidth: stroke });
+  // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
+  if (token.ring !== null) surface.tokenRing(0, 0, getTokenRingOuterDiameter(size, stroke, 1), size, token.ring);
   surface.pop();
 }
 

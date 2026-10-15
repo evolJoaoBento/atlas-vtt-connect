@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
+import type { TokenOverlay } from '../../../src/app/online/view/layers/layerTypes';
 import { decodedImage, frame, RecordingSurface } from './recordingSurface';
 import { playerScene, playerToken } from './sceneFixtures';
 
@@ -15,12 +16,19 @@ function draw(tokens: Record<string, PlayerToken>, withImages = false): Recordin
 }
 
 describe('tokens layer', () => {
-  it('clips the art to its circle, cover-fit, and draws the ring on the grid stroke', () => {
+  it("clips the art to its circle, cover-fit, and draws Atlas's ring texture over it at Atlas's size", () => {
     expect(draw({ t1: playerToken() }, true).calls).toEqual([
       { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
       { op: 'image', image: art.image, x: -62, y: -31, width: 124, height: 62, clip: { x: 0, y: 0, radius: 31 } },
-      { op: 'circle', x: 0, y: 0, radius: 33, style: { stroke: '#ffffff', lineWidth: 4 } },
+      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
+      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#ffffff' },
       { op: 'pop' },
+    ]);
+  });
+
+  it('draws the ring in the colour the GM chose for the token', () => {
+    expect(draw({ t1: playerToken({ ring: '#e93147' }) }, true).ops('tokenRing')).toEqual([
+      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#e93147' },
     ]);
   });
 
@@ -106,6 +114,32 @@ describe('tokens layer', () => {
     }));
     expect(surface.ops('push')[0]).toMatchObject({ x: 400, y: 300 });
     expect(surface.ops('push').map(({ x }) => x)).not.toContain(100);
+  });
+
+  it("glides a moved token as Atlas does, and keeps a dragged one under the pointer", () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const at = (tokens: Record<string, PlayerToken>, overlay?: TokenOverlay): number => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame(playerScene({ tokens }), overlay ? { overlay } : {}));
+      return surface.ops('push')[0]!.x;
+    };
+    expect(at({ t1: playerToken({ x: 100 }) })).toBe(100);
+    expect(layer.animating?.()).toBe(false);
+    // 200 px at 400 px/s: half a second, eased in and out.
+    expect(at({ t1: playerToken({ x: 300 }) })).toBe(100);
+    expect(layer.animating?.()).toBe(true);
+    now = 250;
+    expect(at({ t1: playerToken({ x: 300 }) })).toBe(200);
+    now = 500;
+    expect(at({ t1: playerToken({ x: 300 }) })).toBe(300);
+    expect(layer.animating?.()).toBe(false);
+    // Dragged: straight under the pointer.
+    expect(at({ t1: playerToken({ x: 300 }) }, { controlled: new Set(['t1']), positions: new Map([['t1', { x: 900, y: 100 }]]), held: 't1' })).toBe(900);
+    // Dropped there and snapped by the GM a little away: the shortest glide, 150 ms.
+    expect(at({ t1: playerToken({ x: 910 }) })).toBe(900);
+    now = 650;
+    expect(at({ t1: playerToken({ x: 910 }) })).toBe(910);
   });
 
   it('never draws a token smaller than a pixel, even under half a cell', () => {

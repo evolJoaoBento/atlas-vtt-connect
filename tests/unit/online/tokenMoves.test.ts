@@ -58,22 +58,26 @@ describe('TokenMoves', () => {
     expect(changes()).toBeGreaterThan(before);
     expect(moves.isDragging()).toBe(true);
     expect(positions(moves)).toEqual({ t1: { x: 200, y: 100 } });
+    // The held token follows the pointer; once dropped, its moves glide again.
+    expect(moves.overlay().held).toBe('t1');
     moves.move({ x: 240, y: 145 });
     expect(sent).toEqual([]);
     moves.drop({ x: 240, y: 145 });
     expect(sent).toEqual([['t1', 250, 150]]);
     expect(moves.isDragging()).toBe(false);
-    expect(positions(moves)).toEqual({ t1: { x: 250, y: 150 } });
+    expect(moves.overlay().held).toBeNull();
+    // Shown at once in the cell the GM's grid (70 px) will snap it to, so it glides there without waiting.
+    expect(positions(moves)).toEqual({ t1: { x: 245, y: 175 } });
     expect(moves.overlay().controlled).toEqual(new Set(['t1']));
   });
 
-  it("keeps the token at the drop spot until the scene brings the GM's position", () => {
+  it("keeps the token in its snapped cell until the scene brings the GM's position", () => {
     const { moves } = setup();
     dragT1(moves);
     moves.drop({ x: 190, y: 95 });
     // Another change of the scene is not the answer.
     moves.setScene({ ...scene, widgets: [] });
-    expect(positions(moves)).toEqual({ t1: { x: 200, y: 100 } });
+    expect(positions(moves)).toEqual({ t1: { x: 175, y: 105 } });
     moves.setScene(withT1(scene, 205, 105));
     expect(positions(moves)).toEqual({});
   });
@@ -83,9 +87,17 @@ describe('TokenMoves', () => {
     dragT1(moves);
     moves.drop({ x: 190, y: 95 });
     vi.advanceTimersByTime(CONFIRM_TIMEOUT_MS - 1);
-    expect(positions(moves)).toEqual({ t1: { x: 200, y: 100 } });
+    expect(positions(moves)).toEqual({ t1: { x: 175, y: 105 } });
     vi.advanceTimersByTime(1);
     expect(positions(moves)).toEqual({});
+  });
+
+  it("keeps the drop spot itself where the GM's snap-to-grid is off", () => {
+    const { moves } = setup();
+    moves.setScene({ ...scene, measurement: { ...scene.measurement, snapToGrid: false } });
+    dragT1(moves);
+    moves.drop({ x: 190, y: 95 });
+    expect(positions(moves)).toEqual({ t1: { x: 200, y: 100 } });
   });
 
   it('puts a refused token back and says so for a few seconds', () => {

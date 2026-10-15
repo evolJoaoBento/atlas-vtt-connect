@@ -13,8 +13,8 @@ describe('join page screens', () => {
   });
 
   it('shows full-screen messages while connecting, waiting, refused or ended', () => {
-    expect(pageScreen(state({ status: 'connecting' }), false)).toEqual({ kind: 'message', text: 'Connecting…' });
-    expect(pageScreen(state({ status: 'waiting' }), false)).toEqual({ kind: 'message', text: 'Waiting for the GM to let you in…' });
+    expect(pageScreen(state({ status: 'connecting' }), false)).toEqual({ kind: 'message', text: 'Connecting…', loading: true });
+    expect(pageScreen(state({ status: 'waiting' }), false)).toEqual({ kind: 'message', text: 'Waiting for the GM to let you in…', loading: true });
     expect(pageScreen(state({ status: 'admitted', title: 'Vault' }), false))
       .toEqual({ kind: 'message', text: 'Connected to Vault. Waiting for the GM to show a scene.' });
     expect(pageScreen(state({ status: 'denied', reason: 'kicked' }), true)).toEqual({ kind: 'message', text: 'The GM removed you from the session.' });

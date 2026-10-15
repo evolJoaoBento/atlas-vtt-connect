@@ -16,6 +16,8 @@ export interface TokenOverlay {
   controlled: ReadonlySet<string>;
   /** Where tokens being dragged, or waiting for the GM's answer, are drawn instead of their scene position. */
   positions: ReadonlyMap<string, ScenePoint>;
+  /** The token being dragged: it follows the pointer, where every other move glides. */
+  held?: string | null;
 }
 
 export const NO_TOKEN_OVERLAY: TokenOverlay = { controlled: new Set(), positions: new Map() };
@@ -38,6 +40,8 @@ export interface PlayerLayer {
   draw(surface: ViewSurface, frame: LayerFrame): void;
   /** Frees what the layer caches (the fog image). */
   dispose?(): void;
+  /** Whether the layer moves on its own (a token gliding): the view keeps drawing. */
+  animating?(): boolean;
 }
 
 /** Drawn over the scene (the player's tools); while one animates (a fading laser) the view keeps drawing. */

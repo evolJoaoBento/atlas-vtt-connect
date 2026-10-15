@@ -1,12 +1,15 @@
 /**
- * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7.x) that has none.
+ * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7.x and 0.8.x) that has none.
  *
  * It reads what stock Atlas leaves reachable at runtime: the map views in the workspace (`viewId`, `atlasStore`,
- * `tabMetaStore`, `renderer`), the plugin's `settingsService` and its `presentedScene`. It is hacky by design: it
- * depends on private shapes of those objects, so every member is checked before use and a failed check turns that
- * capability off (`has()` is false) rather than throwing. Only what hosting needs is provided: `views`,
- * `presentation`, `rules`, `settings`, `storage` and `lighting` (`stockLighting/`, which fails closed: a lit scene
- * whose lighting cannot be read shows players nothing).
+ * `tabMetaStore`, `renderer`, `serviceManager`), the plugin's `settingsService` and its `presentedScene`. It is hacky by
+ * design: it depends on private shapes of those objects, so every member is checked before use and a failed check turns
+ * that capability off (`has()` is false) or makes the call fail closed, rather than throwing. What it provides:
+ * `views` (with `showTab`, so `scene-tabs`), `presentation`, `rules` (the defaults), `settings`, `storage`, `lighting`
+ * (`stockLighting/`, which fails closed: a lit scene whose lighting cannot be read shows players nothing), `tokens`
+ * (`stockTokens/`: players' moves, stopped at walls on a lit scene), `dice` (`stockDice/`), `lasers` (`stockLasers/`)
+ * and `ui` (`stockUi/`: a floating dock and panels, in place of the slots stock Atlas does not have). Not provided:
+ * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
@@ -15,6 +18,12 @@ import type {
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
+import { onlineSessionStore } from '../app/online/onlineSessionStore';
+import { stockDiceApi } from './stockDice/stockDice';
+import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
+import { stockLasersApi } from './stockLasers/stockLasers';
+import { stockTokensApi } from './stockTokens/stockTokens';
+import { stockUi } from './stockUi/stockUi';
 
 export const STOCK_API_VERSION = '1.0.0';
 
@@ -53,6 +62,8 @@ interface StockViewport {
 }
 interface StockView {
   readonly viewId: string;
+  readonly containerEl?: HTMLElement;
+  readonly serviceManager?: unknown;
   readonly atlasStore: Store<StockSceneState>;
   readonly tabMetaStore: Store<{ tabs: StockTab[]; activeTabId: string | null }>;
   readonly renderer?: {
@@ -61,6 +72,8 @@ interface StockView {
     /** The fork's earlier renderer: a single background sprite. */
     getBackgroundSprite?(): { width: number; height: number; destroyed: boolean } | null;
     getViewportInstance?(): StockViewport | null;
+    /** The token layer, which can say which token is under a point (for the token menu). */
+    getTokenRenderer?(): { hitTestTokens?(x: number, y: number): string | null; viewport?: { toWorld?(point: { x: number; y: number }): { x: number; y: number } } } | null | undefined;
   } | null;
   switchToTab(tabId: string): Promise<void>;
 }
@@ -114,6 +127,13 @@ function mapViews(app: App): StockView[] {
     if (isStockView(view) && view.atlasStore.getState().remoteView == null) found.push(view);
   }
   return found;
+}
+
+/** The map view the GM works in: the most recent leaf when it is one, else the first open. */
+function activeMapView(app: App): StockView | null {
+  const recent = app.workspace.getMostRecentLeaf?.()?.view;
+  if (isStockView(recent) && recent.atlasStore.getState().remoteView == null) return recent;
+  return mapViews(app)[0] ?? null;
 }
 
 const loaded = (state: Pick<StockSceneState, 'mapLoaded' | 'isMapLoading'>): boolean => state.mapLoaded && !state.isMapLoading;
@@ -436,12 +456,103 @@ function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
       viewport.on('frame-end', frame);
       return add(() => { if (!viewport.destroyed) viewport.off('frame-end', frame); });
     },
+    // The GM's view does show the tab while it loads, as it does on any switch; the presented scene holds meanwhile.
+    showTab: (viewId: string, tabId: string): Promise<boolean> => showTab(app, viewId, tabId, disposers),
   });
+}
+
+/** How long a tab may take to load before `showTab` gives up. */
+const SHOW_TAB_TIMEOUT_MS = 60_000;
+/** How often a waiting `showTab` looks for its view having closed. */
+const SHOW_TAB_POLL_MS = 500;
+
+/**
+ * Makes a tab of a map view active without presenting it, and answers true once its map is loaded in the view's store
+ * (`snapshotTabId`). False for an unknown view or tab, when another switch (a later `showTab`, or the GM's own click)
+ * overtakes this one (the view then shows another tab), when the view closes meanwhile, and after 60 seconds. Never throws.
+ */
+async function showTab(app: App, viewId: string, tabId: string, disposers: Set<Disposer>): Promise<boolean> {
+  const view = trackedView(app, viewId);
+  if (!view || typeof tabId !== 'string' || !view.tabMetaStore.getState().tabs.some((tab) => tab.id === tabId)) return false;
+  try {
+    await view.switchToTab(tabId);
+  } catch (error) {
+    console.error('[Atlas VTT Connect] Atlas could not switch tabs:', error);
+    return false;
+  }
+  return new Promise<boolean>((resolve) => {
+    const stops: Disposer[] = [];
+    const finish = (ok: boolean): void => {
+      for (const stop of stops.splice(0)) stop();
+      resolve(ok);
+    };
+    const check = (): void => {
+      const now = trackedView(app, viewId);
+      if (!now || now.tabMetaStore.getState().activeTabId !== tabId) finish(false);
+      else if (snapshotTabId(now) === tabId) finish(true);
+    };
+    stops.push(view.atlasStore.subscribe(check), view.tabMetaStore.subscribe(check));
+    const poll = window.setInterval(check, SHOW_TAB_POLL_MS);
+    const timeout = window.setTimeout(() => finish(false), SHOW_TAB_TIMEOUT_MS);
+    // Atlas unloading ends the wait.
+    const unload = (): void => finish(false);
+    disposers.add(unload);
+    stops.push(() => { window.clearInterval(poll); window.clearTimeout(timeout); disposers.delete(unload); });
+    check();
+  });
+}
+
+/** Atlas's library tokens (`AssetService.getTokenAssets`), with whether each is a player character; none where it cannot be read. */
+async function libraryTokens(app: App): Promise<LibraryToken[]> {
+  const manager = activeMapView(app)?.serviceManager;
+  const getService = isObj(manager) ? manager.getAssetService : undefined;
+  const service: unknown = typeof getService === 'function' ? (getService as () => unknown).call(manager) : null;
+  const getTokens = isObj(service) ? service.getTokenAssets : undefined;
+  const list: unknown = typeof getTokens === 'function' ? await (getTokens as () => Promise<unknown>).call(service) : [];
+  if (!Array.isArray(list)) return [];
+  return (list as unknown[]).flatMap((asset) => (isObj(asset) && typeof asset.id === 'string' && typeof asset.imagePath === 'string' ? [{ id: asset.id, imagePath: asset.imagePath, playerCharacter: asset.playerCharacter === true }] : []));
+}
+
+/** Calls `listener` when a view opens or closes, or the tokens on its scene are replaced (placed, removed, a scene loaded). */
+function watchTokens(app: App, events: Events, listener: () => void): Disposer {
+  const followed = new Map<string, Disposer>();
+  const follow = (): void => {
+    const open = mapViews(app);
+    for (const view of open) {
+      if (followed.has(view.viewId)) continue;
+      let tokens = view.atlasStore.getState().objects.tokens;
+      followed.set(view.viewId, view.atlasStore.subscribe(() => {
+        const now = view.atlasStore.getState().objects.tokens;
+        // A drag replaces the tokens as it goes: only the set of them matters here.
+        if (now === tokens || Object.keys(now).length === Object.keys(tokens).length) { tokens = now; return; }
+        tokens = now;
+        listener();
+      }));
+    }
+    for (const [id, stop] of [...followed]) {
+      if (open.some((view) => view.viewId === id)) continue;
+      stop();
+      followed.delete(id);
+    }
+  };
+  follow();
+  const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, () => { follow(); listener(); }));
+  return () => {
+    for (const stop of stops) stop();
+    for (const stop of followed.values()) stop();
+    followed.clear();
+  };
+}
+
+/** Whether Atlas's dynamic lighting experiment is on; null when its settings cannot be read. */
+function dynamicLighting(service: StockSettings): boolean | null {
+  const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
+  return typeof on === 'boolean' ? on : null;
 }
 
 /** Builds the stand-in API. The caller has checked `canShimStockAtlas(app.plugins.plugins['atlas-vtt'])`. */
 export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
-  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting']);
+  const capabilities = new Set<AtlasCapability>(['views', 'presentation', 'rules', 'settings', 'storage', 'lighting', 'ui', 'tokens', 'dice', 'lasers', 'scene-tabs']);
   return Object.freeze({
     version: STOCK_API_VERSION,
     has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -464,27 +575,97 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       disposers.add(() => app.workspace.offref(ref));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
       const extensionId = plugin.manifest.id;
-      const folder = async (): Promise<string> => {
-        const path = normalizePath(`${STORAGE_ROOT}/${extensionId}`);
-        let built = '';
-        for (const part of path.split('/')) {
-          built = built ? `${built}/${part}` : part;
-          if (!(await app.vault.adapter.exists(built))) await app.vault.adapter.mkdir(built);
-        }
-        return path;
+      // Asked for by Connect and by the player character links at once: made once.
+      let made: Promise<string> | null = null;
+      const folder = (): Promise<string> => {
+        made ??= (async (): Promise<string> => {
+          const path = normalizePath(`${STORAGE_ROOT}/${extensionId}`);
+          let built = '';
+          for (const part of path.split('/')) {
+            built = built ? `${built}/${part}` : part;
+            if (await app.vault.adapter.exists(built)) continue;
+            try {
+              await app.vault.adapter.mkdir(built);
+            } catch (error) {
+              // Made meanwhile by something else: fine, so long as it is there.
+              if (!(await app.vault.adapter.exists(built))) throw error;
+            }
+          }
+          return path;
+        })().catch((error: unknown) => {
+          made = null;
+          throw error;
+        });
+        return made;
       };
+      // Atlas's player characters and Connect's players: a character given to a player is theirs again on every scene.
+      const party = new PartyLinks({
+        session: { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) },
+        tokens: () => {
+          const view = activeMapView(app);
+          const state = view?.atlasStore.getState();
+          return view && state && loaded(state) ? state.objects.tokens : null;
+        },
+        watchScene: (listener) => watchTokens(app, events, listener),
+        library: () => libraryTokens(app),
+        memory: fileMemory(async () => `${await folder()}/player-characters.json`, {
+          exists: (path) => app.vault.adapter.exists(path),
+          read: (path) => app.vault.adapter.read(path),
+          write: (path, data) => app.vault.adapter.write(path, data),
+        }),
+      });
+      party.start();
+      disposers.add(() => party.stop());
+      // Connect goes into Atlas's own toolbar; a floating dock stands in for a view whose toolbar cannot be found.
+      const ui = stockUi(app, {
+        views: () => mapViews(app),
+        active: () => activeMapView(app),
+        presentedTabId: () => presented.get()?.tabId ?? null,
+        onViewsChanged: (listener) => {
+          const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, listener as never));
+          return () => { for (const stop of stops) stop(); };
+        },
+      });
+      disposers.add(ui.dispose);
       return Object.freeze({
         id: extensionId,
         views: viewsApi(app, disposers),
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
+        ui: ui.api,
+        lasers: stockLasersApi({
+          view: (viewId) => trackedView(app, viewId),
+          add: (dispose) => {
+            disposers.add(dispose);
+            return () => { disposers.delete(dispose); dispose(); };
+          },
+        }),
+        dice: stockDiceApi({
+          views: () => {
+            const first = activeMapView(app);
+            const open = mapViews(app);
+            return [...(first ? [first] : []), ...open.filter((view) => view !== first)].map((view) => ({
+              viewId: view.viewId, mapPath: () => view.atlasStore.getState().mapPath, serviceManager: view.serviceManager,
+            }));
+          },
+          onViewsChanged: (listener) => {
+            const stops = (['map-loaded', 'map-closed'] as const).map((event) => events.on(event, listener as never));
+            return () => { for (const stop of stops) stop(); };
+          },
+          add: (dispose) => {
+            disposers.add(dispose);
+            return () => { disposers.delete(dispose); dispose(); };
+          },
+        }),
+        tokens: stockTokensApi({
+          view: (viewId) => trackedView(app, viewId),
+          mapSize,
+          dynamicLighting: () => dynamicLighting(service),
+        }),
         lighting: stockLightingApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
-          dynamicLighting: () => {
-            const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
-            return typeof on === 'boolean' ? on : null;
-          },
+          dynamicLighting: () => dynamicLighting(service),
           add: (dispose) => {
             disposers.add(dispose);
             return () => { disposers.delete(dispose); dispose(); };

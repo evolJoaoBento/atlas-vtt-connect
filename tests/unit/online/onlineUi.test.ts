@@ -49,4 +49,14 @@ describe('join request notice', () => {
     expect(linked).toBe(1);
     expect(notice.hidden).toBe(true);
   });
+
+  it('warns when the name is taken in the session by another client', () => {
+    showJoinRequestNotice({ playerId: 'p', name: 'Anna', status: 'pending', sameNameAs: 'disconnected' }, () => undefined);
+    showJoinRequestNotice({ playerId: 'q', name: 'Anna', status: 'pending', sameNameAs: 'connected' }, () => undefined, {
+      identity: { kind: 'new', sameName: { name: 'Anna', personId: 'person-1' } } as never, link: null,
+    });
+    const warning = (index: number): string | null | undefined => notices[index]!.noticeEl.querySelector('.atlas-connect-request__warning')?.textContent;
+    expect(warning(0)).toBe("Not the browser or device Anna used before. Allowing gives them Anna's place and tokens.");
+    expect(warning(1)).toBe('Anna is already connected from another browser or device. Allowing adds a second Anna. Someone named Anna is already in your people list.');
+  });
 });

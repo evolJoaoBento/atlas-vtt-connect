@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createCanvasSurface } from '../../../src/app/online/view/canvasSurface';
 
 function fakeCanvas(fields: Record<string, unknown> = {}): { canvas: HTMLCanvasElement; calls: string[] } {
@@ -75,5 +75,51 @@ describe('canvas surface', () => {
     const { canvas, calls } = fakeCanvas();
     createCanvasSurface(canvas)!.icon('nope', 0, 0, 10, '#ffffff', 1);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("Atlas's token ring on the canvas", () => {
+  it('draws Atlas\'s stand-in until the texture loads, then the texture tinted by the colour, and says when to draw again', async () => {
+    const { whenTokenRingLoaded } = await import('../../../src/app/online/view/canvasSurface');
+    const created: Array<{ tag: string; element: unknown; calls?: string[] }> = [];
+    const RealImage = window.Image;
+    const spy = vi.spyOn(window, 'Image').mockImplementation(function made(this: unknown, width?: number, height?: number) {
+      const element = new RealImage(width, height);
+      created.push({ tag: 'img', element });
+      return element;
+    } as unknown as typeof Image);
+    const { canvas, calls } = fakeCanvas();
+    Object.defineProperty(canvas, 'ownerDocument', { value: document });
+    // The tinted copies are bare copies of the surface's canvas.
+    Object.defineProperty(canvas, 'cloneNode', { value: () => {
+      const tinted = fakeCanvas();
+      created.push({ tag: 'canvas', element: tinted.canvas, calls: tinted.calls });
+      return tinted.canvas;
+    } });
+    const surface = createCanvasSurface(canvas)!;
+
+    // Not loaded: a plain ring as wide as the padding (70 − 62) / 2, in the colour; a colour that is not hex is white.
+    surface.tokenRing(0, 0, 70, 62, '#E93147');
+    expect(calls).toEqual(expect.arrayContaining(['strokeStyle=#e93147', 'lineWidth=4', `arc(0,0,33,0,${Math.PI * 2})`, 'globalAlpha=0.95']));
+    calls.length = 0;
+    surface.tokenRing(0, 0, 70, 62, 'url(javascript:1)');
+    expect(calls).toContain('strokeStyle=#ffffff');
+
+    const redraw = vi.fn();
+    whenTokenRingLoaded(redraw);
+    const image = created.find((entry) => entry.tag === 'img')!.element as HTMLImageElement;
+    expect(image.src).toContain('token-ring');
+    image.dispatchEvent(new Event('load'));
+    expect(redraw).toHaveBeenCalledOnce();
+
+    // Loaded: the texture, tinted once per colour (multiply, then its own alpha back), drawn at the ring's size.
+    calls.length = 0;
+    surface.tokenRing(10, 20, 70, 62, '#e93147');
+    const tint = created.find((entry) => entry.tag === 'canvas')!;
+    expect(tint.calls).toEqual(expect.arrayContaining(['globalCompositeOperation=multiply', 'fillStyle=#e93147', 'globalCompositeOperation=destination-in']));
+    expect(calls).toEqual(['drawImage(object,-25,-15,70,70)']);
+    surface.tokenRing(10, 20, 70, 62, '#e93147');
+    expect(created.filter((entry) => entry.tag === 'canvas')).toHaveLength(1);
+    spy.mockRestore();
   });
 });

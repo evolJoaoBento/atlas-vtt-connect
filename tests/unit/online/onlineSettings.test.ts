@@ -50,6 +50,7 @@ describe('online settings', () => {
       playerPageUrl: 'https://p.example/',
       logEvents: false,
       playerName: '',
+      rememberPlayerName: true,
       keepImages: true,
       table: null,
       shareableProperties: ['tags', 'aliases'],
@@ -66,6 +67,8 @@ describe('online settings', () => {
     expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true, table: null });
     expect(resolveOnlineSettings({ playerName: 'Anna', keepImages: false })).toMatchObject({ playerName: 'Anna', keepImages: false });
     expect(resolveOnlineSettings({ playerName: 4, keepImages: 'no' })).toMatchObject({ playerName: '', keepImages: true });
+    expect(resolveOnlineSettings({ rememberPlayerName: false })).toMatchObject({ rememberPlayerName: false });
+    expect(resolveOnlineSettings({ rememberPlayerName: 'no' })).toMatchObject({ rememberPlayerName: true });
   });
 
   it('shares the tags and aliases of a note unless the list says otherwise', () => {

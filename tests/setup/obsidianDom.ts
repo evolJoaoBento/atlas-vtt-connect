@@ -96,6 +96,9 @@ const helpers: Record<string, (this: HTMLElement, ...args: never[]) => unknown> 
   instanceOf(this: HTMLElement, type: new () => unknown) {
     return this instanceof type;
   },
+  setCssProps(this: HTMLElement, props: Record<string, string>) {
+    for (const [name, value] of Object.entries(props)) this.style.setProperty(name, value);
+  },
   hide(this: HTMLElement) {
     this.style.display = 'none';
   },

@@ -110,7 +110,7 @@ describe('OnlineJoinService', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(joinedSessionStore.getState().session?.status).toBe('waiting');
     expect(w.players()).toEqual([expect.objectContaining({ name: 'Ben', status: 'pending', client: 'obsidian' })]);
-    expect(w.settings.set).toHaveBeenCalledWith({ playerName: 'Ben' });
+    expect(w.settings.set).toHaveBeenCalledWith({ playerName: 'Ben', rememberPlayerName: true });
     expect(w.opened).not.toHaveBeenCalled();
     await w.admitLast();
     expect(joinedSessionStore.getState().session).toMatchObject({ status: 'admitted', title: 'Table' });
@@ -281,6 +281,17 @@ describe('OnlineJoinService', () => {
     w.service.join(LINK, 'Ben');
     w.service.dispose();
     expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps no name when "Remember this name" is off, and offers none next time', async () => {
+    const w = world();
+    expect(w.service.remembersName()).toBe(true);
+    expect(w.service.join(LINK, 'Ben', false)).toBeNull();
+    expect(w.settings.set).toHaveBeenCalledWith({ playerName: '', rememberPlayerName: false });
+    w.settings.set({ playerName: 'Left over', rememberPlayerName: false });
+    expect(w.service.rememberedName()).toBe('');
+    expect(w.service.remembersName()).toBe(false);
+    w.service.dispose();
   });
 
   it('offers a cleaned remembered name', () => {

@@ -83,7 +83,7 @@ export class AtlasLink {
     if (this.extension || this.atlasSeen) return false;
     const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
     if (!atlas || !canShimStockAtlas(atlas)) return false;
-    console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in (hosting and joining only).');
+    console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in.');
     this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
     return true;
   }

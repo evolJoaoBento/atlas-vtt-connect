@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { ChevronDown, Circle, Dices, Ellipsis, Flashlight, Hand, Minus, Plus, Ruler, Triangle, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Dices, Ellipsis, Flashlight, Hand, LocateFixed, Maximize, Minus, Plus, Ruler, Triangle, X } from 'lucide-react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
@@ -30,7 +30,7 @@ describe('the join page icons', () => {
   it("are the Lucide icons of Atlas's toolbar", () => {
     const icons: Record<ToolIconName, React.ComponentType> = {
       hand: Hand, ruler: Ruler, circle: Circle, triangle: Triangle, flashlight: Flashlight, dices: Dices, ellipsis: Ellipsis,
-      'chevron-down': ChevronDown, x: X, minus: Minus, plus: Plus,
+      'chevron-down': ChevronDown, x: X, minus: Minus, plus: Plus, 'chevron-right': ChevronRight, maximize: Maximize, 'locate-fixed': LocateFixed,
     };
     for (const [name, Icon] of Object.entries(icons)) {
       expect(parsed(TOOL_ICON_MARKUP[name as ToolIconName]), name).toEqual(rendered(<Icon />));

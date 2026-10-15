@@ -6,26 +6,38 @@ Atlas VTT Connect is an Obsidian plugin that adds online play and sharing to [At
 - an Obsidian player tab;
 - note and map sharing.
 
-Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It works on top of Atlas VTT through Atlas's extension API and changes nothing in Atlas.
+Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It works on top of Atlas VTT and changes nothing in Atlas.
 
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against the API build's 1.17.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). Without the API, or with another major version, Connect shows a notice and stays off.
+- **Atlas VTT**, from Community plugins. On a released Atlas (0.7.x, 0.8.x) Connect stands in for the extension API Atlas does not have yet: see [Stock Atlas](#stock-atlas-no-extension-api) for what works there.
+- **Optional: Atlas VTT with extension API 1.x**, which unlocks everything below (sharing notes and maps, per-collection rules). It is not in any released Atlas yet, because it is not merged upstream. Connect is built against the API build's 1.17.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). With another major version of the API, Connect shows a notice and stays off.
 - **Atlas VTT with the extension API.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, choosing the latest version (0.6.2-beta.1 or newer). You can also build Atlas from the branch `api/extension-api` (see Developing).
 - TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
 ## Stock Atlas (no extension API)
 
-On an Atlas without the extension API, such as upstream 0.7.x and 0.8.x, Connect stands in for the API after about 3 seconds (`src/connect/stockAtlas.ts`). It reads the views, settings, lighting and presented scene that stock Atlas leaves reachable, so it can break with any Atlas release. It covers hosting and joining only, with no account and no relay: it is a separate plugin and works beside Atlas's own online play (0.8.0 and later), not through it. Use one of the two for a table at a time.
+On an Atlas without the extension API, such as upstream 0.7.x and 0.8.x, Connect stands in for the API after about 3 seconds (`src/connect/stockAtlas.ts`). It reads the views, settings, lighting, dice and presented scene that stock Atlas leaves reachable, so it can break with any Atlas release. It needs no account and no relay: it is a separate plugin and works beside Atlas's own online play (0.8.0 and later), not through it. Use one of the two for a table at a time.
+
+Atlas has no toolbar, menu or panel slots for a plugin to use, so Connect puts itself into Atlas's own toolbar: a group of buttons before the GM view switch (online session, "More options", the token menu of the tokens you have selected with "Controlled by", and, with more than one scene tab, a "Scenes" menu with "Present to"), and the session panel rises over them like Atlas's dice tray, all in Atlas's own styling. Atlas draws its toolbar with React, so Connect watches for it being redrawn and puts its buttons back; if a later Atlas changes its toolbar so they cannot be put there, a small floating dock stands in. The commands in the command palette work as before.
 
 - **Works:** host a session, join it, present scenes, and the player page, with tokens, fog and widgets limited to what players may see.
-- **Dynamic lighting** works as in Atlas's own player window: players see the map where the sight of your vision tokens and the light reach, and the tokens Atlas shows them. It needs Atlas's dynamic lighting experiment switched on, as Atlas itself does; with it off, Atlas shows lit scenes unlit and so does Connect. Whatever Connect cannot read at that moment (a map loading, a tab switch, an Atlas it does not know) shows players nothing rather than a guess.
-- **Lighting gaps:** Connect shows players less than Atlas's window, never more. Left out for now: the explored memory (areas seen earlier stay dark for players), and the footprint of a token seen in the dark. The map shows in 8 pixel cells, so edges of sight are slightly rougher than Atlas's.
-- **Known gaps:** a map with a stretch-fit grid shows players an unstretched image, so its grid may not line up; running timers show their last saved value.
-- **Missing:** players moving tokens, shared dice and lasers, Atlas toolbar and menu entries (use the commands), split party, sharing notes and maps, and per-collection rules (defaults are used).
+- **Dynamic lighting** works as in Atlas's own player window: players see the map where the sight of your vision tokens and the light reach, and the tokens Atlas shows them. It needs Atlas's dynamic lighting experiment switched on, as Atlas itself does; with it off, Atlas shows lit scenes unlit and so does Connect. Whatever Connect cannot read at that moment (a map loading, a tab switch, an Atlas it does not know) shows players nothing rather than a guess; the console says why.
+- **Explored memory** (the places your party saw before) shows to players too, from the mask Atlas saves. It never shows more than Atlas's window: after you erase, undo or reset memory, or change map, none shows for 4 seconds while Atlas saves, and the line-of-sight fallback (shown when Atlas's lighting cannot run on the graphics device) has none.
+- **Players move their tokens:** right-click a character token and tick the players under "Controlled by" (an entry Connect adds to Atlas's own token menu; the toolbar's token menu has the same list). A moved token snaps as your own drag does, and on a lit scene it stops before the first wall in its way, closed doors and gaps the lighting seals included, so a player cannot walk through a wall and show the sight behind it. A move is refused while you are dragging.
+- **Player characters:** a token that Atlas 0.8 marks as a player character (right-click, "player character") goes with the player you give it to. Connect remembers the player by name and hands every token of that character to them again on any scene and in later sessions, as soon as they are admitted. Take it from them with "Controlled by" and it is forgotten. A player who leaves keeps their characters for when they come back. The links are in `atlas-vtt/.atlas-data/extensions/atlas-vtt-connect/player-characters.json`; two players of one name at the table get nothing until one of them leaves.
+- **Dice:** a player's roll is rolled by Atlas's own dice tool, by the map's rules, thrown on your screen and logged under their name, and every roll Atlas logs reaches the players' log.
+- **Lasers:** your laser pointer shows on players' maps and theirs on yours, on a transparent layer over the map.
+- **Split party:** give players different scene tabs ("Present to"). Showing a scene that is not the one on screen makes the view switch to its tab for a moment, as any switch does.
+- **Gaps:** footprints of tokens seen in the dark are not shown to players (less than Atlas's window, never more); the map shows to players in 8 pixel cells, so edges of sight are a little rougher; a map with a stretch-fit grid shows players an unstretched image, so its grid may not line up; running timers show their last saved value; a roll thrown with "result card only" is thrown in 3D anyway; Atlas's marks and pings are not relayed.
+- **Missing:** sharing notes and maps, and per-collection rules (defaults are used).
 
-## Install with BRAT
+## Install
+
+From Settings, Community plugins: install and enable Atlas VTT, then Atlas VTT Connect.
+
+### With BRAT (the extension API build)
 
 If you use the online play preview (the fork's built-in online play, Atlas VTT 0.5.x or 0.6.1-beta.x from `evolJoaoBento/atlas-vtt`), see [Moving from the online preview](#moving-from-the-online-preview) first.
 
@@ -87,7 +99,7 @@ Connect replaces the online play preview (the fork of Atlas VTT with online play
 
 1. In BRAT, select `evolJoaoBento/atlas-vtt`, unfreeze it if you pinned a version, and update it to the latest version (0.6.2-beta.1 or newer). That is Atlas with the extension API; the built-in online play is gone and Connect replaces it.
 2. Restart Obsidian, or turn Atlas VTT off and on.
-3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.6**) and enable it.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0**) and enable it.
 
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
 - **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.

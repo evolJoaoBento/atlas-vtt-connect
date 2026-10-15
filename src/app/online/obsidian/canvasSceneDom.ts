@@ -5,6 +5,8 @@
  * which the join dialog and Obsidian's own settings replace. The class names are the page's, scoped by
  * `styles/online-scene-canvas.scss`.
  */
+import { toolIconUrl, type ToolIconName } from '../page/toolIcons';
+
 export interface SceneDom {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
@@ -26,22 +28,40 @@ export interface SceneDom {
   diceLogList: HTMLElement;
 }
 
+/** Atlas's icon in a CSS mask, in the colour of its button (`.tool-icon`). */
+function icon(parent: HTMLElement, name: ToolIconName): void {
+  const glyph = parent.createSpan({ cls: 'tool-icon', attr: { 'aria-hidden': 'true' } });
+  glyph.setCssProps({ '--icon': toolIconUrl(name) });
+}
+
+/** One of the toolbar's icon buttons: Atlas's own tool-button shape, its name as the label and the tooltip. */
+function toolButton(parent: HTMLElement, label: string, name: ToolIconName): HTMLButtonElement {
+  const button = parent.createEl('button', { cls: 'tool-button', attr: { type: 'button', 'aria-label': label, 'data-label': label } });
+  icon(button, name);
+  return button;
+}
+
 export function buildSceneDom(parent: HTMLElement): SceneDom {
   const root = parent.createDiv({ cls: 'atlas-connect-scene table', attr: { role: 'region', 'aria-label': 'Scene' } });
   const canvas = root.createEl('canvas', { cls: 'atlas-connect-scene__map', attr: { role: 'img', 'aria-label': 'Map' } });
   const bar = root.createEl('header', { cls: 'top-bar' });
-  const sessionName = bar.createSpan({ cls: 'session-name' });
-  const connection = bar.createSpan({ cls: 'connection', attr: { role: 'status' } });
-  const message = bar.createSpan({ cls: 'connection scene-message' });
-  const reconnect = bar.createEl('button', { cls: 'secondary', text: 'Reconnect', attr: { type: 'button' } });
+  // Two floating pills over the map, as Atlas's own toolbar floats: what the session is, and the dice log.
+  const info = bar.createDiv({ cls: 'top-pill top-info' });
+  const connection = info.createSpan({ cls: 'connection', attr: { role: 'status' } });
+  const sessionName = info.createSpan({ cls: 'session-name' });
+  const message = info.createSpan({ cls: 'connection scene-message' });
+  const reconnect = info.createEl('button', { cls: 'secondary', text: 'Reconnect', attr: { type: 'button' } });
   reconnect.hidden = true;
-  const diceLogButton = bar.createEl('button', {
+  const actions = bar.createDiv({ cls: 'top-pill top-actions' });
+  const diceLogButton = actions.createEl('button', {
     cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Dice log', 'aria-expanded': 'false' },
   });
-  const viewButtons = root.createDiv({ cls: 'view-buttons' });
+  // Follow GM and Fit map are icon buttons of the toolbar: they start here and the scene moves them into it once the toolbar
+  // has drawn its own controls (`CanvasScene`).
+  const viewButtons = root.createDiv({ cls: 'toolbar-item view-buttons' });
   viewButtons.hidden = true;
-  const followButton = viewButtons.createEl('button', { text: 'Follow GM', attr: { type: 'button' } });
-  const fitButton = viewButtons.createEl('button', { cls: 'secondary', text: 'Fit map', attr: { type: 'button' } });
+  const followButton = toolButton(viewButtons, 'Follow GM', 'locate-fixed');
+  const fitButton = toolButton(viewButtons, 'Fit map', 'maximize');
   const stack = root.createDiv({ cls: 'top-stack' });
   const notes = stack.createDiv({ cls: 'top-notes' });
   const moveNotice = notes.createEl('p', { cls: 'move-notice', attr: { role: 'status' } });
@@ -54,8 +74,10 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLog = root.createEl('aside', { cls: 'dice-log', attr: { 'aria-label': 'Dice log' } });
   diceLog.hidden = true;
   const header = diceLog.createDiv({ cls: 'dice-log-header' });
+  // A chevron on the pane's left edge, pointing the way the drawer goes.
+  const diceLogClose = header.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close dice log' } });
+  icon(diceLogClose, 'chevron-right');
   header.createEl('h2', { text: 'Dice log' });
-  const diceLogClose = header.createEl('button', { cls: 'icon-button', text: '×', attr: { type: 'button', 'aria-label': 'Close dice log' } });
   const diceLogEmpty = diceLog.createEl('p', { cls: 'dice-log-empty', text: 'No rolls yet' });
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
   return {

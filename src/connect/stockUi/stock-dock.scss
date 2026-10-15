@@ -1,0 +1,301 @@
+// The floating dock and panels that stand in for the Atlas toolbar and panel slots a stock Atlas does not have.
+// Laid out like the floating dice panel of Atlas's interactive dice extension: a fixed panel with a grip, a title
+// and a button in the corner, in Obsidian's tokens so it follows the theme.
+
+$connect-dock-gap: 4px;
+$connect-dock-z: 1000;
+
+.atlas-connect-dock,
+.atlas-connect-window {
+  --connect-border: var(--background-modifier-border);
+  --connect-radius: var(--radius-xl);
+  --connect-press: 160ms cubic-bezier(0.23, 1, 0.32, 1);
+
+  position: fixed;
+  z-index: $connect-dock-z;
+  display: flex;
+  flex-direction: column;
+  gap: $connect-dock-gap;
+  width: fit-content;
+  max-width: calc(100vw - 16px);
+  padding: $connect-dock-gap;
+  background: var(--background-primary);
+  border: 1px solid var(--connect-border);
+  border-radius: var(--connect-radius);
+  box-shadow: var(--shadow-l);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  pointer-events: auto;
+  animation: atlas-connect-dock-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+
+  // Obsidian gives every button its own frame and shadow; the dock draws its own.
+  button {
+    margin: 0;
+    box-shadow: none;
+    font-family: var(--font-interface);
+    transition: background-color 100ms ease, color 100ms ease, transform var(--connect-press);
+
+    &:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+@keyframes atlas-connect-dock-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-connect-dock,
+  .atlas-connect-window {
+    animation: none;
+  }
+}
+
+.atlas-connect-dock__header,
+.atlas-connect-window__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $connect-dock-gap;
+}
+
+.atlas-connect-dock__grip,
+.atlas-connect-window__grip {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: $connect-dock-gap;
+  min-width: 0;
+  padding-left: $connect-dock-gap;
+  color: var(--text-muted);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+
+  &:hover {
+    color: var(--text-normal);
+  }
+
+  &.is-dragging {
+    cursor: grabbing;
+  }
+}
+
+.atlas-connect-dock__icon,
+.atlas-connect-window__icon {
+  display: inline-flex;
+}
+
+.atlas-connect-dock__title,
+.atlas-connect-window__title {
+  overflow: hidden;
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-connect-dock__collapse,
+.atlas-connect-window__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+
+  &:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
+}
+
+.atlas-connect-dock__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $connect-dock-gap;
+  padding: 0 2px 2px;
+}
+
+.atlas-connect-dock.is-collapsed .atlas-connect-dock__body {
+  display: none;
+}
+
+.atlas-connect-dock__button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+
+  &:hover {
+    background: var(--background-modifier-hover);
+  }
+
+  &.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+}
+
+// A count or a dot sits on the button's corner, as on Atlas's own toolbar.
+.atlas-connect-dock__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--text-error);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-smaller);
+  line-height: 16px;
+  text-align: center;
+}
+
+.atlas-connect-dock__dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-success, currentColor);
+  box-shadow: 0 0 0 2px var(--background-primary);
+}
+
+.atlas-connect-window__content {
+  min-width: 280px;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+}
+
+// Other people's lasers, drawn over a map view's canvas: it takes no pointer and sits under the dock.
+.atlas-connect-lasers {
+  position: fixed;
+  z-index: 20;
+  display: none;
+  pointer-events: none;
+}
+
+// Connect in Atlas's own toolbar: a group of Atlas's tool buttons, and Atlas's own tray and dropdown for what they open.
+// Atlas's styles are scoped to its view's root, so everything here lives inside it.
+.atlas-connect-group {
+  gap: 8px;
+
+  // The group's buttons sit in the bar as Atlas's own tool buttons do.
+  .atlas-connect-item {
+    position: relative;
+  }
+
+  .atlas-connect-badge,
+  .atlas-connect-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    pointer-events: none;
+  }
+
+  .atlas-connect-badge {
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--text-error);
+    color: var(--text-on-accent);
+    font-size: var(--font-ui-smaller);
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .atlas-connect-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-success, currentColor);
+    box-shadow: 0 0 0 2px var(--background-primary);
+  }
+}
+
+// The tray rises over the group like Atlas's dice tray; its width follows what it holds.
+.atlas-connect-tray {
+  .atlas-connect-tray__panel {
+    min-width: 340px;
+    max-width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 180px);
+    overflow: auto;
+  }
+
+  .atlas-connect-tray__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 0 0 4px;
+  }
+
+  .atlas-connect-tray__title {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+  }
+
+  .atlas-connect-tray__content {
+    min-width: 0;
+  }
+}
+
+.atlas-connect-menu {
+  .atlas-connect-menu__heading {
+    padding: 2px 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+  }
+
+  .atlas-connect-menu__icon,
+  .atlas-connect-menu__arrow {
+    display: inline-flex;
+  }
+
+  .atlas-connect-menu__arrow.is-open {
+    transform: rotate(90deg);
+  }
+
+  .atlas-connect-menu__sub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 12px;
+  }
+}
+
+/* Connect's entries in Atlas's own token menu (`tokenContextMenu.ts`). */
+.atlas-connect-ctx-item { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.atlas-connect-ctx-item:hover { background: var(--background-modifier-hover); }
+.atlas-connect-ctx-item[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.atlas-connect-ctx-sub { padding-left: 12px; }
+.atlas-connect-ctx-chevron { display: inline-flex; transition: transform 120ms; }
+.atlas-connect-ctx-chevron.is-open { transform: rotate(90deg); }
+
+/* Connect's tooltip over a toolbar button: fixed from the moment it is in the page, shown once placed (`nativeToolbar.ts`). */
+.tooltip-content.atlas-connect-tip { position: fixed; left: 0; top: 0; width: max-content; max-width: calc(100vw - 16px); pointer-events: none; visibility: hidden; }
+.tooltip-content.atlas-connect-tip.is-placed { visibility: visible; }

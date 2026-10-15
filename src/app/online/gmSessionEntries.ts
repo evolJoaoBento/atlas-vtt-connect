@@ -13,6 +13,33 @@ export interface Entry {
   device: DeviceProof | null;
   /** The table proof sent on every admission; set with a person id. */
   table: TableProof | null;
+  /** A waiting entry's earlier player of the same name, joined from another client: the one allowing takes over. */
+  earlier: string | null;
+}
+
+/** Player names match regardless of case: "anna" coming back is Anna. */
+export function sameName(a: string, b: string): boolean {
+  return a.toLocaleLowerCase() === b.toLocaleLowerCase();
+}
+
+/** The player in the session (not waiting) who already uses `name`, a disconnected one first; null when none. */
+export function earlierOf(entries: Iterable<Entry>, name: string): Entry | null {
+  const matches = [...entries].filter((entry) => entry.player.status !== 'pending' && sameName(entry.player.name, name));
+  return matches.find((entry) => entry.player.status === 'gone') ?? matches[0] ?? null;
+}
+
+/** The player as the GM's UI sees them: a waiting one says whether their name is taken, and by whom. */
+export function playerView(entries: ReadonlyMap<string, Entry>, entry: Entry): SessionPlayer {
+  const player: SessionPlayer = { ...entry.player };
+  const earlier = entry.player.status === 'pending' && entry.earlier ? entries.get(entry.earlier) : undefined;
+  if (earlier && earlier.player.status !== 'pending') player.sameNameAs = earlier.player.status === 'gone' ? 'disconnected' : 'connected';
+  return player;
+}
+
+/** A gone player with a person id whose device is the one joining: the same client after a reload, its identity checked by the owner. */
+export function sameDevice(entries: Iterable<Entry>, device: DeviceProof | undefined): Entry | null {
+  if (!device) return null;
+  return [...entries].find((entry) => entry.player.status === 'gone' && entry.player.personId && entry.device?.key === device.key && entry.device.table === device.table) ?? null;
 }
 
 /** Per connection, before and after it joins. */

@@ -128,11 +128,17 @@ export class OnlineJoinService {
 
   /** The name to offer in the Join dialog. */
   rememberedName(): string {
-    return normalizePlayerName(this.settings.get().playerName) ?? '';
+    const { playerName, rememberPlayerName } = this.settings.get();
+    return rememberPlayerName ? normalizePlayerName(playerName) ?? '' : '';
+  }
+
+  /** Whether the Join dialog's "Remember this name" starts ticked. */
+  remembersName(): boolean {
+    return this.settings.get().rememberPlayerName;
   }
 
   /** Starts joining; null once it started, else what stops it. A session that ended is left first. */
-  join(link: string, name: string): JoinProblem | null {
+  join(link: string, name: string, remember = true): JoinProblem | null {
     const target = parseJoinLink(link);
     if (!target) return 'link';
     const cleaned = normalizePlayerName(name);
@@ -140,7 +146,8 @@ export class OnlineJoinService {
     if (this.isHosting()) return 'hosting';
     if (isInSession(joinedSessionStore.getState())) return 'joined';
     this.leave();
-    this.settings.set({ playerName: cleaned });
+    // Not remembered means not kept: the name is cleared, so it is not offered again.
+    this.settings.set({ playerName: remember ? cleaned : '', rememberPlayerName: remember });
     const loader = new AssetLoader({
       cache: this.imageCache(), decode: this.decode, ...(this.hash ? { hash: this.hash } : {}),
       onChange: () => { if (this.joined?.loader === loader) this.sink?.images(); },

@@ -42,7 +42,9 @@ function element<T extends HTMLElement>(id: string): T {
 const screen = element<HTMLElement>('screen');
 const form = element<HTMLFormElement>('join');
 const nameInput = element<HTMLInputElement>('name');
+const rememberName = element<HTMLInputElement>('remember-name');
 const status = element<HTMLParagraphElement>('status');
+const waitingLoader = element<HTMLElement>('loader');
 const table = element<HTMLElement>('table');
 const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
@@ -175,13 +177,19 @@ function show(view: PageScreen): void {
   table.hidden = view.kind !== 'table';
   form.hidden = view.kind !== 'form' || started;
   if (view.kind === 'message') status.textContent = view.text;
+  // A spinner while the page waits on the GM or the connection, so it does not look stuck.
+  waitingLoader.hidden = !(view.kind === 'message' && view.loading === true);
   if (view.kind === 'table') {
     sessionName.textContent = view.title;
     connection.textContent = view.connection;
+    connection.dataset.state = view.connection === 'Connected' ? 'ok' : 'wait';
     // The canvas and the toolbar have their sizes only once the table is shown; after that they follow resizes.
     if (!tableShown) {
       map?.measure();
       toolbar.fit();
+      // Measured again once the page has laid the table out: a browser that was not painting while the GM answered must
+      // still show the table by itself, with no click needed to wake it.
+      for (const wait of [150, 600, 1500]) window.setTimeout(() => { map?.measure(); toolbar.fit(); }, wait);
     }
   }
   tableShown = view.kind === 'table';
@@ -226,6 +234,10 @@ function renderScene(): void {
   (window as unknown as { atlasScene: PlayerScene | null }).atlasScene = shown;
 }
 
+// Back in front after being behind another window: draw what arrived meanwhile.
+window.addEventListener('focus', () => { map?.measure(); });
+window.addEventListener('pageshow', () => { map?.measure(); });
+
 const target = parseJoinFragment(location.hash);
 if (!target) {
   status.textContent = INCOMPLETE_LINK_TEXT;
@@ -233,7 +245,9 @@ if (!target) {
   status.textContent = NO_CANVAS_TEXT;
 } else {
   form.hidden = false;
-  nameInput.value = stored('name', () => '');
+  // "Remember this name" is on unless it was turned off; off, no name is kept or offered.
+  rememberName.checked = stored('remember-name', () => 'on') !== 'off';
+  nameInput.value = rememberName.checked ? stored('name', () => '') : '';
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (started) return;
@@ -242,7 +256,11 @@ if (!target) {
       status.textContent = NAME_PROBLEM_TEXT;
       return;
     }
-    try { localStorage.setItem(pageKey('name'), name); } catch { /* private window */ }
+    try {
+      localStorage.setItem(pageKey('remember-name'), rememberName.checked ? 'on' : 'off');
+      if (rememberName.checked) localStorage.setItem(pageKey('name'), name);
+      else localStorage.removeItem(pageKey('name'));
+    } catch { /* private window */ }
     started = true;
     form.hidden = true;
     session = createJoinSession({

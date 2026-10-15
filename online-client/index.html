@@ -16,9 +16,13 @@
       <form id="join" hidden>
         <label for="name">Your name</label>
         <input id="name" maxlength="40" autocomplete="nickname" required>
+        <label class="remember"><input id="remember-name" type="checkbox" checked> Remember this name</label>
         <button type="submit">Join</button>
       </form>
-      <p id="status" role="status"></p>
+      <div class="status-row">
+        <div id="loader" class="loader" hidden aria-hidden="true"></div>
+        <p id="status" role="status"></p>
+      </div>
     </main>
     <footer class="links">
       Atlas VTT online play · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect" target="_blank" rel="noopener">Source code (AGPL-3.0)</a>
@@ -28,14 +32,18 @@
   <section id="table" class="table" hidden aria-label="Scene">
     <canvas id="map" role="img" aria-label="Map"></canvas>
     <header class="top-bar">
-      <span id="session-name" class="session-name"></span>
-      <span id="connection" class="connection" role="status"></span>
-      <div id="image-progress" class="image-progress" hidden>
-        <progress id="image-progress-bar" aria-label="Loading images"></progress>
-        <span id="image-progress-text" role="status"></span>
+      <div class="top-pill top-info">
+        <span id="connection" class="connection" role="status"></span>
+        <span id="session-name" class="session-name"></span>
+        <div id="image-progress" class="image-progress" hidden>
+          <progress id="image-progress-bar" aria-label="Loading images"></progress>
+          <span id="image-progress-text" role="status"></span>
+        </div>
       </div>
-      <button id="dice-log-button" class="icon-button" type="button" aria-label="Dice log" aria-expanded="false" aria-controls="dice-log"></button>
-      <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
+      <div class="top-pill top-actions">
+        <button id="dice-log-button" class="icon-button" type="button" aria-label="Dice log" aria-expanded="false" aria-controls="dice-log"></button>
+        <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
+      </div>
     </header>
     <div id="view-buttons" class="view-buttons" hidden>
       <button id="follow-gm" type="button">Follow GM</button>

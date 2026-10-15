@@ -98,6 +98,21 @@ describe('GmSession identity on a new join of a known person', () => {
     expect(reconnect.received[0]).toMatchObject({ type: 'admitted', table: NEW_TABLE });
   });
 
+  it('knows the same device under a new session key (Obsidian reloaded): reissued, not asked about, no second entry', async () => {
+    const reissue = vi.fn(async (): Promise<Admission | null> => ({ personId: 'ana_1', table: NEW_TABLE }));
+    const { network, session, requests } = await admitted(reissue);
+    const again = await player(network, 'k2', AGAIN);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requests).toHaveLength(1);
+    expect(again.received[0]).toMatchObject({ type: 'admitted', playerId: requests[0]!.player.playerId, table: NEW_TABLE });
+    expect(session.getPlayers()).toEqual([expect.objectContaining({ personId: 'ana_1', status: 'admitted' })]);
+    // The new key is the one its reconnect is known by.
+    again.link.close();
+    const reconnect = await player(network, 'k2', AGAIN);
+    expect(reconnect.received[0]).toMatchObject({ type: 'admitted', table: NEW_TABLE });
+    expect(reissue).toHaveBeenCalledTimes(1);
+  });
+
   it('denies another device, a join without a device and a refused reissue', async () => {
     const reissue = vi.fn(async (): Promise<Admission | null> => null);
     const { network, session } = await admitted(reissue);

@@ -8,7 +8,8 @@ import type { PlayerSessionState } from '../PlayerSession';
 
 export type PageScreen =
   | { kind: 'form' }
-  | { kind: 'message'; text: string }
+  /** `loading`: the page is waiting on something (the GM, the connection) and shows a loader beside the text. */
+  | { kind: 'message'; text: string; loading?: true }
   | { kind: 'table'; title: string; connection: string };
 
 export const INCOMPLETE_LINK_TEXT = 'This link is incomplete. Ask your GM for the join link again.';
@@ -43,9 +44,9 @@ export function pageScreen(state: PlayerSessionState | null, hasScene: boolean):
     case 'lost':
       return { kind: 'message', text: sessionReasonText(state.reason, 'unreachable') };
     case 'waiting':
-      return { kind: 'message', text: 'Waiting for the GM to let you in…' };
+      return { kind: 'message', text: 'Waiting for the GM to let you in…', loading: true };
     case 'connecting':
-      return hasScene ? { kind: 'table', title, connection: 'Reconnecting…' } : { kind: 'message', text: 'Connecting…' };
+      return hasScene ? { kind: 'table', title, connection: 'Reconnecting…' } : { kind: 'message', text: 'Connecting…', loading: true };
     case 'admitted':
       return hasScene
         ? { kind: 'table', title, connection: 'Connected' }

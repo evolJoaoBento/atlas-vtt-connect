@@ -20,19 +20,19 @@
   h2 { margin: 0; font-size: 16px; }
   /* The table: the map fills the window, everything else floats over it. */
   &.table {
-    position: absolute; inset: 0; overflow: hidden; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr);
+    position: absolute; inset: 0; overflow: hidden; overflow: clip; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr);
     /* A pinch or double-tap that starts on the bar or a button must not zoom the page. */
     touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
   /* The map sits below the top bar, so the GM's framing is never hidden behind it. */
-  .atlas-connect-scene__map { grid-row: 2; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+  .atlas-connect-scene__map { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
   /* A grab hand over the player's own tokens; grabbing while a token or the map is dragged. */
   .atlas-connect-scene__map.can-grab { cursor: grab; }
   .atlas-connect-scene__map:active, .atlas-connect-scene__map.is-grabbing { cursor: grabbing; }
   /* "Move not allowed.": over the top of the map, never taking input. */
   /* The top of the map: the move notice, a roll's toast and your own throw, stacked so none covers another. */
   .top-stack {
-    grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; max-width: calc(100% - 32px);
+    grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: calc(var(--header-height, 40px) + 72px); max-width: calc(100% - 32px);
     display: flex; flex-direction: column; align-items: center; gap: var(--gap); pointer-events: none;
   }
   .top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
@@ -42,21 +42,42 @@
     margin: 0;
     padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
   }
+  /* The top of the table is no bar: two floating pills over the map, as Atlas's own toolbar floats over it. */
   .top-bar {
-    grid-row: 1; position: relative; z-index: 1; display: flex; align-items: center; gap: var(--gap);
-    padding: max(var(--gap), env(safe-area-inset-top)) max(var(--gap), env(safe-area-inset-right)) var(--gap) max(var(--gap), env(safe-area-inset-left));
-    background: var(--bar); border-bottom: 1px solid var(--border);
+    grid-row: 1 / -1; grid-column: 1; align-self: start; position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gap);
+    /* The tab's own header (and its edge) lies over the top of the table: the pills start below it. */
+    padding: calc(var(--header-height, 40px) + 12px) 12px 0; pointer-events: none;
   }
-  .session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-  .connection { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .top-pill {
+    pointer-events: auto; display: flex; align-items: center; gap: var(--inset); min-width: 0; padding: var(--inset);
+    background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+  }
+  .top-info { padding-inline: 16px; min-height: calc(var(--tool-size) + 2 * var(--inset) + 2 * var(--panel-border)); }
+  /* The dice log opener is a bare, glowing icon in the middle of the right edge, not a pill. It sits against the table
+     itself (the bar is no containing block), so the middle is the table's. */
+  .top-bar { position: static; }
+  .top-actions {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); padding: 0; background: none; border: 0; box-shadow: none;
+  }
+  .top-actions .icon-button {
+    width: 48px; height: 48px; color: #cfcae6; opacity: 0.6; transition: opacity 120ms, filter 120ms;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.35)) drop-shadow(0 0 12px var(--accent));
+  }
+  .top-actions .icon-button:hover, .top-actions .icon-button:focus-visible, .top-actions .icon-button[aria-expanded="true"] {
+    opacity: 0.9; background: transparent; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 16px var(--accent));
+  }
+  .top-actions .icon-button .tool-icon { width: 30px; height: 30px; }
+  .session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+  .connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .connection[data-tone]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d29922; }
+  .connection[data-tone="connected"]::before { background: #3fb950; }
+  .connection[data-tone="ended"]::before { background: #f85149; }
   .icon-button {
-    width: var(--target); height: var(--target); padding: 0; margin-left: auto; display: grid; place-items: center;
-    background: transparent; color: var(--text); border: 1px solid var(--border); font-size: 20px; font-weight: 500;
+    width: var(--tool-size); height: var(--tool-size); min-height: 0; padding: 0; display: grid; place-items: center;
+    background: transparent; color: var(--text); border: 0; border-radius: 8px; font-size: 18px; font-weight: 500;
   }
-  .view-buttons {
-    position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
-    display: flex; gap: var(--gap);
-  }
+  .icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--hover); }
+  .icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   /* The toolbar, dice tray, dice log and toast: Atlas's floating surfaces. They copy styles/_mixins.scss
      (atlas-elevated-surface, atlas-panel-radius($radius-2xl)): controls sit $spacing-s inside a 1.5 px border, and their
      outer corners run concentric with the surface's (24 − 1.5 − 8 = 14.5 px). */
@@ -82,6 +103,9 @@
     background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
   }
   .toolbar-item { position: relative; display: flex; align-items: center; }
+  /* Follow GM and Fit map: two more icon buttons at the end of the toolbar, there while the view is off the GM's. */
+  .view-buttons { gap: var(--inset); }
+  .toolbar > .view-buttons > .tool-button:first-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
   .tool-button, .tool-chevron, .menu-entry {
     min-height: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 500;
   }
@@ -195,14 +219,22 @@
   .tray-actions > button:nth-last-child(1 of :not([hidden])) { border-bottom-right-radius: var(--inset-radius); }
   .tray-roll { flex: 1; }
 
-  /* The dice log: a side panel on the left, a bottom sheet on narrow screens, like the menu. */
+  /* The dice log: a drawer drawn over the table from the right edge, a bottom sheet on narrow screens. It lies over the map
+     and takes nothing from it (absolute, no room of its own). It is opened and closed with the hidden attribute, which would
+     remove it from the page, so a closed drawer is kept in the page instead, off to the side and out of reach, and the
+     change is a transition: it slides out as well as in. */
+  .dice-log[hidden] { display: grid !important; transform: translateX(105%); visibility: hidden; pointer-events: none; box-shadow: none; }
   .dice-log {
-    position: absolute; top: 0; left: 0; bottom: 0; z-index: 2; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
+    position: absolute; top: 0; right: 0; bottom: 0; z-index: 3; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
     display: grid; align-content: start; gap: var(--inset);
-    padding: max(var(--inset), env(safe-area-inset-top)) var(--inset) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
-    background: var(--card); border-right: 1px solid var(--border);
+    padding: calc(var(--header-height, 40px) + var(--inset)) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) var(--inset);
+    background: var(--card); border-left: 1px solid var(--border); border-radius: 16px 0 0 16px; box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+    transform: translateX(0); visibility: visible;
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0s, box-shadow 280ms;
   }
-  .dice-log-header { display: flex; align-items: center; gap: 12px; }
+  .dice-log[hidden] { transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms, box-shadow 280ms; }
+  .dice-log-header { display: flex; align-items: center; gap: 8px; }
+  .dice-log-header .icon-button { width: var(--tool-size); height: var(--tool-size); }
   .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
   .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
   .dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
@@ -236,10 +268,9 @@
 
   @media (max-width: 720px) {
     .dice-log {
-      top: auto; right: 0; width: auto; max-height: 70%; border-right: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
-      padding-right: max(var(--inset), env(safe-area-inset-right));
+      top: auto; left: 0; width: auto; max-height: 70%; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
+      padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
     }
-    /* Follow GM and Fit map move above the toolbar. */
-    .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
+    .dice-log[hidden] { transform: translateY(105%); }
   }
 }

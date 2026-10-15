@@ -15,19 +15,23 @@ export const JOIN_DIALOG_TITLE = 'Join online session';
 
 type JoinPort = Pick<OnlineJoinService, 'join' | 'leave'>;
 
+
 export class JoinSessionModal extends Modal {
   private link = '';
   private name: string;
+  private remember: boolean;
   private joining = false;
   private admitted = false;
   private statusEl: HTMLElement | null = null;
+  private spinnerEl: HTMLElement | null = null;
   private joinButton: HTMLButtonElement | null = null;
   private linkInput: HTMLInputElement | null = null;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(app: App, private readonly service: JoinPort, name: string) {
+  constructor(app: App, private readonly service: JoinPort, name: string, remember = true) {
     super(app);
     this.name = name;
+    this.remember = remember;
     this.modalEl.addClass(...ATLAS_NATIVE_MODAL_CLASSES, 'atlas-join-modal');
   }
 
@@ -51,7 +55,19 @@ export class JoinSessionModal extends Modal {
         text.inputEl.setAttribute('aria-label', 'Your name');
         text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
       });
-    this.statusEl = contentEl.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
+    new Setting(contentEl)
+      .setName('Remember this name')
+      .setDesc('Offer it again next time, so you do not retype it.')
+      .addToggle((toggle) => {
+        toggle.setValue(this.remember).onChange((value) => { this.remember = value; });
+        toggle.toggleEl.setAttribute('aria-label', 'Remember this name');
+      });
+    // The spinner is an element of its own beside the words: a pseudo-element here is positioned by Obsidian's and Atlas's
+    // modal styles, which put it over the text.
+    const statusRow = contentEl.createDiv({ cls: 'atlas-join-modal__status-row' });
+    this.spinnerEl = statusRow.createSpan({ cls: 'atlas-join-modal__spinner', attr: { 'aria-hidden': 'true' } });
+    this.spinnerEl.hidden = true;
+    this.statusEl = statusRow.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
     const buttons = contentEl.createDiv({ cls: 'modal-button-container' });
     this.joinButton = buttons.createEl('button', { cls: 'mod-cta', text: 'Join' });
     this.joinButton.addEventListener('click', () => this.submit());
@@ -76,7 +92,7 @@ export class JoinSessionModal extends Modal {
   }
 
   private submit(): void {
-    const problem = this.service.join(this.link, this.name);
+    const problem = this.service.join(this.link, this.name, this.remember);
     if (problem) {
       this.setStatus(JOIN_PROBLEM_TEXT[problem], true);
       return;
@@ -124,6 +140,7 @@ export class JoinSessionModal extends Modal {
 
   private setBusy(busy: boolean): void {
     if (this.joinButton) this.joinButton.disabled = busy;
+    if (this.spinnerEl) this.spinnerEl.hidden = !busy;
   }
 }
 
@@ -134,5 +151,5 @@ export function openJoinSessionModal(app: App): void {
     new Notice('Online play is not ready yet. Try again in a moment.');
     return;
   }
-  new JoinSessionModal(app, service, service.rememberedName()).open();
+  new JoinSessionModal(app, service, service.rememberedName(), service.remembersName()).open();
 }
