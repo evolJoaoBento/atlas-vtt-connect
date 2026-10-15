@@ -78,11 +78,6 @@
   }
   .icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--hover); }
   .icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .view-buttons {
-    /* Above Obsidian's status bar, which lies over the bottom of the table. */
-    position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(var(--status-bar-height, 24px) + 12px);
-    display: flex; gap: var(--gap);
-  }
   /* The toolbar, dice tray, dice log and toast: Atlas's floating surfaces. They copy styles/_mixins.scss
      (atlas-elevated-surface, atlas-panel-radius($radius-2xl)): controls sit $spacing-s inside a 1.5 px border, and their
      outer corners run concentric with the surface's (24 − 1.5 − 8 = 14.5 px). */
@@ -108,6 +103,9 @@
     background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
   }
   .toolbar-item { position: relative; display: flex; align-items: center; }
+  /* Follow GM and Fit map: two more icon buttons at the end of the toolbar, there while the view is off the GM's. */
+  .view-buttons { gap: var(--inset); }
+  .toolbar > .view-buttons > .tool-button:first-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
   .tool-button, .tool-chevron, .menu-entry {
     min-height: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-weight: 500;
   }
@@ -235,7 +233,8 @@
     transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0s, box-shadow 280ms;
   }
   .dice-log[hidden] { transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms, box-shadow 280ms; }
-  .dice-log-header { display: flex; align-items: center; gap: 12px; }
+  .dice-log-header { display: flex; align-items: center; gap: 8px; }
+  .dice-log-header .icon-button { width: var(--tool-size); height: var(--tool-size); }
   .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
   .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
   .dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
@@ -273,7 +272,5 @@
       padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
     }
     .dice-log[hidden] { transform: translateY(105%); }
-    /* Follow GM and Fit map move above the toolbar. */
-    .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
   }
 }

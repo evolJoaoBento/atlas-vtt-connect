@@ -90,6 +90,8 @@ export class CanvasScene implements OnlineSceneSink {
       ...(options.active ? { active: options.active } : {}),
       doc,
     });
+    // The toolbar has drawn its controls: Follow GM and Fit map join them, shown only while the view is off the GM's.
+    dom.toolbar.append(dom.viewButtons);
     this.controls = {
       followGm: () => this.map?.followGm(),
       fitMap: () => this.map?.fitMap(),

@@ -110,6 +110,26 @@ describe('CanvasSceneView', () => {
     expect(notice?.hidden).toBe(true);
   });
 
+  it('has Follow GM and Fit map as icon buttons of the toolbar, and a chevron at the left of the dice log to close it', async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const toolbar = view.contentEl.querySelector<HTMLElement>('.toolbar')!;
+    const follow = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Follow GM"]')!;
+    const fit = toolbar.querySelector<HTMLButtonElement>('button[aria-label="Fit map"]')!;
+    // Icons, not words, and in the toolbar after the tools themselves.
+    expect(follow.textContent).toBe('');
+    expect(follow.querySelector('.tool-icon')).not.toBeNull();
+    expect(fit.querySelector('.tool-icon')).not.toBeNull();
+    expect(toolbar.lastElementChild).toBe(follow.parentElement);
+    expect(view.contentEl.querySelector('.top-stack ~ .view-buttons, .table > .view-buttons')).toBeNull();
+    const header = view.contentEl.querySelector('.dice-log-header')!;
+    const close = header.querySelector<HTMLButtonElement>('button[aria-label="Close dice log"]')!;
+    expect(header.firstElementChild).toBe(close);
+    expect(close.textContent).toBe('');
+    expect(close.querySelector('.tool-icon')).not.toBeNull();
+  });
+
   it('closing the tab leaves the session', async () => {
     const w = world();
     const { view } = w.open();

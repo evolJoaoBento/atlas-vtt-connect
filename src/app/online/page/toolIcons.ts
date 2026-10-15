@@ -6,7 +6,7 @@
  * checks both against Atlas's components.
  */
 export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x'
-  | 'minus' | 'plus';
+  | 'minus' | 'plus' | 'chevron-right' | 'maximize' | 'locate-fixed';
 
 /** Each Lucide icon's children. */
 export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
@@ -27,6 +27,9 @@ export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   minus: '<path d="M5 12h14"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  'locate-fixed': '<line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/>',
 };
 
 const LUCIDE_ROOT = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
