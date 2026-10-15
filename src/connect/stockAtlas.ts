@@ -18,7 +18,9 @@ import type {
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
+import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
+import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
@@ -498,6 +500,48 @@ async function showTab(app: App, viewId: string, tabId: string, disposers: Set<D
   });
 }
 
+/** Atlas's library tokens (`AssetService.getTokenAssets`), with whether each is a player character; none where it cannot be read. */
+async function libraryTokens(app: App): Promise<LibraryToken[]> {
+  const manager = activeMapView(app)?.serviceManager;
+  const getService = isObj(manager) ? manager.getAssetService : undefined;
+  const service: unknown = typeof getService === 'function' ? (getService as () => unknown).call(manager) : null;
+  const getTokens = isObj(service) ? service.getTokenAssets : undefined;
+  const list: unknown = typeof getTokens === 'function' ? await (getTokens as () => Promise<unknown>).call(service) : [];
+  if (!Array.isArray(list)) return [];
+  return (list as unknown[]).flatMap((asset) => (isObj(asset) && typeof asset.id === 'string' && typeof asset.imagePath === 'string' ? [{ id: asset.id, imagePath: asset.imagePath, playerCharacter: asset.playerCharacter === true }] : []));
+}
+
+/** Calls `listener` when a view opens or closes, or the tokens on its scene are replaced (placed, removed, a scene loaded). */
+function watchTokens(app: App, events: Events, listener: () => void): Disposer {
+  const followed = new Map<string, Disposer>();
+  const follow = (): void => {
+    const open = mapViews(app);
+    for (const view of open) {
+      if (followed.has(view.viewId)) continue;
+      let tokens = view.atlasStore.getState().objects.tokens;
+      followed.set(view.viewId, view.atlasStore.subscribe(() => {
+        const now = view.atlasStore.getState().objects.tokens;
+        // A drag replaces the tokens as it goes: only the set of them matters here.
+        if (now === tokens || Object.keys(now).length === Object.keys(tokens).length) { tokens = now; return; }
+        tokens = now;
+        listener();
+      }));
+    }
+    for (const [id, stop] of [...followed]) {
+      if (open.some((view) => view.viewId === id)) continue;
+      stop();
+      followed.delete(id);
+    }
+  };
+  follow();
+  const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, () => { follow(); listener(); }));
+  return () => {
+    for (const stop of stops) stop();
+    for (const stop of followed.values()) stop();
+    followed.clear();
+  };
+}
+
 /** Whether Atlas's dynamic lighting experiment is on; null when its settings cannot be read. */
 function dynamicLighting(service: StockSettings): boolean | null {
   const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
@@ -529,16 +573,48 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       disposers.add(() => app.workspace.offref(ref));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
       const extensionId = plugin.manifest.id;
-      const folder = async (): Promise<string> => {
-        const path = normalizePath(`${STORAGE_ROOT}/${extensionId}`);
-        let built = '';
-        for (const part of path.split('/')) {
-          built = built ? `${built}/${part}` : part;
-          if (!(await app.vault.adapter.exists(built))) await app.vault.adapter.mkdir(built);
-        }
-        return path;
+      // Asked for by Connect and by the player character links at once: made once.
+      let made: Promise<string> | null = null;
+      const folder = (): Promise<string> => {
+        made ??= (async (): Promise<string> => {
+          const path = normalizePath(`${STORAGE_ROOT}/${extensionId}`);
+          let built = '';
+          for (const part of path.split('/')) {
+            built = built ? `${built}/${part}` : part;
+            if (await app.vault.adapter.exists(built)) continue;
+            try {
+              await app.vault.adapter.mkdir(built);
+            } catch (error) {
+              // Made meanwhile by something else: fine, so long as it is there.
+              if (!(await app.vault.adapter.exists(built))) throw error;
+            }
+          }
+          return path;
+        })().catch((error: unknown) => {
+          made = null;
+          throw error;
+        });
+        return made;
       };
-      // The floating dock stands in for the toolbar, palette, menus and panels stock Atlas has no slots for.
+      // Atlas's player characters and Connect's players: a character given to a player is theirs again on every scene.
+      const party = new PartyLinks({
+        session: { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) },
+        tokens: () => {
+          const view = activeMapView(app);
+          const state = view?.atlasStore.getState();
+          return view && state && loaded(state) ? state.objects.tokens : null;
+        },
+        watchScene: (listener) => watchTokens(app, events, listener),
+        library: () => libraryTokens(app),
+        memory: fileMemory(async () => `${await folder()}/player-characters.json`, {
+          exists: (path) => app.vault.adapter.exists(path),
+          read: (path) => app.vault.adapter.read(path),
+          write: (path, data) => app.vault.adapter.write(path, data),
+        }),
+      });
+      party.start();
+      disposers.add(() => party.stop());
+      // Connect goes into Atlas's own toolbar; a floating dock stands in for a view whose toolbar cannot be found.
       const ui = stockUi(app, {
         views: () => mapViews(app),
         active: () => activeMapView(app),
