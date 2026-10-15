@@ -6,7 +6,7 @@
  * a token they drag or just dropped is drawn where they put it.
  */
 import { DOWNED_LOOK } from '@atlas-vtt/shared/draw';
-import { getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';
+import { getTokenRingCenterRadius, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
 import { computeTokenPixelSize, computeTokenStrokeWidth } from '@atlas-vtt/shared/draw';
 import type { PlayerToken } from '../../scene/sceneTypes';
 import { intersects } from '../camera';
@@ -68,39 +68,9 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
   } else {
     surface.circle(0, 0, radius, { fill: TOKEN_MARKER_COLOR });
   }
-  if (token.ring !== null) drawRing(surface, token.ring, size, stroke);
+  // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
+  if (token.ring !== null) surface.tokenRing(0, 0, getTokenRingOuterDiameter(size, stroke, 1), size, token.ring);
   surface.pop();
-}
-
-/**
- * Atlas's token ring is a worn-stone band (a texture) tinted by the ring's colour, drawn over the edge of the art: about
- * 14.5% of the ring's outer diameter thick, a lighter outer rim, a mid body and a dark inner edge. Seen as a thin flat
- * line in the ring's colour it all but vanishes against pale art, so it is drawn as that band: three strokes whose
- * greys are multiplied by the colour as the texture is by its tint (white keeps the greys).
- */
-const RING_BAND_SHARE = 0.145;
-const RING_BANDS = [
-  { from: 0, to: 1, level: 0.38 },
-  { from: 0, to: 0.24, level: 0.55 },
-  { from: 0.7, to: 1, level: 0.12 },
-] as const;
-
-/** `color` with every channel scaled by `level`, as a texture's grey is by its tint; a colour that is not #rrggbb is kept. */
-export function tintedGrey(color: string, level: number): string {
-  const match = /^#([0-9a-f]{6})$/i.exec(color);
-  if (!match) return color;
-  const value = Number.parseInt(match[1]!, 16);
-  const channel = (shift: number): string => Math.round(((value >> shift) & 255) * level).toString(16).padStart(2, '0');
-  return `#${channel(16)}${channel(8)}${channel(0)}`;
-}
-
-function drawRing(surface: ViewSurface, color: string, size: number, stroke: number): void {
-  const outer = (size + stroke * 2) / 2;
-  const band = outer * 2 * RING_BAND_SHARE;
-  for (const { from, to, level } of RING_BANDS) {
-    const width = band * (to - from);
-    surface.circle(0, 0, outer - band * from - width / 2, { stroke: tintedGrey(color, level), lineWidth: width });
-  }
 }
 
 /** What Atlas's downed overlay does to the token: greyed art and ring, and the skull on top, upright. */

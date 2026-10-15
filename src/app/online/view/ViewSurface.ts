@@ -57,6 +57,12 @@ export interface ViewSurface {
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void;
   /** `image` stretched over the rectangle, clipped to `clip` when given. */
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null): void;
+  /**
+   * Atlas's token ring (its `token-ring.webp`), `diameter` wide and centred on (x, y), its colours multiplied by `color`
+   * as Atlas tints it, around art `artSize` wide. Until the texture has loaded, Atlas's own stand-in: a plain ring in the
+   * colour as wide as the padding between the art and the ring's edge.
+   */
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void;
   text(text: string, x: number, y: number, style: TextStyle): void;
   /** The width of `text` in `font`, in the font's own pixels (the camera does not apply). */
   measureText(text: string, font: string): number;

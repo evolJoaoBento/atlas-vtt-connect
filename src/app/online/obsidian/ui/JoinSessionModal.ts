@@ -23,6 +23,7 @@ export class JoinSessionModal extends Modal {
   private joining = false;
   private admitted = false;
   private statusEl: HTMLElement | null = null;
+  private spinnerEl: HTMLElement | null = null;
   private joinButton: HTMLButtonElement | null = null;
   private linkInput: HTMLInputElement | null = null;
   private unsubscribe: (() => void) | null = null;
@@ -61,7 +62,12 @@ export class JoinSessionModal extends Modal {
         toggle.setValue(this.remember).onChange((value) => { this.remember = value; });
         toggle.toggleEl.setAttribute('aria-label', 'Remember this name');
       });
-    this.statusEl = contentEl.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
+    // The spinner is an element of its own beside the words: a pseudo-element here is positioned by Obsidian's and Atlas's
+    // modal styles, which put it over the text.
+    const statusRow = contentEl.createDiv({ cls: 'atlas-join-modal__status-row' });
+    this.spinnerEl = statusRow.createSpan({ cls: 'atlas-join-modal__spinner', attr: { 'aria-hidden': 'true' } });
+    this.spinnerEl.hidden = true;
+    this.statusEl = statusRow.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
     const buttons = contentEl.createDiv({ cls: 'modal-button-container' });
     this.joinButton = buttons.createEl('button', { cls: 'mod-cta', text: 'Join' });
     this.joinButton.addEventListener('click', () => this.submit());
@@ -134,7 +140,7 @@ export class JoinSessionModal extends Modal {
 
   private setBusy(busy: boolean): void {
     if (this.joinButton) this.joinButton.disabled = busy;
-    this.statusEl?.toggleClass('is-loading', busy);
+    if (this.spinnerEl) this.spinnerEl.hidden = !busy;
   }
 }
 

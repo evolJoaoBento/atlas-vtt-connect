@@ -14,6 +14,7 @@ export type SurfaceCall =
   | { op: 'circle'; x: number; y: number; radius: number; style: ShapeStyle }
   | { op: 'paths'; paths: ScenePoint[][]; closed: boolean; style: ShapeStyle }
   | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null }
+  | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string }
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
   | { op: 'drawLayer'; layer: number; x: number; y: number; width: number; height: number };
@@ -44,6 +45,7 @@ export class RecordingSurface implements ViewSurface {
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null): void {
     this.calls.push({ op: 'image', image, x, y, width, height, clip });
   }
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void { this.calls.push({ op: 'tokenRing', x, y, diameter, artSize, color }); }
   text(text: string, x: number, y: number, style: TextStyle): void { this.calls.push({ op: 'text', text, x, y, style }); }
   measureText(text: string, font: string): number {
     const size = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 10);

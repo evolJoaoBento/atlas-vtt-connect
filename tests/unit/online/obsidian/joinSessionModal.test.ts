@@ -63,7 +63,10 @@ describe('Join online session dialog', () => {
     expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna', true);
     joinedSessionStore.setState({ session: state('waiting') });
     expect(status()).toBe('Waiting for the GM to let you in…');
-    expect(modal.contentEl.querySelector('[role="status"]')?.classList.contains('is-loading')).toBe(true);
+    // The spinner is its own element, beside the words on their line, shown while waiting.
+    const spinner = modal.contentEl.querySelector<HTMLElement>('.atlas-join-modal__spinner')!;
+    expect(spinner.hidden).toBe(false);
+    expect(spinner.nextElementSibling).toBe(modal.contentEl.querySelector('[role="status"]'));
     expect(button('Join').disabled).toBe(true);
     joinedSessionStore.setState({ session: state('admitted') });
     expect(close).toHaveBeenCalled();

@@ -48,21 +48,28 @@
   }
 }
 
-// The Join dialog while it waits on the GM or the connection: a ring turning before the words, so it does not look stuck.
-.atlas-join-modal__status.is-loading {
+// The Join dialog while it waits on the GM or the connection: a ring turning before the words, on their line.
+.atlas-join-modal__status-row {
   display: flex;
   align-items: center;
   gap: 10px;
 
-  &::before {
-    content: '';
-    flex: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--background-modifier-border);
-    border-top-color: var(--interactive-accent);
-    border-radius: 50%;
-    animation: atlas-join-spin 800ms linear infinite;
+  .atlas-join-modal__status {
+    margin: 0;
+  }
+}
+
+.atlas-join-modal__spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--background-modifier-border);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: atlas-join-spin 800ms linear infinite;
+
+  &[hidden] {
+    display: none;
   }
 }
 

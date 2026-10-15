@@ -15,28 +15,20 @@ function draw(tokens: Record<string, PlayerToken>, withImages = false): Recordin
 }
 
 describe('tokens layer', () => {
-  it("clips the art to its circle, cover-fit, and draws Atlas's stone ring band over its edge", () => {
-    const calls = draw({ t1: playerToken() }, true).calls;
-    expect(calls.slice(0, 2)).toEqual([
+  it("clips the art to its circle, cover-fit, and draws Atlas's ring texture over it at Atlas's size", () => {
+    expect(draw({ t1: playerToken() }, true).calls).toEqual([
       { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
       { op: 'image', image: art.image, x: -62, y: -31, width: 124, height: 62, clip: { x: 0, y: 0, radius: 31 } },
+      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
+      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#ffffff' },
+      { op: 'pop' },
     ]);
-    expect(calls.at(-1)).toEqual({ op: 'pop' });
-    // The ring's outer diameter is the token's 62 plus twice the 4 px stroke: 35 out, a band of 10.15, in three strokes.
-    const rings = calls.slice(2, -1) as Array<{ op: string; radius: number; style: { stroke: string; lineWidth: number } }>;
-    expect(rings.map(({ style }) => style.stroke)).toEqual(['#616161', '#8c8c8c', '#1f1f1f']);
-    expect(rings[0]!.radius + rings[0]!.style.lineWidth / 2).toBeCloseTo(35);
-    expect(rings[0]!.style.lineWidth).toBeCloseTo(10.15);
-    // The rim is the outer quarter, the dark edge the inner third.
-    expect(rings[1]!.radius + rings[1]!.style.lineWidth / 2).toBeCloseTo(35);
-    expect(rings[2]!.radius - rings[2]!.style.lineWidth / 2).toBeCloseTo(35 - 10.15);
   });
 
-  it('tints the band by the ring colour as Atlas tints its texture', () => {
-    const strokes = (ring: string): string[] => draw({ t1: playerToken({ ring }) }, true).ops('circle').filter(({ style }) => style.stroke !== undefined).map(({ style }) => String(style.stroke));
-    expect(strokes('#ff0000')).toEqual(['#610000', '#8c0000', '#1f0000']);
-    expect(strokes('#22aaff')).toEqual(['#0d4161', '#135e8c', '#04141f']);
-    expect(strokes('crimson')).toEqual(['crimson', 'crimson', 'crimson']);
+  it('draws the ring in the colour the GM chose for the token', () => {
+    expect(draw({ t1: playerToken({ ring: '#e93147' }) }, true).ops('tokenRing')).toEqual([
+      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#e93147' },
+    ]);
   });
 
   it('draws a marker until the art has loaded, turned by the rotation, without a ring when it is off', () => {

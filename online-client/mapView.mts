@@ -22,6 +22,7 @@ import { PlayerTools, type PlayerTool } from '../src/app/online/view/tools/Playe
 import { createToolsLayer } from '../src/app/online/view/tools/toolsLayer';
 import { ViewInput } from '../src/app/online/view/ViewInput';
 import type { ViewSurface } from '../src/app/online/view/ViewSurface';
+import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
 
 /** What the toolbar shows of the tools. */
@@ -112,6 +113,9 @@ export class MapView {
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
     this.measure();
+    // Tokens are drawn with Atlas's stand-in ring until the ring texture has loaded: then once more with it.
+    const stopRing = whenTokenRingLoaded(() => this.renderer.invalidate());
+    this.listeners.signal.addEventListener('abort', stopRing, { once: true });
   }
 
   /** The scene to show; null shows nothing and resets the camera. */

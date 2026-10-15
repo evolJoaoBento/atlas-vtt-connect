@@ -4,6 +4,7 @@
  * `fillText`, which ignore invalid values and never interpret markup. Map icons are
  * drawn from Atlas's own markup through `Path2D`.
  */
+import tokenRingUrl from '../../assets/token-ring.webp';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
 import type { ImageClip, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
@@ -25,6 +26,71 @@ function iconShapes(name: string): IconShape[] | null {
     icons.set(name, shapes);
   }
   return shapes;
+}
+
+/**
+ * Atlas's token ring texture (`src/app/assets/token-ring.webp`, the same file), loaded once for every surface, and the
+ * tinted copies drawn from it. Atlas multiplies the texture's colours by the ring colour (Pixi's `tint`) and keeps its
+ * alpha; a copy per colour does the same once, at a size that keeps the stone's grain on any token on screen.
+ */
+const RING_TINT_SIZE = 512;
+/** Ring colours come from the network: a bounded cache, so they cannot grow it. */
+const RING_TINT_CACHE = 32;
+let ringImage: HTMLImageElement | null = null;
+let ringLoaded = false;
+const ringListeners = new Set<() => void>();
+const tintedRings = new Map<string, HTMLCanvasElement>();
+
+/** The ring texture, or null while it loads; starts loading on the first call. */
+function tokenRingImage(doc: Document): HTMLImageElement | null {
+  if (!ringImage) {
+    // The page's Image constructor (a pop-out window's too): `createEl` is Obsidian's alone, and this runs on the join page.
+    ringImage = new (doc.defaultView ?? window).Image();
+    ringImage.decoding = 'async';
+    ringImage.addEventListener('load', () => {
+      ringLoaded = true;
+      for (const listener of [...ringListeners]) listener();
+    }, { once: true });
+    ringImage.src = tokenRingUrl;
+  }
+  return ringLoaded ? ringImage : null;
+}
+
+/** Calls `listener` once the ring texture has loaded, so a view drawn with the stand-in is drawn again; at once if it has. */
+export function whenTokenRingLoaded(listener: () => void): () => void {
+  if (ringLoaded) {
+    listener();
+    return () => undefined;
+  }
+  ringListeners.add(listener);
+  return () => { ringListeners.delete(listener); };
+}
+
+/** Atlas reads the ring colour as hex and falls back to white: the same here, so a colour from the network is only #rrggbb. */
+function ringColor(color: string): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#ffffff';
+}
+
+function tintedRing(image: HTMLImageElement, blank: () => HTMLCanvasElement, color: string): HTMLCanvasElement | null {
+  const cached = tintedRings.get(color);
+  if (cached) return cached;
+  const canvas = blank();
+  canvas.width = RING_TINT_SIZE;
+  canvas.height = RING_TINT_SIZE;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.drawImage(image, 0, 0, RING_TINT_SIZE, RING_TINT_SIZE);
+  if (color !== '#ffffff') {
+    // Multiply by the colour, then keep the texture's own alpha, as a Pixi tint does.
+    context.globalCompositeOperation = 'multiply';
+    context.fillStyle = color;
+    context.fillRect(0, 0, RING_TINT_SIZE, RING_TINT_SIZE);
+    context.globalCompositeOperation = 'destination-in';
+    context.drawImage(image, 0, 0, RING_TINT_SIZE, RING_TINT_SIZE);
+  }
+  if (tintedRings.size >= RING_TINT_CACHE) tintedRings.clear();
+  tintedRings.set(color, canvas);
+  return canvas;
 }
 
 function trace(context: CanvasRenderingContext2D, points: readonly ScenePoint[], closed: boolean): void {
@@ -118,6 +184,21 @@ class CanvasSurface implements ViewSurface {
     }
     context.drawImage(image, x, y, width, height);
     context.restore();
+  }
+
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void {
+    const doc = this.canvas.ownerDocument;
+    const tint = ringColor(color);
+    const image = tokenRingImage(doc);
+    // A bare copy of this surface's canvas, as createLayer makes one.
+    const ring = image ? tintedRing(image, () => this.canvas.cloneNode(false) as HTMLCanvasElement, tint) : null;
+    if (ring) {
+      this.context.drawImage(ring, x - diameter / 2, y - diameter / 2, diameter, diameter);
+      return;
+    }
+    // Atlas's stand-in while the texture loads (SpriteFactory.createFallbackRing): a ring as wide as the padding.
+    const width = Math.max(2, (diameter - artSize) / 2);
+    this.circle(x, y, Math.max(0, diameter / 2 - width / 2), { stroke: tint, lineWidth: width, alpha: 0.95 });
   }
 
   text(text: string, x: number, y: number, style: TextStyle): void {
