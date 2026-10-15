@@ -2,12 +2,13 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import module from 'node:module';
 import { atlasAliases } from './vite/atlasAliases.mts';
+import { noScriptElements } from './vite/noScriptElements.mts';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
 /** The Obsidian plugin bundle. It writes dist/ and nothing else: never a vault (README, "Developing"). */
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), noScriptElements()],
   resolve: { alias: atlasAliases },
   css: { preprocessorOptions: { scss: { quietDeps: true } } },
   define: { 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development') },
