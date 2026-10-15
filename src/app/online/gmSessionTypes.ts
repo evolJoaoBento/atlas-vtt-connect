@@ -23,6 +23,12 @@ export interface SessionPlayer {
   client?: 'obsidian';
   /** The person the GM admitted them as (Obsidian players with a verified device); absent otherwise. */
   personId?: string;
+  /**
+   * Set on a waiting player whose name a player in the session already uses, joined from another client (another
+   * browser, device or Obsidian): whether that player is connected now. Allowing a disconnected one's name gives
+   * the new client their place (tokens, scene); a connected one is left as is.
+   */
+  sameNameAs?: 'connected' | 'disconnected';
 }
 
 /** Who the GM admits a player as: the person id, and the table proof that tells the player. */

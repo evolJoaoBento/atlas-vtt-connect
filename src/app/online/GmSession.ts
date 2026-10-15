@@ -1,5 +1,5 @@
 import { admit, joinSession, type AdmissionHost } from './gmSessionAdmission';
-import { cancelReissue, presenceOf, type Entry, type LinkState } from './gmSessionEntries';
+import { cancelReissue, playerView, presenceOf, sameName, setClient, type Entry, type LinkState } from './gmSessionEntries';
 import { SESSION_LIMITS, type Admission, type GmSessionOptions, type PlayerStatus, type SessionHandler, type SessionPlayer } from './gmSessionTypes';
 import { decodeControl, encodeControl, PLAYER_MESSAGE_TYPES, type ControlMessage, type DenyReason, type DeviceProof } from './protocol';
 import { channelPort } from './transport/channelPort';
@@ -47,20 +47,22 @@ export class GmSession {
   }
 
   getPlayers(): SessionPlayer[] {
-    return [...this.entries.values()].map((entry) => ({ ...entry.player }));
+    return [...this.entries.values()].map((entry) => playerView(this.entries, entry));
   }
 
   /** Admits a waiting player; `admission` gives them a person id and tells them with the table proof. */
   allow(playerId: string, admission?: Admission): void {
-    const entry = this.entries.get(playerId);
-    if (this.stopped || !entry || entry.player.status !== 'pending' || !entry.link) return;
-    this.closeRequest(entry);
+    const waiting = this.entries.get(playerId);
+    if (this.stopped || !waiting || waiting.player.status !== 'pending' || !waiting.link) return;
+    this.closeRequest(waiting);
     if (this.countStatus('admitted') >= SESSION_LIMITS.maxPlayers) {
       this.entries.delete(playerId);
-      this.refuse(this.release(entry), 'full');
+      this.refuse(this.release(waiting), 'full');
       this.changed();
       return;
     }
+    const earlier = waiting.earlier ? this.entries.get(waiting.earlier) : undefined;
+    const entry = earlier?.player.status === 'gone' ? this.takeOverEarlier(waiting, earlier) : waiting;
     if (admission) {
       entry.player.personId = admission.personId;
       entry.table = admission.table;
@@ -211,6 +213,28 @@ export class GmSession {
     for (const entry of this.entries.values()) {
       if (entry.player.status === 'admitted') entry.link?.send('control', message);
     }
+  }
+
+  /**
+   * The GM let a new client in under the name of a disconnected player: it takes that player's place (their id, so
+   * their tokens and scene) instead of being listed beside them, and other disconnected players of that name go.
+   * Nothing of the old client's identity carries over: the admission, if any, gives the new one.
+   */
+  private takeOverEarlier(waiting: Entry, earlier: Entry): Entry {
+    this.entries.delete(waiting.player.playerId);
+    const state = waiting.link ? this.links.get(waiting.link) : undefined;
+    if (state) state.entry = earlier;
+    earlier.link = waiting.link;
+    earlier.playerKey = waiting.playerKey;
+    earlier.device = waiting.device;
+    earlier.table = null;
+    earlier.player.name = waiting.player.name;
+    setClient(earlier.player, waiting.player.client ?? 'web');
+    delete earlier.player.personId;
+    for (const other of [...this.entries.values()]) {
+      if (other !== earlier && other.player.status === 'gone' && sameName(other.player.name, earlier.player.name)) this.entries.delete(other.player.playerId);
+    }
+    return earlier;
   }
 
   /** Detaches an entry from its connection so closing it is not seen as a drop. */

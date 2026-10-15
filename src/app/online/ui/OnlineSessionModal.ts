@@ -2,6 +2,7 @@ import { App, Modal, Notice, setIcon } from 'obsidian';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../ui/nativeModal';
 import { OnlineSessionService } from '../OnlineSessionService';
 import { onlineSessionStore, type OnlineSessionState } from '../onlineSessionStore';
+import { otherClientWarning } from './onlineCopy';
 
 const STATUS_TEXT: Record<OnlineSessionState['status'], string> = {
   idle: 'Not hosting. Start a session to get a link your players can open in a browser.',
@@ -53,6 +54,7 @@ export class OnlineSessionModal extends Modal {
         setIcon(dot, player.status === 'pending' ? 'hourglass' : 'circle');
         item.createSpan({ cls: 'atlas-connect-session-modal__name' }).setText(player.name);
         item.createSpan({ cls: 'atlas-connect-session-modal__state', text: player.status === 'pending' ? 'wants to join' : player.status === 'gone' ? 'disconnected' : 'connected' });
+        if (player.sameNameAs) item.createSpan({ cls: 'atlas-connect-session-modal__warning', text: otherClientWarning(player.name, player.sameNameAs === 'connected') });
         if (player.status === 'pending') {
           item.createEl('button', { cls: 'mod-cta', text: 'Allow' }).addEventListener('click', () => this.service.allow(player.playerId));
           item.createEl('button', { text: 'Deny' }).addEventListener('click', () => this.service.deny(player.playerId));

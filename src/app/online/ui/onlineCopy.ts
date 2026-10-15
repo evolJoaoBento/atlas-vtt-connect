@@ -15,5 +15,9 @@ export const NEW_PERSON_MARK = '(new)';
 export const sameNameWarning = (name: string, notMet = false): string => (notMet
   ? `${name} was added by name and has not joined yet`
   : `Someone named ${name} is already in your people list`);
-export const linkToLabel = (name: string): string => `Link to ${name}`;
+/** A join under the name of a player in the session, from another client than theirs (`GmSession`'s `sameNameAs`). */
+export const otherClientWarning = (name: string, connected: boolean): string => (connected
+  ? `${name} is already connected from another browser or device. Allowing adds a second ${name}.`
+  : `Not the browser or device ${name} used before. Allowing gives them ${name}'s place and tokens.`);
+export const linkToLabel =(name: string): string => `Link to ${name}`;
 export const PEOPLE_LABEL = 'People';

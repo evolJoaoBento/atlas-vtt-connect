@@ -1,5 +1,5 @@
 /** The GM session's admission paths: a join, a returning player taking over their entry, the identity re-check and the admit itself. */
-import { rejoinCheck, runReissue, setClient, type Entry, type LinkState } from './gmSessionEntries';
+import { earlierOf, playerView, rejoinCheck, runReissue, sameDevice, setClient, type Entry, type LinkState } from './gmSessionEntries';
 import { SESSION_LIMITS, type GmSessionOptions, type PlayerStatus, type SessionHandler } from './gmSessionTypes';
 import { randomId } from './ids';
 import { encodeControl, normalizePlayerName, type ControlMessage, type DenyReason } from './protocol';
@@ -30,7 +30,8 @@ export function joinSession(host: AdmissionHost, link: PeerLink, state: LinkStat
     return;
   }
 
-  const known = [...host.entries.values()].find((entry) => entry.playerKey === message.playerKey);
+  // The same client by its session key, or an Obsidian player's same device after a reload (its proof checked again).
+  const known = [...host.entries.values()].find((entry) => entry.playerKey === message.playerKey) ?? sameDevice(host.entries.values(), message.device);
   if (known) {
     const check = rejoinCheck(known, message.device);
     if (check === 'deny') host.refuse(link, 'denied');
@@ -51,12 +52,13 @@ export function joinSession(host: AdmissionHost, link: PeerLink, state: LinkStat
     requestTimer: null,
     device: message.device ?? null,
     table: null,
+    earlier: earlierOf(host.entries.values(), name)?.player.playerId ?? null,
   };
   entry.requestTimer = window.setTimeout(() => host.deny(entry.player.playerId), SESSION_LIMITS.requestTimeoutMs);
   state.entry = entry;
   host.entries.set(entry.player.playerId, entry);
   host.changed();
-  host.options.onJoinRequest({ ...entry.player }, entry.device);
+  host.options.onJoinRequest(playerView(host.entries, entry), entry.device);
 }
 
 /** Another tab of the same player, or a reconnect: the new link takes over. */
@@ -67,6 +69,8 @@ function takeOver(host: AdmissionHost, link: PeerLink, state: LinkState, known: 
   }
   const older = known.link;
   known.link = link;
+  // A same-device return brings a new session key: the next reconnect is matched by it.
+  known.playerKey = message.playerKey;
   setClient(known.player, message.client.kind);
   state.entry = known;
   if (older && older !== link) {

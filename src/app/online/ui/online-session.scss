@@ -41,6 +41,7 @@
 .atlas-connect-session-modal__player--admitted .atlas-connect-session-modal__dot { color: var(--color-green); }
 .atlas-connect-session-modal__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-medium); }
 .atlas-connect-session-modal__state { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.atlas-connect-session-modal__warning { flex-basis: 100%; font-size: var(--font-ui-smaller); color: var(--text-warning); }
 .atlas-connect-session-modal__footer { display: flex; justify-content: flex-end; }
 
 // The join request notice lives in Obsidian's notice container, outside any Atlas view.
