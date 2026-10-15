@@ -28,6 +28,8 @@ export interface DockView {
   viewId: string;
   /** The document of the window the view is in. */
   doc: Document;
+  /** The view's root element, where Atlas's own toolbar is; null when it has none to read. */
+  root: HTMLElement | null;
   selectedTokens(): DockToken[];
   tabs(): DockTab[];
 }
@@ -50,6 +52,8 @@ export interface MenuLike {
 export interface DockEnv {
   activeView(): DockView | null;
   view(viewId: string): DockView | null;
+  /** Every open map view. */
+  views(): DockView[];
   /** Calls `listener` when the active view, the open views, a selection or the tabs may have changed. */
   watch(listener: () => void): Disposer;
   menu(): MenuLike;
@@ -94,7 +98,12 @@ export class FloatingDock implements PanelHost {
   private stopWatching: Disposer | null = null;
   private readonly panels = new Map<string, OpenPanel>();
 
-  constructor(private readonly records: UiRecords, private readonly env: DockEnv) {}
+  constructor(
+    private readonly records: UiRecords,
+    private readonly env: DockEnv,
+    /** Whether the dock stands in for this view's toolbar: not where Connect is in Atlas's own. */
+    private readonly standsIn: (viewId: string) => boolean = () => true,
+  ) {}
 
   start(): Disposer {
     this.stopWatching = this.env.watch(() => this.refresh());
@@ -115,7 +124,7 @@ export class FloatingDock implements PanelHost {
       if (!this.env.view(viewOfKey(key))) this.closeKey(key);
     }
     const view = this.env.activeView();
-    if (!view || !this.hasSlots()) {
+    if (!view || !this.hasSlots() || !this.standsIn(view.viewId)) {
       this.removeRoot();
       return;
     }
@@ -348,10 +357,15 @@ export class FloatingDock implements PanelHost {
 
   private moreItems(ctx: ViewContext): MenuItem[] {
     const items: MenuItem[] = [];
+    // A command registered both as a menu item and in the palette shows once, under the first.
+    const seen = new Set<string>();
     const join = (group: MenuItem[]): void => {
-      if (group.length === 0) return;
+      const fresh = group.filter((entry, index) => (index === 0 && entry.disabled === true && !entry.onClick) || !seen.has(entry.label));
+      for (const entry of fresh) seen.add(entry.label);
+      // A palette section left with only its heading has nothing to show.
+      if (fresh.length === 0 || (fresh.length === 1 && fresh[0]!.disabled === true && !fresh[0]!.onClick)) return;
       if (items.length > 0) items.push({ label: '-' });
-      items.push(...group);
+      items.push(...fresh);
     };
     for (const provider of this.records.viewMenus) join(guarded('A menu provider', [] as MenuItem[], () => provider(ctx)));
     for (const section of this.records.palette.values()) {

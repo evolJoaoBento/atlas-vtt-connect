@@ -30,7 +30,7 @@ class FakeMenu implements MenuLike {
 function setup(options: { submenus?: boolean; selected?: Array<{ id: string; kind: 'token' | 'character'; label: string }> } = {}) {
   const views = new Map<string, DockView>();
   const view: DockView = {
-    viewId: 'v1', doc: document,
+    viewId: 'v1', doc: document, root: null,
     selectedTokens: () => options.selected ?? [],
     tabs: () => [{ tabId: 't1', mapPath: 'a.atlasmap', name: 'One', active: true, presented: false }, { tabId: 't2', mapPath: 'b.atlasmap', name: 'Two', active: false, presented: true }],
   };
@@ -42,6 +42,7 @@ function setup(options: { submenus?: boolean; selected?: Array<{ id: string; kin
   const env: DockEnv = {
     activeView: () => active,
     view: (id) => views.get(id) ?? null,
+    views: () => [...views.values()],
     watch: (listener) => { notify = listener; return () => { notify = () => undefined; }; },
     menu: () => new FakeMenu(options.submenus ?? true, shown),
     setIcon: (element, name) => { element.dataset.icon = name; },

@@ -196,3 +196,94 @@ $connect-dock-z: 1000;
   display: none;
   pointer-events: none;
 }
+
+// Connect in Atlas's own toolbar: a group of Atlas's tool buttons, and Atlas's own tray and dropdown for what they open.
+// Atlas's styles are scoped to its view's root, so everything here lives inside it.
+.atlas-connect-group {
+  gap: 8px;
+
+  // The group's buttons sit in the bar as Atlas's own tool buttons do.
+  .atlas-connect-item {
+    position: relative;
+  }
+
+  .atlas-connect-badge,
+  .atlas-connect-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    pointer-events: none;
+  }
+
+  .atlas-connect-badge {
+    min-width: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: var(--text-error);
+    color: var(--text-on-accent);
+    font-size: var(--font-ui-smaller);
+    line-height: 16px;
+    text-align: center;
+  }
+
+  .atlas-connect-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-success, currentColor);
+    box-shadow: 0 0 0 2px var(--background-primary);
+  }
+}
+
+// The tray rises over the group like Atlas's dice tray; its width follows what it holds.
+.atlas-connect-tray {
+  .atlas-connect-tray__panel {
+    min-width: 340px;
+    max-width: min(520px, calc(100vw - 32px));
+    max-height: calc(100vh - 180px);
+    overflow: auto;
+  }
+
+  .atlas-connect-tray__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 0 0 4px;
+  }
+
+  .atlas-connect-tray__title {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+  }
+
+  .atlas-connect-tray__content {
+    min-width: 0;
+  }
+}
+
+.atlas-connect-menu {
+  .atlas-connect-menu__heading {
+    padding: 2px 8px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+  }
+
+  .atlas-connect-menu__icon,
+  .atlas-connect-menu__arrow {
+    display: inline-flex;
+  }
+
+  .atlas-connect-menu__arrow.is-open {
+    transform: rotate(90deg);
+  }
+
+  .atlas-connect-menu__sub {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 12px;
+  }
+}

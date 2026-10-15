@@ -5,7 +5,8 @@
 import { Menu, setIcon, type App } from 'obsidian';
 import type { Disposer, UiApi } from '@atlas-vtt/api-types';
 import { FloatingDock, type DockEnv, type DockTab, type DockToken, type DockView, type MenuLike } from './floatingDock';
-import { createUiRegistry } from './uiRegistry';
+import { NativeToolbar } from './nativeToolbar';
+import { createUiRegistry, type PanelHost } from './uiRegistry';
 
 /** What the dock reads of a stock map view. */
 export interface UiStockView {
@@ -48,6 +49,7 @@ function dockView(view: UiStockView, presentedTabId: () => string | null): DockV
   return {
     viewId: view.viewId,
     doc: view.containerEl?.ownerDocument ?? document,
+    root: view.containerEl ?? null,
     selectedTokens: (): DockToken[] => {
       const { selectedIds, objects } = view.atlasStore.getState();
       return (selectedIds ?? []).filter((id) => Object.hasOwn(objects.tokens, id)).map((id) => {
@@ -88,6 +90,7 @@ export function stockDockEnv(app: App, deps: StockUiDeps): DockEnv {
       const view = deps.views().find((candidate) => candidate.viewId === viewId);
       return view ? dockView(view, deps.presentedTabId) : null;
     },
+    views: () => deps.views().map((view) => dockView(view, deps.presentedTabId)),
     watch: (listener) => {
       let timer: number | null = null;
       // One redraw for a burst of changes (a selection drag, a tab switch).
@@ -138,18 +141,51 @@ export function stockDockEnv(app: App, deps: StockUiDeps): DockEnv {
   };
 }
 
-/** The `ui` namespace of one extension and the dock that draws it; `dispose` takes both away. */
+/**
+ * The `ui` namespace of one extension and what draws it: Connect in Atlas's own toolbar where it can be put there
+ * (`nativeToolbar.ts`), the floating dock (`floatingDock.ts`) for a view whose toolbar cannot be found. `dispose` takes
+ * both away.
+ */
 export function stockUi(app: App, deps: StockUiDeps): { api: UiApi; dispose: Disposer } {
-  let dock: FloatingDock | null = null;
-  const registry = createUiRegistry(() => dock, () => dock?.refresh());
-  dock = new FloatingDock(registry.records, stockDockEnv(app, deps));
-  const stopDock = dock.start();
+  const env = stockDockEnv(app, deps);
+  // The surfaces and the registry need each other: the registry tells them of changes, the panels they hold answer it.
+  let native: NativeToolbar | null = null;
+  let floating: FloatingDock | null = null;
+  const refresh = (): void => {
+    native?.sync();
+    floating?.refresh();
+  };
+  const host: PanelHost = {
+    open: (panelId, viewId) => {
+      const id = viewId ?? env.activeView()?.viewId;
+      if (id !== undefined && native?.handles(id)) native.open(panelId, viewId);
+      else floating?.open(panelId, viewId);
+    },
+    close: (panelId, viewId) => {
+      native?.close(panelId, viewId);
+      floating?.close(panelId, viewId);
+    },
+    isOpen: (panelId, viewId) => native?.isOpen(panelId, viewId) === true || floating?.isOpen(panelId, viewId) === true,
+    remove: (panelId) => {
+      native?.remove(panelId);
+      floating?.remove(panelId);
+    },
+  };
+  const registry = createUiRegistry(() => host, refresh);
+  floating = new FloatingDock(registry.records, env, (viewId) => native?.handles(viewId) !== true);
+  native = new NativeToolbar(registry.records, env, () => floating?.refresh());
+  const stopWatching = env.watch(() => native?.sync());
+  const stopFloating = floating.start();
+  native.sync();
   return {
     api: registry.api,
     dispose: () => {
       registry.dispose();
-      stopDock();
-      dock = null;
+      stopWatching();
+      stopFloating();
+      native?.stop();
+      native = null;
+      floating = null;
     },
   };
 }
