@@ -15,13 +15,28 @@ function draw(tokens: Record<string, PlayerToken>, withImages = false): Recordin
 }
 
 describe('tokens layer', () => {
-  it('clips the art to its circle, cover-fit, and draws the ring on the grid stroke', () => {
-    expect(draw({ t1: playerToken() }, true).calls).toEqual([
+  it("clips the art to its circle, cover-fit, and draws Atlas's stone ring band over its edge", () => {
+    const calls = draw({ t1: playerToken() }, true).calls;
+    expect(calls.slice(0, 2)).toEqual([
       { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
       { op: 'image', image: art.image, x: -62, y: -31, width: 124, height: 62, clip: { x: 0, y: 0, radius: 31 } },
-      { op: 'circle', x: 0, y: 0, radius: 33, style: { stroke: '#ffffff', lineWidth: 4 } },
-      { op: 'pop' },
     ]);
+    expect(calls.at(-1)).toEqual({ op: 'pop' });
+    // The ring's outer diameter is the token's 62 plus twice the 4 px stroke: 35 out, a band of 10.15, in three strokes.
+    const rings = calls.slice(2, -1) as Array<{ op: string; radius: number; style: { stroke: string; lineWidth: number } }>;
+    expect(rings.map(({ style }) => style.stroke)).toEqual(['#4d4d4d', '#6b6b6b', '#1a1a1a']);
+    expect(rings[0]!.radius + rings[0]!.style.lineWidth / 2).toBeCloseTo(35);
+    expect(rings[0]!.style.lineWidth).toBeCloseTo(10.15);
+    // The rim is the outer quarter, the dark edge the inner third.
+    expect(rings[1]!.radius + rings[1]!.style.lineWidth / 2).toBeCloseTo(35);
+    expect(rings[2]!.radius - rings[2]!.style.lineWidth / 2).toBeCloseTo(35 - 10.15);
+  });
+
+  it('tints the band by the ring colour as Atlas tints its texture', () => {
+    const strokes = (ring: string): string[] => draw({ t1: playerToken({ ring }) }, true).ops('circle').filter(({ style }) => style.stroke !== undefined).map(({ style }) => String(style.stroke));
+    expect(strokes('#ff0000')).toEqual(['#4d0000', '#6b0000', '#1a0000']);
+    expect(strokes('#22aaff')).toEqual(['#0a334d', '#0e476b', '#03111a']);
+    expect(strokes('crimson')).toEqual(['crimson', 'crimson', 'crimson']);
   });
 
   it('draws a marker until the art has loaded, turned by the rotation, without a ring when it is off', () => {
