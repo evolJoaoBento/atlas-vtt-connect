@@ -20,6 +20,7 @@ export interface SceneDom {
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
   hoverCard: HTMLElement;
+  turnNotice: HTMLElement;
   diceToast: HTMLButtonElement;
   diceTray: HTMLElement;
   toolbar: HTMLElement;
@@ -65,6 +66,8 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const fitButton = toolButton(viewButtons, 'Fit map', 'maximize');
   const stack = root.createDiv({ cls: 'top-stack' });
   const notes = stack.createDiv({ cls: 'top-notes' });
+  const turnNotice = notes.createEl('p', { cls: 'turn-notice', attr: { role: 'status' } });
+  turnNotice.hidden = true;
   const moveNotice = notes.createEl('p', { cls: 'move-notice', attr: { role: 'status' } });
   moveNotice.hidden = true;
   const diceToast = notes.createEl('button', { cls: 'dice-toast', attr: { type: 'button', 'aria-live': 'polite' } });
@@ -86,6 +89,6 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
-    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard,
+    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice,
   };
 }

@@ -14,6 +14,7 @@ import { intersects } from '../camera';
 import type { ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
 import { TokenGlides } from './tokenGlides';
+import { turnOf } from '../turns';
 import { drawTokenUi } from './tokenUiDrawing';
 
 /** The stand-in drawn until a token's art has loaded. */
@@ -24,6 +25,8 @@ export const DOWNED_VEIL = { color: '#2b2b30', alpha: 0.55, skull: '#d6cebd' } a
 const SKULL_GLYPH_SHARE = 20 / 24;
 /** The ring around the tokens this player controls. */
 export const CONTROLLED_RING_COLOR = '#facc15';
+/** The ring around the token whose turn it is in a fight in turn order, for every player. */
+export const TURN_RING_COLOR = '#f8fafc';
 
 export function createTokensLayer(options: { now?: () => number } = {}): PlayerLayer {
   // Sorted once per change of the tokens, not on every frame; ids kept for the overlay.
@@ -40,6 +43,7 @@ export function createTokensLayer(options: { now?: () => number } = {}): PlayerL
       const stroke = computeTokenStrokeWidth(cellSize);
       const { controlled, positions, held } = frame.overlay;
       glides.begin(frame.scene.sceneId);
+      const turnToken = turnOf(frame.scene, controlled).tokenId;
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
         const target = positions.get(id) ?? inScene;
         const at = glides.position(id, { x: target.x, y: target.y }, id === held);
@@ -55,6 +59,8 @@ export function createTokensLayer(options: { now?: () => number } = {}): PlayerL
         if (controlled.has(id)) {
           surface.circle(token.x, token.y, ringRadius + stroke * 1.5, { stroke: CONTROLLED_RING_COLOR, lineWidth: stroke });
         }
+        // Whose turn it is, outside the player's own ring so both show.
+        if (id === turnToken) surface.circle(token.x, token.y, ringRadius + stroke * 3, { stroke: TURN_RING_COLOR, lineWidth: stroke, alpha: 0.9 });
         drawTokenUi(surface, token, { size, cellSize, ringRadius });
       }
       glides.end();

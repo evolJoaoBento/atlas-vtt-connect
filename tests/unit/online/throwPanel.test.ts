@@ -82,10 +82,10 @@ describe("the join page's thrown roll", () => {
 
   // The page shows a refused move, another player's roll and your own throw at the top of the map:
   // one column, so none covers another (`.top-stack` in style.css).
-  it("stacks the move notice, the roll toast and your throw under one another at the top of the map", () => {
+  it("stacks the turn and move notices, the roll toast and your throw under one another at the top of the map", () => {
     const page = new DOMParser().parseFromString(readFileSync(join(process.cwd(), 'online-client/index.html'), 'utf8'), 'text/html');
     const stack = page.querySelector('.top-stack');
-    expect([...stack!.querySelectorAll('[id]')].map((child) => child.id)).toEqual(['move-notice', 'dice-toast', 'dice-throws']);
+    expect([...stack!.querySelectorAll('[id]')].map((child) => child.id)).toEqual(['turn-notice', 'move-notice', 'dice-toast', 'dice-throws']);
     const css = readFileSync(join(process.cwd(), 'online-client/style.css'), 'utf8');
     expect(css).toMatch(/\.top-stack \{[^}]*flex-direction: column/);
     expect(css).not.toMatch(/\.(move-notice|dice-toast|dice-throws) \{[^}]*grid-row/);

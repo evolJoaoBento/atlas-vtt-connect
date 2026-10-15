@@ -353,3 +353,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .hover-card-title { font-weight: 600; }
 .hover-card-line { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .hover-card-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hover-dot); }
+
+/* "Your turn": the move notice's look, in the accent colour. */
+.turn-notice {
+  margin: 0; padding: var(--gap); background: var(--bar); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none;
+  color: var(--accent); font-weight: 600;
+}

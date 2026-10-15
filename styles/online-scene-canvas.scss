@@ -297,3 +297,15 @@
 .atlas-connect-scene .hover-card-title { font-weight: var(--font-semibold); }
 .atlas-connect-scene .hover-card-line { display: flex; align-items: center; gap: var(--size-4-1); color: var(--text-muted); }
 .atlas-connect-scene .hover-card-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hover-dot); }
+
+// "Your turn": the move notice's look, in the accent colour.
+.atlas-connect-scene .turn-notice {
+  margin: 0;
+  padding: var(--gap);
+  background: var(--bar);
+  border: 1px solid var(--interactive-accent);
+  border-radius: 8px;
+  pointer-events: none;
+  color: var(--text-accent);
+  font-weight: var(--font-semibold);
+}

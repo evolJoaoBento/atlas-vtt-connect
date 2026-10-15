@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR, TURN_RING_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
 import type { TokenOverlay } from '../../../src/app/online/view/layers/layerTypes';
@@ -11,7 +11,8 @@ const images = (id: string | null): typeof art | null => (id === 'asset-1' ? art
 
 function draw(tokens: Record<string, PlayerToken>, withImages = false): RecordingSurface {
   const surface = new RecordingSurface();
-  createTokensLayer().draw(surface, frame(playerScene({ tokens }), withImages ? { images } : {}));
+  // No fight: the turn ring has its own test.
+  createTokensLayer().draw(surface, frame({ ...playerScene({ tokens }), initiative: null }, withImages ? { images } : {}));
   return surface;
 }
 
@@ -140,6 +141,12 @@ describe('tokens layer', () => {
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(900);
     now = 650;
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(910);
+  });
+
+  it("rings the token whose turn it is, for every player", () => {
+    const surface = new RecordingSurface();
+    createTokensLayer().draw(surface, frame(playerScene({ tokens: { t1: playerToken(), t2: playerToken({ x: 300 }) } })));
+    expect(surface.ops('circle').filter(({ style }) => style.stroke === TURN_RING_COLOR).map(({ x }) => x)).toEqual([100]);
   });
 
   it('never draws a token smaller than a pixel, even under half a cell', () => {

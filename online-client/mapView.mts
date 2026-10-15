@@ -26,6 +26,7 @@ import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
 import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
+import { turnNotice, turnOf } from '../src/app/online/view/turns';
 
 /** What the toolbar shows of the tools. */
 export interface ToolState {
@@ -62,6 +63,8 @@ export interface MapViewOptions {
   active?: () => boolean;
   /** The document whose keys the map takes; the page's by default. */
   doc?: Document;
+  /** Says "Your turn" while a token the player controls has the turn; without it nothing says so. */
+  turnNotice?: HTMLElement;
   /** The card shown while the mouse rests on a token (its name, conditions and, for the player's own, numbers); without it none shows. */
   hoverCard?: HTMLElement;
 }
@@ -137,6 +140,7 @@ export class MapView {
     this.tools.setScene(scene);
     this.updateButtons();
     this.updateHoverCard();
+    this.updateTurn();
   }
 
   /** Exact numbers of the tokens this player controls (`token-stats`): the card of each shows them. */
@@ -268,6 +272,7 @@ export class MapView {
     this.options.notice.hidden = notice === null;
     this.updateCursor();
     this.updateHoverCard();
+    this.updateTurn();
   }
 
   /** Draws again; the toolbar hears only of a new tool or shape, never of every move. */
@@ -289,6 +294,15 @@ export class MapView {
     canvas.classList.toggle('is-grabbing', holding);
     const canGrab = !holding && this.tools.tool === 'move' && this.hover !== null && this.moves.canGrab(this.hover);
     canvas.classList.toggle('can-grab', canGrab);
+  }
+
+  /** "Your turn" while a token the player controls (or its side) has the turn. */
+  private updateTurn(): void {
+    const element = this.options.turnNotice;
+    if (!element) return;
+    const text = turnNotice(turnOf(this.scene, this.moves.overlay().controlled));
+    element.textContent = text ?? '';
+    element.hidden = text === null;
   }
 
   /** The card for the token under the mouse, or none: not while dragging or with no token there. */

@@ -63,6 +63,7 @@ export class CanvasScene implements OnlineSceneSink {
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),
         notice: dom.moveNotice,
         hoverCard: dom.hoverCard,
+        turnNotice: dom.turnNotice,
         onToolsChange: () => this.syncToolbar(),
         ...(options.frames ? { frames: options.frames } : {}),
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),
