@@ -38,22 +38,20 @@
 
 .atlas-connect-tooltip {
   @include atlas-elevated-surface;
-  position: absolute;
-  left: 50%;
+  // Fixed to the window, hidden until placed (LabelTooltip.tsx): never part of a scrolling panel's length.
+  position: fixed;
+  left: 0;
+  top: 0;
+  visibility: hidden;
   z-index: var(--layer-tooltip, 100);
   padding: 4px 8px;
   font-size: var(--font-ui-smaller);
   color: var(--text-normal);
   white-space: nowrap;
   pointer-events: none;
-  transform: translateX(-50%);
 
-  &.is-top {
-    bottom: calc(100% + 4px);
-  }
-
-  &.is-bottom {
-    top: calc(100% + 4px);
+  &.is-placed {
+    visibility: visible;
   }
 
   &.is-multiline {
