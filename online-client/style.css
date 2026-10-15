@@ -23,6 +23,9 @@ h1 { margin: 0; font-size: 20px; }
 h2 { margin: 0; font-size: 16px; }
 form { display: grid; gap: 8px; }
 input { min-height: var(--target); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+/* "Remember this name": a tick and its words, as light as the form's labels. */
+.remember { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.remember input { width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: var(--accent); }
 button { min-height: var(--target); padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
 button:disabled { opacity: 0.5; cursor: default; }

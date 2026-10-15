@@ -345,7 +345,11 @@ export class DropdownComponent extends InputBacked<HTMLSelectElement> {
 
 export class ToggleComponent extends ValueComponent<boolean> {
   private value = false;
-  constructor(public toggleEl: HTMLElement) { super(); }
+  constructor(public toggleEl: HTMLElement) {
+    super();
+    // As Obsidian's switch: a press flips it.
+    toggleEl.addEventListener('click', () => this.setValue(!this.value));
+  }
   setValue(value: boolean): this {
     if (this.value !== value) { this.value = value; this.changed?.(value); }
     this.toggleEl.classList.toggle('is-enabled', value);

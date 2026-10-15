@@ -32,6 +32,8 @@ export interface OnlineSettings {
   logEvents: boolean;
   /** The name this Atlas last joined a session with, offered next time. */
   playerName: string;
+  /** Whether the Join dialog keeps the name used, to offer it next time; off, none is kept. */
+  rememberPlayerName: boolean;
   /** Joining from Atlas: keep a session's images on this device (outside the vault) for the next one. */
   keepImages: boolean;
   /**
@@ -51,6 +53,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-connect/',
   logEvents: false,
   playerName: '',
+  rememberPlayerName: true,
   keepImages: true,
   table: null,
   shareableProperties: ['tags', 'aliases'],
@@ -113,6 +116,7 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
     playerPageUrl: typeof source.playerPageUrl === 'string' ? source.playerPageUrl : defaults.playerPageUrl,
     logEvents: source.logEvents === true,
     playerName: typeof source.playerName === 'string' ? source.playerName.slice(0, 200) : defaults.playerName,
+    rememberPlayerName: source.rememberPlayerName !== false,
     keepImages: source.keepImages !== false,
     table: validStoredTable(source.table),
     shareableProperties: Array.isArray(source.shareableProperties)

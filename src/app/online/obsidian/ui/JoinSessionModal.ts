@@ -15,9 +15,11 @@ export const JOIN_DIALOG_TITLE = 'Join online session';
 
 type JoinPort = Pick<OnlineJoinService, 'join' | 'leave'>;
 
+
 export class JoinSessionModal extends Modal {
   private link = '';
   private name: string;
+  private remember: boolean;
   private joining = false;
   private admitted = false;
   private statusEl: HTMLElement | null = null;
@@ -25,9 +27,10 @@ export class JoinSessionModal extends Modal {
   private linkInput: HTMLInputElement | null = null;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(app: App, private readonly service: JoinPort, name: string) {
+  constructor(app: App, private readonly service: JoinPort, name: string, remember = true) {
     super(app);
     this.name = name;
+    this.remember = remember;
     this.modalEl.addClass(...ATLAS_NATIVE_MODAL_CLASSES, 'atlas-join-modal');
   }
 
@@ -50,6 +53,13 @@ export class JoinSessionModal extends Modal {
         text.setValue(this.name).onChange((value) => { this.name = value; });
         text.inputEl.setAttribute('aria-label', 'Your name');
         text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
+      });
+    new Setting(contentEl)
+      .setName('Remember this name')
+      .setDesc('Offer it again next time, so you do not retype it.')
+      .addToggle((toggle) => {
+        toggle.setValue(this.remember).onChange((value) => { this.remember = value; });
+        toggle.toggleEl.setAttribute('aria-label', 'Remember this name');
       });
     this.statusEl = contentEl.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
     const buttons = contentEl.createDiv({ cls: 'modal-button-container' });
@@ -76,7 +86,7 @@ export class JoinSessionModal extends Modal {
   }
 
   private submit(): void {
-    const problem = this.service.join(this.link, this.name);
+    const problem = this.service.join(this.link, this.name, this.remember);
     if (problem) {
       this.setStatus(JOIN_PROBLEM_TEXT[problem], true);
       return;
@@ -134,5 +144,5 @@ export function openJoinSessionModal(app: App): void {
     new Notice('Online play is not ready yet. Try again in a moment.');
     return;
   }
-  new JoinSessionModal(app, service, service.rememberedName()).open();
+  new JoinSessionModal(app, service, service.rememberedName(), service.remembersName()).open();
 }

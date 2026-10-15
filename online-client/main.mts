@@ -42,6 +42,7 @@ function element<T extends HTMLElement>(id: string): T {
 const screen = element<HTMLElement>('screen');
 const form = element<HTMLFormElement>('join');
 const nameInput = element<HTMLInputElement>('name');
+const rememberName = element<HTMLInputElement>('remember-name');
 const status = element<HTMLParagraphElement>('status');
 const table = element<HTMLElement>('table');
 const sessionName = element<HTMLElement>('session-name');
@@ -234,7 +235,9 @@ if (!target) {
   status.textContent = NO_CANVAS_TEXT;
 } else {
   form.hidden = false;
-  nameInput.value = stored('name', () => '');
+  // "Remember this name" is on unless it was turned off; off, no name is kept or offered.
+  rememberName.checked = stored('remember-name', () => 'on') !== 'off';
+  nameInput.value = rememberName.checked ? stored('name', () => '') : '';
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (started) return;
@@ -243,7 +246,11 @@ if (!target) {
       status.textContent = NAME_PROBLEM_TEXT;
       return;
     }
-    try { localStorage.setItem(pageKey('name'), name); } catch { /* private window */ }
+    try {
+      localStorage.setItem(pageKey('remember-name'), rememberName.checked ? 'on' : 'off');
+      if (rememberName.checked) localStorage.setItem(pageKey('name'), name);
+      else localStorage.removeItem(pageKey('name'));
+    } catch { /* private window */ }
     started = true;
     form.hidden = true;
     session = createJoinSession({

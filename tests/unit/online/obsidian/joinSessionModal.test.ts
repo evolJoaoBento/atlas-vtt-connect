@@ -9,9 +9,9 @@ const state = (status: PlayerSessionState['status'], reason: string | null = nul
   status, playerId: status === 'admitted' ? 'p1' : null, title: 'Table', players: [], reason,
 });
 
-function open(result: JoinProblem | null = null) {
-  const service = { join: vi.fn((_link: string, _name: string): JoinProblem | null => result), leave: vi.fn() };
-  const modal = new JoinSessionModal({} as App, service, 'Anna');
+function open(result: JoinProblem | null = null, remember = true) {
+  const service = { join: vi.fn((_link: string, _name: string, _remember?: boolean): JoinProblem | null => result), leave: vi.fn() };
+  const modal = new JoinSessionModal({} as App, service, 'Anna', remember);
   const close = vi.spyOn(modal, 'close');
   modal.onOpen();
   const [link, name] = Array.from(modal.contentEl.querySelectorAll('input'));
@@ -36,6 +36,19 @@ describe('Join online session dialog', () => {
     expect(name?.value).toBe('Anna');
   });
 
+  it('has "Remember this name", on as it was left, and joins with what it says', () => {
+    const on = open();
+    const toggle = on.modal.contentEl.querySelector<HTMLElement>('.setting-item:nth-of-type(3) .setting-item-control > div')!;
+    expect(on.modal.contentEl.textContent).toContain('Remember this name');
+    expect(toggle.classList.contains('is-enabled')).toBe(true);
+    toggle.click();
+    on.type(on.link, 'https://example.org/join/#id=gm');
+    on.button('Join').click();
+    expect(on.service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna', false);
+    const off = open(null, false);
+    expect(off.modal.contentEl.querySelector('.setting-item:nth-of-type(3) .setting-item-control > div')!.classList.contains('is-enabled')).toBe(false);
+  });
+
   it("says what is wrong with the link, the name or the moment, and stays open", () => {
     const { button, status, close } = open('hosting');
     button('Join').click();
@@ -47,7 +60,7 @@ describe('Join online session dialog', () => {
     const { service, modal, button, type, link, status, close } = open();
     type(link, 'https://example.org/join/#id=gm');
     button('Join').click();
-    expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna');
+    expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna', true);
     joinedSessionStore.setState({ session: state('waiting') });
     expect(status()).toBe('Waiting for the GM to let you in…');
     expect(button('Join').disabled).toBe(true);
@@ -81,6 +94,6 @@ describe('Join online session dialog', () => {
     focus.mockRestore();
     type(link, 'https://example.org/join/#id=gm');
     name!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna');
+    expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna', true);
   });
 });
