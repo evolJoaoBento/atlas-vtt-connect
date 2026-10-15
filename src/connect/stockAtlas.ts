@@ -72,6 +72,8 @@ interface StockView {
     /** The fork's earlier renderer: a single background sprite. */
     getBackgroundSprite?(): { width: number; height: number; destroyed: boolean } | null;
     getViewportInstance?(): StockViewport | null;
+    /** The token layer, which can say which token is under a point (for the token menu). */
+    getTokenRenderer?(): { hitTestTokens?(x: number, y: number): string | null; viewport?: { toWorld?(point: { x: number; y: number }): { x: number; y: number } } } | null | undefined;
   } | null;
   switchToTab(tabId: string): Promise<void>;
 }

@@ -11,6 +11,7 @@
 import type { Disposer, MenuItem, PanelSpec, SceneTabMenuContext, TokenMenuContext, ToolbarItemContext, ViewContext } from '@atlas-vtt/api-types';
 import type { DockEnv, DockToken, DockView } from './floatingDock';
 import type { PanelHost, UiRecords } from './uiRegistry';
+import { watchTokenContextMenu } from './tokenContextMenu';
 
 const END = '.atlas-main-toolbar > .atlas-toolbar-end';
 const GROUP = 'atlas-connect-group';
@@ -200,6 +201,7 @@ export class NativeToolbar implements PanelHost {
     const { root } = bar.view;
     const win = bar.view.doc.defaultView;
     if (!root || !win) return;
+    bar.stops.push(watchTokenContextMenu(bar.view, { items: (view, token) => this.tokenItems(view, [token]), setIcon: (element, name) => this.env.setIcon(element, name) }));
     let queued = false;
     const again = (): void => {
       if (queued) return;
@@ -367,10 +369,15 @@ export class NativeToolbar implements PanelHost {
       const inner = make('div', 'tooltip-inner');
       inner.appendChild(make('span', 'tooltip-label', text));
       tip.appendChild(inner);
+      // Out of the page's flow before it is in the page (`.atlas-connect-tip` is fixed and hidden until placed): a tooltip
+      // that is for a moment a block at the end of the body makes the page overflow, the layout shifts under the pointer,
+      // and the button loses its hover and gains it again.
       button.ownerDocument.body.appendChild(tip);
       const rect = button.getBoundingClientRect();
       const tipRect = tip.getBoundingClientRect();
-      tip.setCssProps({ position: 'fixed', left: `${Math.max(EDGE, Math.min(rect.left + rect.width / 2 - tipRect.width / 2, win.innerWidth - tipRect.width - EDGE))}px`, top: `${rect.top - tipRect.height - 8}px` });
+      const left = Math.max(EDGE, Math.min(rect.left + rect.width / 2 - tipRect.width / 2, win.innerWidth - tipRect.width - EDGE));
+      tip.setCssProps({ left: `${left}px`, top: `${Math.max(EDGE, rect.top - tipRect.height - 8)}px` });
+      tip.classList.add('is-placed');
       this.tip = tip;
     }, TIP_DELAY_MS);
   }

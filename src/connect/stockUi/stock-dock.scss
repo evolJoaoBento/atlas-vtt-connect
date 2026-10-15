@@ -287,3 +287,15 @@ $connect-dock-z: 1000;
     padding-left: 12px;
   }
 }
+
+/* Connect's entries in Atlas's own token menu (`tokenContextMenu.ts`). */
+.atlas-connect-ctx-item { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.atlas-connect-ctx-item:hover { background: var(--background-modifier-hover); }
+.atlas-connect-ctx-item[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.atlas-connect-ctx-sub { padding-left: 12px; }
+.atlas-connect-ctx-chevron { display: inline-flex; transition: transform 120ms; }
+.atlas-connect-ctx-chevron.is-open { transform: rotate(90deg); }
+
+/* Connect's tooltip over a toolbar button: fixed from the moment it is in the page, shown once placed (`nativeToolbar.ts`). */
+.tooltip-content.atlas-connect-tip { position: fixed; left: 0; top: 0; width: max-content; max-width: calc(100vw - 16px); pointer-events: none; visibility: hidden; }
+.tooltip-content.atlas-connect-tip.is-placed { visibility: visible; }

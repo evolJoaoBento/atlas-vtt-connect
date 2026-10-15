@@ -178,6 +178,7 @@ function show(view: PageScreen): void {
   if (view.kind === 'table') {
     sessionName.textContent = view.title;
     connection.textContent = view.connection;
+    connection.dataset.state = view.connection === 'Connected' ? 'ok' : 'wait';
     // The canvas and the toolbar have their sizes only once the table is shown; after that they follow resizes.
     if (!tableShown) {
       map?.measure();

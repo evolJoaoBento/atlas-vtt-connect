@@ -12,6 +12,8 @@ import { createUiRegistry, type PanelHost } from './uiRegistry';
 export interface UiStockView {
   readonly viewId: string;
   readonly containerEl?: HTMLElement;
+  /** Atlas's renderer: its token layer can say which token is under a point (`hitTestTokens`, in world coordinates). */
+  readonly renderer?: { getTokenRenderer?(): { hitTestTokens?(x: number, y: number): string | null; viewport?: { toWorld?(point: { x: number; y: number }): { x: number; y: number } } } | null | undefined } | null | undefined;
   readonly atlasStore: { getState(): UiSceneState; subscribe(listener: () => void): () => void };
   readonly tabMetaStore: { getState(): { tabs: Array<{ id: string; filePath: string; displayName: string }>; activeTabId: string | null }; subscribe(listener: () => void): () => void };
 }
@@ -50,6 +52,16 @@ function dockView(view: UiStockView, presentedTabId: () => string | null): DockV
     viewId: view.viewId,
     doc: view.containerEl?.ownerDocument ?? document,
     root: view.containerEl ?? null,
+    tokenAt: (clientX, clientY): DockToken | null => {
+      const canvas = view.containerEl?.querySelector('canvas');
+      const layer = view.renderer?.getTokenRenderer?.();
+      if (!canvas || !layer?.hitTestTokens || !layer.viewport?.toWorld) return null;
+      const rect = canvas.getBoundingClientRect();
+      const at = layer.viewport.toWorld({ x: clientX - rect.left, y: clientY - rect.top });
+      const id = layer.hitTestTokens(at.x, at.y);
+      const token = id === null ? undefined : view.atlasStore.getState().objects.tokens[id];
+      return id === null || !token ? null : { id, kind: token.kind === 'character' ? 'character' : 'token', label: tokenLabel(token) };
+    },
     selectedTokens: (): DockToken[] => {
       const { selectedIds, objects } = view.atlasStore.getState();
       return (selectedIds ?? []).filter((id) => Object.hasOwn(objects.tokens, id)).map((id) => {

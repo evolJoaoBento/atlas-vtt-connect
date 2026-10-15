@@ -36,15 +36,15 @@ button:disabled { opacity: 0.5; cursor: default; }
   /* A pinch or double-tap that starts on the bar or a button must not zoom the page. */
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
-/* The map sits below the top bar, so the GM's framing is never hidden behind it. */
-#map { grid-row: 2; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+/* The map fills the window; the top pills float over its corners. */
+#map { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
 /* A grab hand over the player's own tokens; grabbing while a token or the map is dragged. */
 #map.can-grab { cursor: grab; }
 #map:active, #map.is-grabbing { cursor: grabbing; }
 /* "Move not allowed.": over the top of the map, never taking input. */
 /* The top of the map: the move notice, a roll's toast and your own throw, stacked so none covers another. */
 .top-stack {
-  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; max-width: calc(100% - 32px);
+  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 72px; max-width: calc(100% - 32px);
   display: flex; flex-direction: column; align-items: center; gap: var(--gap); pointer-events: none;
 }
 .top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
@@ -54,19 +54,31 @@ button:disabled { opacity: 0.5; cursor: default; }
   margin: 0;
   padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
 }
+/* The top of the table is no bar: two floating pills over the map, as Atlas's own toolbar floats over it. */
 .top-bar {
-  grid-row: 1; position: relative; z-index: 1; display: flex; align-items: center; gap: var(--gap);
-  padding: max(var(--gap), env(safe-area-inset-top)) max(var(--gap), env(safe-area-inset-right)) var(--gap) max(var(--gap), env(safe-area-inset-left));
-  background: var(--bar); border-bottom: 1px solid var(--border);
+  grid-row: 1 / -1; grid-column: 1; align-self: start; position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gap);
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  pointer-events: none;
 }
-.session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.connection { color: var(--muted); font-size: 13px; white-space: nowrap; }
-.image-progress { flex: 1; min-width: 80px; display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+.top-pill {
+  pointer-events: auto; display: flex; align-items: center; gap: var(--inset); min-width: 0; padding: var(--inset);
+  background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+}
+.top-info { padding-inline: 16px; min-height: calc(var(--tool-size) + 2 * var(--inset) + 2 * var(--panel-border)); }
+.session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
+/* Connection is a dot and a word before the name: quiet, as Atlas's own status text. */
+.connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.connection::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d29922; }
+.connection[data-state="ok"]::before { background: #3fb950; }
+.image-progress { flex: 1; min-width: 80px; display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 .image-progress progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .icon-button {
-  width: var(--target); height: var(--target); padding: 0; margin-left: auto; display: grid; place-items: center;
-  background: transparent; color: var(--text); border: 1px solid var(--border); font-size: 20px; font-weight: 500;
+  width: var(--tool-size); height: var(--tool-size); padding: 0; display: grid; place-items: center; min-height: 0;
+  background: transparent; color: var(--text); border: 0; border-radius: 8px; font-size: 18px; font-weight: 500;
 }
+.icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--hover); }
+.icon-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.top-actions { margin-left: auto; }
 .view-buttons {
   position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
   display: flex; gap: var(--gap);

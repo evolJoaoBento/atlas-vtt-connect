@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiApi } from '@atlas-vtt/api-types';
 import type { DockEnv, DockView } from '../../../src/connect/stockUi/floatingDock';
@@ -335,6 +336,28 @@ describe('Connect in Atlas\'s own toolbar', () => {
     expect(document.querySelector('.tooltip-content .tooltip-label')?.textContent).toBe('Online session');
     button.dispatchEvent(new MouseEvent('pointerleave'));
     expect(document.querySelector('.tooltip-content')).toBeNull();
+  });
+
+  it('puts the tooltip over its button, never in the page flow where it would push the layout under the pointer', () => {
+    const t = setup();
+    t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'Online session', onClick: () => undefined });
+    const button = t.buttons()[0]!;
+    const box = (left: number, top: number, width: number, height: number): DOMRect => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === button) return box(700, 735, 40, 40);
+      if (this.classList.contains('tooltip-content')) return box(0, 0, 100, 30);
+      return box(0, 0, 0, 0);
+    });
+    button.dispatchEvent(new MouseEvent('pointerenter'));
+    vi.advanceTimersByTime(300);
+    const tip = document.querySelector<HTMLElement>('.tooltip-content')!;
+    expect(tip.style.left).toBe('670px');
+    expect(tip.style.top).toBe('697px');
+    expect(tip.classList.contains('is-placed')).toBe(true);
+    // Fixed and hidden from the moment it is in the page, so it is never a block in the body's flow.
+    const css = readFileSync('src/connect/stockUi/stock-dock.scss', 'utf8');
+    expect(css).toMatch(/\.tooltip-content\.atlas-connect-tip \{[^}]*position: fixed;[^}]*visibility: hidden;/);
+    vi.restoreAllMocks();
   });
 
   it('leaves nothing behind when it stops', async () => {

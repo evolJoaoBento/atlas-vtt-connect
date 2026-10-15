@@ -31,6 +31,8 @@ export interface DockView {
   /** The view's root element, where Atlas's own toolbar is; null when it has none to read. */
   root: HTMLElement | null;
   selectedTokens(): DockToken[];
+  /** The token under a point of the window, when Atlas can say. */
+  tokenAt?(clientX: number, clientY: number): DockToken | null;
   tabs(): DockTab[];
 }
 
