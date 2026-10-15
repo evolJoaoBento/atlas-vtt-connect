@@ -80,9 +80,9 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
  */
 const RING_BAND_SHARE = 0.145;
 const RING_BANDS = [
-  { from: 0, to: 1, level: 0.3 },
-  { from: 0, to: 0.24, level: 0.42 },
-  { from: 0.7, to: 1, level: 0.1 },
+  { from: 0, to: 1, level: 0.38 },
+  { from: 0, to: 0.24, level: 0.55 },
+  { from: 0.7, to: 1, level: 0.12 },
 ] as const;
 
 /** `color` with every channel scaled by `level`, as a texture's grey is by its tint; a colour that is not #rrggbb is kept. */

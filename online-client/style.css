@@ -31,7 +31,9 @@ button.secondary { background: var(--card); color: var(--text); border: 1px soli
 button:disabled { opacity: 0.5; cursor: default; }
 #status { margin: 0; color: var(--muted); }
 /* The waiting loader: a ring turning in the accent colour, still under reduced motion (it says the page is alive). */
-.loader { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: loader-spin 800ms linear infinite; }
+/* The loader sits before the words, on their line. */
+.status-row { display: flex; align-items: center; gap: 10px; }
+.loader { flex: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: loader-spin 800ms linear infinite; }
 @keyframes loader-spin { to { transform: rotate(360deg); } }
 .links { color: var(--muted); font-size: 13px; }
 .links a { color: inherit; }
