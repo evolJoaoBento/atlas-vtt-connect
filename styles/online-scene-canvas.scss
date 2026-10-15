@@ -20,7 +20,7 @@
   h2 { margin: 0; font-size: 16px; }
   /* The table: the map fills the window, everything else floats over it. */
   &.table {
-    position: absolute; inset: 0; overflow: hidden; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr);
+    position: absolute; inset: 0; overflow: hidden; overflow: clip; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr);
     /* A pinch or double-tap that starts on the bar or a button must not zoom the page. */
     touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }

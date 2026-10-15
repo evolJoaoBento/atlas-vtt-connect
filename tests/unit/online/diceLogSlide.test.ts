@@ -19,3 +19,13 @@ describe("the player tab's dice log", () => {
     expect(css).toMatch(/\.top-bar \{ position: static; \}/);
   });
 });
+
+describe('opening the drawer does not move the table', () => {
+  it('keeps the table from being scrolled, by focus or otherwise', () => {
+    // A drawer still off to the side, focused, would scroll an overflow:hidden table sideways to show it.
+    expect(css).toMatch(/&\.table \{[^}]*overflow: hidden; overflow: clip;/);
+    const view = readFileSync('online-client/diceLogView.mts', 'utf8');
+    expect(view).toContain('closeButton.focus({ preventScroll: true })');
+    expect(view).toContain('toggleButton.focus({ preventScroll: true })');
+  });
+});

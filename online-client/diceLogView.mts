@@ -107,7 +107,8 @@ export class DiceLogView {
     this.options.panel.hidden = !open;
     this.options.toggleButton.setAttribute('aria-expanded', String(open));
     this.log.setOpen(open);
-    if (open) this.options.closeButton.focus();
+    // Never scrolling: a drawer still off to the side would otherwise pull the whole table sideways to show its button.
+    if (open) this.options.closeButton.focus({ preventScroll: true });
   }
 
   dispose(): void {
@@ -117,7 +118,7 @@ export class DiceLogView {
 
   private close(): void {
     this.setOpen(false);
-    this.options.toggleButton.focus();
+    this.options.toggleButton.focus({ preventScroll: true });
   }
 
   private render(): void {
