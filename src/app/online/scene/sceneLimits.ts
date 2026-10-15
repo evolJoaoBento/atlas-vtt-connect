@@ -25,6 +25,8 @@ export const SCENE_LIMITS = {
   points: 5_000,
   records: 10_000,
   conditions: 64,
+  /** Longest condition name players get. */
+  conditionName: 64,
   /** A token has this many resource sockets; the window draws the first two. */
   resources: 6,
   widgets: 64,

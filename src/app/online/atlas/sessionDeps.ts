@@ -20,7 +20,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
   | 'tabScenes'
 >;
 
@@ -62,6 +62,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     collectionGrid: (p) => atlas.rules.forMap(p).gridDefaults,
     coneAngle: (p) => atlas.rules.forMap(p).measurement.coneAngle,
     resources: (p) => atlas.rules.forMap(p).resources,
+    conditions: (p) => atlas.rules.forMap(p).conditions,
     initiativeRules: (p) => atlas.rules.forMap(p).initiative,
     watchResources: (cb) => atlas.on('rules-changed', () => cb()),
     playerViewSettings: {

@@ -1,5 +1,5 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
-import type { CollectionGridDefaults, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
+import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
@@ -38,6 +38,8 @@ export interface SceneProjectionOptions {
   coneAngle?: (mapPath: string | null) => number;
   /** The resources of the collection holding the map at `mapPath`, which decide the bars players see; without it none show. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  /** The condition definitions of the collection holding the map at `mapPath`, which name the conditions players see; without it they go unnamed. */
+  conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   /** The initiative rules of the collection holding the map at `mapPath`, which say whether the list is by sides before a fight; without it the list is in turn order. */
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Calls `listener` when a collection's rules change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
@@ -109,8 +111,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
@@ -119,6 +121,7 @@ export function sceneContext(
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
+    conditions: options.conditions?.(mapPath) ?? [],
     ...(initiativeRules && { initiativeRules }),
   };
 }

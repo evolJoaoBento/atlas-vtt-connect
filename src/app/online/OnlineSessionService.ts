@@ -1,5 +1,5 @@
 import type { App } from 'obsidian';
-import type { CollectionGridDefaults, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
+import type { CollectionGridDefaults, ConditionDefinition, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import type { GmSession, SessionPlayer } from './GmSession';
 import { hostSession, type HostedSession, type HostedSharingHooks, type OptionalParts } from './hostedSession';
@@ -49,6 +49,7 @@ export interface Deps extends OptionalParts {
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
   coneAngle?: (mapPath: string | null) => number;
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Tells when those resources or rules may have changed. */
   watchResources?: (listener: () => void) => () => void;
@@ -133,6 +134,7 @@ export class OnlineSessionService {
           ...(deps.collectionGrid ? { collectionGrid: deps.collectionGrid } : {}),
           ...(deps.coneAngle ? { coneAngle: deps.coneAngle } : {}),
           ...(deps.resources ? { resources: deps.resources } : {}),
+          ...(deps.conditions ? { conditions: deps.conditions } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
           ...(deps.watchResources ? { watchResources: deps.watchResources } : {}),
           ...(deps.diceLook ? { diceLook: deps.diceLook } : {}),

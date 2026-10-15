@@ -78,6 +78,10 @@ export interface PlayerCondition {
   id: string;
   /** The number of a valued condition; null when the token stores none. */
   value: number | null;
+  /** The collection's name for it ("Frightened"); absent from an older GM or for a condition the collection no longer defines. */
+  name?: string;
+  /** Its colour, `#rrggbb`; absent as `name` is. */
+  color?: string;
 }
 
 /** The two sides of a fight by sides, as `InitiativeSide` (a parity test keeps them equal). */

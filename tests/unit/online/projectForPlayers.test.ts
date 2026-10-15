@@ -323,6 +323,15 @@ describe('projectForPlayers fix round 1', () => {
     expect(projectForPlayers(withTokens({ hero: linked }), context()).tokens.hero?.name).toBe('Unknown Creature');
   });
 
+  it("names a character's conditions as the collection does, for the player's hover card", () => {
+    const named = hero({ conditions: ['prone', 'gone'], conditionValues: { prone: 2 } } as Partial<Character>);
+    const conditions = [{ id: 'prone', name: ' Prone ', color: '#AA3300' }, { id: 'odd', name: 'x'.repeat(200), color: 'red' }] as never;
+    expect(projectForPlayers(withTokens({ hero: named }), context({ conditions })).tokens.hero?.conditions).toEqual([
+      { id: 'prone', value: 2, name: 'Prone', color: '#AA3300' },
+      { id: 'gone', value: null },
+    ]);
+  });
+
   it('sends no conditions for plain tokens', () => {
     const plain = { id: 'rock', kind: 'token', x: 0, y: 0, imagePath: 'rock.png', conditions: ['prone'] } as unknown as Token;
     expect(projectForPlayers(withTokens({ rock: plain }), context()).tokens.rock?.conditions).toEqual([]);

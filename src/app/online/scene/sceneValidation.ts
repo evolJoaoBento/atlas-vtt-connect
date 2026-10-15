@@ -110,7 +110,9 @@ function optional(check: Check): Check {
   return (value) => value === undefined || check(value);
 }
 function isCondition(value: unknown): boolean {
-  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value));
+  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value))
+    && optional((name: unknown) => isText(name, SCENE_LIMITS.conditionName))(value.name)
+    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color);
 }
 
 function isPlayerMap(value: unknown): boolean {

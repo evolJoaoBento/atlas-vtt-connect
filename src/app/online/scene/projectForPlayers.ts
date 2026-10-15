@@ -7,7 +7,7 @@
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
-import type { Character, CollectionGridDefaults, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
+import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
 import type { AssetIds } from './sceneContracts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
@@ -52,6 +52,8 @@ export interface ProjectionContext {
    * them nothing is shown, so a map whose collection is unknown shows no resource.
    */
   resources?: readonly ResourceDefinition[];
+  /** The collection's condition definitions: what names a token's conditions for players. */
+  conditions?: readonly ConditionDefinition[];
   /**
    * The initiative rules of the map's collection, which decide whether the list is by sides before
    * a fight starts (`projectSides`); without them the default rules apply: turn order.
@@ -207,7 +209,7 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     layer: finiteOr(token.layer, 0),
     image: context.assets.idFor(token.imagePath),
     ring: token.showRing === false ? null : textOr(token.ringColor, DEFAULT_RING),
-    conditions: character ? projectConditions(token) : [],
+    conditions: character ? projectConditions(token, context.conditions ?? []) : [],
     name: character && rules.showTokenNameplates ? displayName(character) : null,
     // Atlas 0.5 replaced HP and stress with the collection's resources; the old fields stay null for older players.
     hp: null,
@@ -222,7 +224,10 @@ function displayName(token: Character): string | null {
   return textOrNull(token.name) ?? (token.statblockPath ? textOrNull(token.statblockName) ?? 'Unknown Creature' : null);
 }
 
-function projectConditions(token: TokenEntity): PlayerCondition[] {
+/** A condition's colour as players may receive it. */
+const CONDITION_COLOR = /^#[0-9a-f]{6}$/i;
+
+function projectConditions(token: TokenEntity, definitions: readonly ConditionDefinition[]): PlayerCondition[] {
   const ids: unknown[] = Array.isArray(token.conditions) ? token.conditions : [];
   const values: Record<string, unknown> = typeof token.conditionValues === 'object' && token.conditionValues !== null
     ? token.conditionValues
@@ -230,5 +235,13 @@ function projectConditions(token: TokenEntity): PlayerCondition[] {
   return ids
     .filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= SCENE_LIMITS.idLength)
     .slice(0, SCENE_LIMITS.conditions)
-    .map((id) => ({ id, value: Object.hasOwn(values, id) ? finiteOrNull(values[id]) : null }));
+    .map((id) => {
+      const condition: PlayerCondition = { id, value: Object.hasOwn(values, id) ? finiteOrNull(values[id]) : null };
+      // Named as the GM's collection names it, for the player's hover card; an id it no longer defines stays unnamed.
+      const definition = definitions.find((candidate) => candidate.id === id);
+      const name = typeof definition?.name === 'string' ? definition.name.trim().slice(0, SCENE_LIMITS.conditionName) : '';
+      if (name) condition.name = name;
+      if (typeof definition?.color === 'string' && CONDITION_COLOR.test(definition.color)) condition.color = definition.color;
+      return condition;
+    });
 }
