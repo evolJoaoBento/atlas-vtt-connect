@@ -173,12 +173,21 @@ export class NativeToolbar implements PanelHost {
     const timers = [60, 400].map((wait) => win.setTimeout(place, wait));
     const resize = (): void => place();
     win.addEventListener('resize', resize);
+    // Like Atlas's own dropdowns, a press outside the group closes it. A press on one of the group's buttons is that
+    // button's to answer (it toggles the panel), and a press in the panel itself is the panel's.
+    const doc = bar.view.doc;
+    const outside = (event: Event): void => {
+      if (event.target instanceof Node && bar.group?.contains(event.target)) return;
+      this.closePanel(bar, spec.id);
+    };
+    doc.addEventListener('pointerdown', outside, true);
     return {
       tray,
       content,
       dispose: () => {
         for (const timer of timers) win.clearTimeout(timer);
         win.removeEventListener('resize', resize);
+        doc.removeEventListener('pointerdown', outside, true);
         unmount?.();
       },
     };
@@ -281,9 +290,12 @@ export class NativeToolbar implements PanelHost {
       bar.items.delete(key);
       if (bar.menu && key === `menu:${bar.menu.name}`) this.closeMenu(bar);
     }
-    // Panels and the open menu sit last in the group, so the buttons keep their order.
-    for (const open of bar.panels.values()) group.appendChild(open.tray);
-    if (bar.menu) group.appendChild(bar.menu.element);
+    // Panels and the open menu sit last in the group, so the buttons keep their order. One already in its place is left
+    // alone: moving a node removes it, and a panel taken out and put back plays its slide-up again, which shows as a flash.
+    const after: HTMLElement[] = [...[...bar.panels.values()].map((open) => open.tray), ...(bar.menu ? [bar.menu.element] : [])];
+    after.forEach((element, offset) => {
+      if (group.children[bar.items.size + offset] !== element) group.insertBefore(element, group.children[bar.items.size + offset] ?? null);
+    });
   }
 
   /** One button of the group, made once and kept: its icon, label, state and badge follow what is registered. */

@@ -163,6 +163,52 @@ describe('Connect in Atlas\'s own toolbar', () => {
       expect(t.buttons()[0]!.classList.contains('is-active')).toBe(false);
     });
 
+    it('are not taken out and put back when the group is drawn again, which would replay their slide-up as a flash', async () => {
+      const t = setup();
+      const handle = t.ui.addPanel({ id: 'p', title: 'P', mount: () => () => undefined });
+      t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'A', onClick: () => undefined });
+      handle.open('v1');
+      const tray = t.root.querySelector('.atlas-connect-tray')!;
+      const moves: string[] = [];
+      const observer = new MutationObserver((records) => {
+        for (const record of records) {
+          for (const node of record.removedNodes) if (node === tray) moves.push('removed');
+          for (const node of record.addedNodes) if (node === tray) moves.push('added');
+        }
+      });
+      observer.observe(t.root, { childList: true, subtree: true });
+      // What an outside click sets going: the views change, the group is drawn again, with and without a menu.
+      t.native.sync();
+      t.ui.invalidate();
+      t.native.sync();
+      t.ui.addViewMenuItems(() => [{ label: 'One', onClick: () => undefined }]);
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      t.native.sync();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(moves).toEqual([]);
+      expect(t.root.querySelector('.atlas-connect-tray')).toBe(tray);
+      observer.disconnect();
+    });
+
+    it('close on a press outside the group, and not on a press in them or on their buttons', () => {
+      const t = setup();
+      const unmounted: string[] = [];
+      const handle = t.ui.addPanel({ id: 'p', title: 'P', mount: () => () => unmounted.push('x') });
+      t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'A', onClick: () => undefined });
+      handle.open('v1');
+      t.root.querySelector('.atlas-connect-tray__content')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      t.buttons()[0]!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(handle.isOpen('v1')).toBe(true);
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(handle.isOpen('v1')).toBe(false);
+      expect(unmounted).toEqual(['x']);
+      expect(t.root.querySelector('.atlas-connect-tray')).toBeNull();
+      // Pressing outside once the panel is gone does nothing, and leaves no listener behind.
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(unmounted).toEqual(['x']);
+    });
+
     it('close from their own button, once in a view, and a mount that throws is not fatal', () => {
       const t = setup();
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
