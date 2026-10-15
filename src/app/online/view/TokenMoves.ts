@@ -2,8 +2,8 @@
  * The player's side of moving their own tokens: which tokens they control, the drag of
  * one, and what the view shows until the GM answers. While dragging, only this view
  * shows the token under the pointer (a preview); one `token-move` goes out on release.
- * The dropped token stays where it was dropped until the scene brings an update of it
- * (the GM's snapped position), a refusal arrives (it goes back, and "Move not allowed."
+ * The dropped token shows where the GM's grid will snap it until the scene brings an update
+ * of it (the GM's snapped position), a refusal arrives (it goes back, and "Move not allowed."
  * shows for `REFUSED_NOTICE_MS`) or `CONFIRM_TIMEOUT_MS` passes. A drag is cancelled,
  * sending nothing, by a new scene, the token leaving the scene, losing control of it or
  * the connection, and by `cancel` (Escape, pointer cancel, a second finger). Shared with
@@ -14,6 +14,7 @@ import type { PlayerScene, PlayerToken, ScenePoint } from '../scene/sceneTypes';
 import type { ScreenPoint } from './camera';
 import type { TokenOverlay } from './layers/layerTypes';
 import { controlledTokenAt } from './tokenHit';
+import { toolGridOf } from './tools/toolGrid';
 import type { TokenGrab } from './ViewInput';
 
 export const CONFIRM_TIMEOUT_MS = 2000;
@@ -147,14 +148,16 @@ export class TokenMoves implements TokenGrab {
     this.held = null;
     const { tokenId, position } = held;
     const token = this.scene ? tokenOf(this.scene, tokenId) : null;
-    if (token && position) {
+    if (token && position && this.scene) {
       // Registered before sending: a refusal delivered synchronously must find it to settle.
       this.settle(tokenId);
       const timer = window.setTimeout(() => {
         this.settle(tokenId);
         this.options.onChange();
       }, CONFIRM_TIMEOUT_MS);
-      this.pending.set(tokenId, { position, token, timer });
+      // Shown where the GM's drop will snap it (the drag ruler's end), so it glides into its cell at once, as in
+      // Atlas, not after the GM's answer has come back; the answer puts it where the GM's Atlas really did.
+      this.pending.set(tokenId, { position: toolGridOf(this.scene).snapDrag(position, token.size), token, timer });
       if (!this.options.send(tokenId, position.x, position.y)) this.settle(tokenId);
     }
     this.options.onChange();
