@@ -6,12 +6,13 @@ Atlas VTT Connect is an Obsidian plugin that adds online play and sharing to [At
 - an Obsidian player tab;
 - note and map sharing.
 
-Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It works on top of Atlas VTT through Atlas's extension API and changes nothing in Atlas.
+Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It works on top of Atlas VTT and changes nothing in Atlas.
 
 ## What you need
 
 - Obsidian 1.8.7 or newer, on desktop.
-- **Atlas VTT with extension API 1.x.** This is not in any released Atlas yet: Atlas 0.6.0 does not have the API, because it is not merged upstream. Until it is, Connect needs an Atlas build that includes the extension API. Connect is built against the API build's 1.17.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). Without the API, or with another major version, Connect shows a notice and stays off.
+- **Atlas VTT**, from Community plugins. On a released Atlas (0.7.x, 0.8.x) Connect stands in for the extension API Atlas does not have yet: see [Stock Atlas](#stock-atlas-no-extension-api) for what works there.
+- **Optional: Atlas VTT with extension API 1.x**, which unlocks everything below (sharing notes and maps, per-collection rules). It is not in any released Atlas yet, because it is not merged upstream. Connect is built against the API build's 1.17.0. It never compares minor versions: it checks each feature it uses (the API's capabilities and the functions it calls), so it also runs on an Atlas whose API starts again at 1.0.0. Where a feature is missing, only that part is off: without scenes or bundles there is no sharing, without the Atlas toolbar and menus the commands still work, and an older remote view shows Follow GM and Fit map in other plugins' views too (doing nothing there), leaves no margin on Fit map and has no Shared with me button in the Online scene's status bar (use the command instead). With another major version of the API, Connect shows a notice and stays off.
 - **Atlas VTT with the extension API.** Install it with BRAT from `evolJoaoBento/atlas-vtt`, choosing the latest version (0.6.2-beta.1 or newer). You can also build Atlas from the branch `api/extension-api` (see Developing).
 - TODO (fill in once upstream ships it): the first upstream Atlas release that includes the extension API. Switch to that release once it ships.
 
@@ -32,7 +33,11 @@ Atlas has no toolbar, menu or panel slots for a plugin to use, so Connect puts i
 - **Gaps:** footprints of tokens seen in the dark are not shown to players (less than Atlas's window, never more); the map shows to players in 8 pixel cells, so edges of sight are a little rougher; a map with a stretch-fit grid shows players an unstretched image, so its grid may not line up; running timers show their last saved value; a roll thrown with "result card only" is thrown in 3D anyway; Atlas's marks and pings are not relayed.
 - **Missing:** sharing notes and maps, and per-collection rules (defaults are used).
 
-## Install with BRAT
+## Install
+
+From Settings, Community plugins: install and enable Atlas VTT, then Atlas VTT Connect.
+
+### With BRAT (the extension API build)
 
 If you use the online play preview (the fork's built-in online play, Atlas VTT 0.5.x or 0.6.1-beta.x from `evolJoaoBento/atlas-vtt`), see [Moving from the online preview](#moving-from-the-online-preview) first.
 
@@ -94,7 +99,7 @@ Connect replaces the online play preview (the fork of Atlas VTT with online play
 
 1. In BRAT, select `evolJoaoBento/atlas-vtt`, unfreeze it if you pinned a version, and update it to the latest version (0.6.2-beta.1 or newer). That is Atlas with the extension API; the built-in online play is gone and Connect replaces it.
 2. Restart Obsidian, or turn Atlas VTT off and on.
-3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0-beta.6**) and enable it.
+3. Add Atlas VTT Connect with BRAT (`evolJoaoBento/atlas-vtt-connect`, **0.1.0**) and enable it.
 
 Connect takes over the online preview's settings, people and shares on its first start. One thing works differently once:
 - **Maps you received before.** A map someone shared with you before Connect ran on an Atlas VTT that lets it replace received maps (including every map the online preview received) cannot be updated in place.
