@@ -29,7 +29,7 @@ export interface SceneDom {
   sheetBody: HTMLElement;
   handout: HandoutViewOptions;
   turnNotice: HTMLElement;
-  diceToast: HTMLButtonElement;
+  diceToast: HTMLElement;
   diceTray: HTMLElement;
   toolbar: HTMLElement;
   diceLog: HTMLElement;
@@ -87,7 +87,7 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   turnNotice.hidden = true;
   const moveNotice = notes.createEl('p', { cls: 'move-notice', attr: { role: 'status' } });
   moveNotice.hidden = true;
-  const diceToast = notes.createEl('button', { cls: 'dice-toast', attr: { type: 'button', 'aria-live': 'polite' } });
+  const diceToast = notes.createDiv({ cls: 'dice-toasts', attr: { 'aria-live': 'polite' } });
   diceToast.hidden = true;
   const diceTray = root.createDiv({ cls: 'dice-tray', attr: { role: 'group', 'aria-label': 'Dice tray' } });
   diceTray.hidden = true;

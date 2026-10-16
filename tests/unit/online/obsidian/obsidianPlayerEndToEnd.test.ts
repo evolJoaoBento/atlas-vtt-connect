@@ -148,7 +148,7 @@ describe('an Obsidian player end to end', () => {
     expect(entries[0]!.textContent).toContain('d20+2');
     expect(entries[0]!.textContent).toContain('13');
     // The player's own roll shows as a result card: no second three.js beside Atlas's.
-    const card = view().contentEl.querySelector('.dice-toast')!;
+    const card = view().contentEl.querySelector('.dice-toasts')!;
     expect(card.hasAttribute('hidden')).toBe(false);
     expect(card.textContent).toContain('13');
     service.dispose();

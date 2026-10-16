@@ -211,9 +211,10 @@ describe('CanvasSceneView', () => {
     sink.session(admitted);
     sink.diceLog([roll]);
     expect(view.contentEl.querySelectorAll('.dice-log-list .dice-entry')).toHaveLength(1);
-    expect(view.contentEl.querySelector('.dice-toast')?.hasAttribute('hidden')).toBe(true);
+    expect(view.contentEl.querySelector('.dice-toasts')?.hasAttribute('hidden')).toBe(true);
     sink.ownRoll(roll);
-    expect(view.contentEl.querySelector('.dice-toast')?.hasAttribute('hidden')).toBe(false);
+    expect(view.contentEl.querySelector('.dice-toasts')?.hasAttribute('hidden')).toBe(false);
+    expect(view.contentEl.querySelector('.dice-toasts .dice-card')).not.toBeNull();
   });
 
   it('offers Reconnect once the connection was lost', async () => {

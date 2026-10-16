@@ -29,7 +29,7 @@ function iconShapes(name: string): IconShape[] | null {
   return shapes;
 }
 
-/** Atlas's widget and condition icons are drawn on a 512 × 512 canvas. */
+/** Atlas's widget and condition icons are drawn on a 512 Ã— 512 canvas. */
 const WIDGET_ICON_SPACE = 512;
 /** Only Atlas's own icons are cached, so names from the network cannot grow it. */
 const widgetIcons = new Map<string, Path2D>();

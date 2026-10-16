@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiceLogView } from '../../../online-client/diceLogView.mts';
+import { DICE_CARD_MS } from '../../../online-client/diceToastView.mts';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 
 const views: DiceLogView[] = [];
@@ -74,16 +75,44 @@ describe('the join page dice log', () => {
     expect(element('dice-toast').hidden).toBe(false);
   });
 
-  it('toasts a new roll while closed, and opens the log from the toast', () => {
+  it("shows a new roll while closed as Atlas's result card, which a click dismisses, and the log opening clears", () => {
+    vi.useFakeTimers();
+    try {
+      const { view, element } = setup();
+      view.receive([], true);
+      view.receive([entry('a')], false);
+      const cards = (): HTMLElement[] => [...element('dice-toast').querySelectorAll<HTMLElement>('.dice-card:not(.is-exiting)')];
+      expect(element('dice-toast').hidden).toBe(false);
+      expect(cards()).toHaveLength(1);
+      expect(cards()[0]!.querySelector('.dice-card-name')?.textContent).toBe('Anna');
+      expect(cards()[0]!.querySelector('.dice-card-total')?.textContent).toBe(String(entry('a').total));
+      // A click on the card dismisses it, as Atlas's does; the log stays closed.
+      cards()[0]!.click();
+      expect(cards()).toHaveLength(0);
+      vi.advanceTimersByTime(DICE_CARD_MS.exit);
+      expect(element('dice-toast').hidden).toBe(true);
+      expect(element('dice-log').hidden).toBe(true);
+      // Two rolls stack, newest on top; opening the log clears them.
+      view.receive([entry('b'), entry('c')], false);
+      view.receive([entry('d')], false);
+      expect(cards().length).toBeGreaterThan(0);
+      element('dice-log-button').click();
+      expect(cards()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names the ability on its own and tags advantage, taking the ability off the roller\u2019s name', () => {
     const { view, element } = setup();
     view.receive([], true);
-    view.receive([entry('a')], false);
-    expect(element('dice-toast').hidden).toBe(false);
-    expect(element('dice-toast').textContent).toContain('Anna');
-    element('dice-toast').click();
-    expect(element('dice-log').hidden).toBe(false);
-    expect(element('dice-toast').hidden).toBe(true);
-    expect(element('dice-log-button').getAttribute('aria-expanded')).toBe('true');
+    view.receive([{ ...entry('a'), name: 'Anna: Mace', ability: 'Mace', advantage: 'advantage', dice: [{ die: 'd20', value: 12, dropped: true }, { die: 'd20', value: 16 }] }], false);
+    const card = element('dice-toast').querySelector('.dice-card')!;
+    expect(card.querySelector('.dice-card-name')?.textContent).toBe('Anna');
+    expect(card.querySelector('.dice-card-ability')?.textContent).toBe('Mace');
+    expect(card.querySelector('.dice-card-advantage')?.textContent).toBe('Advantage');
+    (card.querySelector('.dice-card-toggle') as HTMLButtonElement).click();
+    expect([...card.querySelectorAll('.dice-card-die')].map((die) => die.classList.contains('is-dropped'))).toEqual([true, false]);
   });
 
   it('opens from the Dice log button and closes with its close button or Escape', () => {

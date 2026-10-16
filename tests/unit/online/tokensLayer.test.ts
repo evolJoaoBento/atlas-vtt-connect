@@ -202,7 +202,7 @@ describe('tokens layer', () => {
     expect(layer.animating?.()).toBe(true);
   });
 
-  it('draws every token before any bars, so a token on a higher layer never covers a neighbour’s', () => {
+  it('draws every token before any bars, so a token on a higher layer never covers a neighbourâ€™s', () => {
     const surface = new RecordingSurface();
     const bar = { color: '#22c55e', share: 0.5, spent: false };
     createTokensLayer().draw(surface, frame(playerScene({ tokens: {
