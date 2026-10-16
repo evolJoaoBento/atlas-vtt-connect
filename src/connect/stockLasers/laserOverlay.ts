@@ -100,7 +100,11 @@ export class LaserOverlay {
     }
     const element = this.ensure(canvas);
     const scale = canvas.ownerDocument.defaultView?.devicePixelRatio || 1;
-    element.setCssProps({ display: 'block', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+    // Beside the map's canvas it shares its containing block; on the page's body it lies in the window's.
+    const besideCanvas = element.parentElement === canvas.parentElement;
+    const left = besideCanvas ? canvas.offsetLeft : rect.left;
+    const top = besideCanvas ? canvas.offsetTop : rect.top;
+    element.setCssProps({ display: 'block', position: besideCanvas ? 'absolute' : 'fixed', left: `${left}px`, top: `${top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
     const wide = Math.round(rect.width * scale);
     const high = Math.round(rect.height * scale);
     if (element.width !== wide) element.width = wide;
@@ -168,7 +172,10 @@ export class LaserOverlay {
   private ensure(canvas: HTMLCanvasElement): HTMLCanvasElement {
     if (this.element?.isConnected) return this.element;
     const element = createEl('canvas', { cls: 'atlas-connect-lasers', attr: { 'aria-hidden': 'true' } });
-    canvas.ownerDocument.body.appendChild(element);
+    // Right after the map's canvas: above the map, below Atlas's own panels and menus, which come later in the view.
+    // Lasting templates stay on screen, so they must never cover a panel. Without a parent, over the page.
+    if (canvas.parentElement) canvas.after(element);
+    else canvas.ownerDocument.body.appendChild(element);
     this.element = element;
     return element;
   }

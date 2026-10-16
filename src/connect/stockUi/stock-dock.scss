@@ -191,8 +191,8 @@ $connect-dock-z: 1000;
 
 // Other people's lasers, drawn over a map view's canvas: it takes no pointer and sits under the dock.
 .atlas-connect-lasers {
-  position: fixed;
-  z-index: 20;
+  // Placed beside the map's canvas (absolute) or, without one, over the page (fixed); see `LaserOverlay`.
+  position: absolute;
   display: none;
   pointer-events: none;
 }
