@@ -146,7 +146,9 @@ function isPlayerToken(value: unknown): boolean {
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
-    && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side);
+    && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
+    && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)
+    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale);
 }
 
 function isPlayerFogOp(value: unknown): boolean {

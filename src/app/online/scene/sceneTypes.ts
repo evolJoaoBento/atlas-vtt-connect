@@ -136,6 +136,13 @@ export interface PlayerToken {
   downed?: boolean;
   /** The side the list by sides puts this combatant under; sent only for a token with an initiative entry while the list is by sides. */
   side?: PlayerSide;
+  /**
+   * The number on Atlas's instance badge, counted among the look-alikes (same art) players see; sent only while two or
+   * more are in view and the map shows badges.
+   */
+  instance?: number;
+  /** The map's ring size setting, which scales the ring and what sits on it; sent only when it is not 1. */
+  ringScale?: number;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */

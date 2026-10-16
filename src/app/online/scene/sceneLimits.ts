@@ -58,4 +58,8 @@ export const SCENE_RANGES = {
   resourceValue: [-1_000_000, 1_000_000],
   /** A wheel's socket: the first two are bars. */
   wheelSlot: [2, 5],
+  /** The number on a look-alike's badge. */
+  instance: [1, 9_999],
+  /** The map's ring size setting (`tokenRingSize`). */
+  ringScale: [0.25, 4],
 } as const satisfies Record<string, Range>;

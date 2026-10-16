@@ -73,6 +73,8 @@ export function sliceOf(snapshot: SceneSnapshot): Slice {
     snapshot.initiativeTrackerOpen, snapshot.lighting,
     // A stock Atlas's snapshot carries its note pins (an Atlas API's has none): the readable ones go to players.
     (snapshot.objects as { pins?: unknown }).pins,
+    // And its token settings: the instance badges and ring size players see follow them.
+    (snapshot as { tokenSettings?: unknown }).tokenSettings,
   ];
 }
 

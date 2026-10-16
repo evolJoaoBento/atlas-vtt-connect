@@ -14,7 +14,7 @@
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
-  MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, ViewCamera, ViewInfo,
+  MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
@@ -51,6 +51,8 @@ interface StockSceneState {
   initiative: SceneSnapshot['initiative'];
   initiativeTrackerOpen: boolean;
   lighting: SceneSnapshot['lighting'];
+  /** The map's token settings: instance badges and the ring's size reach players from here. */
+  tokenSettings?: Partial<TokenSettings>;
   remoteView?: unknown;
 }
 interface StockViewport {
@@ -183,6 +185,7 @@ function snapshot(view: StockView): SceneSnapshot {
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
     lighting: state.lighting,
+    ...(state.tokenSettings ? { tokenSettings: state.tokenSettings } : {}),
   });
 }
 
@@ -201,7 +204,7 @@ function camera(view: StockView): ViewCamera | null {
 function snapshotSlice(view: StockView): readonly unknown[] {
   const s = view.atlasStore.getState();
   return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
-    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting];
+    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings];
 }
 
 function guard(what: string, call: () => void): void {

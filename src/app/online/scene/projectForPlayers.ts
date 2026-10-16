@@ -7,7 +7,8 @@
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
-import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
+import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
+import { badgeNumberInView, NO_INSTANCE_NUMBERS, numberTokensInView, type TokenInView } from './instanceNumbers';
 import type { AssetIds } from './sceneContracts';
 import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
@@ -26,7 +27,10 @@ import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { WIDGET_ICON_PATHS } from '../../types/widgetIcons';
 
 /** The part of a `SceneSnapshot` the projection reads; `mapPath` is the GM's own path and is never sent. */
-export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'>;
+export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'> & {
+  /** The map's token settings where the host reads them (a stock Atlas): instance badges and the ring's size. */
+  tokenSettings?: Partial<Pick<TokenSettings, 'showInstanceBadges' | 'tokenRingSize'>>;
+};
 
 export interface ProjectionContext {
   sceneId: string;
@@ -84,7 +88,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
   const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
   const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules);
-  const tokens = withCombatantSides(seen, initiative, objects?.tokens);
+  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state, memo);
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
@@ -269,6 +273,36 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
   };
+}
+
+/**
+ * The instance badges and ring size of the tokens players see, as Atlas's players' picture shows them
+ * (`PlayerInstanceBadges`): look-alikes numbered among the tokens sent, each keeping its number while it stays in view.
+ */
+function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput, memo: ProjectionMemo): Record<string, PlayerToken> {
+  const settings = state.tokenSettings;
+  const ring = finiteOr(settings?.tokenRingSize, 1, SCENE_RANGES.ringScale);
+  const previous = memo.instances?.map === state.mapPath ? memo.instances.numbers : NO_INSTANCE_NUMBERS;
+  const inView: TokenInView[] = [];
+  for (const id of Object.keys(tokens)) {
+    const token = state.objects?.tokens?.[id];
+    if (token) inView.push({ id, art: typeof token.imagePath === 'string' ? token.imagePath : '', rank: finiteOr(token.instanceNumber, 1) });
+  }
+  const numbers = numberTokensInView(previous, inView);
+  memo.instances = { map: state.mapPath, numbers };
+  const badgesOn = settings?.showInstanceBadges ?? true;
+  let changed: Record<string, PlayerToken> | null = null;
+  for (const [id, token] of Object.entries(tokens)) {
+    const number = badgeNumberInView(numbers, id, badgesOn);
+    if (number === null && ring === 1) continue;
+    changed ??= { ...tokens };
+    changed[id] = {
+      ...token,
+      ...(number !== null ? { instance: finiteOr(number, 1, SCENE_RANGES.instance) } : {}),
+      ...(ring !== 1 ? { ringScale: ring } : {}),
+    };
+  }
+  return changed ?? tokens;
 }
 
 /** The nameplate text `TokenUIRenderer` shows: the name, the statblock's name, or a placeholder for a statblock. */

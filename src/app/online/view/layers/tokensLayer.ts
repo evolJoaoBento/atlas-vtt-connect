@@ -78,7 +78,9 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         // The art, its rings, and the bars and badges around it.
         const reach = size / 2 + stroke + cellSize;
         if (!intersects({ x: token.x - reach, y: token.y - reach, width: reach * 2, height: reach * 2 }, frame.visible)) continue;
-        const ringRadius = getTokenRingCenterRadius(size, stroke, 1);
+        // The map's ring size scales the ring, and the rings, badges and wheels placed on it (`TokenUIRenderer.ringRadius`).
+        const ringScale = token.ringScale ?? 1;
+        const ringRadius = getTokenRingCenterRadius(size * ringScale, stroke, ringScale);
         const downed = downedFades.progress(id, token.downed === true);
         drawArt(surface, frame, token, size, stroke, ringRadius, downed);
         if (controlled.has(id)) {
@@ -135,8 +137,10 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
   surface.pop();
   if (token.ring !== null) {
     surface.glassDome(token.x, token.y, size);
-    // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
-    const diameter = getTokenRingOuterDiameter(size, stroke, 1);
+    // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side,
+    // scaled by the map's ring size.
+    const ringScale = token.ringScale ?? 1;
+    const diameter = getTokenRingOuterDiameter(size * ringScale, stroke, ringScale);
     surface.tokenRing(token.x, token.y, diameter, size, token.ring);
     if (downed > 0) surface.tokenRing(token.x, token.y, diameter, size, token.ring, { lifeless: true, alpha: downed });
   }
@@ -145,4 +149,20 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
     const scale = DOWNED_MOTION.emblemScale - (DOWNED_MOTION.emblemScale - 1) * downed;
     surface.downedEmblem(token.x, token.y, size * scale, downed * DOWNED_MOTION.emblemOpacity);
   }
+  if (token.instance !== undefined) drawInstanceBadge(surface, token, size, stroke, token.instance);
+}
+
+/**
+ * Atlas's instance badge (`updateInstanceBadge`): a black disc with a grey rim on the ring band, up and to the right,
+ * with the number in white bold. Atlas places it on the ring as the token's own size draws it, whatever the ring size.
+ */
+function drawInstanceBadge(surface: ViewSurface, token: PlayerToken, size: number, stroke: number, number: number): void {
+  const radius = Math.max(8, size * 0.14);
+  const fontSize = Math.max(10, radius * 1.3);
+  const ringRadius = getTokenRingCenterRadius(size, stroke, 1);
+  const x = token.x + ringRadius * Math.SQRT1_2;
+  const y = token.y - ringRadius * Math.SQRT1_2;
+  surface.circle(x, y, radius, { fill: '#000000' });
+  surface.circle(x, y, radius, { stroke: '#555555', lineWidth: 1.5 });
+  surface.text(String(number), x, y, { font: `bold ${fontSize}px Arial, sans-serif`, color: '#ffffff', align: 'center' });
 }
