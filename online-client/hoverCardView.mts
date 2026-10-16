@@ -54,8 +54,8 @@ export class HoverCardView {
     const y = clientY + OFFSET + height > maxY ? Math.max(8, clientY - OFFSET - height) : clientY + OFFSET;
     // A fixed element is placed in its containing block, which is the window only where no ancestor contains it:
     // an Obsidian pane does (`contain: strict`). Placed at 0, 0 first, it tells where that block begins.
-    element.style.setProperty('--hover-x', '0px');
-    element.style.setProperty('--hover-y', '0px');
+    element.style.removeProperty('--hover-x');
+    element.style.removeProperty('--hover-y');
     const origin = element.getBoundingClientRect();
     element.style.setProperty('--hover-x', `${Math.round(x - origin.left)}px`);
     element.style.setProperty('--hover-y', `${Math.round(y - origin.top)}px`);
