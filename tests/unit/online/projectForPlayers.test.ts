@@ -205,13 +205,15 @@ describe('projectForPlayers', () => {
       'isHidden', 'notePath', 'statblockPath', 'statblockName', 'tags', 'playerLinked', 'playerId', 'playerCharacterId',
       'hasVision', 'visionInnerRadius', 'visionOuterRadius', 'instanceNumber', 'showNameplate', 'hope', 'difficulty',
       'maxHpOverridden', 'maxStressOverridden', 'statblockResources', 'conditionValues', 'imagePath', 'kind', 'futureField',
-      'pins', 'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
+      'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
       'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
       'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
     ];
     // The grid and the snap grid are geometry players are meant to have (an offset among it).
     const keys = keysOf({ ...scene, grid: null, measurement: { ...scene.measurement, snapGrid: null }, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);
+    // The scene's one pin is for the GM only.
+    expect(scene.pins).toEqual([]);
     expect(Object.keys(scene.measurement.snapGrid!).sort()).toEqual(['offsetX', 'offsetY', 'size', 'type']);
     expect(scene.initiative?.entries[0]).not.toHaveProperty('stress');
     expect(keysOf(scene.widgets).has('color')).toBe(false);
@@ -330,6 +332,23 @@ describe('projectForPlayers fix round 1', () => {
       { id: 'prone', value: 2, name: 'Prone', color: '#AA3300' },
       { id: 'gone', value: null },
     ]);
+  });
+
+  it('sends the pins the GM made readable, where players see the map, by title only', () => {
+    const pins = {
+      a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md#The Cellar', readable: true, label: '1' },
+      b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Secrets/Guard.md' },
+      c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gm.md', readable: true, gmOnly: true },
+      d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'scenes/Cave.atlasmap', readable: true },
+      e: { id: 'e', kind: 'pin', x: 700, y: 700, notePath: 'Fogged.md', readable: true },
+      f: { id: 'f', kind: 'pin', x: 300, y: 100, notePath: 'Dock.md', readable: true },
+    };
+    const scene = projectForPlayers(withTokens({}, { pins } as never), context({ coverage: fogOver(600, 600, 300, 200) }));
+    expect(scene.pins).toEqual([
+      { id: 'pin-0', x: 100, y: 100, label: '1', title: 'The Cellar' },
+      { id: 'pin-1', x: 300, y: 100, label: null, title: 'Dock' },
+    ]);
+    expect(JSON.stringify(scene.pins)).not.toContain('Secrets');
   });
 
   it('sends no conditions for plain tokens', () => {

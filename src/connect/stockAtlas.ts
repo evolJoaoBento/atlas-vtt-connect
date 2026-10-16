@@ -200,7 +200,7 @@ function camera(view: StockView): ViewCamera | null {
 /** The slice of a view's stores a snapshot is made of; unchanged by reference means no new snapshot. */
 function snapshotSlice(view: StockView): readonly unknown[] {
   const s = view.atlasStore.getState();
-  return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings,
+  return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting];
 }
 

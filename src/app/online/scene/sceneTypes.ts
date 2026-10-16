@@ -257,6 +257,20 @@ export interface PlayerScene {
   widgets: PlayerWidget[];
   initiative: PlayerInitiative | null;
   measurement: PlayerMeasurement;
+  /** The map pins the GM made readable, where players see them; absent from an older GM. */
+  pins?: PlayerPin[];
+}
+
+/** A note pin players may read: its place, its number or letter, and its note's title. Never the note's path. */
+export interface PlayerPin {
+  /** An alias, not Atlas's pin id. */
+  id: string;
+  x: number;
+  y: number;
+  /** The pin's number or letter, for pins that show one. */
+  label: string | null;
+  /** The linked note's title (its file name, or its heading). */
+  title: string | null;
 }
 
 /** A snapshot's scene: everything but the fog and the drawings, which follow in parts. */
@@ -266,7 +280,7 @@ export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
-export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement'] as const;
+export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins'] as const;
 export type SceneFieldKey = typeof SCENE_FIELD_KEYS[number];
 
 export interface ScenePatchBody {

@@ -220,12 +220,19 @@ function isPlayerMeasurement(value: unknown): boolean {
     && optional(nullable(isSnapGrid))(value.snapGrid);
 }
 
+function isPlayerPins(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SCENE_LIMITS.pins && value.every((pin) => isFields(pin)
+    && isText(pin.id, SCENE_LIMITS.idLength) && isCoordinate(pin.x) && isCoordinate(pin.y)
+    && (pin.label === null || isText(pin.label, SCENE_LIMITS.pinLabel)) && (pin.title === null || isText(pin.title, SCENE_LIMITS.pinTitle)));
+}
+
 const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   map: isPlayerMap,
   grid: nullable(isPlayerGrid),
   widgets: isPlayerWidgets,
   initiative: nullable(isPlayerInitiative),
   measurement: isPlayerMeasurement,
+  pins: isPlayerPins,
 };
 const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
   tokens: isPlayerToken,
@@ -238,7 +245,7 @@ const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
 export function isPlayerSceneBody(value: unknown): boolean {
   return isFields(value) && isSceneId(value.sceneId)
     // An older GM sends no measurement; the mirror fills it in.
-    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement'))
+    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins'))
     && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText);
 }
 

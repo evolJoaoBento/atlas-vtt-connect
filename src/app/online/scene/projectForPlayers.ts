@@ -19,7 +19,7 @@ import { projectDrawings, projectFog, projectRecord, projectTexts, type Projecti
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES,
-  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
+  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerPin, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 
@@ -94,7 +94,51 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     widgets: projectWidgets(state, context.rules),
     initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
+    // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
+    ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
   };
+}
+
+function hasPins(objects: unknown): boolean {
+  const pins = (objects as { pins?: unknown } | undefined)?.pins;
+  return typeof pins === 'object' && pins !== null;
+}
+
+/** A pin's title from its note link: the heading when it names one, else the file name, without folders or extension. */
+function pinTitle(notePath: string): string | null {
+  const [path = '', heading] = notePath.split('#');
+  const name = heading?.trim() || (path.split('/').pop() ?? '').replace(/\.md$/i, '').trim();
+  return name ? name.slice(0, SCENE_LIMITS.pinTitle) : null;
+}
+
+/**
+ * The note pins players may read, as Atlas's own online play chooses them (`ReadablePins`): marked readable, not for
+ * the GM only, linking a note (never a scene), and only where players see the map (the fog, and the lighting of a lit
+ * scene). Atlas's API has no pins; a stock Atlas's snapshot carries them. Each gets an alias in place of its id.
+ */
+function projectPins(objects: unknown, visible: Shows, cellSize: number): PlayerPin[] {
+  const record = (objects as { pins?: unknown } | undefined)?.pins;
+  if (typeof record !== 'object' || record === null) return [];
+  const found: PlayerPin[] = [];
+  const entries = Object.entries(record as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const [, value] of entries) {
+    if (found.length >= SCENE_LIMITS.pins) break;
+    if (typeof value !== 'object' || value === null) continue;
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown };
+    if (pin.readable !== true || pin.gmOnly === true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
+    const x = finiteOrNull(pin.x);
+    const y = finiteOrNull(pin.y);
+    const around = { x: (x ?? 0) - cellSize / 4, y: (y ?? 0) - cellSize / 4, width: cellSize / 2, height: cellSize / 2 };
+    if (x === null || y === null || !visible.shows(around)) continue;
+    found.push({
+      id: `pin-${found.length}`,
+      x: finiteOr(x, 0, SCENE_RANGES.coordinate),
+      y: finiteOr(y, 0, SCENE_RANGES.coordinate),
+      label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
+      title: pinTitle(pin.notePath),
+    });
+  }
+  return found;
 }
 
 /**

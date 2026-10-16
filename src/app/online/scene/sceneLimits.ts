@@ -27,6 +27,10 @@ export const SCENE_LIMITS = {
   conditions: 64,
   /** Longest condition name players get. */
   conditionName: 64,
+  /** Readable pins players get of one scene. */
+  pins: 200,
+  pinLabel: 8,
+  pinTitle: 120,
   /** A token has this many resource sockets; the window draws the first two. */
   resources: 6,
   widgets: 64,

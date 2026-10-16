@@ -141,6 +141,7 @@ export class PlayerSceneMirror {
       sceneId: body.sceneId, map: body.map, grid: body.grid, tokens: body.tokens, texts: body.texts,
       widgets: body.widgets, initiative: body.initiative,
       measurement: withMeasurementDefaults(body.measurement),
+      ...(body.pins ? { pins: body.pins } : {}),
       fog: keepFogIdentity(this.current?.fog, toRecord(pending.fog)), drawings: toRecord(pending.drawings),
     });
   }

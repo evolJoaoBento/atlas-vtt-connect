@@ -28,6 +28,7 @@ import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
 import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
 import { turnNotice, turnOf } from '../src/app/online/view/turns';
+import { createPinsLayer, pinAt } from '../src/app/online/view/layers/pinsLayer';
 
 /** What the toolbar shows of the tools. */
 export interface ToolState {
@@ -104,7 +105,7 @@ export class MapView {
       images: options.images,
       layers: createSceneLayers(),
       // Read at draw time, once the tools exist.
-      overlays: [createToolsLayer({ overlay: () => this.tools.overlay(), isAnimating: () => this.tools.isAnimating() })],
+      overlays: [createPinsLayer(), createToolsLayer({ overlay: () => this.tools.overlay(), isAnimating: () => this.tools.isAnimating() })],
       requestFrame: (draw) => frames.request(draw),
       cancelFrame: (handle) => frames.cancel(handle),
       isHidden: options.isHidden ?? ((): boolean => document.hidden),
@@ -323,9 +324,13 @@ export class MapView {
       card.hide();
       return;
     }
-    const id = tokenAt(scene, this.moves.overlay().positions, this.camera.toWorld(this.hover));
+    const world = this.camera.toWorld(this.hover);
+    const id = tokenAt(scene, this.moves.overlay().positions, world);
+    // A pin the GM made readable names its note when no token is there.
+    const pin = id ? null : pinAt(scene, world, this.camera.current().zoom);
     const rect = this.options.canvas.getBoundingClientRect();
-    card.show(id ? hoverCardFor(scene, id, this.numbers.get(id) ?? null) : null, rect.left + this.hover.x, rect.top + this.hover.y);
+    const shown = id ? hoverCardFor(scene, id, this.numbers.get(id) ?? null) : pin ? { title: pin.title ?? 'Note', lines: [] } : null;
+    card.show(shown, rect.left + this.hover.x, rect.top + this.hover.y);
   }
 
   private updateButtons(): void {
