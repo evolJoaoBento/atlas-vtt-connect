@@ -25,6 +25,8 @@ export const SHEET_LIMITS = {
   resources: 6,
   /** Rolls a player may ask for per second. */
   rollsPerSecond: 2,
+  /** The text of one roll in a trait's text, as the player clicked it. */
+  rollText: 200,
 } as const;
 
 export const ABILITY_NAMES = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -83,12 +85,21 @@ export interface TokenSheet {
   sheet: PlayerSheet | null;
 }
 
-/** Where on a sheet a roll is: an ability check, a save, a skill, or the n-th roll in a trait's or action's text. */
-export type SheetRollRef =
+/** A roll with advantage or disadvantage: Atlas's dice set rule for that side decides what it does (`diceAdvantage`). */
+export const ADVANTAGE_SIDES = ['advantage', 'disadvantage'] as const;
+export type AdvantageSide = typeof ADVANTAGE_SIDES[number];
+
+/**
+ * Where on a sheet a roll is: an ability check, a save, a skill, or the n-th roll in a trait's or action's text, whose
+ * `text` is what the player clicked (the GM rolls only when its own copy has that text there), and the side it is
+ * rolled with, if any.
+ */
+export type SheetRollRef = (
   | { kind: 'check'; index: number }
   | { kind: 'save'; index: number }
   | { kind: 'skill'; index: number }
-  | { kind: 'text'; section: number; item: number; index: number };
+  | { kind: 'text'; section: number; item: number; index: number; text?: string }
+) & { side?: AdvantageSide };
 
 type Rec = Record<string, unknown>;
 const isObject = (value: unknown): value is Rec => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -213,19 +224,37 @@ export function buildSheet(creature: unknown, fallbackName: string | null = null
 /** One piece of a trait's text: plain, or a roll a player can click (its index among the item's rolls). */
 export type TextPart = { text: string } | { text: string; roll: number; formula: string };
 
-/** "+5 to hit" (an attack: 1d20+5) and dice like "2d6 + 3" (damage); everything else is plain text. */
-const ROLL_PATTERN = /([+-]\s?\d{1,2})\s+to hit|\b(\d{1,2}d(?:4|6|8|10|12|20|100)(?:\s*[+-]\s*\d{1,3})?)\b/gi;
+/**
+ * Atlas's dice notation in a stat block's text (`statblockDiceLinks.ts`), so players can roll what Atlas's own stat
+ * block would let them. One dice term: `2d8`, `d20`, exploding (`1d6!i`, `1d6!3`, `1d6!!`) and keep marks (`4d6kh3`);
+ * a single `!` ends a sentence far more often than it explodes a die.
+ */
+const DIE = String.raw`\d*d\d+(?:!!?(?:\d+|i(?![a-z]))|!!)?(?:k[hl]\d*(?![a-z]))?`;
+/** A further signed term: a die or a constant after `+`, `-`, a minus sign or an en dash, or after "+ -" ("3d6 + -1"). */
+const NEXT_TERM = String.raw`\s*(?:\+\s*-|[+\-−–])\s*(?:${DIE}|\d+)`;
+/**
+ * Dice expressions (`2d8+3`, `2d6 - 1d4`) and bare bonuses (`+4`, `−1`, `ATK: +4`). Neither starts inside a word or a
+ * number; a bare sign must sit on its digits and not open a dice term, so the dash in "Very Close - 1d12+2" is no roll.
+ */
+const DICE_PATTERN = new RegExp(String.raw`((?<!\w)${DIE}(?:${NEXT_TERM})*|(?:ATK|Attack)\s*:\s*[+-]\d+|(?<!\w)[+\-−]\d+(?!\s*d\d))`, 'gi');
+
+/**
+ * The formula Atlas rolls for matched text (`toRollFormula`). A bare bonus stays bare: Atlas adds it to the dice set's
+ * default roll, so "+5 to hit" rolls the collection's own die.
+ */
+export function toRollFormula(text: string): string {
+  return text.replace(/\s+/g, '').replace(/^(?:ATK|Attack):/i, '').replace(/[−–]/g, '-').replace(/\+-/g, '-');
+}
 
 /** A trait's text cut into plain pieces and the rolls in it, in order; the same on the GM's side and the player's. */
 export function textParts(desc: string): TextPart[] {
   const parts: TextPart[] = [];
   let last = 0;
   let index = 0;
-  for (const match of desc.matchAll(ROLL_PATTERN)) {
+  for (const match of desc.matchAll(DICE_PATTERN)) {
     const at = match.index ?? 0;
     if (at > last) parts.push({ text: desc.slice(last, at) });
-    const formula = match[1] ? `1d20${match[1].replace(/\s/g, '')}` : (match[2] ?? '').replace(/\s/g, '');
-    parts.push({ text: match[0], roll: index, formula });
+    parts.push({ text: match[0], roll: index, formula: toRollFormula(match[0]) });
     index += 1;
     last = at + match[0].length;
   }
@@ -236,23 +265,26 @@ export function textParts(desc: string): TextPart[] {
 /** The formula a roll on `sheet` stands for; null when the sheet has no such roll. */
 export function sheetRollFormula(sheet: PlayerSheet, ref: SheetRollRef): string | null {
   switch (ref.kind) {
+    // A bonus alone, as Atlas's stat block links "(+3)" and "Dex +5": Atlas adds it to the dice set's default roll.
     case 'check': {
       const score = sheet.stats?.[ref.index];
-      return score === undefined ? null : `1d20${signed(modifierOf(score))}`;
+      return score === undefined ? null : signed(modifierOf(score));
     }
     case 'save': {
       const bonus = sheet.saves[ref.index];
-      return bonus ? `1d20${signed(bonus.bonus)}` : null;
+      return bonus ? signed(bonus.bonus) : null;
     }
     case 'skill': {
       const bonus = sheet.skills[ref.index];
-      return bonus ? `1d20${signed(bonus.bonus)}` : null;
+      return bonus ? signed(bonus.bonus) : null;
     }
     case 'text': {
       const item = sheet.sections[ref.section]?.items[ref.item];
       if (!item) return null;
       const part = textParts(item.desc).find((candidate) => 'roll' in candidate && candidate.roll === ref.index);
-      return part && 'formula' in part ? part.formula : null;
+      // Never a roll other than the one clicked: a sheet that changed, or a page that cuts the text another way (an
+      // older version, which sends no text), finds other text there, and nothing is rolled.
+      return part && 'formula' in part && part.text === ref.text ? part.formula : null;
     }
   }
 }
@@ -276,11 +308,13 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 
 export function isSheetRollRef(value: unknown): value is SheetRollRef {
   if (!isObject(value)) return false;
+  if (value.side !== undefined && !(ADVANTAGE_SIDES as readonly unknown[]).includes(value.side)) return false;
   switch (value.kind) {
     case 'check': return isInt(value.index, 0, 5);
     case 'save':
     case 'skill': return isInt(value.index, 0, SHEET_LIMITS.bonuses - 1);
-    case 'text': return isInt(value.section, 0, SHEET_LIMITS.sections - 1) && isInt(value.item, 0, SHEET_LIMITS.items - 1) && isInt(value.index, 0, 99);
+    case 'text': return isInt(value.section, 0, SHEET_LIMITS.sections - 1) && isInt(value.item, 0, SHEET_LIMITS.items - 1) && isInt(value.index, 0, 99)
+      && (value.text === undefined || isText(value.text, SHEET_LIMITS.rollText));
     default: return false;
   }
 }

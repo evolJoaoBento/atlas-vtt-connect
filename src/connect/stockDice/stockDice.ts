@@ -9,13 +9,21 @@
  *   the roll `onRolled` hears carries `rolledBy`, so Connect's players' log attributes it.
  * - `publish` announces on the views' buses, which throw the roll in 3D; `throw: false` cannot ask for a card instead.
  * - `throw`, `registerLook` and the look choices do not exist: only `roll`, `onRolled` and `publish` do.
+ *
+ * More than the API: a roll from a player's sheet names its ability in Atlas's toast and log (the source's
+ * `abilityName`, as Atlas's own stat block rolls do) and is rolled with advantage or disadvantage by the dice set's own
+ * rule (`rollDice`'s options), so `roll` takes `SheetRollExtras` (`SHEET_AWARE_DICE`).
  */
-import type { DiceApi, DicePublishOptions, DiceRollRequest, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
+import type { DiceApi, DicePublishOptions, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
+import { SHEET_AWARE_DICE, type PlayerRollRequest } from '../../app/online/tools/DiceHost';
+import { ADVANTAGE_SIDES, type AdvantageSide } from '../../app/online/tools/sheets';
 
 /** Most dice a roll may list, as the API's `publish` holds it to. */
 const MAX_DICE = 1000;
 /** Longest name a roll may carry for who rolled it. */
 const MAX_ROLLED_BY = 40;
+/** Longest ability a roll may be named after. */
+const MAX_ABILITY = 120;
 /** How many roll ids are remembered so a roll heard on two views is passed on once. */
 const REMEMBERED = 200;
 
@@ -25,7 +33,7 @@ interface DiceBus {
   emit(event: 'dice-rolled', result: DiceRollResult): unknown;
 }
 interface DiceTool {
-  rollDice(formula: string, source?: DiceRollResult['source'], origin?: undefined): DiceRollResult | null;
+  rollDice(formula: string, source?: DiceRollResult['source'], origin?: undefined, options?: { advantage?: AdvantageSide }): DiceRollResult | null;
 }
 
 /** A map view as the dice read it. */
@@ -89,6 +97,12 @@ function isRoll(value: unknown): value is DiceRollResult {
   return rolls.length <= MAX_DICE && rolls.every((die) => isObject(die) && typeof die.value === 'number' && typeof die.max === 'number');
 }
 
+/** A roll's source naming the player who rolled it and the ability of their sheet it was rolled from. */
+function sourceOf(request: PlayerRollRequest): DiceRollResult['source'] | undefined {
+  if (!request.rolledBy) return undefined;
+  return { type: 'toolbar', tokenName: request.rolledBy, ...(request.abilityName ? { abilityName: request.abilityName } : {}) };
+}
+
 export function stockDiceApi(deps: StockDiceDeps): DiceApi {
   /** Who the roll being made now is for: the roll Atlas announces meanwhile carries their name. */
   let rolling: string | null = null;
@@ -149,13 +163,15 @@ export function stockDiceApi(deps: StockDiceDeps): DiceApi {
     return (mapPath ? open.find((view) => view.mapPath() === mapPath) : undefined) ?? open[0] ?? null;
   };
 
-  return Object.freeze({
-    roll: (request: DiceRollRequest): DiceRollResult => {
-      const given = request as Partial<DiceRollRequest> | null;
+  const api: DiceApi = Object.freeze({
+    roll: (request: PlayerRollRequest): DiceRollResult => {
+      const given = request as Partial<PlayerRollRequest> | null;
       const valid = isObject(given) && isString(given.formula)
         && (given.mapPath === undefined || given.mapPath === null || isString(given.mapPath))
-        && (given.rolledBy === undefined || (isString(given.rolledBy) && given.rolledBy.length <= MAX_ROLLED_BY));
-      if (!valid) throw new Error(`[Atlas VTT Connect] dice.roll: the request must be { formula: string, mapPath?: string | null, rolledBy?: string of at most ${MAX_ROLLED_BY} characters }.`);
+        && (given.rolledBy === undefined || (isString(given.rolledBy) && given.rolledBy.length <= MAX_ROLLED_BY))
+        && (given.abilityName === undefined || (isString(given.abilityName) && given.abilityName.length <= MAX_ABILITY))
+        && (given.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(given.advantage));
+      if (!valid) throw new Error(`[Atlas VTT Connect] dice.roll: the request must be { formula: string, mapPath?: string | null, rolledBy?: string of at most ${MAX_ROLLED_BY} characters, abilityName?: string, advantage?: 'advantage' | 'disadvantage' }.`);
       const view = viewFor(request.mapPath);
       const found = view ? diceOf(view) : null;
       if (!view || !found) throw new Error('[Atlas VTT Connect] dice.roll: no open map can roll dice.');
@@ -164,7 +180,10 @@ export function stockDiceApi(deps: StockDiceDeps): DiceApi {
       let rolled: DiceRollResult | null;
       try {
         // Named after the player in Atlas's log and toasts through the roll's source, as a token's roll is named.
-        rolled = found.tool.rollDice(request.formula, request.rolledBy ? { type: 'toolbar', tokenName: request.rolledBy } : undefined);
+        const source = sourceOf(request);
+        rolled = request.advantage
+          ? found.tool.rollDice(request.formula, source, undefined, { advantage: request.advantage })
+          : found.tool.rollDice(request.formula, source);
       } finally {
         rolling = null;
       }
@@ -200,4 +219,6 @@ export function stockDiceApi(deps: StockDiceDeps): DiceApi {
       }
     },
   });
+  SHEET_AWARE_DICE.add(api);
+  return api;
 }

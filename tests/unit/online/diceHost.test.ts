@@ -2,6 +2,7 @@ import type { DiceRules } from '@atlas-vtt/api-types';
 import { persistableDiceLog, rollFormula } from '@atlas-vtt/shared/rules';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DICE_LIMITS } from '../../../src/app/online/tools/toolMessages';
+import { foldedRequest } from '../../../src/app/online/tools/DiceHost';
 import { TAVERN_MAP } from './presentedFixtures';
 import { toolsWorld } from './toolsFixtures';
 import { HUB_PATHS, onHubPath } from './hubPath';
@@ -284,5 +285,16 @@ describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
     a.session.sendDiceRoll({ d6: 1 }, 0);
     expect(w.atlas.dice.rolledFor).toEqual([TAVERN_MAP]);
     w.finish();
+  });
+});
+
+describe('a roll from a player sheet', () => {
+  it('reaches an Atlas API without the extras with the ability in the name and the side as a d20 kept high or low', () => {
+    expect(foldedRequest({ formula: '+4', rolledBy: 'Ana', abilityName: 'Scimitar', advantage: 'advantage' }))
+      .toEqual({ formula: '2d20kh1+4', rolledBy: 'Ana: Scimitar' });
+    expect(foldedRequest({ formula: '1d20-1', rolledBy: 'Ana', advantage: 'disadvantage' })).toEqual({ formula: '2d20kl1-1', rolledBy: 'Ana' });
+    expect(foldedRequest({ formula: '1d6+2', rolledBy: 'Ana', advantage: 'advantage' })).toEqual({ formula: '1d6+2', rolledBy: 'Ana' });
+    expect(foldedRequest({ formula: 'd20', mapPath: 'm' })).toEqual({ formula: 'd20', mapPath: 'm' });
+    expect(foldedRequest({ formula: '+1', rolledBy: 'A'.repeat(30), abilityName: 'Long ability name' }).rolledBy).toHaveLength(40);
   });
 });

@@ -338,12 +338,19 @@
   .sheet-stat-score { font-weight: var(--font-bold); }
   .sheet-bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .sheet-section { margin-top: 4px; padding-bottom: 2px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-accent); font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: 0.04em; }
+  /* Atlas's dice links (`.atlas-dice-link`): accent text, a faint underline that gives way to a wash on hover. */
   .sheet-roll {
-    display: inline; height: auto; min-height: 0; line-height: inherit; vertical-align: baseline; padding: 0 6px; margin: 0 1px; border-radius: var(--radius-s); box-shadow: none;
-    background: hsla(var(--interactive-accent-hsl), 0.18); color: var(--text-accent); font: inherit; font-weight: var(--font-semibold);
+    display: inline; height: auto; min-height: 0; line-height: inherit; vertical-align: baseline; padding: 0 2px; margin: 0 -2px; border: 0; border-radius: var(--radius-s); box-shadow: none;
+    background: transparent; color: var(--text-accent); font: inherit; font-weight: var(--font-semibold); font-variant-numeric: tabular-nums; cursor: pointer;
+    text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: color-mix(in oklch, var(--text-accent) 40%, transparent); text-underline-offset: 3px;
+    transition: background-color 100ms cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 100ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sheet-stat .sheet-roll { justify-self: center; }
-  .sheet-roll:hover, .sheet-roll:focus-visible { background: hsla(var(--interactive-accent-hsl), 0.32); }
+  .sheet-roll:hover, .sheet-roll:focus-visible { background: color-mix(in oklch, var(--text-accent) 14%, transparent); text-decoration-color: transparent; outline: none; }
+  .sheet-roll:focus-visible { box-shadow: 0 0 0 2px var(--interactive-accent); }
+  .sheet-roll:active { background: color-mix(in oklch, var(--text-accent) 24%, transparent); }
+  /* A roll's right-click menu, where it was opened inside the drawer. */
+  .sheet-roll-menu { top: var(--menu-y, 0); left: var(--menu-x, 0); bottom: auto; right: auto; min-width: 220px; }
 }
 
 // The image the GM shows players (`HandoutView`): a panel over the middle of the map, the image fitted inside.

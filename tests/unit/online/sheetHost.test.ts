@@ -79,10 +79,15 @@ describe('players\' own sheets', () => {
   it('rolls what the sheet offers, as the player, and nothing for a token they do not control or a roll not there', () => {
     const w = world();
     w.control.set('hero', 'p1', true);
+    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'text', section: 0, item: 0, index: 1, text: '1d8 + 3' } });
+    expect(w.rollFor).toHaveBeenCalledWith(ANA, '1d8+3', { abilityName: 'Sword' });
+    // A bare bonus, which Atlas adds to the dice set's default roll, with the side asked for.
+    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'check', index: 1, side: 'advantage' } });
+    expect(w.rollFor).toHaveBeenLastCalledWith(ANA, '+2', { abilityName: 'DEX check', advantage: 'advantage' });
+    w.rollFor.mockClear();
+    // Other text at that place (an older page cuts the text another way) rolls nothing.
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'text', section: 0, item: 0, index: 1 } });
-    expect(w.rollFor).toHaveBeenCalledWith(ANA, '1d8+3', 'Ana: Sword');
-    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'check', index: 1 } });
-    expect(w.rollFor).toHaveBeenLastCalledWith(ANA, '1d20+2', 'Ana: DEX check');
+    expect(w.rollFor).not.toHaveBeenCalled();
     w.rollFor.mockClear();
     w.handler().onMessage?.(BEN, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'check', index: 0 } });
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'ogre', roll: { kind: 'check', index: 0 } });

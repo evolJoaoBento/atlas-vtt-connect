@@ -2,7 +2,7 @@
 import type { AtlasExtension, Character, DiceApi, LasersApi, SettingsApi, TokensApi, ViewId } from '@atlas-vtt/api-types';
 import type { OptionalParts } from '../hostedSession';
 import { TokenControlHost } from '../control/TokenControlHost';
-import { DiceHost } from '../tools/DiceHost';
+import { DiceHost, foldedRequest, SHEET_AWARE_DICE } from '../tools/DiceHost';
 import { LaserRelay } from '../tools/LaserRelay';
 import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
@@ -18,7 +18,8 @@ export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['
 export function diceHostPart(dice: DiceApi): NonNullable<OptionalParts['dice']> {
   return ({ session, projection }) => new DiceHost({
     session, projection,
-    roll: (request) => dice.roll(request),
+    // Connect's stock stand-in hands the ability and the side to Atlas's dice tool; an Atlas API takes neither.
+    roll: (request) => dice.roll(SHEET_AWARE_DICE.has(dice) ? request : foldedRequest(request)),
     feed: { subscribe: (listener) => dice.onRolled(listener), publish: (result) => { dice.publish(result); } },
   });
 }

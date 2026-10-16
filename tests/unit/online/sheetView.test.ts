@@ -40,7 +40,47 @@ describe('the sheet drawer', () => {
     rolls.find((button) => button.textContent === '+3')!.click();
     expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'check', index: 1 });
     rolls.find((button) => button.textContent === '1d4 + 4')!.click();
-    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 1 });
+    // The clicked text goes with it: the GM rolls only what its own copy has there.
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 1, text: '1d4 + 4' });
+  });
+
+  it('rolls with advantage on Shift-click and disadvantage on Alt-click, as Atlas, and both at once cancel', () => {
+    const t = setup();
+    t.view.receive([entry('a', 'Anna')]);
+    t.toggleButton.click();
+    const bonus = [...t.body.querySelectorAll<HTMLButtonElement>('.sheet-roll')].find((button) => button.textContent === '+6')!;
+    bonus.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 0, text: '+6', side: 'advantage' });
+    bonus.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 0, text: '+6', side: 'disadvantage' });
+    bonus.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true, altKey: true }));
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 0, text: '+6' });
+    // Damage dice hold no d20: no side changes them.
+    const damage = [...t.body.querySelectorAll<HTMLButtonElement>('.sheet-roll')].find((button) => button.textContent === '1d4 + 4')!;
+    damage.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'text', section: 0, item: 0, index: 1, text: '1d4 + 4' });
+  });
+
+  it('offers the roll and its sides on a right-click, and Escape closes that menu before the drawer', () => {
+    const t = setup();
+    t.view.receive([entry('a', 'Anna')]);
+    t.toggleButton.click();
+    const check = [...t.body.querySelectorAll<HTMLButtonElement>('.sheet-roll')].find((button) => button.textContent === '+3')!;
+    check.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: 10, clientY: 10 }));
+    const entries = () => [...t.panel.querySelectorAll<HTMLButtonElement>('.sheet-roll-menu .menu-entry')];
+    expect(entries().map((entry) => entry.textContent)).toEqual(['Roll', 'Roll with advantage', 'Roll with disadvantage']);
+    entries()[2]!.click();
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'check', index: 1, side: 'disadvantage' });
+    expect(entries()).toHaveLength(0);
+
+    check.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(entries()).toHaveLength(0);
+    expect(t.panel.hidden).toBe(false);
+
+    const damage = [...t.body.querySelectorAll<HTMLButtonElement>('.sheet-roll')].find((button) => button.textContent === '1d4 + 4')!;
+    damage.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 }));
+    expect(entries().map((entry) => entry.textContent)).toEqual(['Roll']);
   });
 
   it('switches between tokens with tabs, and closes on Escape', () => {

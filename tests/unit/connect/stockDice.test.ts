@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DiceRollResult } from '@atlas-vtt/api-types';
 import { stockDiceApi, type DiceView } from '../../../src/connect/stockDice/stockDice';
+import { SHEET_AWARE_DICE } from '../../../src/app/online/tools/DiceHost';
 
 let counter = 0;
 const rollOf = (formula: string, extra: Partial<DiceRollResult> = {}): DiceRollResult => ({
@@ -17,11 +18,11 @@ function fakeView(viewId: string, mapPath: string, options: { noTool?: boolean; 
     off: (_event: string, listener: (result: DiceRollResult) => void) => { listeners.delete(listener); },
     emit: (_event: string, result: DiceRollResult) => { for (const listener of [...listeners]) listener(result); },
   };
-  const rolled: Array<{ formula: string; source: unknown }> = [];
+  const rolled: Array<{ formula: string; source: unknown; options?: unknown }> = [];
   const tool = {
-    rollDice: (formula: string, source?: unknown) => {
+    rollDice: (formula: string, source?: unknown, _origin?: unknown, rollOptions?: unknown) => {
       if (options.refuses) return null;
-      rolled.push({ formula, source });
+      rolled.push({ formula, source, options: rollOptions });
       const result = rollOf(formula, source ? ({ source } as Partial<DiceRollResult>) : {});
       bus.emit('dice-rolled', result);
       return result;
@@ -59,6 +60,20 @@ describe('dice on a stock Atlas', () => {
       expect(a.rolled).toEqual([{ formula: '1d6', source: undefined }]);
       api.roll({ formula: '1d4', mapPath: 'maps/none.atlasmap', rolledBy: 'Bea' });
       expect(a.rolled).toHaveLength(2);
+    });
+
+    it("names the ability of a player's sheet in Atlas's toast, and hands the side to Atlas's dice tool", () => {
+      const a = fakeView('a', 'm');
+      const { api } = setup(a);
+      api.roll({ formula: '+4', rolledBy: 'Ana', abilityName: 'Scimitar', advantage: 'advantage' } as never);
+      api.roll({ formula: '1d6+2', rolledBy: 'Ana', abilityName: 'Scimitar' } as never);
+      expect(a.rolled).toEqual([
+        { formula: '+4', source: { type: 'toolbar', tokenName: 'Ana', abilityName: 'Scimitar' }, options: { advantage: 'advantage' } },
+        { formula: '1d6+2', source: { type: 'toolbar', tokenName: 'Ana', abilityName: 'Scimitar' } },
+      ]);
+      expect(SHEET_AWARE_DICE.has(api)).toBe(true);
+      expect(() => api.roll({ formula: '+4', advantage: 'twice' } as never)).toThrow(/request/);
+      expect(() => api.roll({ formula: '+4', abilityName: 'x'.repeat(121) } as never)).toThrow(/request/);
     });
 
     it("lets onRolled hear it as the player's, and a roll made after as nobody's", () => {

@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { ChevronDown, ChevronRight, Circle, Dices, Ellipsis, Flashlight, Hand, Image, LocateFixed, MapPin, Maximize, Minus, Plus, Radar, Ruler, ScrollText, Shapes, Triangle, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Circle, Dices, Ellipsis, Flashlight, Hand, Image, LocateFixed, MapPin, Maximize, Minus, Plus, Radar, Ruler, ScrollText, Shapes, Triangle, X } from 'lucide-react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
@@ -31,7 +31,7 @@ describe('the join page icons', () => {
     const icons: Record<ToolIconName, React.ComponentType> = {
       hand: Hand, ruler: Ruler, circle: Circle, triangle: Triangle, flashlight: Flashlight, dices: Dices, ellipsis: Ellipsis,
       'chevron-down': ChevronDown, x: X, minus: Minus, plus: Plus, 'chevron-right': ChevronRight, maximize: Maximize, 'locate-fixed': LocateFixed,
-      'scroll-text': ScrollText, radar: Radar, shapes: Shapes, image: Image, 'map-pin': MapPin,
+      'scroll-text': ScrollText, radar: Radar, shapes: Shapes, image: Image, 'map-pin': MapPin, 'chevrons-up': ChevronsUp, 'chevrons-down': ChevronsDown,
     };
     for (const [name, Icon] of Object.entries(icons)) {
       expect(parsed(TOOL_ICON_MARKUP[name as ToolIconName]), name).toEqual(rendered(<Icon />));

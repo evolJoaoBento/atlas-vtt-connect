@@ -19,6 +19,7 @@ import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
 import { buildSheet, SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
+import type { SheetRollExtras } from './DiceHost';
 
 /** A sheets message stays under this, well inside a control message, with room for the envelope. */
 const SHEETS_BUDGET_BYTES = Math.floor(MAX_CONTROL_MESSAGE_BYTES * 0.75);
@@ -35,8 +36,8 @@ export interface SheetHostOptions {
   readStatblock(token: Character): unknown;
   /** Calls `listener` when stat blocks may read differently (the statblock plugin updated); returns the stop. */
   onStatblocksChanged?(listener: () => void): () => void;
-  /** Rolls a formula as the player's roll, named `label` in the log; false when refused. Without it sheets offer no rolls. */
-  rollFor?(player: SessionPlayer, formula: string, label: string): boolean;
+  /** Rolls a formula as the player's roll, named after the ability it was rolled from and with its side; false when refused. Without it sheets offer no rolls. */
+  rollFor?(player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean;
   now?: () => number;
 }
 
@@ -133,7 +134,8 @@ export class SheetHost implements SessionHandler {
     const sheet = buildSheet(this.read(token), displayName(token));
     const formula = sheet ? sheetRollFormula(sheet, message.roll) : null;
     if (!sheet || !formula) return;
-    this.options.rollFor(player, formula, `${player.name}: ${sheetRollLabel(sheet, message.roll)}`.slice(0, 40));
+    const { side } = message.roll;
+    this.options.rollFor(player, formula, { abilityName: sheetRollLabel(sheet, message.roll).slice(0, SHEET_LIMITS.name), ...(side ? { advantage: side } : {}) });
   }
 
   playersChanged(players: readonly SessionPlayer[]): void {

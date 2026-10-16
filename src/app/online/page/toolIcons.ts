@@ -6,7 +6,8 @@
  * checks both against Atlas's components.
  */
 export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x'
-  | 'minus' | 'plus' | 'chevron-right' | 'maximize' | 'locate-fixed' | 'scroll-text' | 'radar' | 'shapes' | 'image' | 'map-pin';
+  | 'minus' | 'plus' | 'chevron-right' | 'maximize' | 'locate-fixed' | 'scroll-text' | 'radar' | 'shapes' | 'image' | 'map-pin'
+  | 'chevrons-up' | 'chevrons-down';
 
 /** Each Lucide icon's children. */
 export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
@@ -35,6 +36,8 @@ export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
   shapes: '<path d="M8.3 10a.7.7 0 0 1-.626-1.079L11.4 3a.7.7 0 0 1 1.198-.043L16.3 8.9a.7.7 0 0 1-.572 1.1Z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   'map-pin': '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  'chevrons-up': '<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
+  'chevrons-down': '<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
 };
 
 const LUCIDE_ROOT = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" '

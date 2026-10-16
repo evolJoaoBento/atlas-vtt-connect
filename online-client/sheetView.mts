@@ -1,12 +1,13 @@
 // online-client/sheetView.mts
 /**
  * The player's sheets: a drawer with the tokens they control, each with its exact numbers and its stat block, where
- * an ability, a save, a skill or a roll in an action's text ("+5 to hit", "1d8 + 3") is a button that asks the GM to
- * roll it. Its button shows only while the player has sheets. Text only, never markup: everything comes from the GM.
- * Shared with the Obsidian scene tab.
+ * an ability, a save, a skill or a roll in an action's text ("+5", "1d8 + 3", as Atlas's stat block links them) asks
+ * the GM to roll it. As in Atlas, a click rolls, Shift-click rolls with advantage and Alt-click (Option) with
+ * disadvantage, both at once cancel, and a right-click offers the three. Its button shows only while the player has
+ * sheets. Text only, never markup: everything comes from the GM. Shared with the Obsidian scene tab.
  */
-import { ABILITY_NAMES, modifierOf, textParts, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
-import { toolIconUrl } from '../src/app/online/page/toolIcons';
+import { ABILITY_NAMES, modifierOf, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
+import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
 import { iconElement } from './icons.mts';
 
 export interface SheetViewOptions {
@@ -25,6 +26,26 @@ export interface SheetViewOptions {
 }
 
 const signed = (value: number): string => (value >= 0 ? `+${value}` : String(value));
+
+/** The side Shift (advantage) and Alt (disadvantage) ask for; both at once cancel (Atlas's `advantageSide`). */
+export function advantageSide(shift: boolean, alt: boolean): AdvantageSide | null {
+  if (shift === alt) return null;
+  return shift ? 'advantage' : 'disadvantage';
+}
+
+/**
+ * Whether advantage can change a roll: a bare bonus (added to the set's default roll) or a roll with a d20. The GM's
+ * Atlas decides by the dice set's own rule, and rolls a roll it does not change as it is.
+ */
+export function mayHaveAdvantage(formula: string): boolean {
+  return /^[+-]\d+$/.test(formula) || /(^|[^\d])d20(?!\d)/i.test(formula);
+}
+
+const MENU_CHOICES: ReadonlyArray<{ label: string; icon: ToolIconName; side: AdvantageSide | null }> = [
+  { label: 'Roll', icon: 'dices', side: null },
+  { label: 'Roll with advantage', icon: 'chevrons-up', side: 'advantage' },
+  { label: 'Roll with disadvantage', icon: 'chevrons-down', side: 'disadvantage' },
+];
 const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : value.toFixed(1));
 
 export class SheetView {
@@ -32,6 +53,8 @@ export class SheetView {
   private picked: string | null = null;
   private open = false;
   private readonly listeners = new AbortController();
+  /** The right-click menu of a roll, while it is open. */
+  private menu: { element: HTMLElement; from: HTMLElement } | null = null;
 
   constructor(private readonly options: SheetViewOptions) {
     const { signal } = this.listeners;
@@ -43,8 +66,14 @@ export class SheetView {
     (options.doc ?? document).addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !this.open || this.options.active?.() === false) return;
       event.stopImmediatePropagation();
-      this.close();
+      // Escape closes the roll menu first, as any menu.
+      if (this.menu) this.closeMenu(true);
+      else this.close();
     }, { capture: true, signal });
+    (options.doc ?? document).addEventListener('pointerdown', (event) => {
+      if (this.menu && !this.menu.element.contains(event.target as Node)) this.closeMenu(false);
+    }, { capture: true, signal });
+    options.panel.addEventListener('scroll', () => this.closeMenu(false), { capture: true, passive: true, signal });
   }
 
   /** The player's sheets now (`token-sheets`); none hides the button and closes the drawer. */
@@ -82,15 +111,73 @@ export class SheetView {
     return element;
   }
 
-  private rollButton(tokenId: string, roll: SheetRollRef, label: string, title: string): HTMLButtonElement {
+  private rollButton(tokenId: string, roll: SheetRollRef, label: string, title: string, advantage: boolean): HTMLButtonElement {
     const button = this.el('button', 'sheet-roll', label);
     button.type = 'button';
     button.setAttribute('aria-label', `Roll ${title}`);
-    button.addEventListener('click', () => { this.options.onRoll(tokenId, roll); });
+    const send = (side: AdvantageSide | null): void => {
+      this.options.onRoll(tokenId, side && advantage ? { ...roll, side } : roll);
+    };
+    button.addEventListener('click', (event) => send(advantageSide(event.shiftKey, event.altKey)));
+    // Enter and Space roll with the side their modifiers ask for, which a button's own click would drop.
+    button.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      send(advantageSide(event.shiftKey, event.altKey));
+    });
+    button.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      // A menu key or Shift+F10 is no right button: the menu hangs from the roll.
+      const box = button.getBoundingClientRect();
+      const at = event.button === 2 ? { x: event.clientX, y: event.clientY } : { x: box.left, y: box.bottom };
+      this.openMenu(button, at, advantage ? MENU_CHOICES : MENU_CHOICES.slice(0, 1), send);
+    });
     return button;
   }
 
+  /** Opens a roll's menu at a point of the page, inside the drawer. */
+  private openMenu(from: HTMLElement, at: { x: number; y: number }, choices: typeof MENU_CHOICES, send: (side: AdvantageSide | null) => void): void {
+    this.closeMenu(false);
+    const { panel } = this.options;
+    const doc = panel.ownerDocument;
+    const element = doc.createElement('div');
+    element.className = 'toolbar-menu sheet-roll-menu';
+    element.setAttribute('role', 'menu');
+    for (const choice of choices) {
+      const entry = doc.createElement('button');
+      entry.type = 'button';
+      entry.className = 'menu-entry';
+      entry.setAttribute('role', 'menuitem');
+      const text = doc.createElement('span');
+      text.textContent = choice.label;
+      entry.append(iconElement(toolIconUrl(choice.icon)), text);
+      entry.addEventListener('click', () => {
+        this.closeMenu(true);
+        send(choice.side);
+      });
+      element.append(entry);
+    }
+    panel.append(element);
+    // In the drawer's own frame (an Obsidian pane is a containing block for fixed elements), kept inside it.
+    const frame = panel.getBoundingClientRect();
+    const left = Math.max(4, Math.min(at.x - frame.left, panel.clientWidth - element.offsetWidth - 4));
+    const top = Math.max(4, Math.min(at.y - frame.top + panel.scrollTop, panel.scrollTop + panel.clientHeight - element.offsetHeight - 4));
+    element.style.setProperty('--menu-x', `${left}px`);
+    element.style.setProperty('--menu-y', `${top}px`);
+    this.menu = { element, from };
+    element.querySelector<HTMLButtonElement>('.menu-entry')?.focus({ preventScroll: true });
+  }
+
+  private closeMenu(refocus: boolean): void {
+    const menu = this.menu;
+    if (!menu) return;
+    this.menu = null;
+    menu.element.remove();
+    if (refocus) menu.from.focus({ preventScroll: true });
+  }
+
   private render(): void {
+    this.closeMenu(false);
     const { tabs, body } = this.options;
     tabs.replaceChildren();
     tabs.hidden = this.entries.length < 2;
@@ -146,7 +233,7 @@ export class SheetView {
         const name = ABILITY_NAMES[index] ?? '';
         const cell = this.el('div', 'sheet-stat');
         cell.append(this.el('span', 'sheet-stat-name', name), this.el('span', 'sheet-stat-score', String(score)));
-        cell.append(this.rollButton(tokenId, { kind: 'check', index }, signed(modifierOf(score)), `${name} check`));
+        cell.append(this.rollButton(tokenId, { kind: 'check', index }, signed(modifierOf(score)), `${name} check`, true));
         stats.append(cell);
       });
       parts.push(stats);
@@ -155,7 +242,7 @@ export class SheetView {
       if (list.length === 0) return;
       const row = this.el('div', 'sheet-bonuses');
       row.append(this.el('span', 'sheet-label', title));
-      list.forEach((bonus, index) => row.append(this.rollButton(tokenId, { kind, index }, `${bonus.label} ${signed(bonus.bonus)}`, `${bonus.label}${kind === 'save' ? ' save' : ''}`)));
+      list.forEach((bonus, index) => row.append(this.rollButton(tokenId, { kind, index }, `${bonus.label} ${signed(bonus.bonus)}`, `${bonus.label}${kind === 'save' ? ' save' : ''}`, true)));
       parts.push(row);
     };
     bonusRow('Saves', 'save', sheet.saves);
@@ -167,7 +254,10 @@ export class SheetView {
         const paragraph = this.el('p', 'sheet-item');
         if (item.name) paragraph.append(this.el('strong', '', `${item.name}. `));
         for (const part of textParts(item.desc)) {
-          if ('roll' in part) paragraph.append(this.rollButton(tokenId, { kind: 'text', section: sectionIndex, item: itemIndex, index: part.roll }, part.text, `${item.name || section.title}: ${part.formula}`));
+          if ('roll' in part) {
+            const ref: SheetRollRef = { kind: 'text', section: sectionIndex, item: itemIndex, index: part.roll, text: part.text };
+            paragraph.append(this.rollButton(tokenId, ref, part.text, `${item.name || section.title}: ${part.formula}`, mayHaveAdvantage(part.formula)));
+          }
           else paragraph.append(this.options.body.ownerDocument.createTextNode(part.text));
         }
         parts.push(paragraph);
