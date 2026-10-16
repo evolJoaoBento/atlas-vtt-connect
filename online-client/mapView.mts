@@ -139,7 +139,7 @@ export class MapView {
     });
     this.input = new ViewInput(this.camera, this.tools);
     this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
-    this.handout = options.handout ? new HandoutView(options.handout) : null;
+    this.handout = options.handout ? new HandoutView({ ...options.handout, ...(options.active ? { active: options.active } : {}) }) : null;
     this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();

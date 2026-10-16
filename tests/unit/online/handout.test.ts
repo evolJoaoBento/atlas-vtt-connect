@@ -38,12 +38,14 @@ describe('handouts', () => {
     expect(JSON.stringify(shown)).not.toContain('SECRET');
   });
 
-  it('open when a new one arrives, close and open again, and go when the GM takes it away', () => {
+  it('open when a new one arrives, close (once faded out) and open again, and go when the GM takes it away', async () => {
     const t = view();
+    const faded = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0); });
     t.view.update({ asset: ASSET, title: 'Cellar' }, null);
     expect(t.panel.hidden).toBe(false);
     expect(t.status.hidden).toBe(false);
     t.closeButton.click();
+    await faded();
     expect(t.panel.hidden).toBe(true);
     t.view.update({ asset: ASSET, title: 'Cellar' }, decodedImage(40, 20));
     expect(t.panel.hidden).toBe(true);
@@ -52,7 +54,40 @@ describe('handouts', () => {
     expect(t.panel.hidden).toBe(false);
     expect([t.canvas.width, t.canvas.height]).toEqual([40, 20]);
     t.view.update(null, null);
+    await faded();
     expect(t.panel.hidden).toBe(true);
     expect(t.openButton.hidden).toBe(true);
+  });
+
+  it("close on Escape and on a click beside the image, as Atlas's image display, and zoom with the wheel", async () => {
+    const t = view();
+    const faded = (): Promise<void> => new Promise((resolve) => { setTimeout(resolve, 0); });
+    t.view.update({ asset: ASSET, title: 'Cellar' }, decodedImage(40, 20));
+    expect(t.canvas.getAttribute('aria-label')).toBe('Cellar');
+    t.panel.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
+    expect(t.canvas.style.getPropertyValue('--handout-scale')).toBe('1.1');
+    t.panel.dispatchEvent(new MouseEvent('dblclick'));
+    expect(t.canvas.style.getPropertyValue('--handout-scale')).toBe('1');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await faded();
+    expect(t.panel.hidden).toBe(true);
+    t.openButton.click();
+    // jsdom lays nothing out: the image's box is empty, so a press anywhere is beside it.
+    const press = (type: string, x: number): void => {
+      const event = new MouseEvent(type, { clientX: x, clientY: 10, button: 0, bubbles: true }) as MouseEvent & { pointerId: number };
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      t.panel.dispatchEvent(event);
+    };
+    press('pointerdown', 10);
+    press('pointermove', 60);
+    press('pointerup', 60);
+    // Dragged: only panned.
+    expect(t.canvas.style.getPropertyValue('--handout-x')).toBe('50px');
+    await faded();
+    expect(t.panel.hidden).toBe(false);
+    press('pointerdown', 10);
+    press('pointerup', 12);
+    await faded();
+    expect(t.panel.hidden).toBe(true);
   });
 });

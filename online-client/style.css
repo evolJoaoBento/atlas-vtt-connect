@@ -470,17 +470,32 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* A roll's right-click menu, where it was opened inside the drawer. */
 .sheet-roll-menu { top: var(--menu-y, 0); left: var(--menu-x, 0); bottom: auto; right: auto; min-width: 220px; }
 
-/* The image the GM shows players: a panel over the middle of the map, the image fitted inside. */
+/* The image the GM shows players, as Atlas's image display (image-display.scss): over the whole map on a dark scrim,
+   the image at most nine tenths of it with the floating surfaces' corners, a round close button at the top right.
+   The title is read out, not shown. Motion and pan and zoom: `HandoutView`. */
 .handout {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4;
-  box-sizing: border-box; width: min(720px, calc(100% - 32px)); max-height: calc(100% - 140px); overflow: hidden;
-  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); gap: var(--gap);
-  padding: var(--gap); background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.9); cursor: grab; -webkit-user-select: none; user-select: none; touch-action: none; overflow: hidden;
 }
-.handout-header { display: flex; align-items: center; gap: var(--gap); }
-.handout-header h2 { flex: 1; min-width: 0; margin: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.handout-status { margin: 0; color: var(--muted); text-align: center; }
-.handout-canvas { width: 100%; height: 100%; min-width: 0; max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+.handout[hidden] { display: none; }
+.handout.is-dragging { cursor: grabbing; }
+.handout.is-leaving { pointer-events: none; }
+.handout-header { position: static; }
+.handout-header h2 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.handout-header .icon-button {
+  position: absolute; top: 20px; right: 20px; z-index: 1; width: 40px; height: 40px; min-height: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; box-shadow: none;
+  background: rgb(38, 38, 38); border: 1px solid rgba(255, 255, 255, 0.3); color: #ffffff; transition: all 0.2s;
+}
+.handout-header .icon-button:hover { background: rgb(64, 64, 64); transform: scale(1.1); }
+.handout-status { margin: 0; color: rgba(255, 255, 255, 0.7); text-align: center; }
+.handout-canvas {
+  display: block; width: auto; height: auto; max-width: 90%; max-height: 90%; border-radius: 24px; pointer-events: none;
+  transform: translate(var(--handout-x, 0), var(--handout-y, 0)) scale(var(--handout-scale, 1)); transform-origin: center center;
+}
+.handout-status:not([hidden]) + .handout-canvas { display: none; }
 
 /* The initiative column, as Atlas's player window floats it (player-initiative.scss): an elevated surface at the
    right edge, one card per combatant with its portrait, value, name and a thin health bar. */
