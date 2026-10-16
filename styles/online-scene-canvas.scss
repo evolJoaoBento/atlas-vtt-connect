@@ -313,8 +313,8 @@
 // The player's sheets (`SheetView`): their tokens' numbers and stat blocks, with buttons that ask the GM to roll.
 .atlas-connect-scene {
   .sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-  .sheet-tab { padding: 4px 10px; }
-  .sheet-tab[aria-pressed="true"] { border-color: var(--interactive-accent); color: var(--text-accent); }
+  .sheet-tab { min-height: 32px; padding: 4px 12px; background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+  .sheet-tab[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .sheet-body { display: grid; gap: 8px; font-size: var(--font-ui-small); line-height: 1.45; user-select: text; }
   .sheet-body p, .sheet-body h3, .sheet-body h4 { margin: 0; }
   .sheet-name { font-size: var(--font-ui-large); }
@@ -332,7 +332,7 @@
   .sheet-bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .sheet-section { margin-top: 4px; padding-bottom: 2px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-accent); font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: 0.04em; }
   .sheet-roll {
-    display: inline; height: auto; padding: 0 6px; margin: 0 1px; border-radius: var(--radius-s); box-shadow: none;
+    display: inline; height: auto; min-height: 0; line-height: inherit; vertical-align: baseline; padding: 0 6px; margin: 0 1px; border-radius: var(--radius-s); box-shadow: none;
     background: hsla(var(--interactive-accent-hsl), 0.18); color: var(--text-accent); font: inherit; font-weight: var(--font-semibold);
   }
   .sheet-stat .sheet-roll { justify-self: center; }
