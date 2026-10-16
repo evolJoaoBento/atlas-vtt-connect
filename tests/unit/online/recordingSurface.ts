@@ -17,6 +17,7 @@ export type SurfaceCall =
   | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string; look?: ImageLook }
   | { op: 'downedEmblem'; x: number; y: number; size: number; alpha: number }
   | { op: 'glassDome'; x: number; y: number; size: number }
+  | { op: 'pinGlyph'; name: string; x: number; y: number; size: number; color: string }
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
   | { op: 'glyph'; name: string; x: number; y: number; size: number; color: string; alpha: number }
@@ -54,6 +55,7 @@ export class RecordingSurface implements ViewSurface {
   }
   downedEmblem(x: number, y: number, size: number, alpha: number): void { this.calls.push({ op: 'downedEmblem', x, y, size, alpha }); }
   glassDome(x: number, y: number, size: number): void { this.calls.push({ op: 'glassDome', x, y, size }); }
+  pinGlyph(name: string, x: number, y: number, size: number, color: string): void { this.calls.push({ op: 'pinGlyph', name, x, y, size, color }); }
   text(text: string, x: number, y: number, style: TextStyle): void { this.calls.push({ op: 'text', text, x, y, style }); }
   measureText(text: string, font: string): number {
     const size = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 10);

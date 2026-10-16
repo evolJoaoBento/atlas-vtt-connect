@@ -8,6 +8,7 @@
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
+import { resolvePinIcon } from '../view/pinIcons';
 import { badgeNumberInView, NO_INSTANCE_NUMBERS, numberTokensInView, type TokenInView } from './instanceNumbers';
 import type { AssetIds } from './sceneContracts';
 import type { Handout } from '../handouts';
@@ -133,7 +134,7 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
   for (const [, value] of entries) {
     if (found.length >= SCENE_LIMITS.pins) break;
     if (typeof value !== 'object' || value === null) continue;
-    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown };
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown; icon?: unknown };
     if (pin.readable !== true || pin.gmOnly === true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
     const x = finiteOrNull(pin.x);
     const y = finiteOrNull(pin.y);
@@ -145,6 +146,7 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
       y: finiteOr(y, 0, SCENE_RANGES.coordinate),
       label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
       title: pinTitle(pin.notePath),
+      icon: resolvePinIcon(pin.icon),
     });
   }
   return found;

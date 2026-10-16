@@ -8,6 +8,7 @@ import tokenRingUrl from '../../assets/token-ring.webp';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
 import { WIDGET_ICON_PATHS, type WidgetIcon } from '../../types/widgetIcons';
+import { PIN_ICON_PATHS, type PinIconId } from './pinIcons';
 import type { ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
 
 interface IconShape {
@@ -33,6 +34,18 @@ function iconShapes(name: string): IconShape[] | null {
 const WIDGET_ICON_SPACE = 512;
 /** Only Atlas's own icons are cached, so names from the network cannot grow it. */
 const widgetIcons = new Map<string, Path2D>();
+
+const pinIcons = new Map<string, Path2D>();
+
+function pinIconPath(name: string): Path2D | null {
+  if (!Object.hasOwn(PIN_ICON_PATHS, name)) return null;
+  let path = pinIcons.get(name);
+  if (!path) {
+    path = new Path2D(PIN_ICON_PATHS[name as PinIconId]);
+    pinIcons.set(name, path);
+  }
+  return path;
+}
 
 function widgetIconPath(name: string): Path2D | null {
   if (!Object.hasOwn(WIDGET_ICON_PATHS, name)) return null;
@@ -528,6 +541,18 @@ class CanvasSurface implements ViewSurface {
     context.clearRect(0, 0, image.width, image.height);
     context.putImageData(pixels, 0, 0);
     this.context.drawImage(scratch, 0, 0, image.width, image.height, x, y, width, height);
+  }
+
+  pinGlyph(name: string, x: number, y: number, size: number, color: string): void {
+    const path = pinIconPath(name);
+    if (!path) return;
+    const context = this.context;
+    context.save();
+    context.translate(x - size / 2, y - size / 2);
+    context.scale(size / WIDGET_ICON_SPACE, size / WIDGET_ICON_SPACE);
+    context.fillStyle = color;
+    context.fill(path);
+    context.restore();
   }
 
   createLayer(width: number, height: number): LayerSurface | null {

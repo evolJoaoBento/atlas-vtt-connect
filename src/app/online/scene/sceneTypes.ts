@@ -312,6 +312,8 @@ export interface PlayerPin {
   label: string | null;
   /** The linked note's title (its file name, or its heading). */
   title: string | null;
+  /** Atlas's pin icon (`resolvePinIcon`), or `number` / `letter` for a labelled pin; absent from an older GM. */
+  icon?: string;
 }
 
 /** A snapshot's scene: everything but the fog and the drawings, which follow in parts. */

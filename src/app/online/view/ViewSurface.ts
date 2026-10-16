@@ -97,6 +97,8 @@ export interface ViewSurface {
   raster(image: RasterImage, x: number, y: number, width: number, height: number): void;
   /** The image's mean luminance (0–255) from a small overview, as Atlas reads a map's for the grid colour; null when unreadable. */
   meanLuminance(image: SurfaceImage): number | null;
+  /** One of Atlas's pin icons (`PIN_ICON_PATHS`), filled, `size` wide and centred on (x, y); an unknown name draws nothing. */
+  pinGlyph(name: string, x: number, y: number, size: number, color: string): void;
   /** An offscreen surface for caching a layer; null when none can be made. */
   createLayer(width: number, height: number): LayerSurface | null;
   /** Draws a cached layer stretched over the rectangle. */
