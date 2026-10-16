@@ -1,11 +1,13 @@
-import type { Plugin } from 'obsidian';
+import { Notice, type Plugin } from 'obsidian';
 import type { Disposer, PresentationApi } from '@atlas-vtt/api-types';
 import { onlineSessionStore, type OnlineSessionState } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
 import { tabBadge } from './gm-ui/tabBadge';
 import { EVERYONE_BACK_COMMAND } from './split/splitCopy';
 import { canBringEveryoneBack } from './splitStore';
-import { ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
+import { ONLINE_SESSION_LABEL, SHOW_HANDOUT_LABEL, START_SESSION_LABEL, STOP_HANDOUT_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
+import { HandoutModal } from './ui/handoutModal';
+import { handouts } from './handouts';
 import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
 
 /** The presentation target Connect holds while hosting: Atlas's eye then presents to online players. */
@@ -88,6 +90,32 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
       },
     });
   }
+
+  // Handouts: an image from the vault shown to every player, until the GM takes it away or stops hosting.
+  commands.push('show-handout', 'stop-handout');
+  plugin.addCommand({
+    id: 'show-handout',
+    name: SHOW_HANDOUT_LABEL,
+    checkCallback: (checking) => {
+      if (onlineSessionStore.getState().status !== 'hosting') return false;
+      if (!checking) {
+        new HandoutModal(plugin.app, (file) => {
+          handouts.show({ path: file.path, title: file.basename });
+          new Notice(`Showing ${file.basename} to your players.`);
+        }).open();
+      }
+      return true;
+    },
+  });
+  plugin.addCommand({
+    id: 'stop-handout',
+    name: STOP_HANDOUT_LABEL,
+    checkCallback: (checking) => {
+      if (onlineSessionStore.getState().status !== 'hosting' || !handouts.current()) return false;
+      if (!checking) handouts.show(null);
+      return true;
+    },
+  });
 
   // With scene tabs the eye of each tab players see is badged while the party is split ("2 players").
   const target = options.splitParty ? { ...ONLINE_TARGET, tabBadge: tabBadge(options.presentation) } : ONLINE_TARGET;

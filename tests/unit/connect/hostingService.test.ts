@@ -61,7 +61,7 @@ describe('hosting through the Atlas API', () => {
   it('registers the session commands, not Atlas\'s own present commands, beside the join command', async () => {
     const { connect } = connected();
     await vi.advanceTimersByTimeAsync(0);
-    expect([...connect.commands.values()].map((command) => command.name)).toEqual(['Join online session…', 'Online session…', 'Start online session', 'Stop online session']);
+    expect([...connect.commands.values()].map((command) => command.name)).toEqual(['Join online session…', 'Online session…', 'Start online session', 'Stop online session', 'Show image to players…', 'Stop showing image to players']);
     expect(connect.statusBar.children).toHaveLength(1);
     expect((connect.statusBar.children[0] as HTMLElement).style.display).toBe('none');
   });
@@ -92,11 +92,11 @@ describe('hosting through the Atlas API', () => {
     const again = new FakeAtlas({ capabilities: HOSTING });
     fire('atlas-vtt:api-ready', again);
     await vi.advanceTimersByTimeAsync(0);
-    expect(connect.added()).toBe(5);
+    expect(connect.added()).toBe(7);
     answer(); // the first setup's folder arrives last
     await vi.advanceTimersByTimeAsync(0);
-    expect(connect.added()).toBe(5);
-    expect([...connect.commands.keys()]).toEqual(['join-online-session', 'online-session', 'start-online-session', 'stop-online-session']);
+    expect(connect.added()).toBe(7);
+    expect([...connect.commands.keys()]).toEqual(['join-online-session', 'online-session', 'start-online-session', 'stop-online-session', 'show-handout', 'stop-handout']);
     expect(connect.statusBar.children).toHaveLength(1);
     expect(connect.run('start-online-session')).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
@@ -111,7 +111,7 @@ describe('hosting through the Atlas API', () => {
     const again = new FakeAtlas({ capabilities: HOSTING });
     fire('atlas-vtt:api-ready', again);
     await vi.advanceTimersByTimeAsync(0);
-    expect(connect.commands.size).toBe(4);
+    expect(connect.commands.size).toBe(6);
     expect(connect.statusBar.children).toHaveLength(1);
     connect.run('start-online-session');
     await vi.advanceTimersByTimeAsync(0);

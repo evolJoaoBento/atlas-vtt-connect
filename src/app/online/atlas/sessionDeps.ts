@@ -4,6 +4,7 @@ import type { Deps } from '../OnlineSessionService';
 import { liveLighting } from '../scene/sceneLighting';
 import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
+import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
 import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
@@ -22,7 +23,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'handout'
   | 'tabScenes'
 >;
 
@@ -77,6 +78,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
+    handout: handouts,
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
     // One per hosted session, disposed with it.
     ...(sceneTabs === true && typeof atlas.views.showTab === 'function' ? { tabScenes: () => createTabScenes(atlas) } : {}),

@@ -75,6 +75,10 @@ const map = surface
     notice: element('move-notice'),
     hoverCard: element('hover-card'),
     turnNotice: element('turn-notice'),
+    handout: {
+      panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
+      status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
+    },
     onToolsChange: () => syncToolbar(),
   })
   : null;

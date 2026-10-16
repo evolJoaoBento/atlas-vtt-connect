@@ -259,6 +259,14 @@ export interface PlayerScene {
   measurement: PlayerMeasurement;
   /** The map pins the GM made readable, where players see them; absent from an older GM. */
   pins?: PlayerPin[];
+  /** The image the GM shows players, or null; absent from an older GM. */
+  handout?: PlayerHandout | null;
+}
+
+/** The image the GM shows players: its asset (null while the GM is still reading it) and its title. */
+export interface PlayerHandout {
+  asset: string | null;
+  title: string;
 }
 
 /** A note pin players may read: its place, its number or letter, and its note's title. Never the note's path. */
@@ -280,7 +288,7 @@ export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
-export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins'] as const;
+export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout'] as const;
 export type SceneFieldKey = typeof SCENE_FIELD_KEYS[number];
 
 export interface ScenePatchBody {

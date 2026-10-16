@@ -70,6 +70,7 @@ export class CanvasScene implements OnlineSceneSink {
         notice: dom.moveNotice,
         hoverCard: dom.hoverCard,
         turnNotice: dom.turnNotice,
+        handout: dom.handout,
         onToolsChange: () => this.syncToolbar(),
         ...(options.frames ? { frames: options.frames } : {}),
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),

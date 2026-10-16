@@ -5,6 +5,7 @@
  * which the join dialog and Obsidian's own settings replace. The class names are the page's, scoped by
  * `styles/online-scene-canvas.scss`.
  */
+import type { HandoutViewOptions } from '../../../../online-client/handoutView.mts';
 import { toolIconUrl, type ToolIconName } from '../page/toolIcons';
 
 export interface SceneDom {
@@ -25,6 +26,7 @@ export interface SceneDom {
   sheetClose: HTMLButtonElement;
   sheetTabs: HTMLElement;
   sheetBody: HTMLElement;
+  handout: HandoutViewOptions;
   turnNotice: HTMLElement;
   diceToast: HTMLButtonElement;
   diceTray: HTMLElement;
@@ -68,6 +70,10 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
     cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Your sheets', 'aria-expanded': 'false' },
   });
   sheetButton.hidden = true;
+  const handoutButton = actions.createEl('button', {
+    cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Shown image', 'aria-expanded': 'false' },
+  });
+  handoutButton.hidden = true;
   // Follow GM and Fit map are icon buttons of the toolbar: they start here and the scene moves them into it once the toolbar
   // has drawn its own controls (`CanvasScene`).
   const viewButtons = root.createDiv({ cls: 'toolbar-item view-buttons' });
@@ -85,6 +91,15 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceTray = root.createDiv({ cls: 'dice-tray', attr: { role: 'group', 'aria-label': 'Dice tray' } });
   diceTray.hidden = true;
   const toolbar = root.createEl('nav', { cls: 'toolbar', attr: { 'aria-label': 'Tools' } });
+  // The image the GM shows players (`HandoutView`).
+  const handout = root.createEl('section', { cls: 'handout', attr: { 'aria-label': 'Shown image' } });
+  handout.hidden = true;
+  const handoutHeader = handout.createDiv({ cls: 'handout-header' });
+  const handoutTitle = handoutHeader.createEl('h2');
+  const handoutClose = handoutHeader.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close image' } });
+  icon(handoutClose, 'x');
+  const handoutStatus = handout.createEl('p', { cls: 'handout-status', text: 'Loading…' });
+  const handoutCanvas = handout.createEl('canvas', { cls: 'handout-canvas', attr: { role: 'img', 'aria-label': 'Shown image' } });
   // The token card under the mouse (`HoverCardView`), placed in the window's coordinates.
   const hoverCard = root.createDiv({ cls: 'hover-card' });
   hoverCard.hidden = true;
@@ -111,5 +126,6 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
     diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice,
     sheetButton, sheetPanel, sheetClose, sheetTabs, sheetBody,
+    handout: { panel: handout, title: handoutTitle, canvas: handoutCanvas, status: handoutStatus, closeButton: handoutClose, openButton: handoutButton },
   };
 }

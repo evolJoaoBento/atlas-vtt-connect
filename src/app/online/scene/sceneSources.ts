@@ -1,4 +1,5 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
+import type { HandoutSource } from '../handouts';
 import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
@@ -46,6 +47,8 @@ export interface SceneProjectionOptions {
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of each scene's collection, sent to its players; without it (an Atlas before API 1.18) none is sent. */
   diceLook?: DiceLookSource;
+  /** The image the GM shows players; without it no scene carries a handout. */
+  handout?: HandoutSource;
 }
 
 /** The dice look of a map's collection, as the GM's Atlas has it (`dice.lookFor`, API 1.18); players are sent it with the scene. */
@@ -111,8 +114,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
@@ -122,6 +125,7 @@ export function sceneContext(
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
     conditions: options.conditions?.(mapPath) ?? [],
+    ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),
   };
 }

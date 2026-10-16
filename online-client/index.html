@@ -43,6 +43,7 @@
       <div class="top-pill top-actions">
         <button id="dice-log-button" class="icon-button" type="button" aria-label="Dice log" aria-expanded="false" aria-controls="dice-log"></button>
         <button id="sheet-button" class="icon-button" type="button" aria-label="Your sheets" aria-expanded="false" aria-controls="sheet-panel" hidden></button>
+        <button id="handout-button" class="icon-button" type="button" aria-label="Shown image" aria-expanded="false" aria-controls="handout" hidden></button>
         <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
       </div>
     </header>
@@ -62,6 +63,14 @@
     <div id="dice-tray" class="dice-tray" role="group" aria-label="Dice tray" hidden></div>
     <nav id="toolbar" class="toolbar" aria-label="Tools"></nav>
     <div id="hover-card" class="hover-card" hidden></div>
+    <section id="handout" class="handout" hidden aria-label="Shown image">
+      <div class="handout-header">
+        <h2 id="handout-title"></h2>
+        <button id="handout-close" class="icon-button" type="button" aria-label="Close image">×</button>
+      </div>
+      <p id="handout-status" class="handout-status">Loading…</p>
+      <canvas id="handout-canvas" class="handout-canvas" role="img" aria-label="Shown image"></canvas>
+    </section>
     <aside id="dice-log" class="dice-log" hidden aria-label="Dice log">
       <div class="dice-log-header">
         <h2>Dice log</h2>

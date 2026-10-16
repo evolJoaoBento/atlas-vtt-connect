@@ -26,6 +26,7 @@ import type { ViewSurface } from '../src/app/online/view/ViewSurface';
 import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
+import { HandoutView, type HandoutViewOptions } from './handoutView.mts';
 import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
 import { turnNotice, turnOf } from '../src/app/online/view/turns';
 import { createPinsLayer, pinAt } from '../src/app/online/view/layers/pinsLayer';
@@ -67,6 +68,8 @@ export interface MapViewOptions {
   active?: () => boolean;
   /** The document whose keys the map takes; the page's by default. */
   doc?: Document;
+  /** The panel of the image the GM shows players; without it handouts are not shown. */
+  handout?: HandoutViewOptions;
   /** Says "Your turn" while a token the player controls has the turn; without it nothing says so. */
   turnNotice?: HTMLElement;
   /** The card shown while the mouse rests on a token (its name, conditions and, for the player's own, numbers); without it none shows. */
@@ -82,6 +85,7 @@ export class MapView {
   private hasScene = false;
   private scene: PlayerScene | null = null;
   private readonly hoverCard: HoverCardView | null;
+  private readonly handout: HandoutView | null;
   /** Exact numbers of the tokens this player controls, from the GM's `token-stats`. */
   private numbers: ReadonlyMap<string, TokenNumbers> = new Map();
   /** Where the mouse is over the canvas, for the grab cursor; null when it is elsewhere. */
@@ -127,6 +131,7 @@ export class MapView {
     });
     this.input = new ViewInput(this.camera, this.tools);
     this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
+    this.handout = options.handout ? new HandoutView(options.handout) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
     this.measure();
@@ -146,6 +151,7 @@ export class MapView {
     this.updateButtons();
     this.updateHoverCard();
     this.updateTurn();
+    this.updateHandout();
   }
 
   /** Exact numbers of the tokens this player controls (`token-stats`): the card of each shows them. */
@@ -225,11 +231,18 @@ export class MapView {
   /** Images arrived or went. */
   refresh(): void {
     this.renderer.invalidate();
+    this.updateHandout();
+  }
+
+  private updateHandout(): void {
+    const handout = this.scene?.handout ?? null;
+    this.handout?.update(handout, handout?.asset ? this.options.images(handout.asset) : null);
   }
 
   /** The session is over: stops drawing and frees the fog image. The page does not use the view again. */
   dispose(): void {
     this.listeners.abort();
+    this.handout?.dispose();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.unwatchPixelRatio();

@@ -85,6 +85,8 @@ export function sceneAssetIds(scene: PlayerScene | null): string[] {
   const ids = new Set<string>();
   if (isAssetId(scene.map.asset)) ids.add(scene.map.asset);
   for (const token of Object.values(scene.tokens)) if (isAssetId(token.image)) ids.add(token.image);
+  // The GM's handout reaches the players of every scene in use.
+  if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);
   return [...ids];
 }
 

@@ -1,4 +1,5 @@
 import type { App } from 'obsidian';
+import { handouts, type HandoutSource } from './handouts';
 import type { CollectionGridDefaults, ConditionDefinition, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import type { GmSession, SessionPlayer } from './GmSession';
@@ -55,6 +56,8 @@ export interface Deps extends OptionalParts {
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of a map's collection (Atlas's `dice.lookFor`, API 1.18), sent to players; without it none is. */
   diceLook?: DiceLookSource;
+  /** The image the GM shows players. */
+  handout?: HandoutSource;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -140,6 +143,7 @@ export class OnlineSessionService {
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
           ...(deps.watchResources ? { watchResources: deps.watchResources } : {}),
           ...(deps.diceLook ? { diceLook: deps.diceLook } : {}),
+          ...(deps.handout ? { handout: deps.handout } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,
@@ -165,6 +169,8 @@ export class OnlineSessionService {
     const hosted = this.hosted;
     this.hosted = null;
     hosted?.stop();
+    // A handout belongs to the session: the next one starts without it.
+    handouts.show(null);
     resetOnlineSessionStore();
   }
 

@@ -9,6 +9,7 @@ import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
 import type { AssetIds } from './sceneContracts';
+import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
 import { closedFrame, type LightingFrame } from './lightingFrame';
@@ -54,6 +55,8 @@ export interface ProjectionContext {
   resources?: readonly ResourceDefinition[];
   /** The collection's condition definitions: what names a token's conditions for players. */
   conditions?: readonly ConditionDefinition[];
+  /** The image the GM shows players, or null; undefined where the session has no handouts (the field is then left out). */
+  handout?: Handout | null;
   /**
    * The initiative rules of the map's collection, which decide whether the list is by sides before
    * a fight starts (`projectSides`); without them the default rules apply: turn order.
@@ -96,6 +99,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
     // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
     ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
+    ...(context.handout !== undefined ? { handout: context.handout ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
   };
 }
 

@@ -286,6 +286,15 @@ export class Modal {
   onClose(): void {}
 }
 
+/** Obsidian's fuzzy picker: items and their text come from the subclass; `choose` stands in for the user's pick. */
+export class FuzzySuggestModal<T> extends Modal {
+  placeholder = '';
+  setPlaceholder(placeholder: string): void { this.placeholder = placeholder; }
+  getItems(): T[] { return []; }
+  getItemText(_item: T): string { return ''; }
+  onChooseItem(_item: T, _event?: MouseEvent | KeyboardEvent): void {}
+}
+
 export const Platform = {
   isMacOS: false,
   isWin: false,
