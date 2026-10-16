@@ -112,27 +112,34 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
 }
 
 /** `downed`: how far the token is into Atlas's downed look, 0 alive to 1: its art and ring greyed over, and the skull. */
+/**
+ * The token as Atlas's `SpriteFactory` builds it. Framed: the art cover-fitted in a circle, under Atlas's glass dome and
+ * ring. Unframed (no ring): the whole artwork, contain-fitted, with neither (`syncTokenArtwork`). Only the art turns with
+ * the token's rotation; the dome and ring stay upright, as Atlas rotates the sprite alone.
+ */
 function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, size: number, stroke: number, _ringRadius: number, downed: number): void {
   const radius = size / 2;
   const art = frame.images(token.image);
+  const framed = token.ring !== null;
   surface.push(token.x, token.y, (token.rotation * Math.PI) / 180, 1);
   if (art) {
-    // Cover-fit: the art fills the circle and keeps its proportions.
-    const scale = Math.max(size / art.width, size / art.height);
-    const width = art.width * scale;
-    const height = art.height * scale;
-    surface.image(art.image, -width / 2, -height / 2, width, height, { x: 0, y: 0, radius });
-    if (downed > 0) surface.image(art.image, -width / 2, -height / 2, width, height, { x: 0, y: 0, radius }, { lifeless: true, alpha: downed });
+    const fit = framed ? Math.max(size / art.width, size / art.height) : Math.min(size / art.width, size / art.height);
+    const width = art.width * fit;
+    const height = art.height * fit;
+    const clip = framed ? { x: 0, y: 0, radius } : null;
+    surface.image(art.image, -width / 2, -height / 2, width, height, clip);
+    if (downed > 0) surface.image(art.image, -width / 2, -height / 2, width, height, clip, { lifeless: true, alpha: downed });
   } else {
     surface.circle(0, 0, radius, { fill: TOKEN_MARKER_COLOR });
   }
-  // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
-  if (token.ring !== null) {
-    const diameter = getTokenRingOuterDiameter(size, stroke, 1);
-    surface.tokenRing(0, 0, diameter, size, token.ring);
-    if (downed > 0) surface.tokenRing(0, 0, diameter, size, token.ring, { lifeless: true, alpha: downed });
-  }
   surface.pop();
+  if (token.ring !== null) {
+    surface.glassDome(token.x, token.y, size);
+    // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
+    const diameter = getTokenRingOuterDiameter(size, stroke, 1);
+    surface.tokenRing(token.x, token.y, diameter, size, token.ring);
+    if (downed > 0) surface.tokenRing(token.x, token.y, diameter, size, token.ring, { lifeless: true, alpha: downed });
+  }
   // The skull stays upright, spans the token and settles from a little larger as it fades in.
   if (downed > 0) {
     const scale = DOWNED_MOTION.emblemScale - (DOWNED_MOTION.emblemScale - 1) * downed;

@@ -82,6 +82,8 @@ export interface ViewSurface {
    * colour as wide as the padding between the art and the ring's edge.
    */
   tokenRing(x: number, y: number, diameter: number, artSize: number, color: string, look?: ImageLook): void;
+  /** Atlas's glass dome over framed token art (`SpriteFactory.getGlassTexture`): a vignette and soft highlights, `size` wide, centred on (x, y). */
+  glassDome(x: number, y: number, size: number): void;
   /** Atlas's downed emblem (`downedEmblemTexture`): a skull in aged bone with embers in its eyes, `size` wide, centred on (x, y). */
   downedEmblem(x: number, y: number, size: number, alpha: number): void;
   text(text: string, x: number, y: number, style: TextStyle): void;

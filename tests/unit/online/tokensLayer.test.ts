@@ -19,19 +19,34 @@ function draw(tokens: Record<string, PlayerToken>, withImages = false): Recordin
 }
 
 describe('tokens layer', () => {
-  it("clips the art to its circle, cover-fit, and draws Atlas's ring texture over it at Atlas's size", () => {
+  it("clips the art to its circle, cover-fit, under Atlas's glass dome and ring texture at Atlas's size", () => {
     expect(draw({ t1: playerToken() }, true).calls).toEqual([
       { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
       { op: 'image', image: art.image, x: -62, y: -31, width: 124, height: 62, clip: { x: 0, y: 0, radius: 31 } },
-      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
-      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#ffffff' },
       { op: 'pop' },
+      { op: 'glassDome', x: 100, y: 100, size: 62 },
+      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
+      { op: 'tokenRing', x: 100, y: 100, diameter: 70, artSize: 62, color: '#ffffff' },
     ]);
   });
 
   it('draws the ring in the colour the GM chose for the token', () => {
     expect(draw({ t1: playerToken({ ring: '#e93147' }) }, true).ops('tokenRing')).toEqual([
-      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#e93147' },
+      { op: 'tokenRing', x: 100, y: 100, diameter: 70, artSize: 62, color: '#e93147' },
+    ]);
+  });
+
+  it('turns only the art with the rotation, as Atlas turns its sprite: the dome and ring stay upright', () => {
+    const calls = draw({ t1: playerToken({ rotation: 90 }) }, true).calls;
+    expect(calls[0]).toMatchObject({ op: 'push', rotation: expect.closeTo(Math.PI / 2) });
+    expect(calls.findIndex((call) => call.op === 'pop')).toBeLessThan(calls.findIndex((call) => call.op === 'tokenRing'));
+  });
+
+  it("shows ring-less art whole, contain-fit, without the dome, as Atlas shows unframed art", () => {
+    expect(draw({ t1: playerToken({ ring: null }) }, true).calls).toEqual([
+      { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
+      { op: 'image', image: art.image, x: -31, y: -15.5, width: 62, height: 31, clip: null },
+      { op: 'pop' },
     ]);
   });
 

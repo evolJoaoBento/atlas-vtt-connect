@@ -84,6 +84,65 @@ function lifelessCopy(source: CanvasImageSource & { width: number; height: numbe
   return copy;
 }
 
+/** Atlas's glass dome, drawn once per document at its texture's size. */
+const GLASS_SIZE = 512;
+const glassDomes = new WeakMap<Document, HTMLCanvasElement | null>();
+
+/**
+ * Atlas's `SpriteFactory.getGlassTexture`, layer for layer: an edge vignette, a broad highlight above the centre, two soft
+ * glints up and to the left, and a faint rim light along the bottom.
+ */
+function glassDomeCanvas(doc: Document, blank: () => HTMLCanvasElement): HTMLCanvasElement | null {
+  if (glassDomes.has(doc)) return glassDomes.get(doc) ?? null;
+  const canvas = blank();
+  canvas.width = GLASS_SIZE;
+  canvas.height = GLASS_SIZE;
+  const ctx = canvas.getContext('2d');
+  glassDomes.set(doc, ctx ? canvas : null);
+  if (!ctx) return null;
+  const centre = GLASS_SIZE / 2;
+  const radius = GLASS_SIZE / 2;
+  const stops = (gradient: CanvasGradient, list: ReadonlyArray<readonly [number, string]>): CanvasGradient => {
+    for (const [offset, color] of list) gradient.addColorStop(offset, color);
+    return gradient;
+  };
+  const glow = (x: number, y: number, reach: number, list: ReadonlyArray<readonly [number, string]>): void => {
+    ctx.fillStyle = stops(ctx.createRadialGradient(x, y, 0, x, y, reach), list);
+    ctx.beginPath();
+    ctx.arc(x, y, reach, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  ctx.beginPath();
+  ctx.arc(centre, centre, radius, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = stops(ctx.createRadialGradient(centre, centre, radius * 0.3, centre, centre, radius), [
+    [0, 'rgba(0, 0, 0, 0)'], [0.55, 'rgba(0, 0, 0, 0)'], [0.65, 'rgba(0, 0, 0, 0.03)'], [0.75, 'rgba(0, 0, 0, 0.08)'],
+    [0.82, 'rgba(0, 0, 0, 0.15)'], [0.88, 'rgba(0, 0, 0, 0.25)'], [0.93, 'rgba(0, 0, 0, 0.35)'], [0.97, 'rgba(0, 0, 0, 0.45)'],
+    [1, 'rgba(0, 0, 0, 0.55)'],
+  ]);
+  ctx.fillRect(0, 0, GLASS_SIZE, GLASS_SIZE);
+  const highY = centre - radius * 0.15;
+  ctx.fillStyle = stops(ctx.createRadialGradient(centre, highY, radius * 0.1, centre, highY, radius * 0.85), [
+    [0, 'rgba(255, 255, 255, 0.2)'], [0.3, 'rgba(255, 255, 255, 0.06)'], [0.5, 'rgba(255, 255, 255, 0.02)'], [1, 'rgba(255, 255, 255, 0)'],
+  ]);
+  ctx.beginPath();
+  ctx.arc(centre, centre, radius, 0, Math.PI * 2);
+  ctx.fill();
+  glow(centre - radius * 0.32, centre - radius * 0.35, radius * 0.4,
+    [[0, 'rgba(255, 255, 255, 0.18)'], [0.4, 'rgba(255, 255, 255, 0.06)'], [1, 'rgba(255, 255, 255, 0)']]);
+  glow(centre - radius * 0.18, centre - radius * 0.5, radius * 0.22,
+    [[0, 'rgba(255, 255, 255, 0.14)'], [0.5, 'rgba(255, 255, 255, 0.04)'], [1, 'rgba(255, 255, 255, 0)']]);
+  ctx.beginPath();
+  ctx.arc(centre, centre, radius - 2, Math.PI * 0.15, Math.PI * 0.85);
+  ctx.strokeStyle = stops(ctx.createLinearGradient(centre - radius, centre + radius * 0.7, centre + radius, centre + radius * 0.7), [
+    [0, 'rgba(255, 255, 255, 0)'], [0.3, 'rgba(255, 255, 255, 0.1)'], [0.5, 'rgba(255, 255, 255, 0.15)'], [0.7, 'rgba(255, 255, 255, 0.1)'],
+    [1, 'rgba(255, 255, 255, 0)'],
+  ]);
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  return canvas;
+}
+
 /** Atlas's downed emblem, drawn once per document at this size (`DOWNED_EMBLEM_TEXTURE_SIZE`). */
 const EMBLEM_SIZE = 384;
 const emblems = new WeakMap<Document, HTMLCanvasElement | null>();
@@ -325,6 +384,11 @@ class CanvasSurface implements ViewSurface {
     context.globalAlpha = alpha;
     context.drawImage(emblem, x - size / 2, y - size / 2, size, size);
     context.restore();
+  }
+
+  glassDome(x: number, y: number, size: number): void {
+    const dome = glassDomeCanvas(this.canvas.ownerDocument, () => this.blank());
+    if (dome) this.context.drawImage(dome, x - size / 2, y - size / 2, size, size);
   }
 
   /** A bare copy of this surface's canvas, made by its own document (a pop-out window's too). */
