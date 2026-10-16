@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
 import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR, TURN_RING_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
@@ -127,20 +128,46 @@ describe('tokens layer', () => {
     };
     expect(at({ t1: playerToken({ x: 100 }) })).toBe(100);
     expect(layer.animating?.()).toBe(false);
-    // 200 px at 400 px/s: half a second, eased in and out.
+    // Atlas's glide: about two thirds of the way left behind every 50 ms, there within a few frames.
     expect(at({ t1: playerToken({ x: 300 }) })).toBe(100);
     expect(layer.animating?.()).toBe(true);
-    now = 250;
-    expect(at({ t1: playerToken({ x: 300 }) })).toBe(200);
-    now = 500;
+    now = 50;
+    expect(at({ t1: playerToken({ x: 300 }) })).toBeCloseTo(300 - 200 * Math.exp(-1));
+    for (let i = 0; i < 20; i++) {
+      now += 50;
+      at({ t1: playerToken({ x: 300 }) });
+    }
     expect(at({ t1: playerToken({ x: 300 }) })).toBe(300);
     expect(layer.animating?.()).toBe(false);
     // Dragged: straight under the pointer.
     expect(at({ t1: playerToken({ x: 300 }) }, { controlled: new Set(['t1']), positions: new Map([['t1', { x: 900, y: 100 }]]), held: 't1' })).toBe(900);
-    // Dropped there and snapped by the GM a little away: the shortest glide, 150 ms.
+    // Dropped there and snapped by the GM a little away: it slides the rest of the way.
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(900);
-    now = 650;
+    // A frame steps by at most 100 ms.
+    now += 300;
+    expect(at({ t1: playerToken({ x: 910 }) })).toBeCloseTo(910 - 10 * Math.exp(-2));
+    for (let i = 0; i < 6; i++) {
+      now += 50;
+      at({ t1: playerToken({ x: 910 }) });
+    }
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(910);
+  });
+
+  it("puts another's token in place at once on a lit scene, where a glide would show players where it came from", () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const dark = { [DARKNESS_FOG_ID]: { type: 'rectangle' as const, erase: false, order: 1, x: 0, y: 0, width: 1, height: 1 } };
+    const at = (x: number, controlled: ReadonlySet<string>): number => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame({ ...playerScene({ tokens: { t1: playerToken({ x }) } }), fog: dark }, { overlay: { controlled, positions: new Map(), held: null } }));
+      return surface.ops('push')[0]!.x;
+    };
+    at(100, new Set());
+    expect(at(300, new Set())).toBe(300);
+    expect(layer.animating?.()).toBe(false);
+    // The player's own token still glides.
+    expect(at(500, new Set(['t1']))).toBe(300);
+    expect(layer.animating?.()).toBe(true);
   });
 
   it("rings the token whose turn it is, for every player", () => {

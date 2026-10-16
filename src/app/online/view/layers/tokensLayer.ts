@@ -4,7 +4,7 @@
  * ring when the token has one, a grey veil and a skull when it is downed, then its bars, nameplate and condition badges. On this
  * player's view only (`frame.overlay`), the tokens they control get a highlight ring, and
  * a token they drag or just dropped is drawn where they put it. A token whose place
- * changes glides there as in Atlas (`tokenGlides.ts`).
+ * changes glides there as in Atlas (`tokenGlides.ts`); on a lit scene only the player's own do.
  */
 import { DOWNED_LOOK } from '@atlas-vtt/shared/draw';
 import { getTokenRingCenterRadius, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
@@ -14,6 +14,7 @@ import { intersects } from '../camera';
 import type { ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
 import { TokenGlides } from './tokenGlides';
+import { DARKNESS_FOG_ID } from '../../scene/darknessFog';
 import { turnOf } from '../turns';
 import { drawTokenUi } from './tokenUiDrawing';
 import { BarFills } from './barFills';
@@ -39,9 +40,10 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   };
   // Moves glide as Atlas's do, instead of jumping (a drop snapping to the grid, the GM moving a token).
   const now = options.now ?? (() => performance.now());
-  const glides = new TokenGlides(now);
+  const reducedMotion = options.reducedMotion ?? prefersReducedMotion;
+  const glides = new TokenGlides(now, reducedMotion);
   // Bars ease to each new value as Atlas's do.
-  const fills = new BarFills(now, options.reducedMotion ?? prefersReducedMotion);
+  const fills = new BarFills(now, reducedMotion);
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
@@ -50,9 +52,11 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       glides.begin(frame.scene.sceneId);
       fills.begin(frame.scene.sceneId);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
+      // A lit scene's darkness reaches players as a fog operation of its own: there only their tokens glide.
+      const lit = Object.hasOwn(frame.scene.fog, DARKNESS_FOG_ID);
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
         const target = positions.get(id) ?? inScene;
-        const at = glides.position(id, { x: target.x, y: target.y }, id === held);
+        const at = glides.position(id, { x: target.x, y: target.y }, id === held, !lit || controlled.has(id));
         const token = at.x === inScene.x && at.y === inScene.y ? inScene : { ...inScene, x: at.x, y: at.y };
         // Never 0 or negative: Atlas's formula gives nothing at half a cell or less.
         const size = Math.max(1, computeTokenPixelSize(cellSize, token.size));
