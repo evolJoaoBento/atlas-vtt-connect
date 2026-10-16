@@ -61,13 +61,51 @@ describe('the tools overlay', () => {
     expect(surface.ops('text')[0]).toMatchObject({ text: '10ft', x: 70, y: 0 });
   });
 
-  it("draws a laser like Atlas's Canvas beam: the body in its colour and a white filament, round", () => {
+  it("draws a laser as Atlas's WebGL beam: a glow in its colour, white-hot at the core and at the held point", () => {
     const surface = new RecordingSurface();
     const trail = [{ x: 0, y: 0, life: 1 }, { x: 50, y: 0, life: 1 }];
     drawTools(surface, { ...NONE, lasers: [{ from: 'p1', color: '#ff9f2e', trail, head: { x: 50, y: 0 } }] }, 1);
+    const [raster] = surface.ops('raster');
+    expect(surface.ops('paths')).toEqual([]);
+    const { image, x, y } = raster!;
+    const at = (worldX: number, worldY: number): number[] => {
+      const index = (Math.floor(worldY - y) * image.width + Math.floor(worldX - x)) * 4;
+      return [...image.data.slice(index, index + 4)];
+    };
+    // Default size 16: a body 5.6 wide either side, the glow reaching 24.
+    expect(raster!.height).toBeGreaterThanOrEqual(48);
+    const [r, g, b, a] = at(25, 10);
+    expect(a).toBeGreaterThan(0);
+    expect(a).toBeLessThan(160);
+    expect([r, g, b]).toEqual([255, 159, 46]);
+    // The core of the beam, away from the held point, is mostly the colour lit towards white; at the held point, white.
+    expect(at(10, 0)[3]!).toBeGreaterThan(250);
+    expect(at(10, 0)[2]!).toBeGreaterThan(46);
+    expect(at(50, 0).slice(0, 3).every((channel) => channel > 200)).toBe(true);
+  });
+
+  it('fades an old part of a laser out as well as narrowing it, as Atlas does', () => {
+    const strength = (life: number): number => {
+      const surface = new RecordingSurface();
+      drawTools(surface, { ...NONE, lasers: [{ from: 'p1', color: '#ff0059', trail: [{ x: 0, y: 0, life }, { x: 50, y: 0, life }], head: null }] }, 1);
+      const raster = surface.ops('raster')[0];
+      if (!raster) return 0;
+      const { image, x, y } = raster;
+      return image.data[(Math.floor(-y) * image.width + Math.floor(25 - x)) * 4 + 3]!;
+    };
+    expect(strength(1)).toBeGreaterThan(250);
+    expect(strength(0.2)).toBeGreaterThan(0);
+    expect(strength(0.2)).toBeLessThan(200);
+    expect(strength(0)).toBe(0);
+  });
+
+  it("falls back to Atlas's Canvas beam when a laser is too wide to work out by pixel", () => {
+    const surface = new RecordingSurface();
+    const trail = [{ x: 0, y: 0, life: 1 }, { x: 100_000, y: 100_000, life: 1 }];
+    drawTools(surface, { ...NONE, lasers: [{ from: 'p1', color: '#ff9f2e', trail, head: null }] }, 1);
+    expect(surface.ops('raster')).toEqual([]);
     const paths = surface.ops('paths');
-    expect(paths.map(({ style }) => style.stroke)).toEqual(['#ff9f2e', '#ffffff']);
+    expect(new Set(paths.map(({ style }) => style.stroke))).toEqual(new Set(['#ff9f2e', '#ffffff']));
     expect(paths.every(({ style }) => style.round === true)).toBe(true);
-    expect(paths[1]!.style.lineWidth).toBeCloseTo(paths[0]!.style.lineWidth! * 0.25);
   });
 });

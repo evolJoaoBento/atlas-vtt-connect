@@ -47,6 +47,13 @@ export interface ImageLook {
   lifeless?: boolean;
 }
 
+/** Pixels worked out in code: straight (not premultiplied) RGBA, row by row. */
+export interface RasterImage {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
 /** A circle an image is clipped to, in the current frame. */
 export interface ImageClip {
   x: number;
@@ -84,6 +91,8 @@ export interface ViewSurface {
   icon(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
   /** One of Atlas's widget and condition icons (`WIDGET_ICON_PATHS`), filled, `size` wide and centred on (x, y); an unknown name draws nothing. */
   glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
+  /** `image` stretched over the rectangle, as an image is: pixels worked out in code, such as the laser's glow. */
+  raster(image: RasterImage, x: number, y: number, width: number, height: number): void;
   /** An offscreen surface for caching a layer; null when none can be made. */
   createLayer(width: number, height: number): LayerSurface | null;
   /** Draws a cached layer stretched over the rectangle. */

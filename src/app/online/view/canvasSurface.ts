@@ -8,7 +8,7 @@ import tokenRingUrl from '../../assets/token-ring.webp';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
 import { WIDGET_ICON_PATHS, type WidgetIcon } from '../../types/widgetIcons';
-import type { ImageClip, ImageLook, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
+import type { ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
 
 interface IconShape {
   path: Path2D;
@@ -229,6 +229,8 @@ function trace(context: CanvasRenderingContext2D, points: readonly ScenePoint[],
 
 class CanvasSurface implements ViewSurface {
   private depth = 0;
+  /** Where `raster` puts its pixels before they are drawn. */
+  private scratch: HTMLCanvasElement | null = null;
 
   constructor(readonly canvas: HTMLCanvasElement, protected readonly context: CanvasRenderingContext2D) {}
 
@@ -410,6 +412,21 @@ class CanvasSurface implements ViewSurface {
     context.fillStyle = color;
     context.fill(path);
     context.restore();
+  }
+
+  raster(image: RasterImage, x: number, y: number, width: number, height: number): void {
+    if (image.width <= 0 || image.height <= 0) return;
+    // Pixels go onto a canvas of their own first: `putImageData` ignores the transform and the alpha.
+    const scratch = (this.scratch ??= this.blank());
+    if (scratch.width < image.width) scratch.width = image.width;
+    if (scratch.height < image.height) scratch.height = image.height;
+    const context = scratch.getContext('2d');
+    if (!context) return;
+    const pixels = context.createImageData(image.width, image.height);
+    pixels.data.set(image.data);
+    context.clearRect(0, 0, image.width, image.height);
+    context.putImageData(pixels, 0, 0);
+    this.context.drawImage(scratch, 0, 0, image.width, image.height, x, y, width, height);
   }
 
   createLayer(width: number, height: number): LayerSurface | null {

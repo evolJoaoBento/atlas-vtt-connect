@@ -1,9 +1,9 @@
 /**
  * What the player's tools draw over the scene, above the fog as Atlas draws its measurements and
  * lasers: the measurement, the drag ruler, then everyone's lasers. Lines, points and labels
- * follow Atlas's measure drawing (`measureGeometry.ts`). Lasers follow its Canvas-renderer beam
- * (`CanvasLaserBeam`): the body in the person's colour and a white-hot filament, without the
- * glow, at the default size. Shared with the web page.
+ * follow Atlas's measure drawing (`measureGeometry.ts`). Lasers are Atlas's WebGL beam (`laserRaster.ts`): glow, body
+ * and white-hot filament, fading as they age, with a hot spot where a laser is held, at the default size. Shared with
+ * the web page.
  */
 import {
   beamRadius, beamSmoothingSpacing, beamWidth, FILAMENT_COLOR, FILAMENT_SHARE, smoothBeam, type BeamPoint,
@@ -16,6 +16,7 @@ import { DEFAULT_LASER_POINTER_SETTINGS } from '@atlas-vtt/shared/rules';
 import type { ScenePoint } from '../../scene/sceneTypes';
 import type { OverlayLayer } from '../layers/layerTypes';
 import { cssColor } from '../layers/tokenUiDrawing';
+import { rasterBeam } from './laserRaster';
 import type { ViewSurface } from '../ViewSurface';
 import type { MeasureOverlay } from './MeasureTool';
 import type { PlayerTools, ToolOverlay } from './PlayerTools';
@@ -37,13 +38,13 @@ const LABEL_TEXT = '#ffffff';
 
 export function createToolsLayer(tools: Pick<PlayerTools, 'overlay' | 'isAnimating'>): OverlayLayer {
   return {
-    draw: (surface, frame) => drawTools(surface, tools.overlay(), frame.zoom),
+    draw: (surface, frame) => drawTools(surface, tools.overlay(), frame.zoom, frame.pixel),
     animating: () => tools.isAnimating(),
   };
 }
 
-/** `zoom`: screen pixels per world unit, as Atlas's viewport scale. */
-export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: number): void {
+/** `zoom`: screen pixels per world unit, as Atlas's viewport scale; `pixel`: a device pixel's size in world units. */
+export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: number, pixel = zoom > 0 ? 1 / zoom : 1): void {
   if (overlay.measure) drawMeasurement(surface, overlay.measure, zoom);
   const ruler = overlay.ruler;
   if (ruler) {
@@ -54,7 +55,7 @@ export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: numb
     if (middle) drawLabel(surface, ruler.label, middle, zoom);
   }
   for (const template of overlay.templates) drawTemplate(surface, template, zoom, overlay.coneOpening);
-  for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.color, zoom);
+  for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.head, laser.color, zoom, pixel);
   for (const ring of overlay.pings) drawPingRing(surface, ring, zoom);
 }
 
@@ -148,9 +149,16 @@ function drawLabel(surface: ViewSurface, text: string, center: ScenePoint, zoom:
   surface.text(text, center.x, center.y, { font, color: LABEL_TEXT, align: 'center' });
 }
 
-function drawLaser(surface: ViewSurface, trail: readonly BeamPoint[], color: string, zoom: number): void {
+/** `head`: where the laser is held, its hot spot. */
+function drawLaser(surface: ViewSurface, trail: readonly BeamPoint[], head: ScenePoint | null, color: string, zoom: number, pixel: number): void {
   const { halfWidth, bodyShare } = beamWidth(DEFAULT_LASER_POINTER_SETTINGS.size, zoom);
   const points = smoothBeam(trail, beamSmoothingSpacing(halfWidth, zoom));
+  const raster = rasterBeam(points, null, { color, halfWidth, bodyShare, pointer: head }, pixel > 0 ? 1 / pixel : zoom);
+  if (raster) {
+    surface.raster(raster.image, raster.x, raster.y, raster.width, raster.height);
+    return;
+  }
+  // Too wide to work out by pixel: Atlas's Canvas-renderer beam (`CanvasLaserBeam`), body and filament without the glow.
   const body = (point: BeamPoint): number => beamRadius(point, halfWidth) * bodyShare;
   for (const share of [1, FILAMENT_SHARE]) {
     const stroke = share === 1 ? color : FILAMENT;

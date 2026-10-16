@@ -2,7 +2,7 @@ import type { DecodedImage } from '../../../src/app/online/assets/AssetLoader';
 import { sceneWorldBounds } from '../../../src/app/online/preview/previewLayout';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { NO_TOKEN_OVERLAY, type LayerFrame } from '../../../src/app/online/view/layers/layerTypes';
-import type { ImageClip, ImageLook, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
+import type { ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
 
 export type SurfaceCall =
   | { op: 'begin'; width: number; height: number; background: string | null }
@@ -19,6 +19,7 @@ export type SurfaceCall =
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
   | { op: 'glyph'; name: string; x: number; y: number; size: number; color: string; alpha: number }
+  | { op: 'raster'; image: RasterImage; x: number; y: number; width: number; height: number }
   | { op: 'drawLayer'; layer: number; x: number; y: number; width: number; height: number };
 
 export type CallOf<K extends SurfaceCall['op']> = Extract<SurfaceCall, { op: K }>;
@@ -61,6 +62,9 @@ export class RecordingSurface implements ViewSurface {
   }
   glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
     this.calls.push({ op: 'glyph', name, x, y, size, color, alpha });
+  }
+  raster(image: RasterImage, x: number, y: number, width: number, height: number): void {
+    this.calls.push({ op: 'raster', image, x, y, width, height });
   }
   createLayer(width: number, height: number): LayerSurface {
     const layer = new RecordingLayer(this.layers.length + 1, width, height);
