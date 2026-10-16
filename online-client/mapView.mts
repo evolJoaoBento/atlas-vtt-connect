@@ -176,6 +176,8 @@ export class MapView {
 
   /** The scene to show; null shows nothing and resets the camera. */
   setScene(scene: PlayerScene | null): void {
+    // Another scene: the frame players saw fades into it, as Atlas's player window crossfades (`crossfadeToNextMap`).
+    if (this.scene && scene && this.scene.sceneId !== scene.sceneId) this.crossfade();
     this.hasScene = scene !== null;
     this.scene = scene;
     this.camera.setScene(scene);
@@ -282,6 +284,7 @@ export class MapView {
 
   /** The session is over: stops drawing and frees the fog image. The page does not use the view again. */
   dispose(): void {
+    this.transition?.cancel();
     this.listeners.abort();
     this.handout?.dispose();
     this.resizeObserver?.disconnect();
@@ -327,6 +330,54 @@ export class MapView {
       observer.observe(doc.body, { attributes: true, attributeFilter: ['class'] });
       signal.addEventListener('abort', () => observer.disconnect(), { once: true });
     }
+  }
+
+  /** The frame of the scene before, fading out over the next; null once it has. */
+  private transition: { paintInto(context: CanvasRenderingContext2D): void; cancel(): void } | null = null;
+
+  /**
+   * Atlas's `freezeCanvasFrame` without the settle, as its player window plays it: a still copy of the map's current
+   * frame, laid right over it, fades out over 300 ms while the next scene draws beneath. A fade still playing is carried
+   * over at its opacity.
+   */
+  private crossfade(): void {
+    const canvas = this.options.canvas;
+    if (canvas.width === 0 || canvas.height === 0) return;
+    const snapshot = canvas.ownerDocument.createElement('canvas');
+    snapshot.className = 'scene-transition-snapshot';
+    snapshot.setAttribute('aria-hidden', 'true');
+    snapshot.width = canvas.width;
+    snapshot.height = canvas.height;
+    let context: CanvasRenderingContext2D | null = null;
+    try {
+      context = snapshot.getContext('2d');
+    } catch {
+      context = null;
+    }
+    if (!context || typeof snapshot.animate !== 'function') return;
+    context.drawImage(canvas, 0, 0);
+    this.transition?.paintInto(context);
+    this.transition?.cancel();
+    canvas.after(snapshot);
+    const fade = snapshot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' });
+    const transition = {
+      paintInto: (into: CanvasRenderingContext2D): void => {
+        if (!snapshot.isConnected) return;
+        into.globalAlpha = Number(snapshot.ownerDocument.defaultView?.getComputedStyle(snapshot).opacity ?? 1);
+        into.drawImage(snapshot, 0, 0);
+        into.globalAlpha = 1;
+      },
+      cancel: (): void => {
+        fade.cancel();
+        snapshot.remove();
+        // Its pixels go at once rather than with the garbage.
+        snapshot.width = 0;
+        snapshot.height = 0;
+        if (this.transition === transition) this.transition = null;
+      },
+    };
+    fade.onfinish = transition.cancel;
+    this.transition = transition;
   }
 
   /** The ratio changes without a resize when the window moves to another screen or the page is zoomed. */

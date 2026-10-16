@@ -586,3 +586,6 @@ button:disabled { opacity: 0.5; cursor: default; }
   .tool-button[data-label]::after, .tray-face[data-label]::after, .turn-notice,
   .dice-tray:not([hidden]), .tray-count { animation: none; }
 }
+
+/* The frame of the scene before, over the map while it fades into the next (Atlas's scene-transition.scss). */
+.scene-transition-snapshot { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; pointer-events: none; }

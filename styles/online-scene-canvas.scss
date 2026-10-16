@@ -545,3 +545,6 @@
 }
 /* Atlas shows its own tooltips where it wants one and switches Obsidian's off there (_native-tooltips.scss). */
 .atlas-connect-scene [data-label] { --no-tooltip: true; }
+
+/* The frame of the scene before, over the map while it fades into the next (Atlas's scene-transition.scss). */
+.atlas-connect-scene .scene-transition-snapshot { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; pointer-events: none; }
