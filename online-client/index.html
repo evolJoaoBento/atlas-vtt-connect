@@ -42,6 +42,7 @@
       </div>
       <div class="top-pill top-actions">
         <button id="dice-log-button" class="icon-button" type="button" aria-label="Dice log" aria-expanded="false" aria-controls="dice-log"></button>
+        <button id="sheet-button" class="icon-button" type="button" aria-label="Your sheets" aria-expanded="false" aria-controls="sheet-panel" hidden></button>
         <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
       </div>
     </header>
@@ -68,6 +69,14 @@
       </div>
       <p id="dice-log-empty" class="dice-log-empty">No rolls yet</p>
       <ol id="dice-log-list" class="dice-log-list" aria-label="Rolls"></ol>
+    </aside>
+    <aside id="sheet-panel" class="sheet-panel" hidden aria-label="Your sheets">
+      <div class="sheet-header">
+        <h2>Your sheets</h2>
+        <button id="sheet-close" class="icon-button" type="button" aria-label="Close sheets">×</button>
+      </div>
+      <div id="sheet-tabs" class="sheet-tabs" hidden></div>
+      <div id="sheet-body" class="sheet-body"></div>
     </aside>
     <aside id="menu" class="menu" hidden aria-label="Menu">
       <div class="menu-header">

@@ -8,6 +8,7 @@ import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, Scene
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
+import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -107,11 +108,15 @@ export type ControlMessage =
    * it with `from`, the sender's session id (`gm` for the GM's own). `dt` times the points: the
    * milliseconds from each to the one before it in the stroke, so receivers can play the motion back smoothly.
    */
-  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string };
+  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string }
+  /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
+  | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
+  /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
+  | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll',
 ]);
 
 export type Decoded =
@@ -169,6 +174,8 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
+  'token-sheets': (m) => isTokenSheets(m.entries),
+  'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
 };
 
 export function encodeControl(message: ControlMessage): string {

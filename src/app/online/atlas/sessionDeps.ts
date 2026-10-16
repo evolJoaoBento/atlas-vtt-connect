@@ -5,7 +5,7 @@ import { liveLighting } from '../scene/sceneLighting';
 import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, laserRelayPart, tokenControlPart } from './toolParts';
+import { diceHostPart, laserRelayPart, sheetHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -17,10 +17,12 @@ export interface OptionalNamespaces {
   tokens: TokensApi | null;
   /** Whether this Atlas has `scene-tabs` (API 1.17.0): the GM's tabs and which one is live, for a split party. */
   sceneTabs?: boolean;
+  /** Reads the stat blocks tokens link, for players' own sheets; without it sheets carry numbers only. */
+  statblocks?: StatblockSource;
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets'
   | 'tabScenes'
 >;
 
@@ -54,7 +56,7 @@ export function diceLookSource(atlas: Pick<AtlasExtension, 'rules' | 'on'>, dice
  * Without `lighting` a scene saved lit shows players only the dark map, and the GM is told (`noLightingCapability`).
  * Without `scene-tabs` there is no split party: every player follows the presented scene.
  */
-export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs }: OptionalNamespaces): AtlasSessionDeps {
+export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs, statblocks }: OptionalNamespaces): AtlasSessionDeps {
   const diceLooks = diceLookSource(atlas, dice);
   return {
     presented: presentedSource(atlas),
@@ -71,6 +73,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     },
     ...(diceLooks ? { diceLook: diceLooks } : {}),
     ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
+    ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),

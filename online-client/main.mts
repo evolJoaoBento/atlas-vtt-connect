@@ -26,6 +26,8 @@ import { AssetsPanel, rememberedKeep } from './assetsPanel.mts';
 import { createCanvasSurface } from '../src/app/online/view/canvasSurface';
 import { DiceDisplayView } from './diceDisplayView.mts';
 import { DiceLogView } from './diceLogView.mts';
+import { SheetView } from './sheetView.mts';
+import { numbersFromSheets } from '../src/app/online/view/tokenHover';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
@@ -95,6 +97,11 @@ const ownRolls = new OwnRollThrows({
     return import('./dice3d/diceThrows.mts');
   }).then((chunk) => chunk.diceThrows),
   fallback: (entry) => diceLog.log.toastRoll(entry),
+});
+const sheets = new SheetView({
+  panel: element('sheet-panel'), body: element('sheet-body'), tabs: element('sheet-tabs'),
+  closeButton: element('sheet-close'), toggleButton: element('sheet-button'),
+  onRoll: (tokenId, roll) => session?.sendSheetRoll(tokenId, roll) ?? false,
 });
 const diceLog = new DiceLogView({
   panel: element('dice-log'), list: element('dice-log-list'), empty: element('dice-log-empty'),
@@ -301,6 +308,10 @@ if (!target) {
       },
       // Not logged: lasers arrive up to twenty times a second per person.
       onLaser: (laser) => map.receiveLaser(laser),
+      onSheets: (entries) => {
+        sheets.receive(entries);
+        map.setTokenNumbers(numbersFromSheets(entries));
+      },
     });
     session.start();
   });

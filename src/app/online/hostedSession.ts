@@ -57,7 +57,12 @@ export interface OptionalParts {
   /** Players move the tokens the GM assigns them, through Atlas's `tokens.move`. Without it nobody controls a token. */
   tokenControl?: (context: HostedContext) => HostedPart & { readonly control: TokenControl };
   /** Players' dice, rolled and logged through Atlas's dice (B7). Without it players cannot roll. */
-  dice?: (context: HostedContext) => HostedPart;
+  dice?: (context: HostedContext) => HostedPart & { rollFor?: (player: SessionPlayer, formula: string, label: string) => boolean };
+  /**
+   * Players' own sheets: the tokens they control with their exact numbers and stat blocks, and rolls from them through
+   * the dice part. Needs token control; without it no sheet is sent.
+   */
+  sheets?: (context: HostedContext & { control: TokenControl; rollFor?: (player: SessionPlayer, formula: string, label: string) => boolean }) => HostedPart;
   /** Players' lasers and the GM's (B7). Without it no laser is relayed. */
   laser?: (context: HostedContext) => HostedPart;
 }
@@ -176,6 +181,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const tokenControl = env.tokenControl?.(context) ?? null;
   const dice = env.dice?.(context) ?? null;
   const laser = env.laser?.(context) ?? null;
+  const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, label: string): boolean => dice.rollFor?.(player, formula, label) ?? false : null;
+  const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
   let stopSharing: (() => void) | null = null;
   let stopLog: (() => void) | null = null;
@@ -187,7 +194,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSharing = null;
     stopErrors();
     assetServer.stop();
-    for (const part of given([tokenControl, laser, dice])) part.stop();
+    for (const part of given([sheets, tokenControl, laser, dice])) part.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -205,7 +212,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSplit = syncSplitState(hub);
     cameraSender.start();
     assetServer.start();
-    for (const part of given([tokenControl, dice, laser])) {
+    for (const part of given([tokenControl, dice, laser, sheets])) {
       part.start();
       parts.push(part);
     }

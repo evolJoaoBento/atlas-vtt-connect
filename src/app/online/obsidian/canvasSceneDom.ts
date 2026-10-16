@@ -20,6 +20,11 @@ export interface SceneDom {
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
   hoverCard: HTMLElement;
+  sheetButton: HTMLButtonElement;
+  sheetPanel: HTMLElement;
+  sheetClose: HTMLButtonElement;
+  sheetTabs: HTMLElement;
+  sheetBody: HTMLElement;
   turnNotice: HTMLElement;
   diceToast: HTMLButtonElement;
   diceTray: HTMLElement;
@@ -58,6 +63,11 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLogButton = actions.createEl('button', {
     cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Dice log', 'aria-expanded': 'false' },
   });
+  // Under the dice log's: the player's sheets, while they have any.
+  const sheetButton = actions.createEl('button', {
+    cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Your sheets', 'aria-expanded': 'false' },
+  });
+  sheetButton.hidden = true;
   // Follow GM and Fit map are icon buttons of the toolbar: they start here and the scene moves them into it once the toolbar
   // has drawn its own controls (`CanvasScene`).
   const viewButtons = root.createDiv({ cls: 'toolbar-item view-buttons' });
@@ -87,8 +97,19 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   header.createEl('h2', { text: 'Dice log' });
   const diceLogEmpty = diceLog.createEl('p', { cls: 'dice-log-empty', text: 'No rolls yet' });
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
+  // The player's sheets (`SheetView`): the same drawer as the dice log.
+  const sheetPanel = root.createEl('aside', { cls: 'sheet-panel', attr: { 'aria-label': 'Your sheets' } });
+  sheetPanel.hidden = true;
+  const sheetHeader = sheetPanel.createDiv({ cls: 'sheet-header' });
+  const sheetClose = sheetHeader.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close sheets' } });
+  icon(sheetClose, 'chevron-right');
+  sheetHeader.createEl('h2', { text: 'Your sheets' });
+  const sheetTabs = sheetPanel.createDiv({ cls: 'sheet-tabs' });
+  sheetTabs.hidden = true;
+  const sheetBody = sheetPanel.createDiv({ cls: 'sheet-body' });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
     diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice,
+    sheetButton, sheetPanel, sheetClose, sheetTabs, sheetBody,
   };
 }

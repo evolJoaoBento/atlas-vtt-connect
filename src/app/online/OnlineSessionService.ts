@@ -118,6 +118,7 @@ export class OnlineSessionService {
       const hosted = await hostSession({
         ...(deps.tokenControl ? { tokenControl: deps.tokenControl } : {}),
         ...(deps.dice ? { dice: deps.dice } : {}),
+        ...(deps.sheets ? { sheets: deps.sheets } : {}),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,

@@ -223,8 +223,8 @@
      and takes nothing from it (absolute, no room of its own). It is opened and closed with the hidden attribute, which would
      remove it from the page, so a closed drawer is kept in the page instead, off to the side and out of reach, and the
      change is a transition: it slides out as well as in. */
-  .dice-log[hidden] { display: grid !important; transform: translateX(105%); visibility: hidden; pointer-events: none; box-shadow: none; }
-  .dice-log {
+  .sheet-panel[hidden], .dice-log[hidden] { display: grid !important; transform: translateX(105%); visibility: hidden; pointer-events: none; box-shadow: none; }
+  .sheet-panel, .dice-log {
     position: absolute; top: 0; right: 0; bottom: 0; z-index: 3; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
     display: grid; align-content: start; gap: var(--inset);
     padding: calc(var(--header-height, 40px) + var(--inset)) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) var(--inset);
@@ -232,10 +232,10 @@
     transform: translateX(0); visibility: visible;
     transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0s, box-shadow 280ms;
   }
-  .dice-log[hidden] { transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms, box-shadow 280ms; }
-  .dice-log-header { display: flex; align-items: center; gap: 8px; }
-  .dice-log-header .icon-button { width: var(--tool-size); height: var(--tool-size); }
-  .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  .sheet-panel[hidden], .dice-log[hidden] { transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 280ms, box-shadow 280ms; }
+  .sheet-header, .dice-log-header { display: flex; align-items: center; gap: 8px; }
+  .sheet-header .icon-button, .dice-log-header .icon-button { width: var(--tool-size); height: var(--tool-size); }
+  .sheet-header h2, .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
   .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
   .dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
   .dice-entry { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
@@ -267,11 +267,11 @@
   .icon-button .tool-icon { width: 20px; height: 20px; }
 
   @media (max-width: 720px) {
-    .dice-log {
+    .sheet-panel, .dice-log {
       top: auto; left: 0; width: auto; max-height: 70%; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
       padding: var(--inset) max(var(--inset), env(safe-area-inset-right)) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
     }
-    .dice-log[hidden] { transform: translateY(105%); }
+    .sheet-panel[hidden], .dice-log[hidden] { transform: translateY(105%); }
   }
 }
 
@@ -308,4 +308,33 @@
   pointer-events: none;
   color: var(--text-accent);
   font-weight: var(--font-semibold);
+}
+
+// The player's sheets (`SheetView`): their tokens' numbers and stat blocks, with buttons that ask the GM to roll.
+.atlas-connect-scene {
+  .sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sheet-tab { padding: 4px 10px; }
+  .sheet-tab[aria-pressed="true"] { border-color: var(--interactive-accent); color: var(--text-accent); }
+  .sheet-body { display: grid; gap: 8px; font-size: var(--font-ui-small); line-height: 1.45; user-select: text; }
+  .sheet-body p, .sheet-body h3, .sheet-body h4 { margin: 0; }
+  .sheet-name { font-size: var(--font-ui-large); }
+  .sheet-subtitle, .sheet-empty { color: var(--text-muted); font-style: italic; }
+  .sheet-numbers { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+  .sheet-number { display: flex; align-items: center; gap: 8px; }
+  .sheet-number-name { flex: 1; color: var(--text-muted); }
+  .sheet-number-value { font-weight: var(--font-bold); font-variant-numeric: tabular-nums; }
+  .sheet-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sheet-dot); }
+  .sheet-label { color: var(--text-muted); font-weight: var(--font-semibold); }
+  .sheet-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-align: center; }
+  .sheet-stat { display: grid; gap: 2px; padding: 4px 0; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+  .sheet-stat-name { color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
+  .sheet-stat-score { font-weight: var(--font-bold); }
+  .sheet-bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .sheet-section { margin-top: 4px; padding-bottom: 2px; border-bottom: 1px solid var(--background-modifier-border); color: var(--text-accent); font-size: var(--font-ui-small); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sheet-roll {
+    display: inline; height: auto; padding: 0 6px; margin: 0 1px; border-radius: var(--radius-s); box-shadow: none;
+    background: hsla(var(--interactive-accent-hsl), 0.18); color: var(--text-accent); font: inherit; font-weight: var(--font-semibold);
+  }
+  .sheet-stat .sheet-roll { justify-self: center; }
+  .sheet-roll:hover, .sheet-roll:focus-visible { background: hsla(var(--interactive-accent-hsl), 0.32); }
 }

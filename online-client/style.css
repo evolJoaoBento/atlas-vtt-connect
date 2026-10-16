@@ -250,14 +250,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tray-roll { flex: 1; }
 
 /* The dice log: a side panel on the left, a bottom sheet on narrow screens, like the menu. */
-.dice-log {
+.sheet-panel, .dice-log {
   position: absolute; top: 0; left: 0; bottom: 0; z-index: 2; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
   display: grid; align-content: start; gap: var(--inset);
   padding: max(var(--inset), env(safe-area-inset-top)) var(--inset) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
   background: var(--card); border-right: 1px solid var(--border);
 }
-.dice-log-header { display: flex; align-items: center; gap: 12px; }
-.dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.sheet-header, .dice-log-header { display: flex; align-items: center; gap: 12px; }
+.sheet-header h2, .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
 .dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
 .dice-entry { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
@@ -330,7 +330,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .icon-button .tool-icon { width: 20px; height: 20px; }
 
 @media (max-width: 720px) {
-  .dice-log {
+  .sheet-panel, .dice-log {
     top: auto; right: 0; width: auto; max-height: 70%; border-right: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
     padding-right: max(var(--inset), env(safe-area-inset-right));
   }
@@ -359,3 +359,30 @@ button:disabled { opacity: 0.5; cursor: default; }
   margin: 0; padding: var(--gap); background: var(--bar); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none;
   color: var(--accent); font-weight: 600;
 }
+
+/* The player's sheets: their tokens' numbers and stat blocks, with buttons that ask the GM to roll. */
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheet-tab { min-height: 32px; padding: 4px 10px; background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+.sheet-tab[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.sheet-body { display: grid; gap: 8px; font-size: 14px; line-height: 1.45; user-select: text; -webkit-user-select: text; }
+.sheet-body p, .sheet-body h3, .sheet-body h4 { margin: 0; }
+.sheet-name { font-size: 18px; }
+.sheet-subtitle, .sheet-empty { color: var(--muted); font-style: italic; }
+.sheet-numbers { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.sheet-number { display: flex; align-items: center; gap: 8px; }
+.sheet-number-name { flex: 1; color: var(--muted); }
+.sheet-number-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sheet-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sheet-dot); }
+.sheet-label { color: var(--muted); font-weight: 600; }
+.sheet-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-align: center; }
+.sheet-stat { display: grid; gap: 2px; padding: 4px 0; border: 1px solid var(--border); border-radius: 8px; }
+.sheet-stat-name { color: var(--muted); font-size: 11px; font-weight: 600; }
+.sheet-stat-score { font-weight: 700; }
+.sheet-bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sheet-section { margin-top: 4px !important; padding-bottom: 2px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+.sheet-roll {
+  display: inline; min-height: 0; padding: 0 6px; margin: 0 1px; border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font: inherit; font-weight: 600;
+}
+.sheet-stat .sheet-roll { justify-self: center; }
+.sheet-roll:hover, .sheet-roll:focus-visible { background: color-mix(in srgb, var(--accent) 32%, transparent); }

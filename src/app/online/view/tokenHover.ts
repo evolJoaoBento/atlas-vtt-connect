@@ -60,3 +60,8 @@ export function hoverCardFor(scene: PlayerScene, id: string, numbers: TokenNumbe
   const title = token.name?.trim() || null;
   return title || lines.length > 0 ? { title, lines } : null;
 }
+
+/** The numbers of each of the player's tokens, by token id, from their sheets (`token-sheets`). */
+export function numbersFromSheets(entries: ReadonlyArray<{ tokenId: string; resources: TokenNumbers['resources'] }>): Map<string, TokenNumbers> {
+  return new Map(entries.filter((entry) => entry.resources.length > 0).map((entry) => [entry.tokenId, { resources: entry.resources }]));
+}

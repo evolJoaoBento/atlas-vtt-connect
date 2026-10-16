@@ -95,19 +95,30 @@ export class DiceHost implements SessionHandler {
    * decides which dice are the default dice a crit or a `default` explosion looks at.
    */
   onMessage(player: SessionPlayer, message: ControlMessage): void {
-    if (message.type !== 'dice-roll' || !this.limit.allow(player.playerId, Date.now())) return;
+    if (message.type !== 'dice-roll') return;
     const formula = playerRollFormula(message.dice, message.modifier);
     if (formula === null) {
       console.warn('[Atlas VTT Connect] A player roll was ignored: Atlas does not roll that formula.');
       return;
     }
-    this.rolling = { playerId: player.playerId, name: player.name };
+    this.rollFor(player, formula);
+  }
+
+  /**
+   * Rolls `formula` for `player` through Atlas, logged under `label` (their name, or "Anna: Dagger" for a roll from
+   * their sheet) and marked theirs; false when it went over their rolls a second or Atlas refused it.
+   */
+  rollFor(player: SessionPlayer, formula: string, label: string = player.name): boolean {
+    if (!this.limit.allow(player.playerId, Date.now())) return false;
+    this.rolling = { playerId: player.playerId, name: label };
     try {
       // The map of the player's own scene: what they see, live or parked; none while they have no scene.
-      this.options.roll({ formula, mapPath: this.options.projection.slotOf(player.playerId)?.mapPath || null, rolledBy: player.name });
+      this.options.roll({ formula, mapPath: this.options.projection.slotOf(player.playerId)?.mapPath || null, rolledBy: label });
+      return true;
     } catch (error) {
       // Atlas refuses a formula it cannot roll by throwing; one player's roll must not stop the session's other messages.
       console.warn('[Atlas VTT Connect] A player roll was ignored:', error);
+      return false;
     } finally {
       this.rolling = null;
     }
