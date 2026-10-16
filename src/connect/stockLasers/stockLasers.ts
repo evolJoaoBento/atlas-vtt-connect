@@ -126,6 +126,19 @@ export function stockLasersApi(deps: StockLasersDeps): LasersApi {
   const hooks = new WeakMap<Pointer, PointerHook>();
   const overlays = new Map<string, LaserOverlay>();
 
+  /** The view's overlay, made when first needed and again after its view closed; null without the view. */
+  const overlayOf = (viewId: string): LaserOverlay | null => {
+    const view = deps.view(viewId);
+    if (!view) return null;
+    let overlay = overlays.get(viewId);
+    if (!overlay || overlay.isDisposed) {
+      overlay = new LaserOverlay(targetOf(view, () => deps.view(viewId) !== null));
+      overlays.set(viewId, overlay);
+      const made = overlay;
+      deps.add(() => { made.dispose(); overlays.delete(viewId); });
+    }
+    return overlay;
+  };
   return Object.freeze({
     onLocal: (viewId: string, listener: (event: LocalLaserEvent) => void): Disposer => {
       if (typeof listener !== 'function') return () => undefined;
@@ -152,16 +165,13 @@ export function stockLasersApi(deps: StockLasersDeps): LasersApi {
     show: (viewId: string, laser: RemoteLaser): void => {
       // Checked first: a malformed laser throws whether or not the view is there.
       const checked = checkedLaser(laser);
-      const view = deps.view(viewId);
-      if (!view) return;
-      let overlay = overlays.get(viewId);
-      if (!overlay || overlay.isDisposed) {
-        overlay = new LaserOverlay(targetOf(view, () => deps.view(viewId) !== null));
-        overlays.set(viewId, overlay);
-        const made = overlay;
-        deps.add(() => { made.dispose(); overlays.delete(viewId); });
-      }
-      overlay.show(checked);
+      overlayOf(viewId)?.show(checked);
+    },
+
+    /** Connect's own: a player's ping on the view's map, drawn in the lasers' overlay (an Atlas API has no such call). */
+    showPing: (viewId: string, ping: { x: number; y: number; color: string }): void => {
+      if (!Number.isFinite(ping.x) || !Number.isFinite(ping.y) || typeof ping.color !== 'string') return;
+      overlayOf(viewId)?.ping({ x: ping.x, y: ping.y }, ping.color);
     },
   });
 }

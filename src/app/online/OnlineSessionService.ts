@@ -119,6 +119,7 @@ export class OnlineSessionService {
         ...(deps.tokenControl ? { tokenControl: deps.tokenControl } : {}),
         ...(deps.dice ? { dice: deps.dice } : {}),
         ...(deps.sheets ? { sheets: deps.sheets } : {}),
+        ...(deps.pings ? { pings: deps.pings } : {}),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,

@@ -10,24 +10,24 @@ const widths = new Map<ToolbarControlId, number>(TOOLBAR_CONTROLS.map((control) 
 const state = (overrides: Partial<ToolbarState> = {}): ToolbarState => ({ tool: 'move', shape: 'line', diceOpen: false, measureMenuOpen: false, laserMenuOpen: false, laserColor: '#ff9f2e', ...overrides });
 
 describe('the join page toolbar', () => {
-  it("holds Move, Measure, Laser and Dice, ranked like Atlas's toolbar", () => {
+  it("holds Move, Measure, Laser, Ping and Dice, ranked like Atlas's toolbar", () => {
     expect(TOOLBAR_CONTROLS.map(({ id, label, priority }) => [id, label, priority])).toEqual([
-      ['move', 'Move', 100], ['measure', 'Measure', 90], ['laser', 'Laser', 80], ['dice', 'Dice', 75],
+      ['move', 'Move', 100], ['measure', 'Measure', 90], ['laser', 'Laser', 80], ['ping', 'Ping', 78], ['dice', 'Dice', 75],
     ]);
   });
 
   it('hides nothing while everything fits', () => {
-    // 19 + 36 + 56 + 36 + 36 + 3 × 8 = 207.
-    expect(hiddenControls(widths, state(), layout(207)).size).toBe(0);
+    // 19 + 36 + 56 + 36 + 36 + 36 + 4 × 8 = 251.
+    expect(hiddenControls(widths, state(), layout(251)).size).toBe(0);
   });
 
   it('moves the lowest priorities into More tools first', () => {
     // 19 + More 36 + Move 44 + Measure 64 = 163; Laser would need 207.
-    expect([...hiddenControls(widths, state(), layout(170))]).toEqual(['laser', 'dice']);
+    expect([...hiddenControls(widths, state(), layout(170))]).toEqual(['laser', 'ping', 'dice']);
   });
 
   it('never moves the tool in use, or a control whose menu or tray is open', () => {
-    expect([...hiddenControls(widths, state({ tool: 'laser', diceOpen: true }), layout(120))]).toEqual(['move', 'measure']);
+    expect([...hiddenControls(widths, state({ tool: 'laser', diceOpen: true }), layout(120))]).toEqual(['move', 'measure', 'ping']);
     expect(isControlPinned('measure', state({ measureMenuOpen: true }))).toBe(true);
     expect(isControlActive('dice', state({ diceOpen: true }))).toBe(true);
     expect(isControlActive('move', state({ tool: 'measure' }))).toBe(false);

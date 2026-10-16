@@ -3,6 +3,7 @@
  * - Move: pans the map, and drags the player's own tokens with Atlas's drag ruler.
  * - Measure: a line, a circle or a cone.
  * - Laser: shown to everyone.
+ * - Ping: a tap shows rings at that point to everyone (`tools/pings.ts`).
  * These are the presses `ViewInput` hands to tokens. With Move, a press on one of the player's
  * tokens drags it and any other press pans. With Measure or Laser, every one-finger press is the
  * tool's. Two fingers always pinch and pan the map, which ends the gesture. Escape, or choosing
@@ -14,6 +15,7 @@ import { DEFAULT_LASER_POINTER_SETTINGS } from '@atlas-vtt/shared/rules';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import { laserColor, swatchLaserColor } from '../../tools/laserColors';
 import type { PlayerLaser } from '../../tools/toolMessages';
+import { PingModel, type PingRing, type PlayerPing } from '../../tools/pings';
 import type { ScreenPoint } from '../camera';
 import type { TokenMoves } from '../TokenMoves';
 import type { PointerKind, TokenGrab } from '../ViewInput';
@@ -22,7 +24,7 @@ import { LaserTool } from './LaserTool';
 import { MeasureTool, type MeasureChoice, type MeasureOverlay } from './MeasureTool';
 import { toolGridOf, type ToolGrid } from './toolGrid';
 
-export type PlayerTool = 'move' | 'measure' | 'laser';
+export type PlayerTool = 'move' | 'measure' | 'laser' | 'ping';
 
 /** What the tools draw this frame. */
 export interface ToolOverlay {
@@ -30,6 +32,8 @@ export interface ToolOverlay {
   ruler: RulerOverlay | null;
   /** Everyone's lasers, this player's own included. */
   lasers: RemoteLaserFrame[];
+  /** Everyone's pings, this player's own included. */
+  pings: PingRing[];
 }
 
 export interface PlayerToolsOptions {
@@ -41,6 +45,8 @@ export interface PlayerToolsOptions {
   now(): number;
   /** `color`: this player's pick, absent until they pick one (the GM then colours it by their place). */
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
+  /** Sends a ping at a world point; false when it could not go. Without it the Ping tool does nothing. */
+  sendPing?(x: number, y: number): boolean;
   /** The colour remembered from an earlier visit, if any. */
   laserColor?: string | null;
   /** The tool, the shape, or what the tools draw changed. */
@@ -63,6 +69,7 @@ export class PlayerTools implements TokenGrab {
   private readonly ruler: DragRulerTool;
   private readonly laser: LaserTool;
   private readonly lasers = new RemoteLasers();
+  private readonly pings = new PingModel();
   /** The tool whose press is in progress: it gets the moves and the release. */
   private pressed: PlayerTool | null = null;
   private connected = false;
@@ -149,6 +156,7 @@ export class PlayerTools implements TokenGrab {
     if (changed) {
       this.endGesture();
       this.lasers.clear();
+      this.pings.clear();
     }
     this.options.onChange();
   }
@@ -174,6 +182,13 @@ export class PlayerTools implements TokenGrab {
     this.options.onChange();
   }
 
+  /** Someone else's ping; one for another scene is ignored. */
+  receivePing(ping: PlayerPing): void {
+    if (!this.scene || ping.sceneId !== this.scene.sceneId) return;
+    this.pings.add({ x: ping.x, y: ping.y }, ping.color, this.options.now());
+    this.options.onChange();
+  }
+
   grab(point: ScreenPoint, kind: PointerKind): boolean {
     const grid = this.grid;
     if (!grid) return false;
@@ -185,6 +200,10 @@ export class PlayerTools implements TokenGrab {
       if (dragged) this.ruler.begin(dragged.origin, grid, kind, this.tokenSize(dragged.tokenId));
     } else if (this.current === 'measure') {
       this.measure.begin(this.options.toWorld(point), grid);
+    } else if (this.current === 'ping') {
+      // One tap, one ping: shown here at once, and sent to everyone else.
+      const at = this.options.toWorld(point);
+      if (this.options.sendPing?.(at.x, at.y)) this.pings.add(at, this.selfColor(), this.options.now());
     } else {
       this.laser.begin(this.options.toWorld(point));
     }
@@ -203,6 +222,8 @@ export class PlayerTools implements TokenGrab {
       if (position) this.ruler.update(position, point);
     } else if (this.pressed === 'measure') {
       this.measure.move(this.options.toWorld(point), grid);
+    } else if (this.pressed === 'ping') {
+      return;
     } else {
       this.laser.move(this.options.toWorld(point), laserPointSpacing(DEFAULT_LASER_POINTER_SETTINGS.size, this.options.zoom()), time);
     }
@@ -224,18 +245,20 @@ export class PlayerTools implements TokenGrab {
       measure: this.grid ? this.measure.overlay(this.shapeChoice, this.grid) : null,
       ruler: this.pressed === 'move' ? this.ruler.overlay() : null,
       lasers: this.lasers.frame(this.options.now()),
+      pings: this.pings.frame(this.options.now()),
     };
   }
 
   /** A laser is fading: the view keeps drawing. */
   isAnimating(): boolean {
-    return this.lasers.isActive;
+    return this.lasers.isActive || this.pings.active;
   }
 
   dispose(): void {
     this.endGesture();
     this.laser.dispose();
     this.lasers.clear();
+    this.pings.clear();
   }
 
   /** A token's size in cells, as the scene sends it; 1 for one it does not hold. */

@@ -1,10 +1,11 @@
 /** Players' tokens, dice and lasers as hosted parts, over Atlas's `tokens`, `dice` and `lasers` (each exists only on an Atlas that has the capability). */
-import type { AtlasExtension, Character, DiceApi, LasersApi, SettingsApi, TokensApi } from '@atlas-vtt/api-types';
+import type { AtlasExtension, Character, DiceApi, LasersApi, SettingsApi, TokensApi, ViewId } from '@atlas-vtt/api-types';
 import type { OptionalParts } from '../hostedSession';
 import { TokenControlHost } from '../control/TokenControlHost';
 import { DiceHost } from '../tools/DiceHost';
 import { LaserRelay } from '../tools/LaserRelay';
 import { SheetHost } from '../tools/SheetHost';
+import { PingRelay } from '../tools/PingRelay';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
@@ -47,5 +48,18 @@ export function sheetHostPart(atlas: Pick<AtlasExtension, 'rules'>, statblocks: 
     readStatblock: (token) => statblocks?.read(token) ?? null,
     ...(statblocks ? { onStatblocksChanged: (listener: () => void) => statblocks.onChange(listener) } : {}),
     ...(rollFor ? { rollFor } : {}),
+  });
+}
+
+/** Shows a ping on a view's map: Connect's stock Atlas stand-in adds it to `lasers` (an Atlas API has none). */
+type PingShowing = { showPing?: (viewId: ViewId, ping: { x: number; y: number; color: string }) => void };
+
+/** Players' pings, relayed to the other players of their scene and shown in the GM's view where the lasers can draw. */
+export function pingRelayPart(lasers: LasersApi | null): NonNullable<OptionalParts['pings']> {
+  // The stand-in's lasers may carry it; an Atlas API's never do.
+  const showPing = lasers ? (lasers as unknown as PingShowing).showPing : undefined;
+  return ({ session, projection }) => new PingRelay({
+    session, projection,
+    ...(typeof showPing === 'function' ? { show: (viewId: ViewId, ping: { x: number; y: number; color: string }) => showPing.call(lasers, viewId, ping) } : {}),
   });
 }

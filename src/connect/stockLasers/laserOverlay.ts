@@ -3,6 +3,7 @@
  * the pointer, redrawn each frame while a laser shows. Stock Atlas has no remote lasers to ask for, and nothing it
  * draws is reachable, so this is drawn here in screen space from the view's own camera (`viewport.toScreen`).
  */
+import { PingModel, ringRadius, type PingRing } from '../../app/online/tools/pings';
 import { LaserModel, type ShownLaser } from './laserModel';
 import type { RemoteLaser } from '@atlas-vtt/api-types';
 
@@ -22,6 +23,7 @@ const HEAD = 7;
 
 export class LaserOverlay {
   private readonly model = new LaserModel();
+  private readonly pings = new PingModel();
   private element: HTMLCanvasElement | null = null;
   private frame: number | null = null;
   private window: Window | null = null;
@@ -41,6 +43,13 @@ export class LaserOverlay {
     this.schedule();
   }
 
+  /** Shows a ping at a world point. */
+  ping(point: { x: number; y: number }, color: string): void {
+    if (this.disposed) return;
+    this.pings.add(point, color, this.now());
+    this.schedule();
+  }
+
   dispose(): void {
     this.disposed = true;
     if (this.frame !== null) this.window?.cancelAnimationFrame(this.frame);
@@ -48,6 +57,7 @@ export class LaserOverlay {
     this.element?.remove();
     this.element = null;
     this.model.clear();
+    this.pings.clear();
   }
 
   private schedule(): void {
@@ -59,7 +69,7 @@ export class LaserOverlay {
     this.frame = win.requestAnimationFrame(() => {
       this.frame = null;
       this.draw();
-      if (this.model.active && !this.disposed) this.schedule();
+      if ((this.model.active || this.pings.active) && !this.disposed) this.schedule();
     });
   }
 
@@ -71,7 +81,8 @@ export class LaserOverlay {
     }
     const rect = canvas.getBoundingClientRect();
     const shown = this.model.frame(this.now());
-    if (shown.length === 0 || rect.width === 0 || rect.height === 0) {
+    const rings = this.pings.frame(this.now());
+    if ((shown.length === 0 && rings.length === 0) || rect.width === 0 || rect.height === 0) {
       this.element?.setCssProps({ display: 'none' });
       return;
     }
@@ -87,6 +98,22 @@ export class LaserOverlay {
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.clearRect(0, 0, rect.width, rect.height);
     for (const laser of shown) this.drawLaser(context, laser);
+    for (const ring of rings) this.drawRing(context, ring);
+  }
+
+  private drawRing(context: CanvasRenderingContext2D, ring: PingRing): void {
+    const place = this.target.toScreen(ring.x, ring.y);
+    if (!place) return;
+    context.globalAlpha = ring.alpha;
+    context.strokeStyle = ring.color;
+    context.lineWidth = 3;
+    context.shadowColor = ring.color;
+    context.shadowBlur = 8;
+    context.beginPath();
+    context.arc(place.x, place.y, ringRadius(ring.grown), 0, Math.PI * 2);
+    context.stroke();
+    context.globalAlpha = 1;
+    context.shadowBlur = 0;
   }
 
   private ensure(canvas: HTMLCanvasElement): HTMLCanvasElement {

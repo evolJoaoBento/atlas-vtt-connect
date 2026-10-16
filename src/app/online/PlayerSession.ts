@@ -10,6 +10,7 @@ import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
 import type { SheetRollRef, TokenSheet } from './tools/sheets';
+import type { PlayerPing } from './tools/pings';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 
@@ -72,6 +73,8 @@ export interface PlayerSessionOptions {
   onLaser?(laser: PlayerLaser): void;
   /** The sheets of the tokens this player controls (`token-sheets`): their exact numbers and stat blocks. */
   onSheets?(entries: readonly TokenSheet[]): void;
+  /** Someone else's ping, for the scene `sceneId`. */
+  onPing?(ping: PlayerPing): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -140,6 +143,14 @@ export class PlayerSession {
   sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
     if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier }));
+    return true;
+  }
+
+  /** Sends a ping at a world point of the scene the player has; false when it cannot go. */
+  sendPing(x: number, y: number): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'map-ping', sceneId: scene.sceneId, x, y }));
     return true;
   }
 
@@ -253,6 +264,12 @@ export class PlayerSession {
         break;
       case 'token-sheets':
         this.options.onSheets?.(message.entries);
+        break;
+      case 'map-ping':
+        // Only the GM's relays carry `from` and a colour.
+        if (message.from !== undefined && message.color !== undefined) {
+          this.options.onPing?.({ from: message.from, sceneId: message.sceneId, x: message.x, y: message.y, color: message.color });
+        }
         break;
       case 'laser':
         // Only the GM's relays carry `from`.

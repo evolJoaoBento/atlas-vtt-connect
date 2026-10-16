@@ -19,6 +19,7 @@ import { cssColor } from '../layers/tokenUiDrawing';
 import type { ViewSurface } from '../ViewSurface';
 import type { MeasureOverlay } from './MeasureTool';
 import type { PlayerTools, ToolOverlay } from './PlayerTools';
+import { ringRadius, type PingRing } from '../../tools/pings';
 
 /** The join page's accent (`--accent` in `style.css`), standing in for the GM's Obsidian accent. */
 export const MEASURE_ACCENT = '#7c5cff';
@@ -52,6 +53,13 @@ export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: numb
     if (middle) drawLabel(surface, ruler.label, middle, zoom);
   }
   for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.color, zoom);
+  for (const ring of overlay.pings) drawPingRing(surface, ring, zoom);
+}
+
+/** One ring of a ping: a circle of constant screen size that grows and fades. */
+function drawPingRing(surface: ViewSurface, ring: PingRing, zoom: number): void {
+  const scale = zoom > 0 ? 1 / zoom : 1;
+  surface.circle(ring.x, ring.y, ringRadius(ring.grown) * scale, { stroke: ring.color, lineWidth: 3 * scale, alpha: ring.alpha });
 }
 
 function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: number): void {

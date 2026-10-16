@@ -3,7 +3,7 @@ import { drawTools, MEASURE_ACCENT } from '../../../src/app/online/view/tools/to
 import type { ToolOverlay } from '../../../src/app/online/view/tools/PlayerTools';
 import { RecordingSurface } from './recordingSurface';
 
-const NONE: ToolOverlay = { measure: null, ruler: null, lasers: [] };
+const NONE: ToolOverlay = { measure: null, ruler: null, lasers: [], pings: [] };
 
 describe('the tools overlay', () => {
   it('draws nothing while no tool is in use', () => {

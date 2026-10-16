@@ -61,9 +61,9 @@ describe('the join page toolbar', () => {
     expect(['move', 'measure', 'laser', 'dice'].map(shown)).toEqual([true, true, false, false]);
     expect(button('More tools').closest<HTMLElement>('.toolbar-more')!.hidden).toBe(false);
     const more = entries('.toolbar-more').filter((entry) => !entry.hidden);
-    expect(more.map((entry) => entry.textContent)).toEqual(['Laser', 'Dice']);
+    expect(more.map((entry) => entry.textContent)).toEqual(['Laser', 'Ping', 'Dice']);
     button('More tools').click();
-    more[1]!.click();
+    more[2]!.click();
     expect(calls).toEqual(['dice']);
     toolbar.update({ tool: 'laser' });
     expect(shown('laser')).toBe(true);
@@ -82,7 +82,7 @@ describe('the join page toolbar', () => {
     expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(0);
     available = 170;
     toolbar.fit();
-    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(2);
+    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(3);
   });
 
   it('closes an open menu on Escape before the rest of the page hears it', () => {

@@ -11,6 +11,7 @@
 import type { SceneCamera } from '../src/app/online/scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../src/app/online/scene/sceneTypes';
 import type { PlayerLaser } from '../src/app/online/tools/toolMessages';
+import type { PlayerPing } from '../src/app/online/tools/pings';
 import type { ScreenPoint } from '../src/app/online/view/camera';
 import { CameraController } from '../src/app/online/view/CameraController';
 import type { ImageLookup } from '../src/app/online/view/layers/layerTypes';
@@ -47,6 +48,8 @@ export interface MapViewOptions {
   sendMove(tokenId: string, x: number, y: number): boolean;
   /** Sends new points of the player's laser; false when they could not be sent. */
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
+  /** Sends a ping at a world point; false when it could not go. */
+  sendPing?(x: number, y: number): boolean;
   /** The laser colour remembered from an earlier visit. */
   laserColor?: string | null;
   /** The player picked a laser colour: remember it. */
@@ -117,6 +120,7 @@ export class MapView {
       zoom: () => this.camera.current().zoom,
       now: options.now ?? ((): number => performance.now()),
       sendLaser: (points, lifted, dt, color) => options.sendLaser(points, lifted, dt, color),
+      sendPing: (x, y) => options.sendPing?.(x, y) ?? false,
       laserColor: options.laserColor ?? null,
       onChange: () => this.toolsChanged(),
     });
@@ -206,6 +210,11 @@ export class MapView {
     this.tools.setPlayers(order, self);
     // The laser colour follows a player's place until they pick one.
     this.toolsChanged();
+  }
+
+  /** Someone else's ping. */
+  receivePing(ping: PlayerPing): void {
+    this.tools.receivePing(ping);
   }
 
   receiveLaser(laser: PlayerLaser): void {

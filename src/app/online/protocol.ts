@@ -9,6 +9,7 @@ import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
 import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
+import { isPingPoint } from './tools/pings';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -112,11 +113,13 @@ export type ControlMessage =
   /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
   | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
   /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
-  | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef };
+  | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
+  /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
+  | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping',
 ]);
 
 export type Decoded =
@@ -176,6 +179,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
   'token-sheets': (m) => isTokenSheets(m.entries),
   'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
+  'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
 };
 
 export function encodeControl(message: ControlMessage): string {

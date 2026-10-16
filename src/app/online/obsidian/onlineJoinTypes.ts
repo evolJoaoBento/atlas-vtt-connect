@@ -1,5 +1,6 @@
 /** What the scene tab takes from a joined session, what it asks of it, and why a join may not start. */
 import type { TokenSheet } from '../tools/sheets';
+import type { PlayerPing } from '../tools/pings';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import type { PlayerSessionState } from '../PlayerSession';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT } from '../page/pageScreen';
@@ -25,6 +26,8 @@ export interface OnlineSceneSink {
   laser(laser: PlayerLaser): void;
   /** The sheets of the tokens this player controls; a view that shows none leaves it out. */
   sheets?(entries: readonly TokenSheet[]): void;
+  /** Someone else's ping; a view that shows none leaves it out. */
+  ping?(ping: PlayerPing): void;
   /** Images arrived, failed or went. */
   images(): void;
   /** The session was left from elsewhere (a new join, the plugin unloading): close the tab. */

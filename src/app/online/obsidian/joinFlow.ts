@@ -98,6 +98,7 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       for (const entry of ownRolls(fresh)) host.sink()?.ownRoll(entry);
     },
     onLaser: (laser) => { if (current()) host.sink()?.laser(laser); },
+    onPing: (ping) => { if (current()) host.sink()?.ping?.(ping); },
     onSheets: (entries) => {
       if (!current()) return;
       joined.sheets = entries;

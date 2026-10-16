@@ -217,6 +217,11 @@ export class OnlineJoinService {
     return this.joined?.session?.sendDiceRoll(dice, modifier) ?? false;
   }
 
+  /** Sends a ping at a world point of the scene shown. */
+  sendPing(x: number, y: number): boolean {
+    return this.joined?.session?.sendPing(x, y) ?? false;
+  }
+
   /** Asks the GM to roll something on the player's own sheet. */
   sendSheetRoll(tokenId: string, roll: SheetRollRef): boolean {
     return this.joined?.session?.sendSheetRoll(tokenId, roll) ?? false;

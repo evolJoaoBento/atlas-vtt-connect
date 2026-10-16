@@ -5,7 +5,7 @@ import { liveLighting } from '../scene/sceneLighting';
 import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, laserRelayPart, sheetHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -22,7 +22,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings'
   | 'tabScenes'
 >;
 
@@ -76,6 +76,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
+    pings: pingRelayPart(lasers),
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
     // One per hosted session, disposed with it.
     ...(sceneTabs === true && typeof atlas.views.showTab === 'function' ? { tabScenes: () => createTabScenes(atlas) } : {}),
