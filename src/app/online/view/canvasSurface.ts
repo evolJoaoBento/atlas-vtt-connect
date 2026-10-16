@@ -84,6 +84,39 @@ function lifelessCopy(source: CanvasImageSource & { width: number; height: numbe
   return copy;
 }
 
+/** Longest side of the overview a map's brightness is read from (`gridContrastColor.ts`). */
+const LUMINANCE_SAMPLE_SIDE = 64;
+const luminances = new WeakMap<SurfaceImage, number | null>();
+
+/** The mean of Atlas's grey (`grayFromCanvasSource`) over a small overview of `image`; null when it cannot be read. */
+function meanLuminanceOf(image: SurfaceImage, blank: () => HTMLCanvasElement): number | null {
+  if (luminances.has(image)) return luminances.get(image) ?? null;
+  let mean: number | null = null;
+  try {
+    const scale = Math.min(1, LUMINANCE_SAMPLE_SIDE / Math.max(image.width, image.height, 1));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = blank();
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (ctx) {
+      ctx.drawImage(image, 0, 0, width, height);
+      const { data } = ctx.getImageData(0, 0, width, height);
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) sum += 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+      mean = sum / (width * height);
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  } catch {
+    // A tainted or unreadable image has no automatic colour.
+    mean = null;
+  }
+  luminances.set(image, mean);
+  return mean;
+}
+
 /** Atlas's glass dome, drawn once per document at its texture's size. */
 const GLASS_SIZE = 512;
 const glassDomes = new WeakMap<Document, HTMLCanvasElement | null>();
@@ -384,6 +417,10 @@ class CanvasSurface implements ViewSurface {
     context.globalAlpha = alpha;
     context.drawImage(emblem, x - size / 2, y - size / 2, size, size);
     context.restore();
+  }
+
+  meanLuminance(image: SurfaceImage): number | null {
+    return meanLuminanceOf(image, () => this.blank());
   }
 
   glassDome(x: number, y: number, size: number): void {

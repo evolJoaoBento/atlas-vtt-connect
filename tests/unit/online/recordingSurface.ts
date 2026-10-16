@@ -65,6 +65,9 @@ export class RecordingSurface implements ViewSurface {
   glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
     this.calls.push({ op: 'glyph', name, x, y, size, color, alpha });
   }
+  /** What `meanLuminance` answers; tests set it. */
+  luminance: number | null = null;
+  meanLuminance(_image: SurfaceImage): number | null { return this.luminance; }
   raster(image: RasterImage, x: number, y: number, width: number, height: number): void {
     this.calls.push({ op: 'raster', image, x, y, width, height });
   }

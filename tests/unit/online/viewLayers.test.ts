@@ -43,7 +43,8 @@ describe('grid layer', () => {
     createGridLayer().draw(surface, frame(playerScene({ map }), { visible }));
     const lines = gridLines(grid, { x: 4096, y: 4096, width: 2048, height: 2048 });
     expect(surface.calls).toEqual([{
-      op: 'paths', paths: lines!.segments, closed: false, style: { stroke: '#808080', alpha: 0.5, lineWidth: 1, dash: [] },
+      // Without the GM's colour, Atlas's white for a map it cannot read.
+      op: 'paths', paths: lines!.segments, closed: false, style: { stroke: '#ffffff', alpha: 0.5, lineWidth: 1, round: true },
     }]);
     expect(lines!.segments.length).toBeLessThan(100);
   });
@@ -74,11 +75,37 @@ describe('grid layer', () => {
     expect(some.every((label) => label.x <= 300 && label.y <= 200)).toBe(true);
   });
 
-  it('dashes in screen pixels and never draws thinner than a device pixel', () => {
+  it("dashes every cell edge twice, as Atlas does, and draws a line thinner than a device pixel a pixel wide and fainter", () => {
     const surface = new RecordingSurface();
     const dashed: PlayerGrid = { ...grid, lineType: 'dashed', lineWidth: 0.1 };
     createGridLayer().draw(surface, frame(playerScene({ grid: dashed }), { zoom: 2, pixel: 0.25 }));
-    expect(surface.ops('paths')[0]?.style).toMatchObject({ dash: [3, 2], lineWidth: 0.25 });
+    const [paths] = surface.ops('paths');
+    expect(paths?.style).toMatchObject({ lineWidth: 0.25, alpha: expect.closeTo(0.5 * 0.4) });
+    // A 70-unit edge: gaps of 4 before, between and after, the rest shared by two dashes shortened to 0.8.
+    const [a, b] = paths!.paths[0]!;
+    expect(Math.hypot(b!.x - a!.x, b!.y - a!.y)).toBeCloseTo(((70 - 12) / 2) * 0.8);
+  });
+
+  it("marks a dotted grid's vertices with Atlas's filled crosses instead of lines", () => {
+    const surface = new RecordingSurface();
+    createGridLayer().draw(surface, frame(playerScene({ grid: { ...grid, lineType: 'dotted' } })));
+    const [markers] = surface.ops('paths');
+    expect(markers?.closed).toBe(true);
+    expect(markers?.style.fill).toBeDefined();
+    // Four arms: two tip corners and an inner corner each.
+    expect(markers!.paths[0]).toHaveLength(12);
+  });
+
+  it("draws the grid black on a bright map and white on a dark one when the GM set no colour, as Atlas does", () => {
+    const colour = (luminance: number): string | undefined => {
+      const surface = new RecordingSurface();
+      surface.luminance = luminance;
+      const scene = playerScene({ map: { asset: 'map', width: 1000, height: 800, cellSize: 70 } });
+      createGridLayer().draw(surface, frame(scene, { images: () => ({ image: {} as ImageBitmap, width: 1000, height: 800, release: () => undefined }) }));
+      return surface.ops('paths')[0]?.style.stroke;
+    };
+    expect(colour(200)).toBe('#000000');
+    expect(colour(40)).toBe('#ffffff');
   });
 
   it('numbers hexes when the GM shows them and they are large enough to read', () => {

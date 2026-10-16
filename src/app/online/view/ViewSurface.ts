@@ -95,6 +95,8 @@ export interface ViewSurface {
   glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
   /** `image` stretched over the rectangle, as an image is: pixels worked out in code, such as the laser's glow. */
   raster(image: RasterImage, x: number, y: number, width: number, height: number): void;
+  /** The image's mean luminance (0–255) from a small overview, as Atlas reads a map's for the grid colour; null when unreadable. */
+  meanLuminance(image: SurfaceImage): number | null;
   /** An offscreen surface for caching a layer; null when none can be made. */
   createLayer(width: number, height: number): LayerSurface | null;
   /** Draws a cached layer stretched over the rectangle. */
