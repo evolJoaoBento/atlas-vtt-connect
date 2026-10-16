@@ -43,8 +43,6 @@ export const FIT_PADDING = 16;
 /** Zoom limits around the map's fitted zoom: out to 1/20 of it, in to 8 times it. */
 export const MIN_ZOOM_SHARE = 1 / 20;
 export const MAX_ZOOM_SHARE = 8;
-/** How long the view takes to glide to the GM's camera. */
-export const GLIDE_MS = 150;
 /** The camera before anything is known: the world origin in the middle, 1:1. */
 export const DEFAULT_CAMERA: Camera = { centerX: 0, centerY: 0, zoom: 1 };
 
@@ -123,15 +121,6 @@ export function visibleArea(camera: Camera, screen: ScreenSize): WorldRect {
   return { x: camera.centerX - width / 2, y: camera.centerY - height / 2, width, height };
 }
 
-/** Part way from `from` to `to` (`t` from 0 to 1), easing out; the zoom moves evenly in scale. */
-export function interpolateCamera(from: Camera, to: Camera, t: number): Camera {
-  const eased = 1 - (1 - clamp(t, 0, 1)) ** 3;
-  return {
-    centerX: from.centerX + (to.centerX - from.centerX) * eased,
-    centerY: from.centerY + (to.centerY - from.centerY) * eased,
-    zoom: from.zoom * (to.zoom / from.zoom) ** eased,
-  };
-}
 
 export function sameRect(a: WorldRect | null, b: WorldRect | null): boolean {
   if (a === null || b === null) return a === b;

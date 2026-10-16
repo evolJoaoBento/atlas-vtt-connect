@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SceneCamera } from '../../../src/app/online/scene/sceneCamera';
-import { DEFAULT_CAMERA, GLIDE_MS, screenToWorld } from '../../../src/app/online/view/camera';
-import { CameraController } from '../../../src/app/online/view/CameraController';
+import { DEFAULT_CAMERA, screenToWorld } from '../../../src/app/online/view/camera';
+import { CAMERA_SETTLE_MS, CameraController } from '../../../src/app/online/view/CameraController';
 import { playerScene, playerToken } from './sceneFixtures';
 
 function setup() {
@@ -36,21 +36,43 @@ describe('CameraController', () => {
     expect(camera.zoom).toBeCloseTo(800 / 210);
   });
 
-  it("glides to the GM's camera in 150 ms, fitting the GM's visible area to the screen", () => {
+  it("glides to the GM's camera on Atlas's spring, fitting the GM's visible area to the screen", () => {
     const { controller, advance } = setup();
     controller.setScreen(PHONE);
     controller.setScene(playerScene());
     const fitted = controller.current();
     controller.setGmCamera(gm());
     expect(controller.current()).toEqual(fitted);
-    advance(GLIDE_MS / 2);
+    advance(100);
     const halfway = controller.current();
     expect(halfway.centerX).toBeLessThan(fitted.centerX);
     expect(halfway.centerX).toBeGreaterThan(200);
     expect(controller.isMoving()).toBe(true);
-    advance(GLIDE_MS / 2);
+    advance(CAMERA_SETTLE_MS);
     expect(controller.current()).toEqual({ centerX: 200, centerY: 300, zoom: 2 });
     expect(controller.isMoving()).toBe(false);
+  });
+
+  it("takes a new GM camera up mid-glide without a seam: the view keeps moving the way it was", () => {
+    const { controller, advance } = setup();
+    controller.setScreen(PHONE);
+    controller.setScene(playerScene());
+    controller.setGmCamera(gm({ centerX: 200 }));
+    advance(CAMERA_SETTLE_MS);
+    controller.current();
+    // The GM pans right, a camera every 100 ms: the view moves right all the way, never stopping between them.
+    const xs: number[] = [];
+    for (let step = 1; step <= 5; step++) {
+      controller.setGmCamera(gm({ centerX: 200 + step * 40 }));
+      for (let frame = 0; frame < 6; frame++) {
+        advance(100 / 6);
+        xs.push(controller.current().centerX);
+      }
+    }
+    for (let i = 1; i < xs.length; i++) expect(xs[i]!).toBeGreaterThan(xs[i - 1]!);
+    // The steps between frames do not fall to nothing when a new camera arrives, as a restarted ease would.
+    const steps = xs.slice(1).map((x, i) => x - xs[i]!);
+    expect(Math.min(...steps.slice(6))).toBeGreaterThan(Math.max(...steps.slice(6)) / 4);
   });
 
   it('keeps the zoom between 1/20 and 8 times the fitted zoom, and the centre on the map', () => {
@@ -70,7 +92,7 @@ describe('CameraController', () => {
     controller.setScreen(PHONE);
     controller.setScene(playerScene());
     controller.setGmCamera(gm());
-    advance(GLIDE_MS);
+    advance(CAMERA_SETTLE_MS);
     const before = changes();
     controller.pan(10, 0);
     expect(controller.isFollowing()).toBe(false);
@@ -80,7 +102,7 @@ describe('CameraController', () => {
     expect(controller.current().centerX).toBeCloseTo(195);
     controller.followGm();
     expect(controller.isFollowing()).toBe(true);
-    advance(GLIDE_MS);
+    advance(CAMERA_SETTLE_MS);
     expect(controller.current()).toEqual({ centerX: 400, centerY: 300, zoom: 2 });
   });
 
@@ -144,10 +166,10 @@ describe('CameraController', () => {
     controller.setScreen(SCREEN);
     controller.setScene(playerScene());
     controller.setGmCamera(gm());
-    advance(GLIDE_MS);
+    advance(CAMERA_SETTLE_MS);
     controller.fitMap();
     expect(controller.isFollowing()).toBe(false);
-    advance(GLIDE_MS);
+    advance(CAMERA_SETTLE_MS);
     expect(controller.current()).toEqual({ centerX: 500, centerY: 400, zoom: 1 });
   });
 
@@ -208,11 +230,11 @@ describe('CameraController', () => {
     controller.setScreen(PHONE);
     controller.setScene(playerScene());
     controller.setGmCamera(gm());
-    advance(GLIDE_MS / 2);
+    advance(CAMERA_SETTLE_MS / 2);
     const before = changes();
     controller.setGmCamera(gm());
     expect(changes()).toBe(before);
-    advance(GLIDE_MS / 2);
+    advance(CAMERA_SETTLE_MS / 2);
     expect(controller.current()).toEqual({ centerX: 200, centerY: 300, zoom: 2 });
     controller.setGmCamera(gm());
     expect(changes()).toBe(before);
