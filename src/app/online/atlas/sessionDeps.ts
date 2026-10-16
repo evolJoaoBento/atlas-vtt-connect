@@ -6,7 +6,7 @@ import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -23,7 +23,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'handout'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'templates' | 'handout'
   | 'tabScenes'
 >;
 
@@ -78,6 +78,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(dice ? { dice: diceHostPart(dice) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
+    templates: templateHostPart(lasers, (mapPath) => atlas.rules.forMap(mapPath).measurement.coneAngle),
     handout: handouts,
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
     // One per hosted session, disposed with it.

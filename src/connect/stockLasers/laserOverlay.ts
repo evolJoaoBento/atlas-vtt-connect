@@ -4,6 +4,7 @@
  * draws is reachable, so this is drawn here in screen space from the view's own camera (`viewport.toScreen`).
  */
 import { PingModel, ringRadius, type PingRing } from '../../app/online/tools/pings';
+import { conePoints, type MapTemplate } from '../../app/online/tools/templates';
 import { LaserModel, type ShownLaser } from './laserModel';
 import type { RemoteLaser } from '@atlas-vtt/api-types';
 
@@ -24,6 +25,8 @@ const HEAD = 7;
 export class LaserOverlay {
   private readonly model = new LaserModel();
   private readonly pings = new PingModel();
+  private templates: readonly MapTemplate[] = [];
+  private coneAngle = Math.PI / 2;
   private element: HTMLCanvasElement | null = null;
   private frame: number | null = null;
   private window: Window | null = null;
@@ -40,6 +43,14 @@ export class LaserOverlay {
   show(laser: RemoteLaser): void {
     if (this.disposed) return;
     this.model.show(laser, this.now());
+    this.schedule();
+  }
+
+  /** The players' lasting templates to draw, kept on screen as the camera moves; none stops drawing them. */
+  setTemplates(templates: readonly MapTemplate[], coneAngleDegrees: number): void {
+    if (this.disposed) return;
+    this.templates = templates;
+    this.coneAngle = (Number.isFinite(coneAngleDegrees) && coneAngleDegrees > 0 ? coneAngleDegrees : 90) * Math.PI / 180;
     this.schedule();
   }
 
@@ -69,7 +80,8 @@ export class LaserOverlay {
     this.frame = win.requestAnimationFrame(() => {
       this.frame = null;
       this.draw();
-      if ((this.model.active || this.pings.active) && !this.disposed) this.schedule();
+      // Templates stay: drawn every frame while there are any, so they follow the camera.
+      if ((this.model.active || this.pings.active || this.templates.length > 0) && !this.disposed) this.schedule();
     });
   }
 
@@ -82,7 +94,7 @@ export class LaserOverlay {
     const rect = canvas.getBoundingClientRect();
     const shown = this.model.frame(this.now());
     const rings = this.pings.frame(this.now());
-    if ((shown.length === 0 && rings.length === 0) || rect.width === 0 || rect.height === 0) {
+    if ((shown.length === 0 && rings.length === 0 && this.templates.length === 0) || rect.width === 0 || rect.height === 0) {
       this.element?.setCssProps({ display: 'none' });
       return;
     }
@@ -97,8 +109,45 @@ export class LaserOverlay {
     if (!context) return;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.clearRect(0, 0, rect.width, rect.height);
+    for (const template of this.templates) this.drawTemplate(context, template);
     for (const laser of shown) this.drawLaser(context, laser);
     for (const ring of rings) this.drawRing(context, ring);
+  }
+
+  /** A template as players draw it: its area filled faintly in its owner's colour, outlined. */
+  private drawTemplate(context: CanvasRenderingContext2D, template: MapTemplate): void {
+    const outline = template.shape === 'cone' ? conePoints(template.start, template.end, this.coneAngle) : null;
+    const start = this.target.toScreen(template.start.x, template.start.y);
+    const end = this.target.toScreen(template.end.x, template.end.y);
+    if (!start || !end) return;
+    context.strokeStyle = template.color;
+    context.fillStyle = template.color;
+    context.lineWidth = 2;
+    context.beginPath();
+    if (template.shape === 'circle') {
+      context.arc(start.x, start.y, Math.hypot(end.x - start.x, end.y - start.y), 0, Math.PI * 2);
+    } else if (outline) {
+      outline.forEach((point, index) => {
+        const place = this.target.toScreen(point.x, point.y);
+        if (!place) return;
+        if (index === 0) context.moveTo(place.x, place.y);
+        else context.lineTo(place.x, place.y);
+      });
+      context.closePath();
+    } else {
+      context.lineWidth = 6;
+      context.globalAlpha = 0.5;
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
+      context.stroke();
+      context.globalAlpha = 1;
+      return;
+    }
+    context.globalAlpha = 0.18;
+    context.fill();
+    context.globalAlpha = 0.8;
+    context.stroke();
+    context.globalAlpha = 1;
   }
 
   private drawRing(context: CanvasRenderingContext2D, ring: PingRing): void {

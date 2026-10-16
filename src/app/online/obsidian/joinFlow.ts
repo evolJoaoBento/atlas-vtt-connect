@@ -3,6 +3,7 @@
  * what a scene tab gets when it attaches. `OnlineJoinService` owns the join and calls these.
  */
 import type { TokenSheet } from '../tools/sheets';
+import type { MapTemplate } from '../tools/templates';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { JoinTarget } from '../joinLink';
 import { mergeDiceLog, ownRolls } from '../page/diceLogModel';
@@ -33,6 +34,8 @@ export interface Joined {
   diceLook: string | null;
   /** The sheets of the tokens this player controls (`token-sheets`). */
   sheets: readonly TokenSheet[];
+  /** The scene's lasting templates, as the GM last sent them; null before any. */
+  templates: { sceneId: string; list: readonly MapTemplate[] } | null;
   ids: JoinIdentity;
 }
 
@@ -99,6 +102,11 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
     },
     onLaser: (laser) => { if (current()) host.sink()?.laser(laser); },
     onPing: (ping) => { if (current()) host.sink()?.ping?.(ping); },
+    onTemplates: (sceneId, list) => {
+      if (!current()) return;
+      joined.templates = { sceneId, list };
+      host.sink()?.templates?.(sceneId, list);
+    },
     onSheets: (entries) => {
       if (!current()) return;
       joined.sheets = entries;
@@ -122,6 +130,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.paused?.(joined.paused),
     () => sink.diceLook?.(joined.diceLook),
     () => sink.sheets?.(joined.sheets),
+    () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
     () => { if (joined.camera) sink.camera(joined.camera); },
     () => sink.images(),
   ];

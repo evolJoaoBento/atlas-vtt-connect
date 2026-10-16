@@ -7,6 +7,7 @@
  * - `show` draws other people's lasers over the view on a canvas of its own (`laserOverlay.ts`).
  * Whatever of the renderer cannot be found makes `onLocal` hear nothing, and `show` draw nothing, and never throws.
  */
+import type { MapTemplate } from '../../app/online/tools/templates';
 import type { Disposer, LasersApi, LocalLaserEvent, RemoteLaser } from '@atlas-vtt/api-types';
 import { LaserOverlay } from './laserOverlay';
 import { checkedLaser } from './laserModel';
@@ -166,6 +167,12 @@ export function stockLasersApi(deps: StockLasersDeps): LasersApi {
       // Checked first: a malformed laser throws whether or not the view is there.
       const checked = checkedLaser(laser);
       overlayOf(viewId)?.show(checked);
+    },
+
+    /** Connect's own: the players' lasting templates on the view's map, drawn in the lasers' overlay; none clears them. */
+    showTemplates: (viewId: string, templates: readonly MapTemplate[], coneAngle: number): void => {
+      const overlay = templates.length > 0 ? overlayOf(viewId) : overlays.get(viewId);
+      overlay?.setTemplates(templates, coneAngle);
     },
 
     /** Connect's own: a player's ping on the view's map, drawn in the lasers' overlay (an Atlas API has no such call). */

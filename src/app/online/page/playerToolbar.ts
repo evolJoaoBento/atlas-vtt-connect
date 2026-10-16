@@ -30,6 +30,7 @@ export { LASER_COLOR_HINT };
 export const TOOLBAR_CONTROLS: readonly ToolbarControl[] = [
   { id: 'move', label: 'Move', icon: 'hand', priority: 100 },
   { id: 'measure', label: 'Measure', icon: 'ruler', priority: 90 },
+  { id: 'template', label: 'Template', icon: 'shapes', priority: 85 },
   { id: 'laser', label: 'Laser', icon: 'flashlight', priority: 80 },
   { id: 'ping', label: 'Ping', icon: 'radar', priority: 78 },
   { id: 'dice', label: 'Dice', icon: 'dices', priority: 75 },

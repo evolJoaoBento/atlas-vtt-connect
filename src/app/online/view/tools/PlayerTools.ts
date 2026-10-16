@@ -4,6 +4,7 @@
  * - Measure: a line, a circle or a cone.
  * - Laser: shown to everyone.
  * - Ping: a tap shows rings at that point to everyone (`tools/pings.ts`).
+ * - Template: a drag leaves the measure shape on the map for everyone; a tap on one of the player's own removes it.
  * These are the presses `ViewInput` hands to tokens. With Move, a press on one of the player's
  * tokens drags it and any other press pans. With Measure or Laser, every one-finger press is the
  * tool's. Two fingers always pinch and pan the map, which ends the gesture. Escape, or choosing
@@ -16,6 +17,7 @@ import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import { laserColor, swatchLaserColor } from '../../tools/laserColors';
 import type { PlayerLaser } from '../../tools/toolMessages';
 import { PingModel, type PingRing, type PlayerPing } from '../../tools/pings';
+import { templateContains, type MapTemplate } from '../../tools/templates';
 import type { ScreenPoint } from '../camera';
 import type { TokenMoves } from '../TokenMoves';
 import type { PointerKind, TokenGrab } from '../ViewInput';
@@ -24,7 +26,13 @@ import { LaserTool } from './LaserTool';
 import { MeasureTool, type MeasureChoice, type MeasureOverlay } from './MeasureTool';
 import { toolGridOf, type ToolGrid } from './toolGrid';
 
-export type PlayerTool = 'move' | 'measure' | 'laser' | 'ping';
+export type PlayerTool = 'move' | 'measure' | 'template' | 'laser' | 'ping';
+
+/** What a player asks of the scene's templates. */
+export type TemplateChange = { add: Pick<MapTemplate, 'shape' | 'start' | 'end'> } | { remove: string };
+
+/** A drag shorter than this (screen pixels) is a tap: it removes a template rather than places one. */
+const TEMPLATE_TAP = 8;
 
 /** What the tools draw this frame. */
 export interface ToolOverlay {
@@ -34,6 +42,10 @@ export interface ToolOverlay {
   lasers: RemoteLaserFrame[];
   /** Everyone's pings, this player's own included. */
   pings: PingRing[];
+  /** The scene's lasting templates, and the one this player is placing (last). */
+  templates: MapTemplate[];
+  /** A cone's full opening, in radians: the GM's cone angle. */
+  coneOpening: number;
 }
 
 export interface PlayerToolsOptions {
@@ -47,6 +59,8 @@ export interface PlayerToolsOptions {
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
   /** Sends a ping at a world point; false when it could not go. Without it the Ping tool does nothing. */
   sendPing?(x: number, y: number): boolean;
+  /** Asks the GM to add a template or remove one of the player's own; false when it could not go. */
+  sendTemplate?(change: TemplateChange): boolean;
   /** The colour remembered from an earlier visit, if any. */
   laserColor?: string | null;
   /** The tool, the shape, or what the tools draw changed. */
@@ -70,6 +84,10 @@ export class PlayerTools implements TokenGrab {
   private readonly laser: LaserTool;
   private readonly lasers = new RemoteLasers();
   private readonly pings = new PingModel();
+  /** The scene's lasting templates, as the GM last sent them. */
+  private templates: MapTemplate[] = [];
+  /** The template being dragged out. */
+  private draft: { start: ScenePoint; end: ScenePoint } | null = null;
   /** The tool whose press is in progress: it gets the moves and the release. */
   private pressed: PlayerTool | null = null;
   private connected = false;
@@ -157,6 +175,7 @@ export class PlayerTools implements TokenGrab {
       this.endGesture();
       this.lasers.clear();
       this.pings.clear();
+      this.templates = [];
     }
     this.options.onChange();
   }
@@ -182,6 +201,13 @@ export class PlayerTools implements TokenGrab {
     this.options.onChange();
   }
 
+  /** The scene's templates, all of them, as the GM keeps them; a list for another scene is ignored. */
+  receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void {
+    if (!this.scene || sceneId !== this.scene.sceneId) return;
+    this.templates = [...templates];
+    this.options.onChange();
+  }
+
   /** Someone else's ping; one for another scene is ignored. */
   receivePing(ping: PlayerPing): void {
     if (!this.scene || ping.sceneId !== this.scene.sceneId) return;
@@ -200,6 +226,9 @@ export class PlayerTools implements TokenGrab {
       if (dragged) this.ruler.begin(dragged.origin, grid, kind, this.tokenSize(dragged.tokenId));
     } else if (this.current === 'measure') {
       this.measure.begin(this.options.toWorld(point), grid);
+    } else if (this.current === 'template') {
+      const at = this.options.toWorld(point);
+      this.draft = { start: at, end: at };
     } else if (this.current === 'ping') {
       // One tap, one ping: shown here at once, and sent to everyone else.
       const at = this.options.toWorld(point);
@@ -222,6 +251,8 @@ export class PlayerTools implements TokenGrab {
       if (position) this.ruler.update(position, point);
     } else if (this.pressed === 'measure') {
       this.measure.move(this.options.toWorld(point), grid);
+    } else if (this.pressed === 'template') {
+      if (this.draft) this.draft = { start: this.draft.start, end: this.options.toWorld(point) };
     } else if (this.pressed === 'ping') {
       return;
     } else {
@@ -232,6 +263,7 @@ export class PlayerTools implements TokenGrab {
 
   drop(point: ScreenPoint): void {
     if (this.pressed === 'move') this.options.moves.drop(point);
+    if (this.pressed === 'template') this.placeTemplate(this.options.toWorld(point));
     this.finishGesture();
   }
 
@@ -246,6 +278,10 @@ export class PlayerTools implements TokenGrab {
       ruler: this.pressed === 'move' ? this.ruler.overlay() : null,
       lasers: this.lasers.frame(this.options.now()),
       pings: this.pings.frame(this.options.now()),
+      templates: this.draft && this.pressed === 'template'
+        ? [...this.templates, { id: 'draft', owner: this.self ?? SELF, shape: this.shapeChoice, start: this.draft.start, end: this.draft.end, color: this.selfColor() }]
+        : this.templates,
+      coneOpening: this.grid?.coneOpening ?? Math.PI / 2,
     };
   }
 
@@ -267,12 +303,30 @@ export class PlayerTools implements TokenGrab {
     return (tokens && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.size : undefined) || 1;
   }
 
+  /** A drag places the measure shape as a template; a tap removes the player's own template under it. */
+  private placeTemplate(end: ScenePoint): void {
+    const draft = this.draft;
+    this.draft = null;
+    if (!draft) return;
+    const zoom = this.options.zoom() || 1;
+    const dragged = Math.hypot(end.x - draft.start.x, end.y - draft.start.y) * zoom;
+    if (dragged >= TEMPLATE_TAP) {
+      this.options.sendTemplate?.({ add: { shape: this.shapeChoice, start: draft.start, end } });
+      return;
+    }
+    const opening = this.grid?.coneOpening ?? Math.PI / 2;
+    const mine = [...this.templates].reverse()
+      .find((template) => template.owner === this.self && templateContains(template, end, opening, TEMPLATE_TAP / zoom));
+    if (mine) this.options.sendTemplate?.({ remove: mine.id });
+  }
+
   private selfColor(): string {
     return this.pickedColor ?? laserColor(this.self ?? SELF, this.order);
   }
 
   /** Released: the measurement goes, the ruler goes, the laser is let go. */
   private finishGesture(): void {
+    this.draft = null;
     this.measure.clear();
     this.ruler.end();
     this.laser.lift();
@@ -283,6 +337,7 @@ export class PlayerTools implements TokenGrab {
   /** Interrupted: as released, and a dragged token goes back instead of dropping. */
   private endGesture(): void {
     if (this.pressed === 'move') this.options.moves.cancel();
+    this.draft = null;
     this.measure.clear();
     this.ruler.end();
     this.laser.lift();

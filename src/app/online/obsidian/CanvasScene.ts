@@ -8,6 +8,7 @@
 import { SheetView } from '../../../../online-client/sheetView.mts';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
+import type { MapTemplate } from '../tools/templates';
 import { numbersFromSheets } from '../view/tokenHover';
 import { DiceLogView } from '../../../../online-client/diceLogView.mts';
 import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
@@ -25,7 +26,7 @@ import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
 import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
-export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing'>;
+export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -67,6 +68,7 @@ export class CanvasScene implements OnlineSceneSink {
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),
         sendPing: (x, y) => service.sendPing(x, y),
+        sendTemplate: (change) => service.sendTemplate(change),
         notice: dom.moveNotice,
         hoverCard: dom.hoverCard,
         turnNotice: dom.turnNotice,
@@ -184,6 +186,11 @@ export class CanvasScene implements OnlineSceneSink {
 
   laser(laser: PlayerLaser): void {
     if (laser.sceneId === this.shown?.sceneId) this.map?.receiveLaser(laser);
+  }
+
+  /** Every lasting template on the scene `sceneId`. */
+  templates(sceneId: string, templates: readonly MapTemplate[]): void {
+    this.map?.receiveTemplates(sceneId, templates);
   }
 
   /** Someone else's ping on the scene shown. */

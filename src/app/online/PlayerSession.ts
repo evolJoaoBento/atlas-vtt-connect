@@ -11,6 +11,8 @@ import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
 import type { SheetRollRef, TokenSheet } from './tools/sheets';
 import type { PlayerPing } from './tools/pings';
+import type { MapTemplate } from './tools/templates';
+import type { TemplateChange } from './view/tools/PlayerTools';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 
@@ -75,6 +77,8 @@ export interface PlayerSessionOptions {
   onSheets?(entries: readonly TokenSheet[]): void;
   /** Someone else's ping, for the scene `sceneId`. */
   onPing?(ping: PlayerPing): void;
+  /** Every lasting template on the scene `sceneId`, whenever they change. */
+  onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -143,6 +147,14 @@ export class PlayerSession {
   sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
     if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier }));
+    return true;
+  }
+
+  /** Asks the GM to add a template on the scene the player has, or remove one of their own; false when it cannot go. */
+  sendTemplate(change: TemplateChange): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'map-template', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : { remove: change.remove }) }));
     return true;
   }
 
@@ -264,6 +276,9 @@ export class PlayerSession {
         break;
       case 'token-sheets':
         this.options.onSheets?.(message.entries);
+        break;
+      case 'map-templates':
+        this.options.onTemplates?.(message.sceneId, message.templates);
         break;
       case 'map-ping':
         // Only the GM's relays carry `from` and a colour.

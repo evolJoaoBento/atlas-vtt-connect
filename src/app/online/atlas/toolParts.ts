@@ -6,6 +6,8 @@ import { DiceHost } from '../tools/DiceHost';
 import { LaserRelay } from '../tools/LaserRelay';
 import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
+import { TemplateHost } from '../tools/TemplateHost';
+import type { MapTemplate } from '../tools/templates';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
@@ -61,5 +63,19 @@ export function pingRelayPart(lasers: LasersApi | null): NonNullable<OptionalPar
   return ({ session, projection }) => new PingRelay({
     session, projection,
     ...(typeof showPing === 'function' ? { show: (viewId: ViewId, ping: { x: number; y: number; color: string }) => showPing.call(lasers, viewId, ping) } : {}),
+  });
+}
+
+/** Draws a scene's templates on a view's map: Connect's stock Atlas stand-in adds it to `lasers` (an Atlas API has none). */
+type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly MapTemplate[], coneAngle: number) => void };
+
+/** Players' lasting templates, kept per scene and drawn in the GM's view where the lasers can draw. */
+export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: string | null) => number): NonNullable<OptionalParts['templates']> {
+  const showTemplates = lasers ? (lasers as unknown as TemplateShowing).showTemplates : undefined;
+  return ({ session, projection }) => new TemplateHost({
+    session, projection,
+    ...(typeof showTemplates === 'function'
+      ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null)) }
+      : {}),
   });
 }

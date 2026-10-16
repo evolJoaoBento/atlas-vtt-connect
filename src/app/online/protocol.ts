@@ -10,6 +10,7 @@ import {
 } from './scene/sceneValidation';
 import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
+import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -115,11 +116,15 @@ export type ControlMessage =
   /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
   | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
   /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
-  | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string };
+  | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string }
+  /** Player to GM: add a lasting template on the scene they have, or remove one of their own (`tools/templates.ts`). */
+  | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string }
+  /** GM to players: every template on the scene, whenever they change. */
+  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template',
 ]);
 
 export type Decoded =
@@ -179,6 +184,10 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
   'token-sheets': (m) => isTokenSheets(m.entries),
   'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
+  'map-template': (m) => isSceneId(m.sceneId) && (m.add === undefined) !== (m.remove === undefined)
+    && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
+    && (m.remove === undefined || isTemplateId(m.remove)),
+  'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
 };
 

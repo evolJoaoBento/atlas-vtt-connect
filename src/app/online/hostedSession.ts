@@ -67,6 +67,8 @@ export interface OptionalParts {
   laser?: (context: HostedContext) => HostedPart;
   /** Players' pings, relayed to their scene and shown in the GM's view where Connect can draw on it. */
   pings?: (context: HostedContext) => HostedPart;
+  /** Players' lasting templates, kept per scene and shown in the GM's view where Connect can draw on it. */
+  templates?: (context: HostedContext) => HostedPart & { clear(): void; hasAny(): boolean };
 }
 
 export interface HostEnvironment extends OptionalParts {
@@ -98,6 +100,8 @@ export interface HostedSession {
   /** The note to show while hosting: the join link is too long to work, or none. */
   readonly linkError: string | null;
   readonly tokenControl: TokenControl | null;
+  /** Players' lasting templates; null without them. */
+  readonly templates: { clear(): void; hasAny(): boolean } | null;
   /** Which scene each player sees, and the split party's assignments. */
   readonly scenes: SceneHub;
   stop(): void;
@@ -184,6 +188,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const dice = env.dice?.(context) ?? null;
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
+  const templates = env.templates?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, label: string): boolean => dice.rollFor?.(player, formula, label) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
@@ -197,7 +202,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSharing = null;
     stopErrors();
     assetServer.stop();
-    for (const part of given([pings, sheets, tokenControl, laser, dice])) part.stop();
+    for (const part of given([templates, pings, sheets, tokenControl, laser, dice])) part.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -215,7 +220,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSplit = syncSplitState(hub);
     cameraSender.start();
     assetServer.start();
-    for (const part of given([tokenControl, dice, laser, sheets, pings])) {
+    for (const part of given([tokenControl, dice, laser, sheets, pings, templates])) {
       part.start();
       parts.push(part);
     }
@@ -226,7 +231,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     throw error;
   }
   return {
-    session, requests, table, hostId: host.id, joinUrl, linkError: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null,
+    session, requests, table, hostId: host.id, joinUrl, linkError: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControl?.control ?? null, templates,
     scenes: hub, stop,
   };
 }

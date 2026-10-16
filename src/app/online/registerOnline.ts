@@ -5,7 +5,7 @@ import type { OnlineSessionService } from './OnlineSessionService';
 import { tabBadge } from './gm-ui/tabBadge';
 import { EVERYONE_BACK_COMMAND } from './split/splitCopy';
 import { canBringEveryoneBack } from './splitStore';
-import { ONLINE_SESSION_LABEL, SHOW_HANDOUT_LABEL, START_SESSION_LABEL, STOP_HANDOUT_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
+import { CLEAR_TEMPLATES_LABEL, ONLINE_SESSION_LABEL, SHOW_HANDOUT_LABEL, START_SESSION_LABEL, STOP_HANDOUT_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
 import { HandoutModal } from './ui/handoutModal';
 import { handouts } from './handouts';
 import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
@@ -92,7 +92,16 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
   }
 
   // Handouts: an image from the vault shown to every player, until the GM takes it away or stops hosting.
-  commands.push('show-handout', 'stop-handout');
+  commands.push('show-handout', 'stop-handout', 'clear-templates');
+  plugin.addCommand({
+    id: 'clear-templates',
+    name: CLEAR_TEMPLATES_LABEL,
+    checkCallback: (checking) => {
+      if (onlineSessionStore.getState().status !== 'hosting' || !service.hasTemplates()) return false;
+      if (!checking) service.clearTemplates();
+      return true;
+    },
+  });
   plugin.addCommand({
     id: 'show-handout',
     name: SHOW_HANDOUT_LABEL,

@@ -70,6 +70,7 @@ const map = surface
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendLaser: (points, lifted, dt, color) => session?.sendLaser(points, lifted, dt, color) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
+    sendTemplate: (change) => session?.sendTemplate(change) ?? false,
     laserColor: loadLaserColor(() => localStorage),
     onLaserColor: (color) => saveLaserColor(color, () => localStorage),
     notice: element('move-notice'),
@@ -314,6 +315,7 @@ if (!target) {
       // Not logged: lasers arrive up to twenty times a second per person.
       onLaser: (laser) => map.receiveLaser(laser),
       onPing: (ping) => map.receivePing(ping),
+      onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
       onSheets: (entries) => {
         sheets.receive(entries);
         map.setTokenNumbers(numbersFromSheets(entries));

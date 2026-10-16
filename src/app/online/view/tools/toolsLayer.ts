@@ -20,6 +20,7 @@ import type { ViewSurface } from '../ViewSurface';
 import type { MeasureOverlay } from './MeasureTool';
 import type { PlayerTools, ToolOverlay } from './PlayerTools';
 import { ringRadius, type PingRing } from '../../tools/pings';
+import { conePoints, type MapTemplate } from '../../tools/templates';
 
 /** The join page's accent (`--accent` in `style.css`), standing in for the GM's Obsidian accent. */
 export const MEASURE_ACCENT = '#7c5cff';
@@ -52,8 +53,26 @@ export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: numb
     const middle = pathMidpoint(ruler.points);
     if (middle) drawLabel(surface, ruler.label, middle, zoom);
   }
+  for (const template of overlay.templates) drawTemplate(surface, template, zoom, overlay.coneOpening);
   for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.color, zoom);
   for (const ring of overlay.pings) drawPingRing(surface, ring, zoom);
+}
+
+/** A lasting template: its area filled faintly in its owner's colour and outlined; a line is a broad translucent stroke. */
+function drawTemplate(surface: ViewSurface, template: MapTemplate, zoom: number, coneOpening: number): void {
+  const unit = zoom > 0 ? 1 / zoom : 1;
+  const { start, end, color } = template;
+  if (template.shape === 'circle') {
+    const radius = Math.hypot(end.x - start.x, end.y - start.y);
+    surface.circle(start.x, start.y, radius, { fill: color, alpha: 0.18 });
+    surface.circle(start.x, start.y, radius, { stroke: color, lineWidth: 2 * unit, alpha: 0.8 });
+  } else if (template.shape === 'cone') {
+    const outline = conePoints(start, end, coneOpening);
+    surface.paths([outline], true, { fill: color, alpha: 0.18 });
+    surface.paths([outline], true, { stroke: color, lineWidth: 2 * unit, alpha: 0.8 });
+  } else {
+    surface.paths([[start, end]], false, { stroke: color, lineWidth: 6 * unit, alpha: 0.5 });
+  }
 }
 
 /** One ring of a ping: a circle of constant screen size that grows and fades. */

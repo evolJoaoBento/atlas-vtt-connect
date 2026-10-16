@@ -123,6 +123,7 @@ export class OnlineSessionService {
         ...(deps.dice ? { dice: deps.dice } : {}),
         ...(deps.sheets ? { sheets: deps.sheets } : {}),
         ...(deps.pings ? { pings: deps.pings } : {}),
+        ...(deps.templates ? { templates: deps.templates } : {}),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
@@ -173,6 +174,11 @@ export class OnlineSessionService {
     handouts.show(null);
     resetOnlineSessionStore();
   }
+
+  /** Takes every player's lasting template off every scene. */
+  clearTemplates(): void { this.hosted?.templates?.clear(); }
+  /** Whether players have left any template on a scene. */
+  hasTemplates(): boolean { return this.hosted?.templates?.hasAny() ?? false; }
 
   /** Admits a waiting player: as who their device is for an Obsidian player, as before for a web player. */
   allow(playerId: string): void { this.hosted?.requests.allow(playerId); }
