@@ -53,22 +53,27 @@
     background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
   }
   .top-info { padding-inline: 16px; min-height: calc(var(--tool-size) + 2 * var(--inset) + 2 * var(--panel-border)); }
-  /* The dice log opener is a bare, glowing icon in the middle of the right edge, not a pill. It sits against the table
-     itself (the bar is no containing block), so the middle is the table's. */
+  /* The panel openers (dice log, sheets, image) are a vertical bar in the middle of the right edge: the toolbar's
+     surface turned on its side, in the theme's colours like Atlas's own bars. It sits against the table itself (the bar
+     is no containing block), so the middle is the table's. */
   .top-bar { position: static; }
   .top-actions {
-    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); padding: 0; background: none; border: 0; box-shadow: none;
-    /* One above another down the edge, however many the session shows (dice log, sheets, image, menu). */
-    flex-direction: column;
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); flex-direction: column;
   }
   .top-actions .icon-button {
-    width: 48px; height: 48px; color: #cfcae6; opacity: 0.6; transition: opacity 120ms, filter 120ms;
-    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.35)) drop-shadow(0 0 12px var(--accent));
+    color: var(--text); transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
   }
-  .top-actions .icon-button:hover, .top-actions .icon-button:focus-visible, .top-actions .icon-button[aria-expanded="true"] {
-    opacity: 0.9; background: transparent; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 16px var(--accent));
+  .top-actions .icon-button:active { transform: scale(0.96); }
+  /* An open panel's button is lit, as the tool in use is on the toolbar. */
+  .top-actions .icon-button[aria-expanded="true"], .top-actions .icon-button[aria-expanded="true"]:hover { background: var(--accent); color: #fff; }
+  @media (prefers-reduced-motion: reduce) { .top-actions .icon-button:active { transform: none; } }
+  /* The first and last buttons shown have their outer corners concentric with the bar's. */
+  .top-actions > .icon-button:nth-child(1 of :not([hidden])) {
+    border-top-left-radius: var(--inset-radius); border-top-right-radius: var(--inset-radius);
   }
-  .top-actions .icon-button .tool-icon { width: 30px; height: 30px; }
+  .top-actions > .icon-button:nth-last-child(1 of :not([hidden])) {
+    border-bottom-left-radius: var(--inset-radius); border-bottom-right-radius: var(--inset-radius);
+  }
   .session-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
   .connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
   .connection[data-tone]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d29922; }

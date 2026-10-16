@@ -12,9 +12,10 @@ describe("the player tab's dice log", () => {
     expect(css).not.toMatch(/animation: atlas-connect-log/);
   });
 
-  it('is opened by a bare, glowing icon in the middle of the right edge rather than a pill', () => {
-    expect(css).toMatch(/\.top-actions \{[^}]*top: 50%; transform: translateY\(-50%\);[^}]*background: none; border: 0; box-shadow: none;/);
-    expect(css).toMatch(/\.top-actions \.icon-button \{[^}]*filter: drop-shadow\(0 0 4px/);
+  it('is opened from a vertical bar in the middle of the right edge, in the toolbar\'s surface', () => {
+    expect(css).toMatch(/\.top-actions \{[^}]*top: 50%; transform: translateY\(-50%\); flex-direction: column;/);
+    // No glow of its own: the pill's surface, border and shadow are the toolbar's.
+    expect(css).not.toMatch(/\.top-actions[^{]*\{[^}]*(filter|background: none|box-shadow: none)/);
     // The bar is no containing block, so 50% is the table's middle, not the bar's.
     expect(css).toMatch(/\.top-bar \{ position: static; \}/);
   });
