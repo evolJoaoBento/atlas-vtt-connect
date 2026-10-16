@@ -71,6 +71,8 @@ export function sliceOf(snapshot: SceneSnapshot): Slice {
     snapshot.background, snapshot.grid, snapshot.objects.tokens, snapshot.objects.texts, snapshot.objects.drawings,
     snapshot.objects.fog, snapshot.widgets.settings, snapshot.widgets.values, snapshot.initiative,
     snapshot.initiativeTrackerOpen, snapshot.lighting,
+    // A stock Atlas's snapshot carries its note pins (an Atlas API's has none): the readable ones go to players.
+    (snapshot.objects as { pins?: unknown }).pins,
   ];
 }
 
