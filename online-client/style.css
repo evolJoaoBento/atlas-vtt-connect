@@ -419,16 +419,26 @@ button:disabled { opacity: 0.5; cursor: default; }
   .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
 }
 
-/* The token card under the mouse: name, conditions and the player's own numbers. Placed by `HoverCardView`. */
+/* The card beside a hovered token, as Atlas's ConditionHoverPanel draws it: its elevated surface (radius 12, a 1.5 px
+   border in the text colour at 0.18, a soft three-layer shadow), 8 px padding and gap, one row per condition, 13 px at
+   weight 500; it fades in over 100 ms while it slides 4 px out of the token and grows from 0.97. Placed by `HoverCardView`. */
 .hover-card {
-  position: fixed; left: var(--hover-x, 0); top: var(--hover-y, 0); z-index: 5; max-width: 260px;
-  padding: var(--gap); display: grid; gap: 4px; pointer-events: none;
-  background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
-  font-size: 13px; line-height: 1.35; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  position: fixed; left: var(--hover-x, 0); top: var(--hover-y, 0); z-index: 5; max-width: 260px; box-sizing: border-box;
+  padding: 8px; display: grid; gap: 8px; pointer-events: none;
+  background: color-mix(in srgb, var(--card) 97%, transparent); color: var(--text);
+  border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 500; line-height: 1.3;
+  box-shadow: 0 5px 2px rgba(0, 0, 0, 0.05), 0 7px 4px rgba(0, 0, 0, 0.05), 0 9px 6px rgba(0, 0, 0, 0.05);
+  opacity: 0; transform: translateX(-4px) scale(0.97); transform-origin: left center;
+  transition: opacity 100ms cubic-bezier(0.23, 1, 0.32, 1), transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.hover-card[hidden] { display: none; }
+.hover-card.is-open { opacity: 1; transform: none; }
+.hover-card-row { display: flex; align-items: center; gap: 8px; }
+.hover-card-badge { flex: none; width: 20px; height: 20px; margin: -2px; }
+.hover-card-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hover-card-title { font-weight: 600; }
-.hover-card-line { display: flex; align-items: center; gap: 6px; color: var(--muted); }
-.hover-card-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hover-dot); }
+@media (prefers-reduced-motion: reduce) { .hover-card { transition: none; } }
 
 /* "Your turn": the move notice's look, in the accent colour. */
 .turn-notice {
@@ -527,3 +537,23 @@ button:disabled { opacity: 0.5; cursor: default; }
 .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 12px; }
 .initiative-hp { width: 100%; height: 4px; accent-color: #22c55e; }
 .initiative-round { text-align: center; color: var(--muted); font-size: 12px; }
+
+/* A resource on a sheet as Atlas's stat block gauge (TrackView, _sheet-numbers.scss): a thin track filled in the accent,
+   with "current / max" beside it. */
+.sheet-gauge { display: inline-flex; align-items: center; gap: 8px; }
+.sheet-gauge-track { display: block; width: 96px; height: 6px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.sheet-gauge-fill { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--sheet-gauge-share, 0)); transform-origin: left center; }
+.sheet-roll.is-static { cursor: default; text-decoration: none; }
+/* Atlas's Ctrl/Cmd+hover stat block preview (statblock-preview-window.scss): the sheet as a stat block card on the
+   elevated shadow, by the pointer, easing in. Placed by `StatblockPreviewView`. */
+@keyframes atlas-connect-preview-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.statblock-preview {
+  position: fixed; left: var(--preview-x, 0); top: var(--preview-y, 0); z-index: 6; pointer-events: none;
+  box-sizing: border-box; width: max-content; max-width: min(420px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: hidden;
+  padding: 16px; border-radius: 12px; background: var(--card); color: var(--text); font-size: 13px;
+  border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.statblock-preview[hidden] { display: none; }
+.statblock-preview.is-open { animation: atlas-connect-preview-in 200ms cubic-bezier(0.23, 1, 0.32, 1); transform-origin: left top; }
+@media (prefers-reduced-motion: reduce) { .statblock-preview.is-open { animation: none; } }

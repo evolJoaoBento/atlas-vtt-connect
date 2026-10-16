@@ -66,10 +66,12 @@ export function wheelGauge(wheel: PlayerWheel): { share: number; ticks: number[]
  * Draws `wheels` beside a token centred at (x, y) `size` wide, whose ring band's centre is `ringRadius` out. The anchors
  * sit past the resize button (`wheelAnchor`), on the token's bottom edge, scaled as the bars.
  */
-export function drawWheels(surface: ViewSurface, at: ScenePoint, wheels: readonly PlayerWheel[], size: number, ringRadius: number, cellSize: number): void {
+export function drawWheels(
+  surface: ViewSurface, at: ScenePoint, wheels: readonly PlayerWheel[], size: number, ringRadius: number, cellSize: number, uiScale?: number,
+): void {
   if (wheels.length === 0) return;
   const anchorX = ringRadius + (RESIZE_HANDLE_SIZE / 2) * tokenUIScale(size);
-  const scale = restingTokenUIScale(cellSize);
+  const scale = uiScale ?? restingTokenUIScale(cellSize);
   for (const wheel of wheels) {
     const centre = wheelCentre(wheel.slot);
     surface.push(at.x + (centre.left ? -anchorX : anchorX), at.y + size / 2, 0, scale);

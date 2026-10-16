@@ -95,6 +95,14 @@ export function screenToWorld(camera: Camera, screen: ScreenSize, point: ScreenP
   };
 }
 
+/** Where world point `point` is on the screen (CSS pixels from its top left): `screenToWorld`'s inverse. */
+export function worldToScreen(camera: Camera, screen: ScreenSize, point: ScreenPoint): ScreenPoint {
+  return {
+    x: (point.x - camera.centerX) * camera.zoom + screen.width / 2,
+    y: (point.y - camera.centerY) * camera.zoom + screen.height / 2,
+  };
+}
+
 /** Zooms by `factor`, keeping the world point under `point` where it is on screen, unless a limit stops it. */
 export function zoomAround(camera: Camera, screen: ScreenSize, point: ScreenPoint, factor: number, limits: CameraLimits | null): Camera {
   if (!Number.isFinite(factor)) return camera;

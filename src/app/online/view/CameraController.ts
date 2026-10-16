@@ -10,7 +10,7 @@ import { sceneWorldBounds } from '../preview/previewLayout';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import {
-  cameraForView, cameraLimits, clampCamera, DEFAULT_CAMERA, fitCamera, panBy, sameRect, screenToWorld, zoomAround,
+  cameraForView, cameraLimits, clampCamera, DEFAULT_CAMERA, fitCamera, panBy, sameRect, screenToWorld, worldToScreen, zoomAround,
   type Camera, type CameraLimits, type ScreenPoint, type ScreenSize, type WorldRect,
 } from './camera';
 import { CriticalSpring } from './criticalSpring';
@@ -84,6 +84,11 @@ export class CameraController {
   /** The world point under `point` (CSS pixels from the canvas's top left), with the camera of now. */
   toWorld(point: ScreenPoint): ScreenPoint {
     return screenToWorld(this.current(), this.screen, point);
+  }
+
+  /** Where world point `point` is on the canvas (CSS pixels from its top left), with the camera of now. */
+  toScreen(point: ScreenPoint): ScreenPoint {
+    return worldToScreen(this.current(), this.screen, point);
   }
 
   /** The canvas's size in CSS pixels. A following view refits; one that broke away keeps its centre. */

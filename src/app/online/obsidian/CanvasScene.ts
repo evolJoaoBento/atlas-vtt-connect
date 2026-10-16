@@ -9,7 +9,6 @@ import { SheetView } from '../../../../online-client/sheetView.mts';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
-import { numbersFromSheets } from '../view/tokenHover';
 import { DiceLogView } from '../../../../online-client/diceLogView.mts';
 import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
@@ -73,6 +72,7 @@ export class CanvasScene implements OnlineSceneSink {
         hoverCard: dom.hoverCard,
         turnNotice: dom.turnNotice,
         initiative: dom.initiative,
+        statblockPreview: dom.statblockPreview,
         handout: dom.handout,
         onToolsChange: () => this.syncToolbar(),
         ...(options.frames ? { frames: options.frames } : {}),
@@ -199,10 +199,10 @@ export class CanvasScene implements OnlineSceneSink {
     if (ping.sceneId === this.shown?.sceneId) this.map?.receivePing(ping);
   }
 
-  /** The sheets of the tokens this player controls: the drawer, and the numbers on their token cards. */
+  /** The sheets of the tokens this player controls: the drawer, and the Ctrl+hover preview of their stat blocks. */
   sheets(entries: readonly TokenSheet[]): void {
     this.sheetView.receive(entries);
-    this.map?.setTokenNumbers(numbersFromSheets(entries));
+    this.map?.setSheets(entries);
   }
 
   /** Images arrived, failed or went. */

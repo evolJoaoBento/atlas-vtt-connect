@@ -20,6 +20,8 @@ import { drawTokenUi } from './tokenUiDrawing';
 import { BarFills } from './barFills';
 import { BadgeEntrances } from './badgeEntrances';
 import { DOWNED_MOTION, DownedFades } from './downedFades';
+import { TokenEmphasis } from './tokenEmphasis';
+import { restingTokenUIScale, selectedTokenUIScale } from '@atlas-vtt/shared/draw';
 import { prefersReducedMotion } from '../motion';
 
 /** The stand-in drawn until a token's art has loaded. */
@@ -46,21 +48,27 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   const entrances = new BadgeEntrances(now, reducedMotion);
   // Going down and being healed fade as Atlas's do.
   const downedFades = new DownedFades(now, reducedMotion);
+  // A selected token's UI grows, and its numbers show while it is hovered or selected, as on Atlas's scene.
+  const emphasis = new TokenEmphasis(now, reducedMotion);
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
       const stroke = computeTokenStrokeWidth(cellSize);
-      const { controlled, positions, held } = frame.overlay;
+      const { controlled, positions, held, selected = null, hovered = null } = frame.overlay;
+      const resting = restingTokenUIScale(cellSize);
+      const selectedScale = selectedTokenUIScale(resting, frame.zoom || 1);
       glides.begin(frame.scene.sceneId);
       fills.begin(frame.scene.sceneId);
       entrances.begin(frame.scene.sceneId);
       downedFades.begin(frame.scene.sceneId);
+      emphasis.begin(frame.scene.sceneId);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
       // A lit scene's darkness reaches players as a fog operation of its own: there only their tokens glide.
       const lit = Object.hasOwn(frame.scene.fog, DARKNESS_FOG_ID);
       // Every token's bars, nameplate and badges go above all the tokens, as Atlas's token UI layer lies above them,
       // so a token on a higher layer never covers a neighbour's.
       const uis: Array<() => void> = [];
+      const raised: Array<() => void> = [];
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
         const target = positions.get(id) ?? inScene;
         const at = glides.position(id, { x: target.x, y: target.y }, id === held, !lit || controlled.has(id));
@@ -79,16 +87,26 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         // Whose turn it is, outside the player's own ring so both show.
         if (id === turnToken) surface.circle(token.x, token.y, ringRadius + stroke * 3, { stroke: TURN_RING_COLOR, lineWidth: stroke, alpha: 0.9 });
         entrances.seeToken(id);
-        uis.push(() => drawTokenUi(surface, token, { size, cellSize, ringRadius }, (slot, share) => fills.frame(`${id}:${slot}`, share),
-          (badge) => entrances.frame(id, badge)));
+        // A held or dragged token's UI rests, as Atlas's does.
+        const shown = emphasis.frame(id, id === selected && id !== held, id === selected || id === hovered);
+        const ui = (): void => drawTokenUi(surface, token, { size, cellSize, ringRadius }, {
+          barFrame: (slot, share) => fills.frame(`${id}:${slot}`, share),
+          badgeFrame: (badge) => entrances.frame(id, badge),
+          uiScale: resting + (selectedScale - resting) * shown.selected,
+          numbers: shown.numbers,
+        });
+        // The selected token's UI is raised above its neighbours', as Atlas raises it.
+        if (id === selected) raised.push(ui);
+        else uis.push(ui);
       }
-      for (const ui of uis) ui();
+      for (const ui of [...uis, ...raised]) ui();
       glides.end();
       fills.end();
       entrances.end();
       downedFades.end();
+      emphasis.end();
     },
-    animating: () => glides.animating() || fills.animating() || entrances.animating() || downedFades.animating(),
+    animating: () => glides.animating() || fills.animating() || entrances.animating() || downedFades.animating() || emphasis.animating(),
   };
 }
 

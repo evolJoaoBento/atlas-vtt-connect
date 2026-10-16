@@ -100,7 +100,9 @@ function isLegacyBar(value: unknown): boolean {
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const isUnit = inRange([0, 1]);
 function isResource(value: unknown): boolean {
-  return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent);
+  return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent)
+    && optional(inRange(SCENE_RANGES.resourceValue))(value.current) && optional(inRange(SCENE_RANGES.resourceValue))(value.max)
+    && optional(isBoolean)(value.fixed);
 }
 function isResources(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((bar) => isResource(bar));

@@ -27,7 +27,6 @@ import { createCanvasSurface } from '../src/app/online/view/canvasSurface';
 import { DiceDisplayView } from './diceDisplayView.mts';
 import { DiceLogView } from './diceLogView.mts';
 import { SheetView } from './sheetView.mts';
-import { numbersFromSheets } from '../src/app/online/view/tokenHover';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
@@ -76,6 +75,7 @@ const map = surface
     hoverCard: element('hover-card'),
     turnNotice: element('turn-notice'),
     initiative: element('initiative-panel'),
+    statblockPreview: element('statblock-preview'),
     handout: {
       panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
       status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
@@ -317,7 +317,7 @@ if (!target) {
       onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
       onSheets: (entries) => {
         sheets.receive(entries);
-        map.setTokenNumbers(numbersFromSheets(entries));
+        map.setSheets(entries);
       },
     });
     session.start();

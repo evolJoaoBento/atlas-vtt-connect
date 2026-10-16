@@ -17,7 +17,7 @@ import type { PlayerCondition, PlayerResource, PlayerToken, ScenePoint } from '.
 import type { ShapeStyle, ViewSurface } from '../ViewSurface';
 import { BAR_MOTION, type BarFrame } from './barFills';
 import type { BadgeFrame } from './badgeEntrances';
-import { drawWheels } from './tokenWheels';
+import { drawWheels, WHEEL_NUMBER } from './tokenWheels';
 
 /** Condition badges without their definitions: one neutral colour for all. */
 export const NEUTRAL_BADGE_COLOR = '#5b5f6a';
@@ -67,22 +67,33 @@ export type BarFrameOf = (slot: number, share: number) => BarFrame;
 /** How far a token's badge is into its entrance this frame (`badgeEntrances.ts`); without it each is settled. */
 export type BadgeFrameOf = (badge: string) => BadgeFrame;
 
-export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: TokenUiGeometry, barFrame?: BarFrameOf, badgeFrame?: BadgeFrameOf): void {
-  const scale = restingTokenUIScale(geometry.cellSize);
+/** How a token's UI is drawn this frame: its animations, and how the player is looking at it (`tokenEmphasis.ts`). */
+export interface TokenUiLook {
+  barFrame?: BarFrameOf;
+  badgeFrame?: BadgeFrameOf;
+  /** The bars', nameplate's and wheels' scale; Atlas's resting size when unset. Badges always rest on the ring. */
+  uiScale?: number;
+  /** The bar numbers' opacity, shown while the token is hovered or selected; 0 when unset. */
+  numbers?: number;
+}
+
+export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: TokenUiGeometry, look: TokenUiLook = {}): void {
+  const resting = restingTokenUIScale(geometry.cellSize);
+  const scale = look.uiScale ?? resting;
   // The window draws the first two sockets as bars, and the others as wheels beside the token (`tokenWheels.ts`).
   const bars = (token.resources ?? []).slice(0, BAR_SLOTS);
   if (bars.length > 0 || token.name) {
     // Anchored on the token's bottom edge, in UI units, like Atlas's `belowToken` container.
     surface.push(token.x, token.y + geometry.size / 2, 0, scale);
     if (token.name) drawNameplate(surface, token.name);
-    drawBars(surface, bars, barFrame ?? ((_slot, share) => ({ fill: share, trail: share })));
+    drawBars(surface, bars, look.barFrame ?? ((_slot, share) => ({ fill: share, trail: share })), look.numbers ?? 0);
     surface.pop();
   }
-  drawWheels(surface, token, token.wheels ?? [], geometry.size, geometry.ringRadius, geometry.cellSize);
-  if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, scale, badgeFrame ?? (() => ({ scale: 1, alpha: 1 })));
+  drawWheels(surface, token, token.wheels ?? [], geometry.size, geometry.ringRadius, geometry.cellSize, scale);
+  if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, resting, look.badgeFrame ?? (() => ({ scale: 1, alpha: 1 })));
 }
 
-function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFrame: BarFrameOf): void {
+function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFrame: BarFrameOf, numbers: number): void {
   const rects = barStackRects(bars.length);
   bars.forEach((bar, index) => {
     const rect = rects[index];
@@ -92,7 +103,32 @@ function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFram
     if (bar.spent) {
       surface.roundRect(rect.x, rect.y, rect.width, rect.height, barDimensions.token.radius, { fill: '#000000', alpha: BAR_STYLE.defeatedAlpha });
     }
+    if (numbers > 0 && bar.current !== undefined && bar.max !== undefined) drawBarNumbers(surface, rect, bar, numbers);
   });
+}
+
+/** Space either side of the slash between a bar's current and maximum numbers, in UI units (`RESOURCE_NUMBER_GAP`). */
+const NUMBER_GAP = 1.5;
+
+/**
+ * A bar's numbers as Atlas's `ResourceBarLabel` sets them: the current right of centre's slash, the maximum left of it,
+ * in Atlas's outlined white; a static resource's maximum alone, centred.
+ */
+function drawBarNumbers(surface: ViewSurface, rect: UiRect, bar: PlayerResource, alpha: number): void {
+  const style = { font: WHEEL_NUMBER.font, color: WHEEL_NUMBER.color, outline: WHEEL_NUMBER.outline, alpha };
+  const y = rect.y + rect.height / 2;
+  const text = (value: string, x: number, align: 'left' | 'center' | 'right'): void => {
+    surface.push(x, y, 0, WHEEL_NUMBER.scale);
+    surface.text(value, 0, 0, { ...style, align });
+    surface.pop();
+  };
+  if (bar.fixed) {
+    text(String(bar.max), 0, 'center');
+    return;
+  }
+  text(String(bar.current), -NUMBER_GAP, 'right');
+  text('/', 0, 'center');
+  text(String(bar.max), NUMBER_GAP, 'left');
 }
 
 function drawBar(surface: ViewSurface, bar: UiRect, shown: BarFrame, color: string): void {
@@ -208,7 +244,12 @@ export function isLightBadgeColor(color: number): boolean {
  * colour with a faint rim of light, its glyph, and its number in a pip.
  */
 function drawBadge(surface: ViewSurface, look: BadgeLook, alpha: number): void {
-  const { radius, bezelWidth, bezelColor, pipShare, pipOffset, pipColor } = CONDITION_BADGE;
+  drawConditionBadge(surface, look, alpha, CONDITION_BADGE.radius);
+}
+
+/** A condition badge `radius` wide centred on the frame's origin; the hover card draws its rows' badges with it. */
+export function drawConditionBadge(surface: ViewSurface, look: BadgeLook, alpha: number, radius: number): void {
+  const { bezelWidth, bezelColor, pipShare, pipOffset, pipColor } = CONDITION_BADGE;
   const base = colorNumber(look.color) ?? colorNumber(NEUTRAL_BADGE_COLOR)!;
   surface.circle(0, radius * 0.18, radius + bezelWidth + 0.5, { fill: '#000000', alpha: 0.3 * alpha });
   surface.circle(0, 0, radius + bezelWidth, { fill: cssColor(bezelColor), alpha });

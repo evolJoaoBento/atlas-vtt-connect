@@ -192,7 +192,7 @@ describe.each(HUB_PATHS)('scene sync end to end, $atlas', ({ tabs }) => {
     w.setResources([{ ...HP, visibleToPlayers: true }]);
     await w.tick();
     w.expectInSync('resources', early, late);
-    expect(early.scene!.tokens.goblin?.resources).toEqual([{ color: '#eab308', share: 0.5, spent: false }]);
+    expect(early.scene!.tokens.goblin?.resources).toEqual([{ color: '#eab308', share: 0.5, spent: false, current: 3, max: 6 }]);
 
     patchToken(w.store, 'goblin', { isHidden: true });
     await w.tick();

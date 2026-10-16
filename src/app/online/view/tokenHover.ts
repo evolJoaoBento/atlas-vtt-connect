@@ -5,6 +5,7 @@
  */
 import { computeTokenPixelSize } from '@atlas-vtt/shared/draw';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
+import { badgeLook, type BadgeLook } from './layers/tokenUiDrawing';
 
 /** One line of the card: a condition (with its colour), or a number of the player's own token. */
 export interface HoverLine {
@@ -44,6 +45,23 @@ function conditionText(condition: PlayerScene['tokens'][string]['conditions'][nu
 }
 
 const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : value.toFixed(1));
+
+/** One row of Atlas's condition card: the condition's badge (without its number) and its label, "Frightened 2". */
+export interface ConditionRow {
+  look: BadgeLook;
+  label: string;
+}
+
+/** The rows of Atlas's condition card for token `id` (`ConditionHoverPanel`): its named conditions; none without any. */
+export function conditionRows(scene: PlayerScene, id: string): ConditionRow[] {
+  const token = Object.hasOwn(scene.tokens, id) ? scene.tokens[id] : undefined;
+  if (!token) return [];
+  return token.conditions.flatMap((condition) => {
+    const label = conditionText(condition);
+    // The label already reads "Frightened 2", so the card's badge leaves out the number.
+    return label ? [{ look: { ...badgeLook(condition), value: null }, label }] : [];
+  });
+}
 
 /** What the card says about token `id`; null when there is nothing to say (no name, no conditions, no numbers). */
 export function hoverCardFor(scene: PlayerScene, id: string, numbers: TokenNumbers | null): HoverCard | null {

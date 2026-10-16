@@ -177,7 +177,7 @@ describe('SceneHub with a split party', () => {
       const scene = w.hub.slotOf(ben.playerId)?.lastSent;
       return scene?.tokens[TOKEN.b]?.resources;
     };
-    expect(bar()).toEqual([{ color: '#22c55e', share: 0.7, spent: false }]);
+    expect(bar()).toEqual([{ color: '#22c55e', share: 0.7, spent: false, current: 7, max: 10 }]);
     await w.switchTo('a');
     const [annaBefore, benBefore] = [anna.received.length, ben.received.length];
     w.setResources([{ ...hp, visibleToPlayers: false }]);

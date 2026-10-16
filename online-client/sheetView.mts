@@ -192,83 +192,96 @@ export class SheetView {
       tabs.append(tab);
     }
     const entry = this.entries.find((candidate) => candidate.tokenId === this.picked);
-    body.replaceChildren(...(entry ? this.sheetElements(entry) : []));
+    body.replaceChildren(...(entry ? sheetContent(entry, body.ownerDocument, (roll, label, title, advantage) => this.rollButton(entry.tokenId, roll, label, title, advantage)) : []));
   }
+}
 
-  private sheetElements(entry: TokenSheet): HTMLElement[] {
-    const parts: HTMLElement[] = [];
-    const sheet = entry.sheet;
-    parts.push(this.el('h3', 'sheet-name', entry.name ?? sheet?.name ?? 'Token'));
-    if (sheet?.subtitle) parts.push(this.el('p', 'sheet-subtitle', sheet.subtitle));
-    if (entry.resources.length > 0) {
-      const numbers = this.el('div', 'sheet-numbers');
-      for (const resource of entry.resources) {
-        const row = this.el('div', 'sheet-number');
-        if (resource.color) {
-          const dot = this.el('span', 'sheet-dot');
-          dot.setAttribute('aria-hidden', 'true');
-          dot.style.setProperty('--sheet-dot', resource.color);
-          row.append(dot);
-        }
-        row.append(this.el('span', 'sheet-number-name', resource.name), this.el('span', 'sheet-number-value', `${formatNumber(resource.current)} / ${formatNumber(resource.max)}`));
-        numbers.append(row);
-      }
-      parts.push(numbers);
-    }
-    if (!sheet) {
-      parts.push(this.el('p', 'sheet-empty', 'No stat block is linked to this token.'));
-      return parts;
-    }
-    parts.push(...this.blockElements(entry.tokenId, sheet));
-    return parts;
-  }
+/** What a roll on the sheet is drawn as: a button that asks the GM to roll it, or plain text in a preview. */
+export type RollMaker = (roll: SheetRollRef, label: string, title: string, advantage: boolean) => HTMLElement;
 
-  private blockElements(tokenId: string, sheet: PlayerSheet): HTMLElement[] {
-    const parts: HTMLElement[] = [];
-    const basics = [['Armor class', sheet.ac], ['Hit points', sheet.hp], ['Speed', sheet.speed]] as const;
-    for (const [label, value] of basics) if (value) parts.push(this.line(label, value));
-    if (sheet.stats) {
-      const stats = this.el('div', 'sheet-stats');
-      sheet.stats.forEach((score, index) => {
-        const name = ABILITY_NAMES[index] ?? '';
-        const cell = this.el('div', 'sheet-stat');
-        cell.append(this.el('span', 'sheet-stat-name', name), this.el('span', 'sheet-stat-score', String(score)));
-        cell.append(this.rollButton(tokenId, { kind: 'check', index }, signed(modifierOf(score)), `${name} check`, true));
-        stats.append(cell);
-      });
-      parts.push(stats);
-    }
-    const bonusRow = (title: string, kind: 'save' | 'skill', list: PlayerSheet['saves']): void => {
-      if (list.length === 0) return;
-      const row = this.el('div', 'sheet-bonuses');
-      row.append(this.el('span', 'sheet-label', title));
-      list.forEach((bonus, index) => row.append(this.rollButton(tokenId, { kind, index }, `${bonus.label} ${signed(bonus.bonus)}`, `${bonus.label}${kind === 'save' ? ' save' : ''}`, true)));
-      parts.push(row);
-    };
-    bonusRow('Saves', 'save', sheet.saves);
-    bonusRow('Skills', 'skill', sheet.skills);
-    for (const line of sheet.lines) parts.push(this.line(line.label, line.text));
-    sheet.sections.forEach((section, sectionIndex) => {
-      parts.push(this.el('h4', 'sheet-section', section.title));
-      section.items.forEach((item, itemIndex) => {
-        const paragraph = this.el('p', 'sheet-item');
-        if (item.name) paragraph.append(this.el('strong', '', `${item.name}. `));
-        for (const part of textParts(item.desc)) {
-          if ('roll' in part) {
-            const ref: SheetRollRef = { kind: 'text', section: sectionIndex, item: itemIndex, index: part.roll, text: part.text };
-            paragraph.append(this.rollButton(tokenId, ref, part.text, `${item.name || section.title}: ${part.formula}`, mayHaveAdvantage(part.formula)));
-          }
-          else paragraph.append(this.options.body.ownerDocument.createTextNode(part.text));
-        }
-        parts.push(paragraph);
-      });
-    });
-    return parts;
-  }
-
-  private line(label: string, value: string): HTMLElement {
-    const row = this.el('p', 'sheet-line');
-    row.append(this.el('span', 'sheet-label', `${label} `), this.options.body.ownerDocument.createTextNode(value));
+/**
+ * A token's sheet as elements: its name, its resources as Atlas's stat block gauges (`TrackView`: a thin track filled in
+ * the accent, with "current / max"), and its stat block, the rolls in it made by `roll`. The drawer and the Ctrl+hover
+ * preview draw it alike.
+ */
+export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker): HTMLElement[] {
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] => {
+    const element = doc.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+  const line = (label: string, value: string): HTMLElement => {
+    const row = el('p', 'sheet-line');
+    row.append(el('span', 'sheet-label', `${label} `), doc.createTextNode(value));
     return row;
+  };
+  const parts: HTMLElement[] = [];
+  const sheet = entry.sheet;
+  parts.push(el('h3', 'sheet-name', entry.name ?? sheet?.name ?? 'Token'));
+  if (sheet?.subtitle) parts.push(el('p', 'sheet-subtitle', sheet.subtitle));
+  if (entry.resources.length > 0) {
+    const numbers = el('div', 'sheet-numbers');
+    for (const resource of entry.resources) {
+      const row = el('div', 'sheet-number');
+      const label = el('span', 'sheet-number-name', resource.name);
+      const gauge = el('span', 'sheet-gauge');
+      const track = el('span', 'sheet-gauge-track');
+      track.setAttribute('role', 'meter');
+      track.setAttribute('aria-label', resource.name);
+      track.setAttribute('aria-valuemin', '0');
+      track.setAttribute('aria-valuemax', String(resource.max));
+      track.setAttribute('aria-valuenow', String(resource.current));
+      const fill = el('span', 'sheet-gauge-fill');
+      const share = resource.max > 0 ? Math.max(0, Math.min(1, resource.current / resource.max)) : 0;
+      fill.style.setProperty('--sheet-gauge-share', String(share));
+      track.append(fill);
+      gauge.append(track, el('span', 'sheet-number-value', `${formatNumber(resource.current)} / ${formatNumber(resource.max)}`));
+      row.append(label, gauge);
+      numbers.append(row);
+    }
+    parts.push(numbers);
   }
+  if (!sheet) {
+    parts.push(el('p', 'sheet-empty', 'No stat block is linked to this token.'));
+    return parts;
+  }
+  const basics = [['Armor class', sheet.ac], ['Hit points', sheet.hp], ['Speed', sheet.speed]] as const;
+  for (const [label, value] of basics) if (value) parts.push(line(label, value));
+  if (sheet.stats) {
+    const stats = el('div', 'sheet-stats');
+    sheet.stats.forEach((score, index) => {
+      const name = ABILITY_NAMES[index] ?? '';
+      const cell = el('div', 'sheet-stat');
+      cell.append(el('span', 'sheet-stat-name', name), el('span', 'sheet-stat-score', String(score)));
+      cell.append(roll({ kind: 'check', index }, signed(modifierOf(score)), `${name} check`, true));
+      stats.append(cell);
+    });
+    parts.push(stats);
+  }
+  const bonusRow = (title: string, kind: 'save' | 'skill', list: PlayerSheet['saves']): void => {
+    if (list.length === 0) return;
+    const row = el('div', 'sheet-bonuses');
+    row.append(el('span', 'sheet-label', title));
+    list.forEach((bonus, index) => row.append(roll({ kind, index }, `${bonus.label} ${signed(bonus.bonus)}`, `${bonus.label}${kind === 'save' ? ' save' : ''}`, true)));
+    parts.push(row);
+  };
+  bonusRow('Saves', 'save', sheet.saves);
+  bonusRow('Skills', 'skill', sheet.skills);
+  for (const entryLine of sheet.lines) parts.push(line(entryLine.label, entryLine.text));
+  sheet.sections.forEach((section, sectionIndex) => {
+    parts.push(el('h4', 'sheet-section', section.title));
+    section.items.forEach((item, itemIndex) => {
+      const paragraph = el('p', 'sheet-item');
+      if (item.name) paragraph.append(el('strong', '', `${item.name}. `));
+      for (const part of textParts(item.desc)) {
+        if ('roll' in part) {
+          const ref: SheetRollRef = { kind: 'text', section: sectionIndex, item: itemIndex, index: part.roll, text: part.text };
+          paragraph.append(roll(ref, part.text, `${item.name || section.title}: ${part.formula}`, mayHaveAdvantage(part.formula)));
+        } else paragraph.append(doc.createTextNode(part.text));
+      }
+      parts.push(paragraph);
+    });
+  });
+  return parts;
 }

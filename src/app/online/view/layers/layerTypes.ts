@@ -18,6 +18,10 @@ export interface TokenOverlay {
   positions: ReadonlyMap<string, ScenePoint>;
   /** The token being dragged: it follows the pointer, where every other move glides. */
   held?: string | null;
+  /** The token the player selected with a click: its UI grows to a constant size on screen and shows its numbers. */
+  selected?: string | null;
+  /** The token under the pointer: its bar numbers show. */
+  hovered?: string | null;
 }
 
 export const NO_TOKEN_OVERLAY: TokenOverlay = { controlled: new Set(), positions: new Map() };

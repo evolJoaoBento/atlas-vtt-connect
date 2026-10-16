@@ -29,9 +29,17 @@ import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
 import { HandoutView, type HandoutViewOptions } from './handoutView.mts';
 import { InitiativeView } from './initiativeView.mts';
-import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
+import { StatblockPreviewView } from './statblockPreviewView.mts';
+import type { TokenSheet } from '../src/app/online/tools/sheets';
+import { conditionRows, tokenAt } from '../src/app/online/view/tokenHover';
+import type { TokenOverlay } from '../src/app/online/view/layers/layerTypes';
+import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';
+
 import { turnNotice, turnOf } from '../src/app/online/view/turns';
 import { createPinsLayer, pinAt } from '../src/app/online/view/layers/pinsLayer';
+
+/** A press that moves further than this, in CSS pixels, pans or drags instead of selecting. */
+const CLICK_TOLERANCE = 5;
 
 /** What the toolbar shows of the tools. */
 export interface ToolState {
@@ -80,6 +88,8 @@ export interface MapViewOptions {
   hoverCard?: HTMLElement;
   /** The initiative column (`InitiativeView`); without it the fight's order is not shown on the map. */
   initiative?: HTMLElement;
+  /** Atlas's Ctrl/Cmd+hover stat block preview of the player's tokens (`StatblockPreviewView`); without it none shows. */
+  statblockPreview?: HTMLElement;
 }
 
 export class MapView {
@@ -93,10 +103,19 @@ export class MapView {
   private readonly hoverCard: HoverCardView | null;
   private readonly handout: HandoutView | null;
   private readonly initiative: InitiativeView | null;
-  /** Exact numbers of the tokens this player controls, from the GM's `token-stats`. */
-  private numbers: ReadonlyMap<string, TokenNumbers> = new Map();
+  private readonly preview: StatblockPreviewView | null;
+  /** The player's sheets by token (`token-sheets`): what the Ctrl+hover preview shows. */
+  private sheets = new Map<string, TokenSheet>();
   /** Where the mouse is over the canvas, for the grab cursor; null when it is elsewhere. */
   private hover: ScreenPoint | null = null;
+  /** The token the player selected with a click (Atlas's selection): its UI grows and shows its numbers. */
+  private selected: string | null = null;
+  /** The token under the pointer: its numbers show, and its conditions card. */
+  private hovered: string | null = null;
+  /** Ctrl or Cmd is down: Atlas then shows a token's stat block instead of its conditions card. */
+  private modifier = false;
+  /** Where the last press began, so a click that dragged (a pan) does not select. */
+  private pressedAt: { x: number; y: number } | null = null;
   /** What the toolbar was last told. */
   private shownTool: ToolState = { tool: 'move', shape: 'line', laserColor: '' };
   private readonly listeners = new AbortController();
@@ -141,6 +160,7 @@ export class MapView {
     this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
     this.handout = options.handout ? new HandoutView({ ...options.handout, ...(options.active ? { active: options.active } : {}) }) : null;
     this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
+    this.preview = options.statblockPreview ? new StatblockPreviewView(options.statblockPreview) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
     this.measure();
@@ -167,9 +187,9 @@ export class MapView {
     this.initiative?.update(scene);
   }
 
-  /** Exact numbers of the tokens this player controls (`token-stats`): the card of each shows them. */
-  setTokenNumbers(numbers: ReadonlyMap<string, TokenNumbers>): void {
-    this.numbers = numbers;
+  /** The sheets of the tokens this player controls (`token-sheets`): Ctrl+hover over one shows its stat block. */
+  setSheets(entries: readonly TokenSheet[]): void {
+    this.sheets = new Map(entries.map((entry) => [entry.tokenId, entry]));
     this.updateHoverCard();
   }
 
@@ -307,8 +327,13 @@ export class MapView {
     this.updateButtons();
   }
 
+  /** The token overlay the map draws with: the moves', and what the player selected and points at. */
+  private tokenOverlay(): TokenOverlay {
+    return { ...this.moves.overlay(), selected: this.selected, hovered: this.hovered };
+  }
+
   private movesChanged(): void {
-    this.renderer.setOverlay(this.moves.overlay());
+    this.renderer.setOverlay(this.tokenOverlay());
     const notice = this.moves.notice();
     this.options.notice.textContent = notice ?? '';
     this.options.notice.hidden = notice === null;
@@ -347,22 +372,58 @@ export class MapView {
     element.hidden = text === null;
   }
 
-  /** The card for the token under the mouse, or none: not while dragging or with no token there. */
+  /**
+   * The token under the pointer, and what it shows: Atlas's conditions card beside it on a plain hover (not while it is
+   * selected or held, nor with Ctrl or Cmd down); a readable pin's title by the pointer when no token is there.
+   */
   private updateHoverCard(): void {
+    const scene = this.scene;
+    const hovered = scene && this.hover && !this.moves.isDragging()
+      ? tokenAt(scene, this.moves.overlay().positions, this.camera.toWorld(this.hover))
+      : null;
+    if (hovered !== this.hovered) {
+      this.hovered = hovered;
+      this.renderer.setOverlay(this.tokenOverlay());
+    }
+    const rect = this.options.canvas.getBoundingClientRect();
+    // Ctrl or Cmd over one of the player's tokens: its stat block by the pointer, as Atlas previews one.
+    const sheet = hovered && this.modifier && this.hover ? this.sheets.get(hovered) : undefined;
+    if (sheet && this.hover) this.preview?.show(sheet, rect.left + this.hover.x, rect.top + this.hover.y);
+    else this.preview?.hide();
     const card = this.hoverCard;
     if (!card) return;
-    const scene = this.scene;
     if (!scene || !this.hover || this.moves.isDragging()) {
       card.hide();
       return;
     }
-    const world = this.camera.toWorld(this.hover);
-    const id = tokenAt(scene, this.moves.overlay().positions, world);
+    if (hovered) {
+      const token = scene.tokens[hovered];
+      if (!token || this.modifier || hovered === this.selected) {
+        card.hide();
+        return;
+      }
+      const at = this.moves.overlay().positions.get(hovered) ?? token;
+      const cellSize = scene.map.cellSize;
+      const size = Math.max(1, computeTokenPixelSize(cellSize, token.size));
+      const ring = getTokenRingCenterRadius(size, computeTokenStrokeWidth(cellSize), 1) + computeTokenStrokeWidth(cellSize) / 2;
+      const screen = this.camera.toScreen({ x: at.x + ring, y: at.y });
+      card.showConditions(conditionRows(scene, hovered), rect.left + screen.x, rect.top + screen.y);
+      return;
+    }
     // A pin the GM made readable names its note when no token is there.
-    const pin = id ? null : pinAt(scene, world, this.camera.current().zoom);
-    const rect = this.options.canvas.getBoundingClientRect();
-    const shown = id ? hoverCardFor(scene, id, this.numbers.get(id) ?? null) : pin ? { title: pin.title ?? 'Note', lines: [] } : null;
-    card.show(shown, rect.left + this.hover.x, rect.top + this.hover.y);
+    const pin = pinAt(scene, this.camera.toWorld(this.hover), this.camera.current().zoom);
+    if (pin) card.showText(pin.title ?? 'Note', rect.left + this.hover.x, rect.top + this.hover.y);
+    else card.hide();
+  }
+
+  /** Selects the token under a click with Move, or none on the map, as a click in Atlas's scene does. */
+  private select(point: ScreenPoint): void {
+    const scene = this.scene;
+    const id = scene ? tokenAt(scene, this.moves.overlay().positions, this.camera.toWorld(point)) : null;
+    if (id === this.selected) return;
+    this.selected = id;
+    this.renderer.setOverlay(this.tokenOverlay());
+    this.updateHoverCard();
   }
 
   private updateButtons(): void {
@@ -382,6 +443,29 @@ export class MapView {
         this.updateHoverCard();
       },
     });
+    // A click (a press that did not move) selects; a press that panned or dragged does not.
+    canvas.addEventListener('pointerdown', (event) => { this.pressedAt = { x: event.clientX, y: event.clientY }; }, { signal });
+    canvas.addEventListener('click', (event) => {
+      const from = this.pressedAt;
+      this.pressedAt = null;
+      if (this.tools.tool !== 'move' || (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > CLICK_TOLERANCE)) return;
+      const rect = canvas.getBoundingClientRect();
+      this.select({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+    }, { signal });
+    const doc = this.options.doc ?? document;
+    const modifierFrom = (event: KeyboardEvent | MouseEvent): void => {
+      const down = event.ctrlKey || event.metaKey;
+      if (down === this.modifier) return;
+      this.modifier = down;
+      this.updateHoverCard();
+    };
+    doc.addEventListener('keydown', (event) => {
+      modifierFrom(event);
+      // Escape lets go of the selection, as in Atlas, when nothing above the map took it.
+      if (event.key === 'Escape' && this.selected !== null && this.options.active?.() !== false && !event.defaultPrevented) this.select({ x: -1e9, y: -1e9 });
+    }, { signal });
+    doc.addEventListener('keyup', modifierFrom, { signal });
+    canvas.addEventListener('pointermove', modifierFrom, { signal });
     followButton.addEventListener('click', () => this.camera.followGm(), { signal });
     fitButton.addEventListener('click', () => this.camera.fitMap(), { signal });
     document.addEventListener('visibilitychange', () => this.renderer.visibilityChanged(), { signal });

@@ -60,7 +60,7 @@ describe('projectForPlayers', () => {
     expect(scene.tokens.hero).toEqual({
       x: 140, y: 140, size: 1, rotation: 0, layer: 0, image: expect.any(String), ring: '#3366ff',
       conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: null, stress: null,
-      resources: [{ color: '#22c55e', share: 0.7, spent: false }, { color: '#a855f7', share: 0.33, spent: false }], downed: false,
+      resources: [{ color: '#22c55e', share: 0.7, spent: false, current: 7, max: 10 }, { color: '#a855f7', share: 0.33, spent: false, current: 2, max: 6 }], downed: false,
     });
     expect(scene.tokens.hero?.image).not.toContain('hero');
   });
@@ -207,8 +207,11 @@ describe('projectForPlayers', () => {
       'maxHpOverridden', 'maxStressOverridden', 'statblockResources', 'conditionValues', 'imagePath', 'kind', 'futureField',
       'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
       'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
-      'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
+      'defeatedWhenSpent', 'field', 'key', 'slot',
     ];
+    // Numbers go out only on the bars of resources players see (shown on hover and selection, as on Atlas's scene).
+    const barNumbers = Object.values(scene.tokens).flatMap((token) => token.resources ?? []).length;
+    expect(json.match(/"current"/g) ?? []).toHaveLength(barNumbers);
     // The grid and the snap grid are geometry players are meant to have (an offset among it).
     const keys = keysOf({ ...scene, grid: null, measurement: { ...scene.measurement, snapGrid: null }, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);

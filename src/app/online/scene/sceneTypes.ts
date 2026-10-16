@@ -72,6 +72,13 @@ export interface PlayerResource {
   share: number;
   /** The window darkens this bar: a resource that defeats the token is spent. At most one bar per token. */
   spent: boolean;
+  /**
+   * The bar's numbers, which show on it while the token is hovered or selected, as on Atlas's own scene
+   * (`ResourceBarLabel`); absent from an older GM. A static resource shows only its maximum (`fixed`).
+   */
+  current?: number;
+  max?: number;
+  fixed?: boolean;
 }
 
 /**
