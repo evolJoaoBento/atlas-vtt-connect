@@ -37,6 +37,8 @@ export interface PlayerViewRendererOptions {
   requestFrame(draw: () => void): number;
   cancelFrame(handle: number): void;
   isHidden(): boolean;
+  /** Whether the page is in a dark theme; the token and ruler labels follow it as Atlas's do. Dark when unset. */
+  isDark?(): boolean;
 }
 
 export class PlayerViewRenderer {
@@ -108,6 +110,7 @@ export class PlayerViewRenderer {
       pixel: 1 / scale,
       bounds: this.bounds,
       overlay: this.overlay,
+      dark: this.options.isDark?.() ?? true,
     };
     // A layer that throws must not hide the others, least of all the fog (drawn last): failing
     // open would show players what the GM hides. The camera is set again to drop any unmatched push.

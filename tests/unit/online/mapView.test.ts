@@ -57,7 +57,8 @@ describe('MapView', () => {
     const listeners = new Set<() => void>();
     const matchMedia = vi.fn((query: string) => ({
       matches: false, media: query,
-      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      // Only the pixel ratio's queries count: the theme's is watched apart.
+      addEventListener: (_type: string, listener: () => void) => query.startsWith('(resolution') && listeners.add(listener),
       removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
     }));
     vi.stubGlobal('matchMedia', matchMedia);

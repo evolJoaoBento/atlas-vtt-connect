@@ -34,25 +34,27 @@ const MIN_ARC_SEGMENTS = 8;
 const MAX_ARC_SEGMENTS = 64;
 const SHADOW = cssColor(MEASURE_SHADOW);
 const FILAMENT = cssColor(FILAMENT_COLOR);
-const LABEL_TEXT = '#ffffff';
 
 export function createToolsLayer(tools: Pick<PlayerTools, 'overlay' | 'isAnimating'>): OverlayLayer {
   return {
-    draw: (surface, frame) => drawTools(surface, tools.overlay(), frame.zoom, frame.pixel),
+    draw: (surface, frame) => drawTools(surface, tools.overlay(), frame.zoom, frame.pixel, frame.dark ?? true),
     animating: () => tools.isAnimating(),
   };
 }
 
-/** `zoom`: screen pixels per world unit, as Atlas's viewport scale; `pixel`: a device pixel's size in world units. */
-export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: number, pixel = zoom > 0 ? 1 / zoom : 1): void {
-  if (overlay.measure) drawMeasurement(surface, overlay.measure, zoom);
+/**
+ * `zoom`: screen pixels per world unit, as Atlas's viewport scale; `pixel`: a device pixel's size in world units; `dark`:
+ * the labels in Atlas's dark-theme colours, or its light ones.
+ */
+export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: number, pixel = zoom > 0 ? 1 / zoom : 1, dark = true): void {
+  if (overlay.measure) drawMeasurement(surface, overlay.measure, zoom, dark);
   const ruler = overlay.ruler;
   if (ruler) {
     drawPath(surface, ruler.points);
     // The dragged token covers the end; the start and waypoints stay marked.
     for (const point of ruler.points.slice(0, -1)) drawPoint(surface, point);
     const middle = pathMidpoint(ruler.points);
-    if (middle) drawLabel(surface, ruler.label, middle, zoom);
+    if (middle) drawLabel(surface, ruler.label, middle, zoom, dark);
   }
   for (const template of overlay.templates) drawTemplate(surface, template, zoom, overlay.coneOpening);
   for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.head, laser.color, zoom, pixel);
@@ -83,7 +85,7 @@ function drawPingRing(surface: ViewSurface, ring: PingRing, zoom: number): void 
 }
 
 /** In the player's colour, as Atlas shows a player's measure. */
-function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: number): void {
+function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: number, dark: boolean): void {
   const { start, end, color } = measure;
   if (measure.shape === 'line') {
     drawPath(surface, [start, end], color);
@@ -94,7 +96,7 @@ function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: nu
     drawCone(surface, start, end, measure.coneOpening, zoom, color);
   }
   drawPoint(surface, start, color);
-  drawLabel(surface, measure.label, measureLabelAnchor(start, end, zoom), zoom);
+  drawLabel(surface, measure.label, measureLabelAnchor(start, end, zoom), zoom, dark);
 }
 
 function drawPath(surface: ViewSurface, points: readonly ScenePoint[], color: string = MEASURE_ACCENT): void {
@@ -133,20 +135,21 @@ function drawCone(surface: ViewSurface, start: ScenePoint, end: ScenePoint, open
 export const MIN_LABEL_PX = 16;
 
 /**
- * The label on Atlas's dark-theme pill; the page has no Obsidian theme. Atlas's size, but never smaller on screen than
+ * The label on Atlas's pill in the page's theme. Atlas's size, but never smaller on screen than
  * `MIN_LABEL_PX` (Atlas's online `readableLabelFontSize`): a player's view, fitted to the whole map, sits where Atlas's
  * cap would shrink it to dots.
  */
-function drawLabel(surface: ViewSurface, text: string, center: ScenePoint, zoom: number): void {
+function drawLabel(surface: ViewSurface, text: string, center: ScenePoint, zoom: number, dark: boolean): void {
   const size = Math.max(measureLabelFontSize(zoom), MIN_LABEL_PX / (zoom || 1));
   const font = `${size}px ${LABEL_FONT_FAMILY}`;
   const box = measureLabelBox(surface.measureText(text, font), size * LABEL_LINE_HEIGHT, center, zoom);
-  const theme = MEASURE_LABEL_COLORS.dark;
+  const theme = dark ? MEASURE_LABEL_COLORS.dark : MEASURE_LABEL_COLORS.light;
   surface.roundRect(box.x, box.y, box.width, box.height, box.radius, { fill: cssColor(theme.fill), alpha: MEASURE_LABEL_COLORS.fillAlpha });
   surface.roundRect(box.x, box.y, box.width, box.height, box.radius, {
     stroke: cssColor(theme.stroke), alpha: theme.strokeAlpha, lineWidth: box.strokeWidth,
   });
-  surface.text(text, center.x, center.y, { font, color: LABEL_TEXT, align: 'center' });
+  // The text takes the outline's colour, as Atlas's (`drawMeasureLabel`).
+  surface.text(text, center.x, center.y, { font, color: cssColor(theme.stroke), align: 'center' });
 }
 
 /** `head`: where the laser is held, its hot spot. */

@@ -139,7 +139,9 @@ export class MapView {
       requestFrame: (draw) => frames.request(draw),
       cancelFrame: (handle) => frames.cancel(handle),
       isHidden: options.isHidden ?? ((): boolean => document.hidden),
+      isDark: () => this.isDark(),
     });
+    this.watchTheme();
     this.moves = new TokenMoves({
       toWorld: (point) => this.camera.toWorld(point),
       send: (tokenId, x, y) => options.sendMove(tokenId, x, y),
@@ -297,6 +299,34 @@ export class MapView {
     this.camera.setScreen({ width, height });
     this.renderer.setSize({ width, height }, pixelRatioFor(window.devicePixelRatio, coarse));
     this.watchPixelRatio();
+  }
+
+  /**
+   * Whether the page is dark, as Atlas reads it: Obsidian's theme class on the body, or without one (the join page)
+   * the system's scheme, which the page's own colours follow.
+   */
+  private isDark(): boolean {
+    const doc = this.options.doc ?? document;
+    const body = doc.body;
+    if (body?.classList.contains('theme-dark')) return true;
+    if (body?.classList.contains('theme-light')) return false;
+    const view = doc.defaultView;
+    return typeof view?.matchMedia === 'function' ? view.matchMedia('(prefers-color-scheme: dark)').matches : true;
+  }
+
+  /** Draws again when the theme changes: Obsidian swaps the body's class, the system its scheme. */
+  private watchTheme(): void {
+    const doc = this.options.doc ?? document;
+    const view = doc.defaultView;
+    const { signal } = this.listeners;
+    if (typeof view?.matchMedia === 'function') {
+      view.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.renderer.invalidate(), { signal });
+    }
+    if (doc.body && typeof view?.MutationObserver === 'function') {
+      const observer = new view.MutationObserver(() => this.renderer.invalidate());
+      observer.observe(doc.body, { attributes: true, attributeFilter: ['class'] });
+      signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+    }
   }
 
   /** The ratio changes without a resize when the window moves to another screen or the page is zoomed. */

@@ -94,6 +94,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
           badgeFrame: (badge) => entrances.frame(id, badge),
           uiScale: resting + (selectedScale - resting) * shown.selected,
           numbers: shown.numbers,
+          dark: frame.dark ?? true,
         });
         // The selected token's UI is raised above its neighbours', as Atlas raises it.
         if (id === selected) raised.push(ui);

@@ -81,6 +81,20 @@ describe('the tokens layer with a selection', () => {
   });
 });
 
+describe("a token's nameplate", () => {
+  it("takes Atlas's light-theme capsule on a light page, and its dark one otherwise", () => {
+    const fills = (dark?: boolean): Array<string | undefined> => {
+      const surface = new RecordingSurface();
+      const scene = playerScene({ tokens: { t1: playerToken({ name: 'Cleric' }) } });
+      createTokensLayer({ now: () => 0 }).draw(surface, frame(scene, dark === undefined ? {} : { dark }));
+      return surface.ops('roundRect').map(({ style }) => style.fill).filter(Boolean);
+    };
+    expect(fills(false)).toContain('#e3e3e3');
+    expect(fills()).toContain('#2a2a2a');
+    expect(fills(true)).not.toContain('#e3e3e3');
+  });
+});
+
 describe("Atlas's conditions card", () => {
   it('lists a hovered token’s named conditions with their badges, and none without', () => {
     const scene = playerScene({ tokens: {

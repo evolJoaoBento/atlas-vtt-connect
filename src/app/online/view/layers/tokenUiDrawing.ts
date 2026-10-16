@@ -75,6 +75,8 @@ export interface TokenUiLook {
   uiScale?: number;
   /** The bar numbers' opacity, shown while the token is hovered or selected; 0 when unset. */
   numbers?: number;
+  /** The nameplate in Atlas's dark-theme colours, or its light ones; dark when unset. */
+  dark?: boolean;
 }
 
 export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: TokenUiGeometry, look: TokenUiLook = {}): void {
@@ -85,7 +87,7 @@ export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: 
   if (bars.length > 0 || token.name) {
     // Anchored on the token's bottom edge, in UI units, like Atlas's `belowToken` container.
     surface.push(token.x, token.y + geometry.size / 2, 0, scale);
-    if (token.name) drawNameplate(surface, token.name);
+    if (token.name) drawNameplate(surface, token.name, look.dark ?? true);
     drawBars(surface, bars, look.barFrame ?? ((_slot, share) => ({ fill: share, trail: share })), look.numbers ?? 0);
     surface.pop();
   }
@@ -187,9 +189,10 @@ function nameWidth(surface: ViewSurface, name: string): number {
   return width;
 }
 
-function drawNameplate(surface: ViewSurface, name: string): void {
+/** Atlas's name badge (`TokenUIRenderer`): a capsule in the theme's colours; its text is white in both, as Atlas's is. */
+function drawNameplate(surface: ViewSurface, name: string, dark: boolean): void {
   const badge = nameplateRect(nameWidth(surface, name));
-  const plate = NAMEPLATE_STYLE.dark;
+  const plate = dark ? NAMEPLATE_STYLE.dark : NAMEPLATE_STYLE.light;
   surface.roundRect(badge.x, badge.y, badge.width, badge.height, badge.height / 2, { fill: cssColor(plate.fill) });
   surface.roundRect(badge.x, badge.y, badge.width, badge.height, badge.height / 2,
     { stroke: cssColor(plate.border), lineWidth: NAMEPLATE_STYLE.borderWidth, alpha: plate.borderAlpha });

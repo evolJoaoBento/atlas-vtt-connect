@@ -38,6 +38,8 @@ export interface LayerFrame {
   /** The map's area, or without a map size the scene's content; null for an empty scene. */
   bounds: WorldRect | null;
   overlay: TokenOverlay;
+  /** Whether the page is in a dark theme, as Atlas reads Obsidian's (`theme-dark`); dark when unset. */
+  dark?: boolean;
 }
 
 export interface PlayerLayer {

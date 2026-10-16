@@ -99,6 +99,18 @@ describe('the tools overlay', () => {
     expect(strength(0)).toBe(0);
   });
 
+  it("draws a ruler's label in Atlas's light-theme colours on a light page: a pale pill, dark text", () => {
+    const measure = { shape: 'line' as const, start: { x: 0, y: 0 }, end: { x: 140, y: 0 }, label: '10ft', coneOpening: Math.PI / 2, color: MEASURE_ACCENT };
+    const light = new RecordingSurface();
+    drawTools(light, { ...NONE, measure }, 1, 1, false);
+    expect(light.ops('roundRect')[0]!.style.fill).toBe('#e3e3e3');
+    expect(light.ops('text')[0]!.style.color).toBe('#000000');
+    const dark = new RecordingSurface();
+    drawTools(dark, { ...NONE, measure }, 1);
+    expect(dark.ops('roundRect')[0]!.style.fill).toBe('#2a2a2a');
+    expect(dark.ops('text')[0]!.style.color).toBe('#ffffff');
+  });
+
   it("falls back to Atlas's Canvas beam when a laser is too wide to work out by pixel", () => {
     const surface = new RecordingSurface();
     const trail = [{ x: 0, y: 0, life: 1 }, { x: 100_000, y: 100_000, life: 1 }];
