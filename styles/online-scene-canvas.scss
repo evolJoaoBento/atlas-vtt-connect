@@ -514,3 +514,34 @@
 .atlas-connect-scene .statblock-preview[hidden] { display: none; }
 .atlas-connect-scene .statblock-preview.is-open { animation: atlas-connect-preview-in 200ms cubic-bezier(0.23, 1, 0.32, 1); transform-origin: left top; }
 @media (prefers-reduced-motion: reduce) { .atlas-connect-scene .statblock-preview.is-open { animation: none; } }
+
+/* Atlas's tooltip (primitives/tooltip.css): a 12 px card with a 1.5 px border in the text colour at 0.18, 1.4 line
+   height, fading in over 120 ms while it grows from 0.96 and rises 4 px towards its button. */
+@keyframes atlas-connect-tip-in { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); } }
+@media (hover: hover) {
+  .atlas-connect-scene .tool-button[data-label]:hover::after, .atlas-connect-scene .tool-button[data-label]:focus-visible::after,
+  .atlas-connect-scene .tray-face[data-label]:hover::after, .atlas-connect-scene .tray-face[data-label]:focus-visible::after {
+    border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--text-normal) 18%, transparent); line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: atlas-connect-tip-in 120ms ease-out;
+  }
+}
+/* Atlas's notice (_notices.scss), for "Your turn": its elevated surface, 12 px padding at 13 px, easing in 4 px from
+   above over 200 ms. The text keeps the accent, as the turn is the player's. */
+@keyframes atlas-connect-notice-in { from { opacity: 0; transform: translateY(-4px); } }
+.atlas-connect-scene .turn-notice {
+  padding: 12px; background: var(--background-primary); border: 1.5px solid color-mix(in srgb, var(--text-normal) 18%, transparent);
+  border-radius: 24px; box-shadow: var(--shadow-l); font-size: 13px; line-height: 1.3;
+  animation: atlas-connect-notice-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* Atlas's dice tray (dice-dropdown.scss) slides up 8 px as it opens; a die's count pops in from nothing. */
+@keyframes atlas-connect-tray-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes atlas-connect-badge-pop { from { transform: scale(0); } }
+.atlas-connect-scene .dice-tray:not([hidden]) { animation: atlas-connect-tray-in 0.2s ease-out both; }
+.atlas-connect-scene .tray-count { animation: atlas-connect-badge-pop 0.15s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .atlas-connect-scene .tool-button[data-label]::after, .atlas-connect-scene .tray-face[data-label]::after, .atlas-connect-scene .turn-notice,
+  .atlas-connect-scene .dice-tray:not([hidden]), .atlas-connect-scene .tray-count { animation: none; }
+}
+/* Atlas shows its own tooltips where it wants one and switches Obsidian's off there (_native-tooltips.scss). */
+.atlas-connect-scene [data-label] { --no-tooltip: true; }
