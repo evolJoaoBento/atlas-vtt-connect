@@ -1,4 +1,5 @@
-// Copied from Atlas VTT 0.8.0 (src/app/types/pinIconPaths.ts), © Fabian Urbanek, AGPL-3.0-only.
+// Copied from Atlas VTT 0.8.0 (src/app/types/pinIconPaths.ts; the tones, legacy ids and resolvePinIcon from
+// src/app/types/pinIcons.ts), © Fabian Urbanek, AGPL-3.0-only.
 /**
  * Pin icon set: silhouettes from game-icons.net (CC BY 3.0, see README credits).
  * Path data on the same 512×512 canvas as the widget icons (`WIDGET_ICON_VIEW_BOX`).

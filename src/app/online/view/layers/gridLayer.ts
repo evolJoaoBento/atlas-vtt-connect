@@ -118,7 +118,8 @@ function drawLines(surface: ViewSurface, frame: LayerFrame, grid: PlayerGrid, li
 const styledCache = new WeakMap<GridLines, { key: string; styled: StyledGrid }>();
 
 function styledOf(lines: GridLines, grid: PlayerGrid, thickness: number, arm: number): StyledGrid {
-  const key = `${grid.lineType}:${thickness}:${arm}`;
+  // Only a dotted grid's markers depend on the drawn width; edges and dashes are the same at every zoom.
+  const key = grid.lineType === 'dotted' ? `dotted:${thickness}:${arm}` : grid.lineType;
   const kept = styledCache.get(lines);
   if (kept?.key === key) return kept.styled;
   const styled = styleGrid(lines, grid, thickness, arm);

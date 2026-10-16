@@ -86,6 +86,16 @@ describe('grid layer', () => {
     expect(Math.hypot(b!.x - a!.x, b!.y - a!.y)).toBeCloseTo(((70 - 12) / 2) * 0.8);
   });
 
+  it('keeps its dashes while only the zoom changes, so a gliding camera does not rebuild them', () => {
+    const surface = new RecordingSurface();
+    const layer = createGridLayer();
+    const scene = playerScene({ grid: { ...grid, lineType: 'dashed', lineWidth: 0.1 } });
+    layer.draw(surface, frame(scene, { zoom: 2, pixel: 0.25 }));
+    layer.draw(surface, frame(scene, { zoom: 1.9, pixel: 0.26 }));
+    const [first, second] = surface.ops('paths');
+    expect(second!.paths[0]![0]).toBe(first!.paths[0]![0]);
+  });
+
   it("marks a dotted grid's vertices with Atlas's filled crosses instead of lines", () => {
     const surface = new RecordingSurface();
     createGridLayer().draw(surface, frame(playerScene({ grid: { ...grid, lineType: 'dotted' } })));
