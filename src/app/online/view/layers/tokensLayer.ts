@@ -1,7 +1,8 @@
 /**
  * Atlas's tokens as the player window shows them, lowest layer first: the art clipped
  * to its circle (a marker until it has loaded) and turned by the token's rotation, the
- * ring when the token has one, a grey veil and a skull when it is downed, then its bars, nameplate and condition badges. On this
+ * ring when the token has one, a grey veil and a skull when it is downed; then, above every token, their bars,
+ * nameplates, wheels and condition badges. On this
  * player's view only (`frame.overlay`), the tokens they control get a highlight ring, and
  * a token they drag or just dropped is drawn where they put it. A token whose place
  * changes glides there as in Atlas (`tokenGlides.ts`); on a lit scene only the player's own do.
@@ -18,6 +19,7 @@ import { DARKNESS_FOG_ID } from '../../scene/darknessFog';
 import { turnOf } from '../turns';
 import { drawTokenUi } from './tokenUiDrawing';
 import { BarFills } from './barFills';
+import { BadgeEntrances } from './badgeEntrances';
 import { prefersReducedMotion } from '../motion';
 
 /** The stand-in drawn until a token's art has loaded. */
@@ -44,6 +46,8 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   const glides = new TokenGlides(now, reducedMotion);
   // Bars ease to each new value as Atlas's do.
   const fills = new BarFills(now, reducedMotion);
+  // New condition badges animate in as Atlas's do.
+  const entrances = new BadgeEntrances(now, reducedMotion);
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
@@ -51,9 +55,13 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       const { controlled, positions, held } = frame.overlay;
       glides.begin(frame.scene.sceneId);
       fills.begin(frame.scene.sceneId);
+      entrances.begin(frame.scene.sceneId);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
       // A lit scene's darkness reaches players as a fog operation of its own: there only their tokens glide.
       const lit = Object.hasOwn(frame.scene.fog, DARKNESS_FOG_ID);
+      // Every token's bars, nameplate and badges go above all the tokens, as Atlas's token UI layer lies above them,
+      // so a token on a higher layer never covers a neighbour's.
+      const uis: Array<() => void> = [];
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
         const target = positions.get(id) ?? inScene;
         const at = glides.position(id, { x: target.x, y: target.y }, id === held, !lit || controlled.has(id));
@@ -71,12 +79,16 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         }
         // Whose turn it is, outside the player's own ring so both show.
         if (id === turnToken) surface.circle(token.x, token.y, ringRadius + stroke * 3, { stroke: TURN_RING_COLOR, lineWidth: stroke, alpha: 0.9 });
-        drawTokenUi(surface, token, { size, cellSize, ringRadius }, (slot, share) => fills.frame(`${id}:${slot}`, share));
+        entrances.seeToken(id);
+        uis.push(() => drawTokenUi(surface, token, { size, cellSize, ringRadius }, (slot, share) => fills.frame(`${id}:${slot}`, share),
+          (badge) => entrances.frame(id, badge)));
       }
+      for (const ui of uis) ui();
       glides.end();
       fills.end();
+      entrances.end();
     },
-    animating: () => glides.animating() || fills.animating(),
+    animating: () => glides.animating() || fills.animating() || entrances.animating(),
   };
 }
 

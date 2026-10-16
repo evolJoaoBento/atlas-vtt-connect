@@ -23,6 +23,7 @@ import {
   type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerPin, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
+import { WIDGET_ICON_PATHS } from '../../types/widgetIcons';
 
 /** The part of a `SceneSnapshot` the projection reads; `mapPath` is the GM's own path and is never sent. */
 export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'>;
@@ -285,14 +286,18 @@ function projectConditions(token: TokenEntity, definitions: readonly ConditionDe
     : {};
   return ids
     .filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= SCENE_LIMITS.idLength)
+    // Atlas draws no badge for a condition the collection no longer defines; without definitions (a collection
+    // unknown yet) every id goes, unnamed.
+    .filter((id) => definitions.length === 0 || definitions.some((candidate) => candidate.id === id))
     .slice(0, SCENE_LIMITS.conditions)
     .map((id) => {
       const condition: PlayerCondition = { id, value: Object.hasOwn(values, id) ? finiteOrNull(values[id]) : null };
-      // Named as the GM's collection names it, for the player's hover card; an id it no longer defines stays unnamed.
+      // Named, coloured and drawn as the GM's collection defines it, for the badge and the player's hover card.
       const definition = definitions.find((candidate) => candidate.id === id);
       const name = typeof definition?.name === 'string' ? definition.name.trim().slice(0, SCENE_LIMITS.conditionName) : '';
       if (name) condition.name = name;
       if (typeof definition?.color === 'string' && CONDITION_COLOR.test(definition.color)) condition.color = definition.color;
+      if (typeof definition?.icon === 'string' && Object.hasOwn(WIDGET_ICON_PATHS, definition.icon)) condition.icon = definition.icon;
       return condition;
     });
 }

@@ -82,14 +82,47 @@ describe('tokens layer', () => {
     expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'icon')).toBe(false);
   });
 
-  it('draws neutral condition badges on the ring with the value in a pip, the last slot counting the rest', () => {
+  it('draws condition badges on the ring with the value in a pip, the last slot counting the rest', () => {
     const conditions = ['a', 'b', 'c', 'd', 'e'].map((id, index) => ({ id, value: index === 1 ? 2 : null }));
     const surface = draw({ t1: playerToken({ conditions }) });
-    expect(surface.ops('circle').filter(({ style }) => style.fill === NEUTRAL_BADGE_COLOR)).toHaveLength(2);
+    // Unnamed (an older GM): the neutral colour, lit from above, and no glyph.
+    const discs = surface.ops('circle').filter(({ style }) => style.gradient?.stops.some(([, color]) => color === NEUTRAL_BADGE_COLOR));
+    expect(discs).toHaveLength(2);
     expect(surface.ops('text').map(({ text }) => text)).toEqual(['2', '+3']);
-    const badges = surface.ops('push').slice(1);
+    const badges = surface.ops('push').slice(1).filter(({ scale }) => scale !== 0.333);
     expect(badges).toHaveLength(3);
     expect(badges.every(({ x, y }) => Math.hypot(x - 100, y - 100) > 32 && Math.hypot(x - 100, y - 100) < 34)).toBe(true);
+  });
+
+  it("draws a condition as Atlas does: in its colour, with its icon, else its initial, dark on a light colour", () => {
+    const surface = draw({ t1: playerToken({ conditions: [
+      { id: 'scared', value: null, name: 'Scared', color: '#7c3aed', icon: 'terror' },
+      { id: 'blessed', value: null, name: 'blessed', color: '#fde047' },
+    ] }) });
+    expect(surface.ops('glyph')).toMatchObject([{ name: 'terror', color: '#ffffff' }]);
+    expect(surface.ops('text')).toMatchObject([{ text: 'B', style: { color: '#16161a' } }]);
+    const stops = surface.ops('circle').flatMap(({ style }) => (style.gradient ? [style.gradient.stops.map(([, color]) => color)] : []));
+    expect(stops[0]).toEqual(['#aa68ff', '#7c3aed', '#4907ba']);
+  });
+
+  it('animates a badge in when a token that was drawn gains it, never on a token that just appeared', () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const scaleOf = (conditions: PlayerToken['conditions']): number[] => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame(playerScene({ tokens: { t1: playerToken({ conditions }) } })));
+      return surface.ops('push').slice(1).map(({ scale }) => scale);
+    };
+    const prone = { id: 'prone', value: null, name: 'Prone', color: '#aa3300' };
+    const settled = scaleOf([prone])[0]!;
+    const scared = { id: 'scared', value: null, name: 'Scared', color: '#7c3aed' };
+    const entering = scaleOf([prone, scared]);
+    expect(entering[0]).toBeCloseTo(settled);
+    expect(entering[1]).toBeCloseTo(settled * 0.5);
+    expect(layer.animating?.()).toBe(true);
+    now = 200;
+    expect(scaleOf([prone, scared])[1]).toBeCloseTo(settled);
+    expect(layer.animating?.()).toBe(false);
   });
 
   it('draws tokens lowest layer first and skips those off screen', () => {
@@ -154,8 +187,7 @@ describe('tokens layer', () => {
   });
 
   it("puts another's token in place at once on a lit scene, where a glide would show players where it came from", () => {
-    let now = 0;
-    const layer = createTokensLayer({ now: () => now });
+    const layer = createTokensLayer({ now: () => 0 });
     const dark = { [DARKNESS_FOG_ID]: { type: 'rectangle' as const, erase: false, order: 1, x: 0, y: 0, width: 1, height: 1 } };
     const at = (x: number, controlled: ReadonlySet<string>): number => {
       const surface = new RecordingSurface();
@@ -168,6 +200,19 @@ describe('tokens layer', () => {
     // The player's own token still glides.
     expect(at(500, new Set(['t1']))).toBe(300);
     expect(layer.animating?.()).toBe(true);
+  });
+
+  it('draws every token before any bars, so a token on a higher layer never covers a neighbour’s', () => {
+    const surface = new RecordingSurface();
+    const bar = { color: '#22c55e', share: 0.5, spent: false };
+    createTokensLayer().draw(surface, frame(playerScene({ tokens: {
+      low: playerToken({ layer: 0, resources: [bar] }), high: playerToken({ x: 110, layer: 1, ring: '#e93147' }),
+    } })));
+    const ops = surface.calls.map((call) => call.op);
+    const lastRing = ops.lastIndexOf('tokenRing');
+    const firstBar = surface.calls.findIndex((call) => call.op === 'roundRect' && call.style.fill === '#22c55e');
+    expect(lastRing).toBeGreaterThan(-1);
+    expect(firstBar).toBeGreaterThan(lastRing);
   });
 
   it("rings the token whose turn it is, for every player", () => {

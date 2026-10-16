@@ -7,6 +7,7 @@
 import tokenRingUrl from '../../assets/token-ring.webp';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
+import { WIDGET_ICON_PATHS, type WidgetIcon } from '../../types/widgetIcons';
 import type { ImageClip, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
 
 interface IconShape {
@@ -26,6 +27,21 @@ function iconShapes(name: string): IconShape[] | null {
     icons.set(name, shapes);
   }
   return shapes;
+}
+
+/** Atlas's widget and condition icons are drawn on a 512 × 512 canvas. */
+const WIDGET_ICON_SPACE = 512;
+/** Only Atlas's own icons are cached, so names from the network cannot grow it. */
+const widgetIcons = new Map<string, Path2D>();
+
+function widgetIconPath(name: string): Path2D | null {
+  if (!Object.hasOwn(WIDGET_ICON_PATHS, name)) return null;
+  let path = widgetIcons.get(name);
+  if (!path) {
+    path = new Path2D(WIDGET_ICON_PATHS[name as WidgetIcon]);
+    widgetIcons.set(name, path);
+  }
+  return path;
 }
 
 /**
@@ -250,6 +266,19 @@ class CanvasSurface implements ViewSurface {
     context.restore();
   }
 
+  glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
+    const path = widgetIconPath(name);
+    if (!path) return;
+    const context = this.context;
+    context.save();
+    context.translate(x - size / 2, y - size / 2);
+    context.scale(size / WIDGET_ICON_SPACE, size / WIDGET_ICON_SPACE);
+    context.globalAlpha = alpha;
+    context.fillStyle = color;
+    context.fill(path);
+    context.restore();
+  }
+
   createLayer(width: number, height: number): LayerSurface | null {
     // A bare copy of the surface's own canvas: made by its own document (a pop-out window's too), which both the
     // join page and Obsidian can say, where `createEl` is Obsidian's alone.
@@ -279,7 +308,19 @@ class CanvasSurface implements ViewSurface {
       context.lineCap = style.round ? 'round' : 'butt';
       context.lineJoin = style.round ? 'round' : 'miter';
       context.setLineDash(style.dash ? [...style.dash] : []);
-      if (style.fill !== undefined) {
+      if (style.gradient) {
+        const { from, to, stops } = style.gradient;
+        const gradient = context.createLinearGradient(from.x, from.y, to.x, to.y);
+        for (const [offset, color] of stops) {
+          try {
+            gradient.addColorStop(Math.max(0, Math.min(1, offset)), color);
+          } catch {
+            // An invalid colour from the network adds no stop.
+          }
+        }
+        context.fillStyle = gradient;
+        context.fill();
+      } else if (style.fill !== undefined) {
         context.fillStyle = style.fill;
         context.fill();
       }

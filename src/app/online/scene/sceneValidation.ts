@@ -120,7 +120,8 @@ function optional(check: Check): Check {
 function isCondition(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value))
     && optional((name: unknown) => isText(name, SCENE_LIMITS.conditionName))(value.name)
-    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color);
+    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color)
+    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(value.icon);
 }
 
 function isPlayerMap(value: unknown): boolean {

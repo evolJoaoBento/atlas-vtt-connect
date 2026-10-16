@@ -21,6 +21,8 @@ export interface ShapeStyle {
   round?: boolean;
   /** Cuts the shape out of what was drawn before (fog erasing). */
   erase?: boolean;
+  /** Fills with a linear gradient from `from` to `to` (current frame) instead of `fill`: offsets 0 to 1 and colours. */
+  gradient?: { from: ScenePoint; to: ScenePoint; stops: ReadonlyArray<readonly [offset: number, color: string]> };
 }
 
 export interface TextStyle {
@@ -70,6 +72,8 @@ export interface ViewSurface {
   measureText(text: string, font: string): number;
   /** One of Atlas's map icons, `size` wide and centred on (x, y); an unknown name draws nothing. */
   icon(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
+  /** One of Atlas's widget and condition icons (`WIDGET_ICON_PATHS`), filled, `size` wide and centred on (x, y); an unknown name draws nothing. */
+  glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
   /** An offscreen surface for caching a layer; null when none can be made. */
   createLayer(width: number, height: number): LayerSurface | null;
   /** Draws a cached layer stretched over the rectangle. */

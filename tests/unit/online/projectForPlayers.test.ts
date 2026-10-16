@@ -325,13 +325,18 @@ describe('projectForPlayers fix round 1', () => {
     expect(projectForPlayers(withTokens({ hero: linked }), context()).tokens.hero?.name).toBe('Unknown Creature');
   });
 
-  it("names a character's conditions as the collection does, for the player's hover card", () => {
-    const named = hero({ conditions: ['prone', 'gone'], conditionValues: { prone: 2 } } as Partial<Character>);
-    const conditions = [{ id: 'prone', name: ' Prone ', color: '#AA3300' }, { id: 'odd', name: 'x'.repeat(200), color: 'red' }] as never;
+  it("names, colours and draws a character's conditions as the collection does, and drops one it no longer defines, as Atlas", () => {
+    const named = hero({ conditions: ['prone', 'gone', 'scared'], conditionValues: { prone: 2 } } as Partial<Character>);
+    const conditions = [
+      { id: 'prone', name: ' Prone ', color: '#AA3300' }, { id: 'odd', name: 'x'.repeat(200), color: 'red' },
+      { id: 'scared', name: 'Scared', color: '#123456', icon: 'terror' }, { id: 'weird', name: 'Weird', color: '#123456', icon: 'not-an-icon' },
+    ] as never;
     expect(projectForPlayers(withTokens({ hero: named }), context({ conditions })).tokens.hero?.conditions).toEqual([
       { id: 'prone', value: 2, name: 'Prone', color: '#AA3300' },
-      { id: 'gone', value: null },
+      { id: 'scared', value: null, name: 'Scared', color: '#123456', icon: 'terror' },
     ]);
+    // A collection not known yet: every id, unnamed.
+    expect(projectForPlayers(withTokens({ hero: named }), context()).tokens.hero?.conditions.map((condition) => condition.id)).toEqual(['prone', 'gone', 'scared']);
   });
 
   it('sends the pins the GM made readable, where players see the map, by title only', () => {

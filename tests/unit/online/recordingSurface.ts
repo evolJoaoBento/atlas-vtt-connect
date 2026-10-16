@@ -17,6 +17,7 @@ export type SurfaceCall =
   | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string }
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
+  | { op: 'glyph'; name: string; x: number; y: number; size: number; color: string; alpha: number }
   | { op: 'drawLayer'; layer: number; x: number; y: number; width: number; height: number };
 
 export type CallOf<K extends SurfaceCall['op']> = Extract<SurfaceCall, { op: K }>;
@@ -53,6 +54,9 @@ export class RecordingSurface implements ViewSurface {
   }
   icon(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
     this.calls.push({ op: 'icon', name, x, y, size, color, alpha });
+  }
+  glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
+    this.calls.push({ op: 'glyph', name, x, y, size, color, alpha });
   }
   createLayer(width: number, height: number): LayerSurface {
     const layer = new RecordingLayer(this.layers.length + 1, width, height);

@@ -97,6 +97,8 @@ export interface PlayerCondition {
   name?: string;
   /** Its colour, `#rrggbb`; absent as `name` is. */
   color?: string;
+  /** Its badge's glyph, one of Atlas's widget icons; absent when it has none (the badge shows the name's initial). */
+  icon?: string;
 }
 
 /** The two sides of a fight by sides, as `InitiativeSide` (a parity test keeps them equal). */
