@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { LASER_INTERVAL_MS } from '../../../src/app/online/tools/LaserBatcher';
 import { TokenMoves } from '../../../src/app/online/view/TokenMoves';
+import { MEASURE_LINGER_MS } from '../../../src/app/online/view/tools/MeasureTool';
 import { PlayerTools } from '../../../src/app/online/view/tools/PlayerTools';
 import { ViewInput, type PointerInput } from '../../../src/app/online/view/ViewInput';
 import { LASER_PLAYBACK_DELAY_MS } from '@atlas-vtt/shared/draw';
@@ -67,16 +68,26 @@ describe('PlayerTools', () => {
     expect([tools.tool, tools.shape]).toEqual(['measure', 'cone']);
   });
 
-  it("measures between snapped cells in the GM's units, privately, and is gone on release", () => {
-    const { tools, sent, moved } = setup();
-    tools.select('measure');
-    expect(tools.grab({ x: 100, y: 100 }, 'mouse')).toBe(true);
-    tools.move({ x: 250, y: 100 });
-    expect(tools.overlay().measure).toEqual({ shape: 'line', start: { x: 105, y: 105 }, end: { x: 245, y: 105 }, label: '10ft', coneOpening: Math.PI / 2 });
-    tools.drop({ x: 250, y: 100 });
-    expect(tools.overlay().measure).toBeNull();
-    expect(sent).toEqual([]);
-    expect(moved).toEqual([]);
+  it("measures between snapped cells in the GM's units, privately, in the player's colour, and stays two seconds after release, as Atlas's", () => {
+    vi.useFakeTimers();
+    try {
+      const { tools, sent, moved } = setup();
+      tools.select('measure');
+      expect(tools.grab({ x: 100, y: 100 }, 'mouse')).toBe(true);
+      tools.move({ x: 250, y: 100 });
+      expect(tools.overlay().measure).toMatchObject({ shape: 'line', start: { x: 105, y: 105 }, end: { x: 245, y: 105 }, label: '10ft', coneOpening: Math.PI / 2 });
+      expect(tools.overlay().measure?.color).toMatch(/^#[0-9a-f]{6}$/i);
+      tools.drop({ x: 250, y: 100 });
+      expect(tools.overlay().measure).not.toBeNull();
+      expect(tools.isAnimating()).toBe(true);
+      vi.advanceTimersByTime(MEASURE_LINGER_MS);
+      expect(tools.overlay().measure).toBeNull();
+      expect(tools.isAnimating()).toBe(false);
+      expect(sent).toEqual([]);
+      expect(moved).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens the measured cone by the GM's cone angle", () => {
@@ -88,12 +99,18 @@ describe('PlayerTools', () => {
     expect(tools.overlay().measure?.coneOpening).toBeCloseTo(Math.PI / 3);
   });
 
-  it('measures unsnapped on a square grid of the cell size when the grid is hidden from players', () => {
+  it("snaps to the GM's cells while snap-to-grid is on, the grid shown or hidden, as Atlas's measure does, and not while it is off", () => {
     const { tools } = setup({ grid: false });
     tools.selectShape('circle');
     tools.grab({ x: 100, y: 100 }, 'mouse');
     tools.move({ x: 240, y: 100 });
-    expect(tools.overlay().measure).toEqual({ shape: 'circle', start: { x: 100, y: 100 }, end: { x: 240, y: 100 }, label: '10ft', coneOpening: Math.PI / 2 });
+    expect(tools.overlay().measure).toMatchObject({ shape: 'circle', start: { x: 105, y: 105 }, end: { x: 245, y: 105 }, label: '10ft' });
+    tools.drop({ x: 240, y: 100 });
+
+    tools.setScene(playerScene({ grid: null, measurement: { ...playerScene().measurement, snapToGrid: false } }));
+    tools.grab({ x: 100, y: 100 }, 'mouse');
+    tools.move({ x: 240, y: 100 });
+    expect(tools.overlay().measure).toMatchObject({ shape: 'circle', start: { x: 100, y: 100 }, end: { x: 240, y: 100 }, label: '10ft' });
   });
 
   it("sends the laser in batches, shows it here at once in this player's colour, and fades it after release", () => {

@@ -274,7 +274,7 @@ export class PlayerTools implements TokenGrab {
 
   overlay(): ToolOverlay {
     return {
-      measure: this.grid ? this.measure.overlay(this.shapeChoice, this.grid) : null,
+      measure: this.grid ? this.measure.overlay(this.shapeChoice, this.grid, this.selfColor(), this.options.now()) : null,
       ruler: this.pressed === 'move' ? this.ruler.overlay() : null,
       lasers: this.lasers.frame(this.options.now()),
       pings: this.pings.frame(this.options.now()),
@@ -287,7 +287,7 @@ export class PlayerTools implements TokenGrab {
 
   /** A laser is fading: the view keeps drawing. */
   isAnimating(): boolean {
-    return this.lasers.isActive || this.pings.active;
+    return this.lasers.isActive || this.pings.active || this.measure.lingering(this.options.now());
   }
 
   dispose(): void {
@@ -324,10 +324,11 @@ export class PlayerTools implements TokenGrab {
     return this.pickedColor ?? laserColor(this.self ?? SELF, this.order);
   }
 
-  /** Released: the measurement goes, the ruler goes, the laser is let go. */
+  /** Released: the measurement stays a moment, the ruler goes, the laser is let go. */
   private finishGesture(): void {
     this.draft = null;
-    this.measure.clear();
+    if (this.pressed === 'measure') this.measure.release(this.options.now());
+    else this.measure.clear();
     this.ruler.end();
     this.laser.lift();
     this.pressed = null;

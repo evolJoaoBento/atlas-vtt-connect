@@ -1,7 +1,7 @@
 /**
  * The grid the player's measuring tools use: the grid the GM's drop snaps to (`snapGridOf`), which is
- * the grid players see when they see one. The measure tool snaps to its cell centres only while players
- * see the grid, like the GM's measure tool (`cellCenterAt`). A dragged token's ruler ends where the GM's
+ * the grid players see when they see one. The measure tool snaps to its cell centres while the GM's
+ * snap-to-grid is on, seen or not, as Atlas's measure tool does (`MeasureRenderer`). A dragged token's ruler ends where the GM's
  * drop puts a token of its size (`snapTokenCenter`: where cells meet for Large and Gargantuan), also on a
  * hidden grid, while the GM's snap-to-grid is on; on a map without a grid it does not snap. Without a
  * grid, distances count squares of the map's cell size. Distances are labelled with the GM's measurement
@@ -32,7 +32,7 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     ?? (grid ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY } : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 });
   return {
     geometry,
-    snap: (point) => (grid ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),

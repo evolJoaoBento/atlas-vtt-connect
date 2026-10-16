@@ -14,7 +14,7 @@ describe('the tools overlay', () => {
 
   it("draws a line measurement like Atlas: shadow, body and core, its points, and the label on a pill above", () => {
     const surface = new RecordingSurface();
-    drawTools(surface, { ...NONE, measure: { shape: 'line', start: { x: 0, y: 0 }, end: { x: 140, y: 0 }, label: '10ft', coneOpening: Math.PI / 2 } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'line', start: { x: 0, y: 0 }, end: { x: 140, y: 0 }, label: '10ft', coneOpening: Math.PI / 2, color: MEASURE_ACCENT } }, 1);
     expect(surface.ops('paths').map(({ style }) => [style.stroke, style.lineWidth, style.alpha])).toEqual([
       ['#000000', 6, 0.3], [MEASURE_ACCENT, 4, 0.8], [MEASURE_ACCENT, 2, 1],
     ]);
@@ -25,12 +25,19 @@ describe('the tools overlay', () => {
     ]);
   });
 
+  it("keeps a label at least 16 px on screen when zoomed out, and draws it in the player's colour", () => {
+    const surface = new RecordingSurface();
+    drawTools(surface, { ...NONE, measure: { shape: 'line', start: { x: 0, y: 0 }, end: { x: 1400, y: 0 }, label: '100ft', coneOpening: Math.PI / 2, color: '#22c55e' } }, 0.25);
+    expect(surface.ops('text')[0]?.style.font).toBe('64px sans-serif');
+    expect(surface.ops('paths').map(({ style }) => style.stroke)).toContain('#22c55e');
+  });
+
   it('draws circles and cones with a faint fill and an outline, and never a negative radius', () => {
     const surface = new RecordingSurface();
-    drawTools(surface, { ...NONE, measure: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, label: '0ft', coneOpening: Math.PI / 2 } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, label: '0ft', coneOpening: Math.PI / 2, color: MEASURE_ACCENT } }, 1);
     expect(surface.ops('circle').every(({ radius }) => radius >= 0)).toBe(true);
     surface.clear();
-    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: Math.PI / 2 } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: Math.PI / 2, color: MEASURE_ACCENT } }, 1);
     const [fill, outline] = surface.ops('paths');
     expect(fill).toMatchObject({ closed: true, style: { fill: MEASURE_ACCENT, alpha: 0.1 } });
     expect(outline).toMatchObject({ closed: false, style: { stroke: MEASURE_ACCENT, lineWidth: 3, alpha: 0.8 } });
@@ -40,7 +47,7 @@ describe('the tools overlay', () => {
   it("opens a cone by the GM's cone angle", () => {
     const surface = new RecordingSurface();
     const opening = (53.13 * Math.PI) / 180;
-    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: opening } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: opening, color: MEASURE_ACCENT } }, 1);
     const [left, right] = surface.ops('paths')[1]!.paths;
     const angle = (path: readonly { x: number; y: number }[] | undefined): number => Math.atan2(path![1]!.y, path![1]!.x);
     expect(angle(right) - angle(left)).toBeCloseTo(opening);

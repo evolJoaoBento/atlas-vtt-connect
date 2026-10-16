@@ -81,55 +81,63 @@ function drawPingRing(surface: ViewSurface, ring: PingRing, zoom: number): void 
   surface.circle(ring.x, ring.y, ringRadius(ring.grown) * scale, { stroke: ring.color, lineWidth: 3 * scale, alpha: ring.alpha });
 }
 
+/** In the player's colour, as Atlas shows a player's measure. */
 function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: number): void {
-  const { start, end } = measure;
+  const { start, end, color } = measure;
   if (measure.shape === 'line') {
-    drawPath(surface, [start, end]);
-    drawPoint(surface, end);
+    drawPath(surface, [start, end], color);
+    drawPoint(surface, end, color);
   } else if (measure.shape === 'circle') {
-    drawCircle(surface, start, Math.hypot(end.x - start.x, end.y - start.y));
+    drawCircle(surface, start, Math.hypot(end.x - start.x, end.y - start.y), color);
   } else {
-    drawCone(surface, start, end, measure.coneOpening, zoom);
+    drawCone(surface, start, end, measure.coneOpening, zoom, color);
   }
-  drawPoint(surface, start);
+  drawPoint(surface, start, color);
   drawLabel(surface, measure.label, measureLabelAnchor(start, end, zoom), zoom);
 }
 
-function drawPath(surface: ViewSurface, points: readonly ScenePoint[]): void {
+function drawPath(surface: ViewSurface, points: readonly ScenePoint[], color: string = MEASURE_ACCENT): void {
   if (points.length < 2) return;
   for (const stroke of MEASURE_PATH_STROKES) {
-    surface.paths([points], false, { stroke: stroke.shadow ? SHADOW : MEASURE_ACCENT, lineWidth: stroke.width, alpha: stroke.alpha });
+    surface.paths([points], false, { stroke: stroke.shadow ? SHADOW : color, lineWidth: stroke.width, alpha: stroke.alpha });
   }
 }
 
-function drawPoint(surface: ViewSurface, point: ScenePoint): void {
+function drawPoint(surface: ViewSurface, point: ScenePoint, color: string = MEASURE_ACCENT): void {
   const { radius, halo, haloAlpha, fillAlpha, ringInset, ringWidth } = MEASURE_POINT;
   surface.circle(point.x, point.y, radius + halo, { fill: SHADOW, alpha: haloAlpha });
-  surface.circle(point.x, point.y, radius, { fill: MEASURE_ACCENT, alpha: fillAlpha });
-  surface.circle(point.x, point.y, radius - ringInset, { stroke: MEASURE_ACCENT, lineWidth: ringWidth });
+  surface.circle(point.x, point.y, radius, { fill: color, alpha: fillAlpha });
+  surface.circle(point.x, point.y, radius - ringInset, { stroke: color, lineWidth: ringWidth });
 }
 
-function drawCircle(surface: ViewSurface, center: ScenePoint, radius: number): void {
+function drawCircle(surface: ViewSurface, center: ScenePoint, radius: number, color: string): void {
   const { fillAlpha, strokeWidth, strokeAlpha, highlightWidth, highlightInset } = MEASURE_AREA;
-  surface.circle(center.x, center.y, radius, { fill: MEASURE_ACCENT, alpha: fillAlpha });
-  surface.circle(center.x, center.y, radius, { stroke: MEASURE_ACCENT, lineWidth: strokeWidth, alpha: strokeAlpha });
-  surface.circle(center.x, center.y, Math.max(0, radius - highlightInset), { stroke: MEASURE_ACCENT, lineWidth: highlightWidth });
+  surface.circle(center.x, center.y, radius, { fill: color, alpha: fillAlpha });
+  surface.circle(center.x, center.y, radius, { stroke: color, lineWidth: strokeWidth, alpha: strokeAlpha });
+  surface.circle(center.x, center.y, Math.max(0, radius - highlightInset), { stroke: color, lineWidth: highlightWidth });
 }
 
-function drawCone(surface: ViewSurface, start: ScenePoint, end: ScenePoint, opening: number, zoom: number): void {
+function drawCone(surface: ViewSurface, start: ScenePoint, end: ScenePoint, opening: number, zoom: number, color: string): void {
   const cone = coneGeometry(start, end, opening);
   const pixels = cone.radius * zoom * opening;
   const segments = Math.min(MAX_ARC_SEGMENTS, Math.max(MIN_ARC_SEGMENTS, Math.ceil(pixels / ARC_PIXELS_PER_SEGMENT)));
   const arc = arcPoints(start, cone.radius, cone.startAngle, cone.endAngle, segments);
-  surface.paths([[start, ...arc]], true, { fill: MEASURE_ACCENT, alpha: MEASURE_AREA.fillAlpha });
+  surface.paths([[start, ...arc]], true, { fill: color, alpha: MEASURE_AREA.fillAlpha });
   surface.paths([[start, cone.left], [start, cone.right], arc], false, {
-    stroke: MEASURE_ACCENT, lineWidth: MEASURE_AREA.strokeWidth, alpha: MEASURE_AREA.strokeAlpha,
+    stroke: color, lineWidth: MEASURE_AREA.strokeWidth, alpha: MEASURE_AREA.strokeAlpha,
   });
 }
 
-/** The label on Atlas's dark-theme pill; the page has no Obsidian theme. */
+/** The smallest a ruler's label is on screen, in CSS pixels (Atlas's online `MIN_LABEL_PX`): the size it has at zoom 1. */
+export const MIN_LABEL_PX = 16;
+
+/**
+ * The label on Atlas's dark-theme pill; the page has no Obsidian theme. Atlas's size, but never smaller on screen than
+ * `MIN_LABEL_PX` (Atlas's online `readableLabelFontSize`): a player's view, fitted to the whole map, sits where Atlas's
+ * cap would shrink it to dots.
+ */
 function drawLabel(surface: ViewSurface, text: string, center: ScenePoint, zoom: number): void {
-  const size = measureLabelFontSize(zoom);
+  const size = Math.max(measureLabelFontSize(zoom), MIN_LABEL_PX / (zoom || 1));
   const font = `${size}px ${LABEL_FONT_FAMILY}`;
   const box = measureLabelBox(surface.measureText(text, font), size * LABEL_LINE_HEIGHT, center, zoom);
   const theme = MEASURE_LABEL_COLORS.dark;
