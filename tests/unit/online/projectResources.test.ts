@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
-import { initiativeShare, isDowned, projectBars } from '../../../src/app/online/scene/projectResources';
+import { initiativeShare, isDowned, projectBars, projectWheels } from '../../../src/app/online/scene/projectResources';
 import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import type { Character, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
@@ -30,7 +30,7 @@ describe('projectBars', () => {
     expect(projectBars(holder({ gm: { current: 1, max: 4 }, empty: { current: 0, max: 0 } }), definitions)).toEqual([]);
   });
 
-  it('draws bars only: a resource in a wheel socket is not sent, as the window has no wheels for players', () => {
+  it('sends bars only as bars: a resource in a wheel socket goes as a wheel (projectWheels)', () => {
     const definitions = [define('a', { slot: 0 }), define('b', { slot: 1 }), define('wheel', { slot: 2 }), define('wheel2', { slot: 5 })];
     const values = { a: { current: 1, max: 2 }, b: { current: 1, max: 2 }, wheel: { current: 1, max: 2 }, wheel2: { current: 1, max: 2 } };
     expect(projectBars(holder(values), definitions)).toHaveLength(2);
@@ -134,5 +134,42 @@ describe('resources in the projection', () => {
     expect(message.kind).toBe('message');
     expect(fog).toEqual({});
     expect(drawings).toEqual({});
+  });
+});
+
+describe('projectWheels', () => {
+  it('sends the wheels players see, in socket order, with the numbers the window shows in them', () => {
+    const definitions = [
+      define('bar', { slot: 0 }), define('ki', { color: '#3b82f6', slot: 3 }), define('ac', { direction: 'static', color: '#94a3b8', slot: 2 }),
+      define('secret', { visibleToPlayers: false, slot: 4 }),
+    ];
+    const values = { bar: { current: 1, max: 2 }, ki: { current: 2, max: 5 }, ac: { current: 0, max: 16 }, secret: { current: 1, max: 1 } };
+    expect(projectWheels(holder(values), definitions)).toEqual([
+      { slot: 2, color: '#94a3b8', current: 0, max: 16, fixed: true },
+      { slot: 3, color: '#3b82f6', current: 2, max: 5, fixed: false },
+    ]);
+  });
+
+  it('holds values players could not draw to the wire range', () => {
+    const wheels = projectWheels(holder({ huge: { current: 5e9, max: Number.NaN } }), [define('huge', { slot: 2 })]);
+    for (const wheel of wheels) {
+      expect(Math.abs(wheel.current)).toBeLessThanOrEqual(1_000_000);
+      expect(Number.isFinite(wheel.max)).toBe(true);
+    }
+  });
+
+  it('goes out on the token for a scene players accept, and a token without wheels has no field an older page would not know', () => {
+    const project = (resources: NonNullable<Character['resources']>, definitions: readonly ResourceDefinition[]) => projectForPlayers(snapshotOf({
+      background: 'maps/tavern.png',
+      objects: { tokens: { hero: { id: 'hero', kind: 'character', x: 70, y: 70, imagePath: 'hero.png', name: 'Hero', resources } }, fog: {}, texts: {}, drawings: {} },
+    }), {
+      sceneId: 's', rules: { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }, coverage: FogCoverage.EMPTY,
+      assets: fakeAssetIds(), mapSize: { width: 1000, height: 800 }, resources: definitions,
+    });
+    const withWheel = project({ ki: { current: 2, max: 5 } }, [define('ki', { slot: 2 })]);
+    expect(withWheel.tokens.hero?.wheels).toEqual([{ slot: 2, color: '#22c55e', current: 2, max: 5, fixed: false }]);
+    const { fog: _fog, drawings: _drawings, ...body } = withWheel;
+    expect(isPlayerSceneBody(body)).toBe(true);
+    expect(project({ hp: { current: 2, max: 5 } }, [HP]).tokens.hero).not.toHaveProperty('wheels');
   });
 });

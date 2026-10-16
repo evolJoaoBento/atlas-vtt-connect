@@ -54,4 +54,8 @@ export const SCENE_RANGES = {
   opacity: [0, 1],
   unitDistance: [0, 1_000_000],
   rangeBand: [1, 1_000_000],
+  /** A wheel's current and maximum values. */
+  resourceValue: [-1_000_000, 1_000_000],
+  /** A wheel's socket: the first two are bars. */
+  wheelSlot: [2, 5],
 } as const satisfies Record<string, Range>;

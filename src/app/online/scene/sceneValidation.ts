@@ -105,6 +105,14 @@ function isResource(value: unknown): boolean {
 function isResources(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((bar) => isResource(bar));
 }
+function isWheel(value: unknown): boolean {
+  return isFields(value) && Number.isInteger(value.slot) && inRange(SCENE_RANGES.wheelSlot)(value.slot)
+    && typeof value.color === 'string' && HEX_COLOR.test(value.color)
+    && inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && isBoolean(value.fixed);
+}
+function isWheels(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((wheel) => isWheel(wheel));
+}
 /** An optional field: a GM of an older version sends none. */
 function optional(check: Check): Check {
   return (value) => value === undefined || check(value);
@@ -135,7 +143,7 @@ function isPlayerToken(value: unknown): boolean {
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
-    && optional(isResources)(value.resources) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side);
+    && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side);
 }
 
 function isPlayerFogOp(value: unknown): boolean {

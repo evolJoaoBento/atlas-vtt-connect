@@ -30,6 +30,8 @@ export interface TextStyle {
   /** Where the point is horizontally; the text is always centred vertically on it. */
   align: 'left' | 'center' | 'right';
   alpha?: number;
+  /** A stroke around the glyphs, in the font's pixels, drawn under the fill. */
+  outline?: { color: string; width: number };
 }
 
 /** A decoded image (`DecodedImage.image`): an `ImageBitmap` or a loaded `<img>`. */

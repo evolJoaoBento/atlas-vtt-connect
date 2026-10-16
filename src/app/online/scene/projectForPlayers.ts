@@ -17,7 +17,7 @@ import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
-import { isDowned, projectBars } from './projectResources';
+import { isDowned, projectBars, projectWheels } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES,
   type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerPin, type PlayerScene, type PlayerToken,
@@ -249,6 +249,8 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
+  // Sent only when there are some, so a scene without wheels is what an older GM sent.
+  const wheels = character ? projectWheels(character, definitions) : [];
   return {
     x: wire.x,
     y: wire.y,
@@ -263,6 +265,7 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     hp: null,
     stress: null,
     resources: character ? projectBars(character, definitions) : [],
+    ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
   };
 }

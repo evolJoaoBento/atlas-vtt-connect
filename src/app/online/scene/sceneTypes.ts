@@ -74,6 +74,21 @@ export interface PlayerResource {
   spent: boolean;
 }
 
+/**
+ * A resource in a wheel socket (2 to 5) as the player window draws it beside the token: a ring gauge in its colour with
+ * its number in the middle (`ResourceWheelView`). The window shows players these numbers, so they are sent as they are.
+ */
+export interface PlayerWheel {
+  /** Its socket: 2 and 3 on the token's right, 4 and 5 on its left, the first of a side the upper one. */
+  slot: number;
+  /** `#rrggbb`. */
+  color: string;
+  current: number;
+  max: number;
+  /** A static resource: a whole ring around its maximum. */
+  fixed: boolean;
+}
+
 export interface PlayerCondition {
   id: string;
   /** The number of a valued condition; null when the token stores none. */
@@ -106,6 +121,8 @@ export interface PlayerToken {
   stress: PlayerLegacyBar | null;
   /** The bars the window draws on the token; absent from a GM of an older version, which sent none. */
   resources?: PlayerResource[];
+  /** The wheels the window draws beside the token, in socket order; absent when it has none or from an older GM. */
+  wheels?: PlayerWheel[];
   /** The window greys the token out and marks it with a skull: a resource that defeats it is spent, whether players see that resource or not. */
   downed?: boolean;
   /** The side the list by sides puts this combatant under; sent only for a token with an initiative entry while the list is by sides. */

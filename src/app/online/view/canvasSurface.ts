@@ -208,6 +208,13 @@ class CanvasSurface implements ViewSurface {
     context.textAlign = style.align;
     context.textBaseline = 'middle';
     context.globalAlpha = style.alpha ?? 1;
+    if (style.outline) {
+      // Under the fill, as PIXI strokes text: half the width shows outside the glyphs.
+      context.strokeStyle = style.outline.color;
+      context.lineWidth = style.outline.width;
+      context.lineJoin = 'round';
+      context.strokeText(text, x, y);
+    }
     context.fillStyle = style.color;
     context.fillText(text, x, y);
     context.restore();

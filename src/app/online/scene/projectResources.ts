@@ -1,8 +1,9 @@
 /**
  * The token resources online players receive: what the player window draws on a token, and no
- * more. `TokenUIRenderer` shows a player the bars (sockets 0 and 1, never the wheels) of the
- * resources its collection shows to players, stacked in socket order, each as a fill in its
- * colour with no label and no numbers; the map's own `hiddenResources` do not apply to them.
+ * more. `TokenUIRenderer` shows a player the resources its collection shows to players: the bars
+ * (sockets 0 and 1) stacked in socket order, each as a fill in its colour with no label and no
+ * numbers, and the wheels (sockets 2 to 5) beside the token, always shown, each with its number;
+ * the map's own `hiddenResources` do not apply to them.
  * A token whose resource that defeats it is spent is greyed with a skull whichever resources
  * players see. `visibleResources` stays the one place that picks the resources, so a rule the
  * window follows is followed here.
@@ -10,7 +11,8 @@
 import { isDefeated, isSpent, resourceColor, shapeOf, visibleResources } from '@atlas-vtt/shared/rules';
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '@atlas-vtt/api-types';
 import { finiteOr } from './coerce';
-import type { PlayerResource } from './sceneTypes';
+import { SCENE_RANGES } from './sceneLimits';
+import type { PlayerResource, PlayerWheel } from './sceneTypes';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const NEUTRAL_COLOR = '#888888';
@@ -43,6 +45,25 @@ export function projectBars(token: ResourceHolder, definitions: readonly Resourc
     bars.push({ color: hexOr(resourceColor(definition, value)), share: fixed ? 1 : shareOf(value), spent: dark });
   }
   return bars;
+}
+
+/**
+ * The wheels the player window draws beside `token`, in socket order: the resources players see in sockets 2 to 5,
+ * each with its numbers, which the window shows in the wheel's middle (`ResourceWheelView`), its wheels at rest.
+ */
+export function projectWheels(token: ResourceHolder, definitions: readonly ResourceDefinition[]): PlayerWheel[] {
+  const wheels: PlayerWheel[] = [];
+  for (const { definition, value, slot } of visibleResources(token, definitions, 'player')) {
+    if (shapeOf(slot) !== 'wheel') continue;
+    wheels.push({
+      slot: finiteOr(slot, 2, SCENE_RANGES.wheelSlot),
+      color: hexOr(resourceColor(definition, value)),
+      current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue),
+      max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue),
+      fixed: definition.direction === 'static',
+    });
+  }
+  return wheels;
 }
 
 /** Whether the window greys the token out: a resource that defeats it is spent, one players see or not. */

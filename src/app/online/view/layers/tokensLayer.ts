@@ -16,6 +16,8 @@ import type { LayerFrame, PlayerLayer } from './layerTypes';
 import { TokenGlides } from './tokenGlides';
 import { turnOf } from '../turns';
 import { drawTokenUi } from './tokenUiDrawing';
+import { BarFills } from './barFills';
+import { prefersReducedMotion } from '../motion';
 
 /** The stand-in drawn until a token's art has loaded. */
 export const TOKEN_MARKER_COLOR = '#9aa0a6';
@@ -28,7 +30,7 @@ export const CONTROLLED_RING_COLOR = '#facc15';
 /** The ring around the token whose turn it is in a fight in turn order, for every player. */
 export const TURN_RING_COLOR = '#f8fafc';
 
-export function createTokensLayer(options: { now?: () => number } = {}): PlayerLayer {
+export function createTokensLayer(options: { now?: () => number; reducedMotion?: () => boolean } = {}): PlayerLayer {
   // Sorted once per change of the tokens, not on every frame; ids kept for the overlay.
   let sorted: { tokens: Readonly<Record<string, PlayerToken>>; list: Array<[string, PlayerToken]> } | null = null;
   const byLayer = (tokens: Readonly<Record<string, PlayerToken>>): Array<[string, PlayerToken]> => {
@@ -36,13 +38,17 @@ export function createTokensLayer(options: { now?: () => number } = {}): PlayerL
     return sorted.list;
   };
   // Moves glide as Atlas's do, instead of jumping (a drop snapping to the grid, the GM moving a token).
-  const glides = new TokenGlides(options.now ?? (() => performance.now()));
+  const now = options.now ?? (() => performance.now());
+  const glides = new TokenGlides(now);
+  // Bars ease to each new value as Atlas's do.
+  const fills = new BarFills(now, options.reducedMotion ?? prefersReducedMotion);
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
       const stroke = computeTokenStrokeWidth(cellSize);
       const { controlled, positions, held } = frame.overlay;
       glides.begin(frame.scene.sceneId);
+      fills.begin(frame.scene.sceneId);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
       for (const [id, inScene] of byLayer(frame.scene.tokens)) {
         const target = positions.get(id) ?? inScene;
@@ -61,11 +67,12 @@ export function createTokensLayer(options: { now?: () => number } = {}): PlayerL
         }
         // Whose turn it is, outside the player's own ring so both show.
         if (id === turnToken) surface.circle(token.x, token.y, ringRadius + stroke * 3, { stroke: TURN_RING_COLOR, lineWidth: stroke, alpha: 0.9 });
-        drawTokenUi(surface, token, { size, cellSize, ringRadius });
+        drawTokenUi(surface, token, { size, cellSize, ringRadius }, (slot, share) => fills.frame(`${id}:${slot}`, share));
       }
       glides.end();
+      fills.end();
     },
-    animating: () => glides.animating(),
+    animating: () => glides.animating() || fills.animating(),
   };
 }
 
