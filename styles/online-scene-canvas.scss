@@ -343,13 +343,14 @@
 .atlas-connect-scene {
   .handout {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4;
-    width: min(720px, calc(100% - 32px)); max-height: calc(100% - 140px); display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: var(--gap);
+    box-sizing: border-box; width: min(720px, calc(100% - 32px)); max-height: calc(100% - 140px); overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); gap: var(--gap);
     padding: var(--gap); background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   }
   .handout[hidden] { display: none; }
   .handout-header { display: flex; align-items: center; gap: var(--gap); }
-  .handout-header h2 { flex: 1; margin: 0; font-size: var(--font-ui-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .handout-header h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--font-ui-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .handout-header .icon-button { width: var(--tool-size); height: var(--tool-size); }
   .handout-status { margin: 0; color: var(--muted); text-align: center; }
-  .handout-canvas { width: 100%; height: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+  .handout-canvas { width: 100%; height: 100%; min-width: 0; max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
 }
