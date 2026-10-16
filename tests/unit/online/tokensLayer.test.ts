@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
-import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR, TURN_RING_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { CONTROLLED_RING_COLOR, createTokensLayer, TOKEN_MARKER_COLOR, TURN_RING_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { DOWNED_MOTION } from '../../../src/app/online/view/layers/downedFades';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
 import type { TokenOverlay } from '../../../src/app/online/view/layers/layerTypes';
@@ -73,13 +74,36 @@ describe('tokens layer', () => {
     expect(fills.filter((style) => style.fill === '#ef4444')).toEqual([]);
   });
 
-  it('greys a downed token out and marks it with a skull, upright, whether or not it shows a bar', () => {
+  it("greys a downed token's art and ring as Atlas does and marks it with Atlas's skull, upright, whether or not it shows a bar", () => {
     const surface = draw({ t1: playerToken({ rotation: 90, downed: true }) }, true);
-    expect(surface.ops('circle').find(({ style }) => style.fill === DOWNED_VEIL.color)).toMatchObject({ x: 100, y: 100, style: { alpha: DOWNED_VEIL.alpha } });
-    expect(surface.calls.filter((call) => call.op === 'icon')).toEqual([
-      expect.objectContaining({ op: 'icon', name: 'skull', x: 100, y: 100 }),
-    ]);
-    expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'icon')).toBe(false);
+    expect(surface.ops('image').map(({ look }) => look)).toEqual([undefined, { lifeless: true, alpha: 1 }]);
+    expect(surface.ops('tokenRing').map(({ look }) => look)).toEqual([undefined, { lifeless: true, alpha: 1 }]);
+    expect(surface.ops('downedEmblem')).toEqual([{ op: 'downedEmblem', x: 100, y: 100, size: 62, alpha: DOWNED_MOTION.emblemOpacity }]);
+    expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'downedEmblem')).toBe(false);
+  });
+
+  it('fades the downed look in over half a second when a token goes down, and out when it is healed', () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const emblem = (downed: boolean): { size: number; alpha: number } | null => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame(playerScene({ tokens: { t1: playerToken({ downed }) } })));
+      const found = surface.ops('downedEmblem')[0];
+      return found ? { size: found.size, alpha: found.alpha } : null;
+    };
+    expect(emblem(false)).toBeNull();
+    expect(emblem(true)).toBeNull();
+    now = 250;
+    const mid = emblem(true)!;
+    expect(mid.alpha).toBeGreaterThan(0);
+    expect(mid.alpha).toBeLessThan(DOWNED_MOTION.emblemOpacity);
+    expect(mid.size).toBeGreaterThan(62);
+    now = 500;
+    expect(emblem(true)).toEqual({ size: 62, alpha: DOWNED_MOTION.emblemOpacity });
+    expect(layer.animating?.()).toBe(false);
+    emblem(false);
+    now = 850;
+    expect(emblem(false)).toBeNull();
   });
 
   it('draws condition badges on the ring with the value in a pip, the last slot counting the rest', () => {

@@ -2,7 +2,7 @@ import type { DecodedImage } from '../../../src/app/online/assets/AssetLoader';
 import { sceneWorldBounds } from '../../../src/app/online/preview/previewLayout';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { NO_TOKEN_OVERLAY, type LayerFrame } from '../../../src/app/online/view/layers/layerTypes';
-import type { ImageClip, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
+import type { ImageClip, ImageLook, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
 
 export type SurfaceCall =
   | { op: 'begin'; width: number; height: number; background: string | null }
@@ -13,8 +13,9 @@ export type SurfaceCall =
   | { op: 'roundRect'; x: number; y: number; width: number; height: number; radius: number; style: ShapeStyle }
   | { op: 'circle'; x: number; y: number; radius: number; style: ShapeStyle }
   | { op: 'paths'; paths: ScenePoint[][]; closed: boolean; style: ShapeStyle }
-  | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null }
-  | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string }
+  | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null; look?: ImageLook }
+  | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string; look?: ImageLook }
+  | { op: 'downedEmblem'; x: number; y: number; size: number; alpha: number }
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
   | { op: 'glyph'; name: string; x: number; y: number; size: number; color: string; alpha: number }
@@ -43,10 +44,13 @@ export class RecordingSurface implements ViewSurface {
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void {
     this.calls.push({ op: 'paths', paths: paths.map((path) => [...path]), closed, style });
   }
-  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null): void {
-    this.calls.push({ op: 'image', image, x, y, width, height, clip });
+  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void {
+    this.calls.push({ op: 'image', image, x, y, width, height, clip, ...(look ? { look } : {}) });
   }
-  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void { this.calls.push({ op: 'tokenRing', x, y, diameter, artSize, color }); }
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string, look?: ImageLook): void {
+    this.calls.push({ op: 'tokenRing', x, y, diameter, artSize, color, ...(look ? { look } : {}) });
+  }
+  downedEmblem(x: number, y: number, size: number, alpha: number): void { this.calls.push({ op: 'downedEmblem', x, y, size, alpha }); }
   text(text: string, x: number, y: number, style: TextStyle): void { this.calls.push({ op: 'text', text, x, y, style }); }
   measureText(text: string, font: string): number {
     const size = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 10);

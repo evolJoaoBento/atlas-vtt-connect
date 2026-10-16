@@ -7,7 +7,6 @@
  * a token they drag or just dropped is drawn where they put it. A token whose place
  * changes glides there as in Atlas (`tokenGlides.ts`); on a lit scene only the player's own do.
  */
-import { DOWNED_LOOK } from '@atlas-vtt/shared/draw';
 import { getTokenRingCenterRadius, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
 import { computeTokenPixelSize, computeTokenStrokeWidth } from '@atlas-vtt/shared/draw';
 import type { PlayerToken } from '../../scene/sceneTypes';
@@ -20,14 +19,11 @@ import { turnOf } from '../turns';
 import { drawTokenUi } from './tokenUiDrawing';
 import { BarFills } from './barFills';
 import { BadgeEntrances } from './badgeEntrances';
+import { DOWNED_MOTION, DownedFades } from './downedFades';
 import { prefersReducedMotion } from '../motion';
 
 /** The stand-in drawn until a token's art has loaded. */
 export const TOKEN_MARKER_COLOR = '#9aa0a6';
-/** The veil over a downed token's art and ring (Atlas greys them) and its skull's colour. */
-export const DOWNED_VEIL = { color: '#2b2b30', alpha: 0.55, skull: '#d6cebd' } as const;
-/** Lucide's skull fills this much of its icon box. */
-const SKULL_GLYPH_SHARE = 20 / 24;
 /** The ring around the tokens this player controls. */
 export const CONTROLLED_RING_COLOR = '#facc15';
 /** The ring around the token whose turn it is in a fight in turn order, for every player. */
@@ -48,6 +44,8 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   const fills = new BarFills(now, reducedMotion);
   // New condition badges animate in as Atlas's do.
   const entrances = new BadgeEntrances(now, reducedMotion);
+  // Going down and being healed fade as Atlas's do.
+  const downedFades = new DownedFades(now, reducedMotion);
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
@@ -56,6 +54,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       glides.begin(frame.scene.sceneId);
       fills.begin(frame.scene.sceneId);
       entrances.begin(frame.scene.sceneId);
+      downedFades.begin(frame.scene.sceneId);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
       // A lit scene's darkness reaches players as a fog operation of its own: there only their tokens glide.
       const lit = Object.hasOwn(frame.scene.fog, DARKNESS_FOG_ID);
@@ -72,8 +71,8 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         const reach = size / 2 + stroke + cellSize;
         if (!intersects({ x: token.x - reach, y: token.y - reach, width: reach * 2, height: reach * 2 }, frame.visible)) continue;
         const ringRadius = getTokenRingCenterRadius(size, stroke, 1);
-        drawArt(surface, frame, token, size, stroke, ringRadius);
-        if (token.downed === true) drawDowned(surface, token, size, ringRadius, stroke);
+        const downed = downedFades.progress(id, token.downed === true);
+        drawArt(surface, frame, token, size, stroke, ringRadius, downed);
         if (controlled.has(id)) {
           surface.circle(token.x, token.y, ringRadius + stroke * 1.5, { stroke: CONTROLLED_RING_COLOR, lineWidth: stroke });
         }
@@ -87,12 +86,14 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       glides.end();
       fills.end();
       entrances.end();
+      downedFades.end();
     },
-    animating: () => glides.animating() || fills.animating() || entrances.animating(),
+    animating: () => glides.animating() || fills.animating() || entrances.animating() || downedFades.animating(),
   };
 }
 
-function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, size: number, stroke: number, ringRadius: number): void {
+/** `downed`: how far the token is into Atlas's downed look, 0 alive to 1: its art and ring greyed over, and the skull. */
+function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, size: number, stroke: number, _ringRadius: number, downed: number): void {
   const radius = size / 2;
   const art = frame.images(token.image);
   surface.push(token.x, token.y, (token.rotation * Math.PI) / 180, 1);
@@ -102,16 +103,20 @@ function drawArt(surface: ViewSurface, frame: LayerFrame, token: PlayerToken, si
     const width = art.width * scale;
     const height = art.height * scale;
     surface.image(art.image, -width / 2, -height / 2, width, height, { x: 0, y: 0, radius });
+    if (downed > 0) surface.image(art.image, -width / 2, -height / 2, width, height, { x: 0, y: 0, radius }, { lifeless: true, alpha: downed });
   } else {
     surface.circle(0, 0, radius, { fill: TOKEN_MARKER_COLOR });
   }
   // Atlas's ring texture at Atlas's size (SpriteFactory.createTokenRing): the art plus a stroke's width on each side.
-  if (token.ring !== null) surface.tokenRing(0, 0, getTokenRingOuterDiameter(size, stroke, 1), size, token.ring);
+  if (token.ring !== null) {
+    const diameter = getTokenRingOuterDiameter(size, stroke, 1);
+    surface.tokenRing(0, 0, diameter, size, token.ring);
+    if (downed > 0) surface.tokenRing(0, 0, diameter, size, token.ring, { lifeless: true, alpha: downed });
+  }
   surface.pop();
-}
-
-/** What Atlas's downed overlay does to the token: greyed art and ring, and the skull on top, upright. */
-function drawDowned(surface: ViewSurface, token: PlayerToken, size: number, ringRadius: number, stroke: number): void {
-  surface.circle(token.x, token.y, Math.max(size / 2, ringRadius + stroke / 2), { fill: DOWNED_VEIL.color, alpha: DOWNED_VEIL.alpha });
-  surface.icon('skull', token.x, token.y, (size * DOWNED_LOOK.skullShare) / SKULL_GLYPH_SHARE, DOWNED_VEIL.skull, DOWNED_LOOK.markerOpacity);
+  // The skull stays upright, spans the token and settles from a little larger as it fades in.
+  if (downed > 0) {
+    const scale = DOWNED_MOTION.emblemScale - (DOWNED_MOTION.emblemScale - 1) * downed;
+    surface.downedEmblem(token.x, token.y, size * scale, downed * DOWNED_MOTION.emblemOpacity);
+  }
 }

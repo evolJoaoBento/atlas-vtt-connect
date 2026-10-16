@@ -8,7 +8,7 @@ import tokenRingUrl from '../../assets/token-ring.webp';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
 import { WIDGET_ICON_PATHS, type WidgetIcon } from '../../types/widgetIcons';
-import type { ImageClip, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
+import type { ImageClip, ImageLook, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
 
 interface IconShape {
   path: Path2D;
@@ -42,6 +42,116 @@ function widgetIconPath(name: string): Path2D | null {
     widgetIcons.set(name, path);
   }
   return path;
+}
+
+/** Atlas's lifeless grey (`DownedTokenOverlay.LIFELESS_MATRIX`): luminance, dimmed and cooled a little per channel. */
+const LIFELESS = { luminance: [0.2126, 0.7152, 0.0722], brightness: [0.7, 0.72, 0.76] } as const;
+/** A greyed copy is drawn at most this many pixels across: token art is small on screen. */
+const LIFELESS_SIZE = 512;
+/** Greyed copies by source; a source that goes takes its copy with it. */
+const lifelessCopies = new WeakMap<object, HTMLCanvasElement | null>();
+
+/** `source` greyed as Atlas greys a downed token; null where its pixels cannot be read. */
+function lifelessCopy(source: CanvasImageSource & { width: number; height: number }, blank: () => HTMLCanvasElement): HTMLCanvasElement | null {
+  if (lifelessCopies.has(source)) return lifelessCopies.get(source) ?? null;
+  let copy: HTMLCanvasElement | null = null;
+  try {
+    const scale = Math.min(1, LIFELESS_SIZE / Math.max(1, source.width, source.height));
+    const canvas = blank();
+    canvas.width = Math.max(1, Math.round(source.width * scale));
+    canvas.height = Math.max(1, Math.round(source.height * scale));
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      const data = pixels.data;
+      const [lr, lg, lb] = LIFELESS.luminance;
+      const [br, bg, bb] = LIFELESS.brightness;
+      for (let i = 0; i < data.length; i += 4) {
+        const grey = lr * data[i]! + lg * data[i + 1]! + lb * data[i + 2]!;
+        data[i] = grey * br;
+        data[i + 1] = grey * bg;
+        data[i + 2] = grey * bb;
+      }
+      context.putImageData(pixels, 0, 0);
+      copy = canvas;
+    }
+  } catch {
+    // A tainted or unreadable image draws in colour only.
+    copy = null;
+  }
+  lifelessCopies.set(source, copy);
+  return copy;
+}
+
+/** Atlas's downed emblem, drawn once per document at this size (`DOWNED_EMBLEM_TEXTURE_SIZE`). */
+const EMBLEM_SIZE = 384;
+const emblems = new WeakMap<Document, HTMLCanvasElement | null>();
+
+/**
+ * Atlas's `createDownedEmblemTexture`: the skull widget icon in muted, aged bone with a dark outline, a soft vignette
+ * that keeps it legible on any art, and embers in its eye sockets.
+ */
+function downedEmblemCanvas(doc: Document, blank: () => HTMLCanvasElement): HTMLCanvasElement | null {
+  if (emblems.has(doc)) return emblems.get(doc) ?? null;
+  const canvas = blank();
+  canvas.width = EMBLEM_SIZE;
+  canvas.height = EMBLEM_SIZE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    emblems.set(doc, null);
+    return null;
+  }
+  const size = EMBLEM_SIZE;
+  const centre = size / 2;
+  const vignette = ctx.createRadialGradient(centre, centre, 0, centre, centre, centre);
+  vignette.addColorStop(0, 'rgba(10, 5, 5, 0.45)');
+  vignette.addColorStop(0.6, 'rgba(10, 5, 5, 0.2)');
+  vignette.addColorStop(1, 'rgba(10, 5, 5, 0)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, size, size);
+  const scale = (size * 0.46) / WIDGET_ICON_SPACE;
+  ctx.translate(size / 2 - (WIDGET_ICON_SPACE / 2) * scale, size / 2 - (WIDGET_ICON_SPACE / 2) * scale);
+  ctx.scale(scale, scale);
+  const skull = new Path2D(WIDGET_ICON_PATHS.skull);
+  for (const [x, y] of [[166, 256], [346, 256]] as const) {
+    const ember = ctx.createRadialGradient(x, y, 0, x, y, 70);
+    ember.addColorStop(0, 'rgba(230, 95, 55, 0.7)');
+    ember.addColorStop(0.45, 'rgba(150, 28, 18, 0.45)');
+    ember.addColorStop(1, 'rgba(120, 10, 10, 0)');
+    ctx.fillStyle = ember;
+    ctx.fillRect(x - 70, y - 70, 140, 140);
+  }
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+  ctx.shadowBlur = size * 0.05;
+  ctx.shadowOffsetY = size * 0.015;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 28;
+  ctx.strokeStyle = '#120c0a';
+  ctx.fillStyle = '#120c0a';
+  ctx.stroke(skull);
+  ctx.fill(skull);
+  ctx.restore();
+  const bone = ctx.createLinearGradient(0, 16, 0, WIDGET_ICON_SPACE - 16);
+  bone.addColorStop(0, '#d6cebd');
+  bone.addColorStop(0.5, '#b3a892');
+  bone.addColorStop(1, '#7c705c');
+  ctx.fillStyle = bone;
+  ctx.fill(skull);
+  ctx.save();
+  ctx.clip(skull);
+  const highlight = ctx.createRadialGradient(200, 90, 0, 200, 90, 260);
+  highlight.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+  highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = highlight;
+  ctx.fillRect(0, 0, WIDGET_ICON_SPACE, WIDGET_ICON_SPACE);
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = 'rgba(60, 40, 30, 0.35)';
+  ctx.stroke(skull);
+  ctx.restore();
+  emblems.set(doc, canvas);
+  return canvas;
 }
 
 /**
@@ -190,31 +300,54 @@ class CanvasSurface implements ViewSurface {
     });
   }
 
-  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null): void {
+  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void {
+    const source = look?.lifeless ? lifelessCopy(image, () => this.blank()) : image;
+    if (!source) return;
     const context = this.context;
     context.save();
+    context.globalAlpha = look?.alpha ?? 1;
     if (clip) {
       context.beginPath();
       context.arc(clip.x, clip.y, Math.max(0, clip.radius), 0, Math.PI * 2);
       context.clip();
     }
-    context.drawImage(image, x, y, width, height);
+    context.drawImage(source, x, y, width, height);
     context.restore();
   }
 
-  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void {
+  downedEmblem(x: number, y: number, size: number, alpha: number): void {
+    const emblem = downedEmblemCanvas(this.canvas.ownerDocument, () => this.blank());
+    if (!emblem || !(alpha > 0)) return;
+    const context = this.context;
+    context.save();
+    context.globalAlpha = alpha;
+    context.drawImage(emblem, x - size / 2, y - size / 2, size, size);
+    context.restore();
+  }
+
+  /** A bare copy of this surface's canvas, made by its own document (a pop-out window's too). */
+  private blank(): HTMLCanvasElement {
+    return this.canvas.cloneNode(false) as HTMLCanvasElement;
+  }
+
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string, look?: ImageLook): void {
     const doc = this.canvas.ownerDocument;
     const tint = ringColor(color);
     const image = tokenRingImage(doc);
-    // A bare copy of this surface's canvas, as createLayer makes one.
-    const ring = image ? tintedRing(image, () => this.canvas.cloneNode(false) as HTMLCanvasElement, tint) : null;
+    const tinted = image ? tintedRing(image, () => this.blank(), tint) : null;
+    const ring = tinted && look?.lifeless ? lifelessCopy(tinted, () => this.blank()) : tinted;
+    const alpha = look?.alpha ?? 1;
     if (ring) {
-      this.context.drawImage(ring, x - diameter / 2, y - diameter / 2, diameter, diameter);
+      const context = this.context;
+      context.save();
+      context.globalAlpha = alpha;
+      context.drawImage(ring, x - diameter / 2, y - diameter / 2, diameter, diameter);
+      context.restore();
       return;
     }
     // Atlas's stand-in while the texture loads (SpriteFactory.createFallbackRing): a ring as wide as the padding.
     const width = Math.max(2, (diameter - artSize) / 2);
-    this.circle(x, y, Math.max(0, diameter / 2 - width / 2), { stroke: tint, lineWidth: width, alpha: 0.95 });
+    this.circle(x, y, Math.max(0, diameter / 2 - width / 2), { stroke: look?.lifeless ? '#5a5c60' : tint, lineWidth: width, alpha: 0.95 * alpha });
   }
 
   text(text: string, x: number, y: number, style: TextStyle): void {
