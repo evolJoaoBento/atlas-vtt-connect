@@ -28,6 +28,7 @@ import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
 import { HandoutView, type HandoutViewOptions } from './handoutView.mts';
+import { InitiativeView } from './initiativeView.mts';
 import { hoverCardFor, tokenAt, type TokenNumbers } from '../src/app/online/view/tokenHover';
 import { turnNotice, turnOf } from '../src/app/online/view/turns';
 import { createPinsLayer, pinAt } from '../src/app/online/view/layers/pinsLayer';
@@ -77,6 +78,8 @@ export interface MapViewOptions {
   turnNotice?: HTMLElement;
   /** The card shown while the mouse rests on a token (its name, conditions and, for the player's own, numbers); without it none shows. */
   hoverCard?: HTMLElement;
+  /** The initiative column (`InitiativeView`); without it the fight's order is not shown on the map. */
+  initiative?: HTMLElement;
 }
 
 export class MapView {
@@ -89,6 +92,7 @@ export class MapView {
   private scene: PlayerScene | null = null;
   private readonly hoverCard: HoverCardView | null;
   private readonly handout: HandoutView | null;
+  private readonly initiative: InitiativeView | null;
   /** Exact numbers of the tokens this player controls, from the GM's `token-stats`. */
   private numbers: ReadonlyMap<string, TokenNumbers> = new Map();
   /** Where the mouse is over the canvas, for the grab cursor; null when it is elsewhere. */
@@ -136,11 +140,15 @@ export class MapView {
     this.input = new ViewInput(this.camera, this.tools);
     this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
     this.handout = options.handout ? new HandoutView(options.handout) : null;
+    this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
     this.measure();
     // Tokens are drawn with Atlas's stand-in ring until the ring texture has loaded: then once more with it.
-    const stopRing = whenTokenRingLoaded(() => this.renderer.invalidate());
+    const stopRing = whenTokenRingLoaded(() => {
+      this.renderer.invalidate();
+      this.initiative?.update(this.scene, true);
+    });
     this.listeners.signal.addEventListener('abort', stopRing, { once: true });
   }
 
@@ -156,6 +164,7 @@ export class MapView {
     this.updateHoverCard();
     this.updateTurn();
     this.updateHandout();
+    this.initiative?.update(scene);
   }
 
   /** Exact numbers of the tokens this player controls (`token-stats`): the card of each shows them. */
@@ -241,6 +250,7 @@ export class MapView {
   refresh(): void {
     this.renderer.invalidate();
     this.updateHandout();
+    this.initiative?.update(this.scene, true);
   }
 
   private updateHandout(): void {

@@ -18,7 +18,7 @@ import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
 import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
-import { initiativeLines, playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
+import { playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
 import { normalizePlayerName } from '../src/app/online/protocol';
 import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
 import { createPeerClient } from '../src/app/online/transport/PeerTransport';
@@ -52,7 +52,6 @@ const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
 const playerList = element<HTMLUListElement>('players');
 const widgetList = element<HTMLUListElement>('widgets');
-const initiativeList = element<HTMLOListElement>('initiative');
 const canvas = element<HTMLCanvasElement>('map');
 
 const cache = new AssetCache({ keep: rememberedKeep(), openStore: openIndexedDbImageStore });
@@ -76,6 +75,7 @@ const map = surface
     notice: element('move-notice'),
     hoverCard: element('hover-card'),
     turnNotice: element('turn-notice'),
+    initiative: element('initiative-panel'),
     handout: {
       panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
       status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
@@ -244,7 +244,6 @@ function renderScene(): void {
     map?.setScene(shown);
   }
   fillList(widgetList, shown ? widgetLines(shown.widgets) : []);
-  fillList(initiativeList, shown ? initiativeLines(shown.initiative, shown.tokens) : []);
   // Read-only, for checking in the developer tools what this page received.
   (window as unknown as { atlasScene: PlayerScene | null }).atlasScene = shown;
 }

@@ -21,6 +21,7 @@ export interface SceneDom {
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
   hoverCard: HTMLElement;
+  initiative: HTMLElement;
   sheetButton: HTMLButtonElement;
   sheetPanel: HTMLElement;
   sheetClose: HTMLButtonElement;
@@ -103,6 +104,9 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   // The token card under the mouse (`HoverCardView`), placed in the window's coordinates.
   const hoverCard = root.createDiv({ cls: 'hover-card' });
   hoverCard.hidden = true;
+  // The fight's order, as Atlas's player window floats it at the right edge (`InitiativeView`).
+  const initiative = root.createDiv({ cls: 'initiative-panel', attr: { role: 'region', 'aria-label': 'Initiative order' } });
+  initiative.hidden = true;
   const diceLog = root.createEl('aside', { cls: 'dice-log', attr: { 'aria-label': 'Dice log' } });
   diceLog.hidden = true;
   const header = diceLog.createDiv({ cls: 'dice-log-header' });
@@ -124,7 +128,7 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const sheetBody = sheetPanel.createDiv({ cls: 'sheet-body' });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
-    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice,
+    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice, initiative,
     sheetButton, sheetPanel, sheetClose, sheetTabs, sheetBody,
     handout: { panel: handout, title: handoutTitle, canvas: handoutCanvas, status: handoutStatus, closeButton: handoutClose, openButton: handoutButton },
   };

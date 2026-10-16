@@ -337,11 +337,6 @@ button:disabled { opacity: 0.5; cursor: default; }
   /* Follow GM and Fit map move above the toolbar. */
   .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
 }
-#initiative:has(li.side) { list-style: none; padding-left: 0; }
-#initiative li.side { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--muted, inherit); list-style: none; }
-#initiative li.side[aria-current="true"] { color: var(--accent); }
-#initiative li.sitting-out { opacity: 0.45; }
-#initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }
 
 /* The token card under the mouse: name, conditions and the player's own numbers. Placed by `HoverCardView`. */
 .hover-card {
@@ -405,3 +400,34 @@ button:disabled { opacity: 0.5; cursor: default; }
 .handout-header h2 { flex: 1; min-width: 0; margin: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .handout-status { margin: 0; color: var(--muted); text-align: center; }
 .handout-canvas { width: 100%; height: 100%; min-width: 0; max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+
+/* The initiative column, as Atlas's player window floats it (player-initiative.scss): an elevated surface at the
+   right edge, one card per combatant with its portrait, value, name and a thin health bar. */
+.initiative-panel {
+  position: absolute; top: 50%; right: max(12px, env(safe-area-inset-right)); transform: translateY(-50%); z-index: 1;
+  width: 96px; max-height: calc(100% - 2 * 160px); box-sizing: border-box; overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--inset); padding: var(--inset);
+  background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+  color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.initiative-panel[hidden] { display: none; }
+.initiative-list, .initiative-side { display: flex; flex-direction: column; gap: var(--inset); min-height: 0; }
+.initiative-list { overflow-y: auto; scrollbar-width: none; }
+.initiative-list::-webkit-scrollbar { display: none; }
+.initiative-side-label { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
+.initiative-side.is-active .initiative-side-label { color: var(--accent); }
+.initiative-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
+  background: var(--hover); border: 1px solid var(--border); border-radius: 12px;
+}
+/* The first card's top corners run concentric with the panel's. */
+.initiative-list > .initiative-card:first-child, .initiative-list > .initiative-side:first-child > .initiative-card:nth-child(2) {
+  border-top-left-radius: var(--inset-radius); border-top-right-radius: var(--inset-radius);
+}
+.initiative-card.is-active, .initiative-side.is-active .initiative-card:not(.is-sitting-out) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.initiative-card.is-sitting-out { opacity: 0.45; }
+.initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
+.initiative-value { font-weight: 600; }
+.initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 12px; }
+.initiative-hp { width: 100%; height: 4px; accent-color: #22c55e; }
+.initiative-round { text-align: center; color: var(--muted); font-size: 12px; }
