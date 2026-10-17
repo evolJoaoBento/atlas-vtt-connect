@@ -103,6 +103,8 @@ export class CanvasScene implements OnlineSceneSink {
       root: dom.toolbar,
       onTool: (tool) => this.map?.selectTool(tool),
       onShape: (shape) => this.map?.selectShape(shape),
+      onTemplateShape: (shape) => this.map?.selectTemplateShape(shape),
+      onClearTemplates: () => this.map?.clearOwnTemplates(),
       onLaserColor: (color) => this.map?.selectLaserColor(color),
       onDice: () => this.setDiceOpen(!this.tray.isOpen),
       ...(options.active ? { active: options.active } : {}),

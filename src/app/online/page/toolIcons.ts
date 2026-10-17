@@ -7,7 +7,7 @@
  */
 export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x'
   | 'minus' | 'plus' | 'chevron-right' | 'maximize' | 'locate-fixed' | 'scroll-text' | 'radar' | 'shapes' | 'image' | 'map-pin'
-  | 'chevrons-up' | 'chevrons-down';
+  | 'chevrons-up' | 'chevrons-down' | 'square' | 'eraser';
 
 /** Each Lucide icon's children. */
 export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
@@ -27,6 +27,8 @@ export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   minus: '<path d="M5 12h14"/>',
+  square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+  eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   'chevron-right': '<path d="m9 18 6-6-6-6"/>',
   maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',

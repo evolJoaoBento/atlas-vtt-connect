@@ -12,7 +12,7 @@ import type { SceneCamera } from '../src/app/online/scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../src/app/online/scene/sceneTypes';
 import type { PlayerLaser } from '../src/app/online/tools/toolMessages';
 import type { PlayerPing } from '../src/app/online/tools/pings';
-import type { MapTemplate } from '../src/app/online/tools/templates';
+import type { MapTemplate, TemplateShape } from '../src/app/online/tools/templates';
 import type { ScreenPoint } from '../src/app/online/view/camera';
 import { CameraController } from '../src/app/online/view/CameraController';
 import type { ImageLookup } from '../src/app/online/view/layers/layerTypes';
@@ -45,6 +45,9 @@ const CLICK_TOLERANCE = 5;
 export interface ToolState {
   tool: PlayerTool;
   shape: MeasureChoice;
+  templateShape: TemplateShape;
+  /** Whether this player has a template on the scene. */
+  ownTemplates: boolean;
   laserColor: string;
 }
 
@@ -117,7 +120,7 @@ export class MapView {
   /** Where the last press began, so a click that dragged (a pan) does not select. */
   private pressedAt: { x: number; y: number } | null = null;
   /** What the toolbar was last told. */
-  private shownTool: ToolState = { tool: 'move', shape: 'line', laserColor: '' };
+  private shownTool: ToolState = { tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '' };
   private readonly listeners = new AbortController();
   private resizeObserver: ResizeObserver | null = null;
   private watchedRatio: number | null = null;
@@ -237,6 +240,16 @@ export class MapView {
     this.camera.fitMap();
   }
 
+  /** A shape from the Template tool's menu, and the Template tool with it. */
+  selectTemplateShape(shape: TemplateShape): void {
+    this.tools.selectTemplateShape(shape);
+  }
+
+  /** Takes all of this player's templates off the scene. */
+  clearOwnTemplates(): void {
+    this.tools.clearOwnTemplates();
+  }
+
   selectShape(shape: MeasureChoice): void {
     this.tools.selectShape(shape);
   }
@@ -246,7 +259,10 @@ export class MapView {
   }
 
   toolState(): ToolState {
-    return { tool: this.tools.tool, shape: this.tools.shape, laserColor: this.tools.laserColor };
+    return {
+      tool: this.tools.tool, shape: this.tools.shape, templateShape: this.tools.templateShape,
+      ownTemplates: this.tools.hasOwnTemplates(), laserColor: this.tools.laserColor,
+    };
   }
 
   /** The session's players in order and this player's id: whose laser has which colour. */
@@ -259,6 +275,8 @@ export class MapView {
   /** Every lasting template on the scene `sceneId`. */
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void {
     this.tools.receiveTemplates(sceneId, templates);
+    // Clear my templates is offered only while the player has some.
+    this.toolsChanged();
   }
 
   /** Someone else's ping. */
@@ -427,7 +445,9 @@ export class MapView {
   private toolsChanged(): void {
     this.renderer.invalidate();
     const state = this.toolState();
-    if (state.tool === this.shownTool.tool && state.shape === this.shownTool.shape && state.laserColor === this.shownTool.laserColor) return;
+    const shown = this.shownTool;
+    if (state.tool === shown.tool && state.shape === shown.shape && state.templateShape === shown.templateShape
+      && state.ownTemplates === shown.ownTemplates && state.laserColor === shown.laserColor) return;
     this.shownTool = state;
     const { tool } = state;
     this.options.canvas.dataset.tool = tool;

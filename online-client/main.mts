@@ -118,6 +118,8 @@ const toolbar = new PageToolbar({
   root: element('toolbar'),
   onTool: (tool) => map?.selectTool(tool),
   onShape: (shape) => map?.selectShape(shape),
+  onTemplateShape: (shape) => map?.selectTemplateShape(shape),
+  onClearTemplates: () => map?.clearOwnTemplates(),
   onLaserColor: (color) => map?.selectLaserColor(color),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });

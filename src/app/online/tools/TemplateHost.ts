@@ -2,8 +2,8 @@
  * Lasting templates in an online session, per scene (`tools/templates.ts`). A player's `map-template` adds one (at
  * most `perPlayer` of theirs and `perScene` in all) or removes one of their own, for the scene they have; the GM gives
  * it its id and its owner's colour, and sends the scene's whole list to its players whenever it changes, to a player
- * when they are admitted or move to another scene, and shows it in its own view of the scene it shows. The GM clears
- * them all with `clear`. Templates of players who leave the session (removed, not just disconnected) go. A
+ * when they are admitted or move to another scene, and shows it in its own view of the scene it shows, where the GM
+ * erases any one of them (`erase`). A player clears all of theirs at once (`clear`). The GM clears them all with `clear`. Templates of players who leave the session (removed, not just disconnected) go. A
  * `GmSession` handler.
  */
 import type { ViewId } from '@atlas-vtt/api-types';
@@ -18,8 +18,8 @@ import { TEMPLATE_LIMITS, type MapTemplate } from './templates';
 export interface TemplateHostOptions {
   session: SceneSession;
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSlot' | 'onSlotChange'>;
-  /** Shows a scene's templates in the GM's view of it; without it the GM sees none. */
-  show?: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string) => void;
+  /** Shows a scene's templates in the GM's view of it, with `erase` taking one off; without it the GM sees none. */
+  show?: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => void;
 }
 
 export class TemplateHost implements SessionHandler {
@@ -50,6 +50,15 @@ export class TemplateHost implements SessionHandler {
     for (const sceneId of scenes) this.broadcast(sceneId);
   }
 
+  /** The GM takes one template off a scene, whoever placed it. */
+  erase(sceneId: string, id: string): void {
+    const list = this.byScene.get(sceneId);
+    const kept = list?.filter((template) => template.id !== id);
+    if (!list || !kept || kept.length === list.length) return;
+    this.byScene.set(sceneId, kept);
+    this.broadcast(sceneId);
+  }
+
   /** Whether any scene has a template: what the GM's clear command offers. */
   hasAny(): boolean {
     return [...this.byScene.values()].some((list) => list.length > 0);
@@ -64,8 +73,8 @@ export class TemplateHost implements SessionHandler {
     const slot = this.options.projection.slotOf(player.playerId);
     if (!slot?.lastSent || message.sceneId !== slot.sceneId || !this.limit.allow(player.playerId, Date.now())) return;
     const list = this.byScene.get(slot.sceneId) ?? [];
-    if (message.remove !== undefined) {
-      const kept = list.filter((template) => !(template.id === message.remove && template.owner === player.playerId));
+    if (message.remove !== undefined || message.clear === true) {
+      const kept = list.filter((template) => !(template.owner === player.playerId && (message.clear === true || template.id === message.remove)));
       if (kept.length === list.length) return;
       this.byScene.set(slot.sceneId, kept);
     } else if (message.add) {
@@ -119,7 +128,8 @@ export class TemplateHost implements SessionHandler {
     if (this.drawnIn && (this.drawnIn.viewId !== target?.viewId || this.drawnIn.sceneId !== target.sceneId)) this.clearGmView();
     if (!shown || !target) return;
     try {
-      show(target.viewId, this.byScene.get(target.sceneId) ?? [], shown.mapPath);
+      const { sceneId } = target;
+      show(target.viewId, this.byScene.get(sceneId) ?? [], shown.mapPath, (id) => this.erase(sceneId, id));
       this.drawnIn = target;
     } catch (error) {
       console.warn('[Atlas VTT Connect] Could not show the templates:', error);
@@ -131,7 +141,7 @@ export class TemplateHost implements SessionHandler {
     this.drawnIn = null;
     if (!drawn) return;
     try {
-      this.options.show?.(drawn.viewId, [], '');
+      this.options.show?.(drawn.viewId, [], '', () => undefined);
     } catch {
       // The view went with its templates.
     }

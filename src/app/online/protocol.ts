@@ -117,8 +117,8 @@ export type ControlMessage =
   | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
   /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
   | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string }
-  /** Player to GM: add a lasting template on the scene they have, or remove one of their own (`tools/templates.ts`). */
-  | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string }
+  /** Player to GM: add a lasting template on the scene they have, remove one of their own, or clear all of theirs (`tools/templates.ts`). */
+  | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
   /** GM to players: every template on the scene, whenever they change. */
   | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] };
 
@@ -184,9 +184,9 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
   'token-sheets': (m) => isTokenSheets(m.entries),
   'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
-  'map-template': (m) => isSceneId(m.sceneId) && (m.add === undefined) !== (m.remove === undefined)
+  'map-template': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1
     && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
-    && (m.remove === undefined || isTemplateId(m.remove)),
+    && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
   'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
 };

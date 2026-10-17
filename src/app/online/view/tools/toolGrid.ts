@@ -17,6 +17,8 @@ export interface ToolGrid {
   geometry: GridGeometry;
   /** Where a measured point lands. */
   snap(point: ScenePoint): ScenePoint;
+  /** Where a square template's corner lands: the nearest corner of a square grid's cells while snapping is on. */
+  snapCorner(point: ScenePoint): ScenePoint;
   /** Where a drag ruler point of a token of `tokenSize` lands: the GM's snap-to-grid decides, as for a dropped token, even if the grid is hidden. */
   snapDrag(point: ScenePoint, tokenSize: number): ScenePoint;
   /** The distance along `points`, e.g. "30ft" or a range band's name. */
@@ -33,6 +35,11 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
   return {
     geometry,
     snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snapCorner: (point) => {
+      if (!scene.measurement.snapToGrid || !(grid || snapGrid) || geometry.type !== 'square' || !(geometry.size > 0)) return { x: point.x, y: point.y };
+      const corner = (value: number, offset: number): number => offset + Math.round((value - offset) / geometry.size) * geometry.size;
+      return { x: corner(point.x, geometry.offsetX ?? 0), y: corner(point.y, geometry.offsetY ?? 0) };
+    },
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),

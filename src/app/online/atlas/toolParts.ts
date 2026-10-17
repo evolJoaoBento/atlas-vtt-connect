@@ -68,7 +68,7 @@ export function pingRelayPart(lasers: LasersApi | null): NonNullable<OptionalPar
 }
 
 /** Draws a scene's templates on a view's map: Connect's stock Atlas stand-in adds it to `lasers` (an Atlas API has none). */
-type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly MapTemplate[], coneAngle: number) => void };
+type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly MapTemplate[], coneAngle: number, erase?: (id: string) => void) => void };
 
 /** Players' lasting templates, kept per scene and drawn in the GM's view where the lasers can draw. */
 export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: string | null) => number): NonNullable<OptionalParts['templates']> {
@@ -76,7 +76,7 @@ export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: 
   return ({ session, projection }) => new TemplateHost({
     session, projection,
     ...(typeof showTemplates === 'function'
-      ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null)) }
+      ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null), erase) }
       : {}),
   });
 }

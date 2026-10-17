@@ -548,3 +548,8 @@
 
 /* The frame of the scene before, over the map while it fades into the next (Atlas's scene-transition.scss). */
 .atlas-connect-scene .scene-transition-snapshot { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; pointer-events: none; }
+
+/* Clear my templates, under the Template tool's shapes: set apart by a rule, faint while the player has none. */
+.atlas-connect-scene .menu-entry--separated { position: relative; margin-top: 5px; }
+.atlas-connect-scene .menu-entry--separated::before { content: ''; position: absolute; left: 8px; right: 8px; top: -3px; border-top: 1px solid var(--background-modifier-border); }
+.atlas-connect-scene .menu-entry:disabled { opacity: 0.45; cursor: default; background: transparent; }

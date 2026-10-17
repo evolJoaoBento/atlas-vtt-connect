@@ -9,6 +9,7 @@ import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules'
 import { overflowingToolbarItems, type ToolbarFitLayout } from '../../packages/components/toolbar/toolbarFit';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool } from '../view/tools/PlayerTools';
+import type { TemplateShape } from '../tools/templates';
 import type { ToolIconName } from './toolIcons';
 
 export type ToolbarControlId = PlayerTool | 'dice';
@@ -24,6 +25,8 @@ export interface ToolbarControl {
 export const MORE_TOOLS_LABEL = 'More tools';
 export const MEASURE_OPTIONS_LABEL = 'Measure options';
 export const LASER_OPTIONS_LABEL = 'Laser color options';
+export const TEMPLATE_OPTIONS_LABEL = 'Template options';
+export const CLEAR_OWN_TEMPLATES_LABEL = 'Clear my templates';
 export { LASER_COLOR_HINT };
 
 /** Atlas's priorities (`MainToolbar.tsx`). The laser lives in Atlas's Move group, so it ranks between Measure and Dice. */
@@ -43,11 +46,24 @@ export const MEASURE_SHAPE_OPTIONS: ReadonlyArray<{ shape: MeasureChoice; label:
   { shape: 'cone', label: 'Cone', icon: 'triangle' },
 ];
 
+/** The Template tool's shapes, in its own flyout. */
+export const TEMPLATE_SHAPE_OPTIONS: ReadonlyArray<{ shape: TemplateShape; label: string; icon: ToolIconName }> = [
+  { shape: 'line', label: 'Line', icon: 'ruler' },
+  { shape: 'circle', label: 'Circle/Sphere', icon: 'circle' },
+  { shape: 'square', label: 'Square/Cube', icon: 'square' },
+  { shape: 'cone', label: 'Cone', icon: 'triangle' },
+];
+
 export interface ToolbarState {
   tool: PlayerTool;
   shape: MeasureChoice;
+  /** The Template tool's shape. */
+  templateShape: TemplateShape;
+  /** Whether this player has a template on the scene: Clear my templates is offered only then. */
+  ownTemplates: boolean;
   diceOpen: boolean;
   measureMenuOpen: boolean;
+  templateMenuOpen: boolean;
   laserMenuOpen: boolean;
   /** The laser's colour now, marked in the flyout. */
   laserColor: string;
@@ -72,6 +88,11 @@ export function measureIcon(shape: MeasureChoice): ToolIconName {
   return MEASURE_SHAPE_OPTIONS.find((option) => option.shape === shape)?.icon ?? 'ruler';
 }
 
+/** The Template button shows its shape. */
+export function templateIcon(shape: TemplateShape): ToolIconName {
+  return TEMPLATE_SHAPE_OPTIONS.find((option) => option.shape === shape)?.icon ?? 'shapes';
+}
+
 export function isControlActive(id: ToolbarControlId, state: ToolbarState): boolean {
   return id === 'dice' ? state.diceOpen : state.tool === id;
 }
@@ -79,7 +100,7 @@ export function isControlActive(id: ToolbarControlId, state: ToolbarState): bool
 /** The tool in use, and a control whose menu or tray hangs from it, stay in the bar. */
 export function isControlPinned(id: ToolbarControlId, state: ToolbarState): boolean {
   return isControlActive(id, state) || (id === 'measure' && state.measureMenuOpen)
-    || (id === 'laser' && state.laserMenuOpen);
+    || (id === 'template' && state.templateMenuOpen) || (id === 'laser' && state.laserMenuOpen);
 }
 
 /** The controls that go into More tools; `widths` holds each control's last measured width. */

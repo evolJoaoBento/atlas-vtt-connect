@@ -150,11 +150,11 @@ export class PlayerSession {
     return true;
   }
 
-  /** Asks the GM to add a template on the scene the player has, or remove one of their own; false when it cannot go. */
+  /** Asks the GM to add a template on the scene the player has, remove one of their own or clear theirs; false when it cannot go. */
   sendTemplate(change: TemplateChange): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'map-template', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : { remove: change.remove }) }));
+    this.link.send('control', encodeControl({ v: 1, type: 'map-template', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : 'remove' in change ? { remove: change.remove } : { clear: true as const }) }));
     return true;
   }
 

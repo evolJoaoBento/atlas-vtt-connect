@@ -170,9 +170,9 @@ export function stockLasersApi(deps: StockLasersDeps): LasersApi {
     },
 
     /** Connect's own: the players' lasting templates on the view's map, drawn in the lasers' overlay; none clears them. */
-    showTemplates: (viewId: string, templates: readonly MapTemplate[], coneAngle: number): void => {
+    showTemplates: (viewId: string, templates: readonly MapTemplate[], coneAngle: number, erase?: (id: string) => void): void => {
       const overlay = templates.length > 0 ? overlayOf(viewId) : overlays.get(viewId);
-      overlay?.setTemplates(templates, coneAngle);
+      overlay?.setTemplates(templates, coneAngle, erase);
     },
 
     /** Connect's own: a player's ping on the view's map, drawn in the lasers' overlay (an Atlas API has no such call). */

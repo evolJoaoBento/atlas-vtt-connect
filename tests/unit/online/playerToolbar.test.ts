@@ -7,7 +7,7 @@ import type { ToolbarFitLayout } from '../../../src/app/packages/components/tool
 const layout = (available: number): ToolbarFitLayout => ({ available, chrome: 19, gap: 8, overflowButtonWidth: 36 });
 // The measure group is a split button, wider than the others.
 const widths = new Map<ToolbarControlId, number>(TOOLBAR_CONTROLS.map((control) => [control.id, control.id === 'measure' ? 56 : 36]));
-const state = (overrides: Partial<ToolbarState> = {}): ToolbarState => ({ tool: 'move', shape: 'line', diceOpen: false, measureMenuOpen: false, laserMenuOpen: false, laserColor: '#ff9f2e', ...overrides });
+const state = (overrides: Partial<ToolbarState> = {}): ToolbarState => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, diceOpen: false, measureMenuOpen: false, templateMenuOpen: false, laserMenuOpen: false, laserColor: '#ff9f2e', ...overrides });
 
 describe('the join page toolbar', () => {
   it("holds Move, Measure, Template, Laser, Ping and Dice, ranked like Atlas's toolbar", () => {

@@ -5,12 +5,14 @@
  * the state the page gives it and hands clicks back; the tools themselves live in the map view.
  */
 import {
-  hiddenControls, isControlActive, LASER_COLOR_HINT, LASER_OPTIONS_LABEL, laserSwatches, MEASURE_OPTIONS_LABEL,
-  MEASURE_SHAPE_OPTIONS, measureIcon, MORE_TOOLS_LABEL, TOOLBAR_CONTROLS, type ToolbarControlId, type ToolbarState,
+  CLEAR_OWN_TEMPLATES_LABEL, hiddenControls, isControlActive, LASER_COLOR_HINT, LASER_OPTIONS_LABEL, laserSwatches, MEASURE_OPTIONS_LABEL,
+  MEASURE_SHAPE_OPTIONS, measureIcon, MORE_TOOLS_LABEL, TEMPLATE_OPTIONS_LABEL, TEMPLATE_SHAPE_OPTIONS, templateIcon, TOOLBAR_CONTROLS,
+  type ToolbarControlId, type ToolbarState,
 } from '../src/app/online/page/playerToolbar';
 import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
 import type { MeasureChoice } from '../src/app/online/view/tools/MeasureTool';
 import type { PlayerTool } from '../src/app/online/view/tools/PlayerTools';
+import type { TemplateShape } from '../src/app/online/tools/templates';
 import type { ToolbarFitLayout } from '../src/app/packages/components/toolbar/toolbarFit';
 import { iconElement, setIcon } from './icons.mts';
 
@@ -18,6 +20,10 @@ export interface PageToolbarOptions {
   root: HTMLElement;
   onTool(tool: PlayerTool): void;
   onShape(shape: MeasureChoice): void;
+  /** A shape from the Template tool's menu; without it the menu does not show. */
+  onTemplateShape?(shape: TemplateShape): void;
+  /** Clear my templates, from the same menu. */
+  onClearTemplates?(): void;
   onLaserColor(color: string): void;
   onDice(): void;
   /** Whether this toolbar's surface has the keyboard: inside Obsidian other panes' Escape must not close its menus. The page always does. */
@@ -83,16 +89,20 @@ function chevronButton(label: string, onClick: () => void): HTMLButtonElement {
   return chevron;
 }
 
-type OpenMenu = 'measure' | 'laser' | 'more';
+type OpenMenu = 'measure' | 'template' | 'laser' | 'more';
 
 export class PageToolbar {
   private state: ToolbarState = {
-    tool: 'move', shape: 'line', diceOpen: false, measureMenuOpen: false, laserMenuOpen: false, laserColor: '',
+    tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false,
+    diceOpen: false, measureMenuOpen: false, templateMenuOpen: false, laserMenuOpen: false, laserColor: '',
   };
   private readonly controls = new Map<ToolbarControlId, Control>();
   private readonly widths = new Map<ToolbarControlId, number>();
   private readonly chevron: HTMLButtonElement;
   private readonly flyout: HTMLElement;
+  private readonly templateChevron: HTMLButtonElement | null = null;
+  private readonly templateFlyout: HTMLElement | null = null;
+  private readonly clearTemplatesEntry: HTMLButtonElement | null = null;
   private readonly laserChevron: HTMLButtonElement;
   private readonly laserFlyout: HTMLElement;
   private readonly swatchButtons = new Map<string, HTMLButtonElement>();
@@ -135,6 +145,26 @@ export class PageToolbar {
       }));
     }
     measure.append(this.chevron, this.flyout);
+    // Template too: its shapes, and clearing the player's own templates.
+    if (options.onTemplateShape) {
+      const template = this.controls.get('template')!.item;
+      template.classList.add('tool-group');
+      this.templateChevron = chevronButton(TEMPLATE_OPTIONS_LABEL, () => this.setMenu(this.state.templateMenuOpen ? null : 'template'));
+      this.templateFlyout = menu();
+      for (const option of TEMPLATE_SHAPE_OPTIONS) {
+        this.templateFlyout.append(menuEntry(option.label, option.icon, () => {
+          this.closeMenus();
+          options.onTemplateShape?.(option.shape);
+        }));
+      }
+      this.clearTemplatesEntry = menuEntry(CLEAR_OWN_TEMPLATES_LABEL, 'eraser', () => {
+        this.closeMenus();
+        options.onClearTemplates?.();
+      });
+      this.clearTemplatesEntry.classList.add('menu-entry--separated');
+      this.templateFlyout.append(this.clearTemplatesEntry);
+      template.append(this.templateChevron, this.templateFlyout);
+    }
     // Laser is one too: its flyout lists the colors.
     const laser = this.controls.get('laser')!.item;
     laser.classList.add('tool-group');
@@ -156,7 +186,7 @@ export class PageToolbar {
   }
 
   /** The page's tool, shape or tray changed. */
-  update(state: Partial<Pick<ToolbarState, 'tool' | 'shape' | 'diceOpen' | 'laserColor'>>): void {
+  update(state: Partial<Pick<ToolbarState, 'tool' | 'shape' | 'templateShape' | 'ownTemplates' | 'diceOpen' | 'laserColor'>>): void {
     this.state = { ...this.state, ...state };
     this.render();
   }
@@ -173,7 +203,9 @@ export class PageToolbar {
       control.entry.hidden = !hidden.has(id);
     }
     this.more.hidden = hidden.size === 0;
-    if (this.more.hidden && !this.moreMenu.hidden) this.setMenu(this.state.measureMenuOpen ? 'measure' : this.state.laserMenuOpen ? 'laser' : null);
+    if (this.more.hidden && !this.moreMenu.hidden) {
+      this.setMenu(this.state.measureMenuOpen ? 'measure' : this.state.templateMenuOpen ? 'template' : this.state.laserMenuOpen ? 'laser' : null);
+    }
   }
 
   closeMenus(): void {
@@ -219,9 +251,11 @@ export class PageToolbar {
 
   /** Opens one menu and closes the others; an open flyout keeps its tool in the bar. */
   private setMenu(open: OpenMenu | null): void {
-    this.state = { ...this.state, measureMenuOpen: open === 'measure', laserMenuOpen: open === 'laser' };
+    this.state = { ...this.state, measureMenuOpen: open === 'measure', templateMenuOpen: open === 'template', laserMenuOpen: open === 'laser' };
     this.flyout.hidden = open !== 'measure';
     this.chevron.setAttribute('aria-expanded', String(open === 'measure'));
+    if (this.templateFlyout) this.templateFlyout.hidden = open !== 'template';
+    this.templateChevron?.setAttribute('aria-expanded', String(open === 'template'));
     this.laserFlyout.hidden = open !== 'laser';
     this.laserChevron.setAttribute('aria-expanded', String(open === 'laser'));
     this.moreMenu.hidden = open !== 'more';
@@ -230,7 +264,7 @@ export class PageToolbar {
   }
 
   private anyMenuOpen(): boolean {
-    return !this.flyout.hidden || !this.laserFlyout.hidden || !this.moreMenu.hidden;
+    return !this.flyout.hidden || this.templateFlyout?.hidden === false || !this.laserFlyout.hidden || !this.moreMenu.hidden;
   }
 
   private render(): void {
@@ -244,6 +278,13 @@ export class PageToolbar {
     const icon = toolIconUrl(measureIcon(this.state.shape));
     setIcon(measure.button, icon);
     setIcon(measure.entry, icon);
+    if (this.templateFlyout) {
+      const template = this.controls.get('template')!;
+      const shapeIcon = toolIconUrl(templateIcon(this.state.templateShape));
+      setIcon(template.button, shapeIcon);
+      setIcon(template.entry, shapeIcon);
+    }
+    if (this.clearTemplatesEntry) this.clearTemplatesEntry.disabled = !this.state.ownTemplates;
     const current = this.state.laserColor.toLowerCase();
     for (const [value, button] of this.swatchButtons) {
       button.setAttribute('aria-checked', String(value === current));

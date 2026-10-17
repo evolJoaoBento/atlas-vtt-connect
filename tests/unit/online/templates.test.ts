@@ -38,7 +38,7 @@ describe('lasting templates', () => {
     w.send(ANA, add());
     expect(w.last('p2')).toEqual([{ id: 't1', owner: 'p1', shape: 'circle', start: { x: 0, y: 0 }, end: { x: 10, y: 0 }, color: expect.stringMatching(/^#/) }]);
     expect(w.last('p1')).toHaveLength(1);
-    expect(w.show).toHaveBeenLastCalledWith('v1', w.last('p1'), 'm');
+    expect(w.show).toHaveBeenLastCalledWith('v1', w.last('p1'), 'm', expect.any(Function));
   });
 
   it('can be removed only by their owner, and all of them by the GM', () => {
@@ -75,12 +75,32 @@ describe('lasting templates', () => {
     expect(w.last('p2')).toEqual([]);
   });
 
+  it("lets a player clear all of theirs, and the GM erase anyone's", () => {
+    const w = world();
+    const p1 = ANA;
+    const p2 = BEN;
+    w.send(p1, add());
+    w.tick();
+    w.send(p1, add());
+    w.tick();
+    w.send(p2, add());
+    w.tick();
+    w.send(p1, { v: 1, type: 'map-template', sceneId: 's1', clear: true });
+    expect(w.last('p1').map((template) => template.owner)).toEqual(['p2']);
+    const erase = w.show.mock.lastCall![3] as (id: string) => void;
+    erase(w.last('p1')[0]!.id);
+    expect(w.last('p1')).toEqual([]);
+  });
+
   it('pass the wire checks only as a single add or remove', () => {
     const kind = (message: unknown): string => decodeControl(encodeControl(message as ControlMessage)).kind;
     expect(kind(add())).toBe('message');
     expect(kind({ v: 1, type: 'map-template', sceneId: 's1', remove: 't1' })).toBe('message');
     expect(kind({ ...add(), remove: 't1' })).toBe('invalid');
-    expect(kind({ v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'square', start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } })).toBe('invalid');
+    expect(kind({ v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'square', start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } })).toBe('message');
+    expect(kind({ v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'hexagon', start: { x: 0, y: 0 }, end: { x: 1, y: 1 } } })).toBe('invalid');
+    expect(kind({ v: 1, type: 'map-template', sceneId: 's1', clear: true })).toBe('message');
+    expect(kind({ v: 1, type: 'map-template', sceneId: 's1', clear: true, remove: 't1' })).toBe('invalid');
   });
 
   it('find whether a point lies on one', () => {

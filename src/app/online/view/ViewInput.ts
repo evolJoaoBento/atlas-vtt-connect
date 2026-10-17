@@ -26,6 +26,8 @@ export interface TokenGrab {
   drop(point: ScreenPoint): void;
   /** Released without moving, cancelled by the browser, or a second finger came down: nothing is sent. */
   cancel(): void;
+  /** Released without moving: a tap the tool may answer (a tap on a template removes it); without it, a `cancel`. */
+  tap?(point: ScreenPoint): void;
 }
 
 export type PointerKind = 'mouse' | 'touch' | 'pen';
@@ -116,6 +118,7 @@ export class ViewInput {
     if (this.holdingToken) {
       this.holdingToken = false;
       if (this.dragging) this.tokens?.drop({ x: input.x, y: input.y });
+      else if (this.tokens?.tap) this.tokens.tap({ x: input.x, y: input.y });
       else this.tokens?.cancel();
     }
     if (!this.dragging && input.kind === 'touch') this.tap({ x: input.x, y: input.y }, input.time);
