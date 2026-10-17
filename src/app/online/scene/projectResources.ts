@@ -5,15 +5,29 @@
  * show on hover and selection as on Atlas's own scene, and the wheels (sockets 2 to 5) beside the
  * token, always shown, each with its number; the map's own `hiddenResources` do not apply to them.
  * Resources the collection keeps from players never go out, numbers or not.
+ * The GM may choose otherwise per token or statblock (`resourceVisibility.ts`): each resource is then shown with its
+ * numbers, as a bar or wheel alone (its numbers never go out), as its numbers alone, or not at all.
  * A token whose resource that defeats it is spent is greyed with a skull whichever resources
- * players see. `visibleResources` stays the one place that picks the resources, so a rule the
+ * players see. `visibleResources` stays the one place that picks the resources and their sockets, so a rule the
  * window follows is followed here.
  */
 import { isDefeated, isSpent, resourceColor, shapeOf, visibleResources } from '@atlas-vtt/shared/rules';
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '@atlas-vtt/api-types';
 import { finiteOr } from './coerce';
+import { collectionShow, type ResourceShow } from './resourceVisibility';
 import { SCENE_RANGES } from './sceneLimits';
 import type { PlayerResource, PlayerWheel } from './sceneTypes';
+
+/** How each resource of one token is shown; without one, as its collection shows it. */
+export type ShowOf = (definition: ResourceDefinition) => ResourceShow;
+
+/** The token's resources with a value, in their sockets, that players see something of, with how. */
+function shownResources(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf) {
+  // The GM's view lists every slotted resource with a value; which of them go out is the show's to say.
+  return visibleResources(token, definitions, 'dm')
+    .map((entry) => ({ ...entry, show: showOf(entry.definition) }))
+    .filter((entry) => entry.show !== 'hidden');
+}
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const NEUTRAL_COLOR = '#888888';
@@ -34,10 +48,10 @@ function hexOr(color: unknown): string {
 }
 
 /** The bars the player window draws on `token`, top to bottom. */
-export function projectBars(token: ResourceHolder, definitions: readonly ResourceDefinition[]): PlayerResource[] {
+export function projectBars(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): PlayerResource[] {
   let darkened = false;
   const bars: PlayerResource[] = [];
-  for (const { definition, value, slot } of visibleResources(token, definitions, 'player')) {
+  for (const { definition, value, slot, show } of shownResources(token, definitions, showOf)) {
     if (shapeOf(slot) !== 'bar') continue;
     const fixed = definition.direction === 'static';
     // The window darkens the first bar whose spending defeats the token, and only that one.
@@ -45,9 +59,10 @@ export function projectBars(token: ResourceHolder, definitions: readonly Resourc
     darkened ||= dark;
     bars.push({
       color: hexOr(resourceColor(definition, value)), share: fixed ? 1 : shareOf(value), spent: dark,
-      // The numbers Atlas's scene shows on the bar on hover and selection: of resources the collection shows to players only.
-      current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue),
+      // The numbers Atlas's scene shows on the bar on hover and selection; a bar shown alone never carries them.
+      ...(show !== 'bar' ? { current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue) } : {}),
       ...(fixed ? { fixed: true } : {}),
+      ...(show === 'numbers' ? { bar: false as const } : {}),
     });
   }
   return bars;
@@ -57,16 +72,20 @@ export function projectBars(token: ResourceHolder, definitions: readonly Resourc
  * The wheels the player window draws beside `token`, in socket order: the resources players see in sockets 2 to 5,
  * each with its numbers, which the window shows in the wheel's middle (`ResourceWheelView`), its wheels at rest.
  */
-export function projectWheels(token: ResourceHolder, definitions: readonly ResourceDefinition[]): PlayerWheel[] {
+export function projectWheels(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): PlayerWheel[] {
   const wheels: PlayerWheel[] = [];
-  for (const { definition, value, slot } of visibleResources(token, definitions, 'player')) {
+  for (const { definition, value, slot, show } of shownResources(token, definitions, showOf)) {
     if (shapeOf(slot) !== 'wheel') continue;
+    const fixed = definition.direction === 'static';
     wheels.push({
       slot: finiteOr(slot, 2, SCENE_RANGES.wheelSlot),
       color: hexOr(resourceColor(definition, value)),
-      current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue),
-      max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue),
-      fixed: definition.direction === 'static',
+      // A wheel shown alone carries how full it is, never its numbers (nor its segments, which would tell its maximum).
+      ...(show === 'bar'
+        ? { share: fixed ? 1 : shareOf(value) }
+        : { current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue) }),
+      fixed,
+      ...(show === 'numbers' ? { ring: false as const } : {}),
     });
   }
   return wheels;
@@ -78,12 +97,14 @@ export function isDowned(token: ResourceHolder & { kind?: unknown }, definitions
 }
 
 /**
- * How full the bar of the player window's initiative list is: the token's `hp` resource, where the
- * collection shows `hp` to players, whatever socket it takes. Null when the list draws no bar.
+ * How full the bar of the player window's initiative list is: the token's `hp` resource, where players
+ * see its bar (the collection shows `hp` to players, or the GM's choice for the token shows a bar), whatever
+ * socket it takes. Null when the list draws no bar.
  */
-export function initiativeShare(token: ResourceHolder | undefined, definitions: readonly ResourceDefinition[]): number | null {
-  const shown = definitions.some((definition) => definition.key === INITIATIVE_KEY && definition.visibleToPlayers);
+export function initiativeShare(token: ResourceHolder | undefined, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): number | null {
+  const definition = definitions.find((candidate) => candidate.key === INITIATIVE_KEY);
+  const show = definition ? showOf(definition) : 'hidden';
   const value = token?.resources?.[INITIATIVE_KEY];
-  if (!shown || !value || !(finiteOr(value.max, 0) > 0)) return null;
+  if ((show !== 'both' && show !== 'bar') || !value || !(finiteOr(value.max, 0) > 0)) return null;
   return shareOf(value);
 }

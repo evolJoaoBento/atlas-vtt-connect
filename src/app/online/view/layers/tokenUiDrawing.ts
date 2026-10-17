@@ -100,6 +100,11 @@ function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFram
   bars.forEach((bar, index) => {
     const rect = rects[index];
     if (!rect) return;
+    // The GM shows this resource's numbers alone: always shown, with no bar under them.
+    if (bar.bar === false) {
+      if (bar.current !== undefined && bar.max !== undefined) drawBarNumbers(surface, rect, bar, 1);
+      return;
+    }
     drawBar(surface, rect, barFrame(index, bar.share), bar.color);
     // The window darkens the bar whose spending defeats the token.
     if (bar.spent) {

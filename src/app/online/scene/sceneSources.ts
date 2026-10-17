@@ -7,6 +7,7 @@ import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import type { ProjectionContext } from './projectForPlayers';
+import type { ResourceVisibilitySource } from './resourceVisibility';
 import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import type { SceneSession } from './sceneContracts';
 import type { LightingSource } from './sceneLighting';
@@ -49,6 +50,8 @@ export interface SceneProjectionOptions {
   diceLook?: DiceLookSource;
   /** The image the GM shows players; without it no scene carries a handout. */
   handout?: HandoutSource;
+  /** What the GM lets players see of each resource per token and statblock; without it, what the collection shows. */
+  resourceVisibility?: ResourceVisibilitySource;
 }
 
 /** The dice look of a map's collection, as the GM's Atlas has it (`dice.lookFor`, API 1.18); players are sent it with the scene. */
@@ -118,8 +121,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
@@ -128,6 +131,7 @@ export function sceneContext(
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
+    ...(options.resourceVisibility ? { resourceShows: options.resourceVisibility.forMap(mapPath) } : {}),
     conditions: options.conditions?.(mapPath) ?? [],
     ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),

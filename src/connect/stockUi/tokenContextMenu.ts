@@ -114,6 +114,7 @@ function fill(into: HTMLElement, items: MenuItem[], deps: TokenContextMenuDeps, 
       trail.appendChild(chevron);
       row.append(lead, trail);
       const sub = make('div', 'atlas-connect-ctx-sub');
+      sub.dataset.label = entry.label;
       fill(sub, entry.submenu, deps, close, redraw);
       // An open list stays open while it is redrawn after a choice.
       sub.hidden = !open.has(entry.label);
@@ -121,8 +122,18 @@ function fill(into: HTMLElement, items: MenuItem[], deps: TokenContextMenuDeps, 
       row.addEventListener('click', () => {
         sub.hidden = !sub.hidden;
         chevron.classList.toggle('is-open', !sub.hidden);
-        if (sub.hidden) open.delete(entry.label);
-        else open.add(entry.label);
+        if (sub.hidden) {
+          open.delete(entry.label);
+          return;
+        }
+        open.add(entry.label);
+        // One list open at a time beside it, so Atlas's menu stays short enough to fit the window.
+        for (const other of Array.from(into.children)) {
+          if (other === sub || !other.classList.contains('atlas-connect-ctx-sub') || other.hasAttribute('hidden')) continue;
+          other.setAttribute('hidden', '');
+          open.delete(other.getAttribute('data-label') ?? '');
+          other.previousElementSibling?.querySelector('.atlas-connect-ctx-chevron')?.classList.remove('is-open');
+        }
       });
       into.append(row, sub);
       continue;

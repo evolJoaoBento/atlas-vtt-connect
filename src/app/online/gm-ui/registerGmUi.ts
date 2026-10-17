@@ -11,6 +11,7 @@ import { onlineSessionStore } from '../onlineSessionStore';
 import { ONLINE_SESSION_LABEL, PRESENT_LABEL, STOP_PRESENTING_LABEL } from '../ui/onlineCopy';
 import { presentedSceneSummaries } from '../ui/presentedSceneSummary';
 import { controlledByProvider } from './controlledByMenu';
+import { resourceVisibilityProvider, type ResourceVisibilityMenuDeps } from './resourceVisibilityMenu';
 import { mountPanel } from './mountPanel';
 import { onlinePaletteSection } from './onlinePalette';
 import { presentingActions } from './presentingHere';
@@ -27,6 +28,8 @@ export interface GmUiOptions {
   presented: PresentedSceneSource;
   /** Opens "Join online session…"; without it the panel offers no join. */
   joinSession?: () => void;
+  /** What players see of each resource, set from a token's menu; without it the menu has no such entries. */
+  resourceVisibility?: Pick<ResourceVisibilityMenuDeps, 'store' | 'resources'>;
 }
 
 /** What `registerGmUi` hands back: the disposer, and the way "Online session…" opens the panel. */
@@ -72,6 +75,11 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
       ];
     }),
     ui.addTokenMenuItems(controlledByProvider()),
+    ...(options.resourceVisibility ? [
+      ui.addTokenMenuItems(resourceVisibilityProvider({ views, ...options.resourceVisibility })),
+      // An open menu shows the choice just made.
+      options.resourceVisibility.store.subscribe(invalidate),
+    ] : []),
     () => panel.dispose(),
   ];
 
