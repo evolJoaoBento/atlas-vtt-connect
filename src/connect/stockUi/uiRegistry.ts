@@ -8,6 +8,7 @@ import type {
   DashboardTile, Disposer, MenuItem, PaletteSection, PanelHandle, PanelSpec, SceneTabMenuContext, SceneTabMenuSection, TokenMenuContext,
   ToolbarItem, UiApi, ViewContext,
 } from '@atlas-vtt/api-types';
+import type { EditTokenSectionProvider, EditTokenSectionsApi } from '../../app/online/gm-ui/editTokenSection';
 
 /** What the dock needs of the panels, so `PanelHandle` can open and close them. */
 export interface PanelHost {
@@ -26,6 +27,8 @@ export interface UiRecords {
   readonly tokenMenus: Set<(ctx: TokenMenuContext) => MenuItem[]>;
   readonly panels: Map<string, PanelSpec>;
   readonly sceneTabSections: Set<SceneTabMenuSection>;
+  /** Connect's own sections of Atlas's Edit Token dialog: not in Atlas's API, drawn on a stock Atlas only. */
+  readonly editTokenSections: Set<EditTokenSectionProvider>;
 }
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
@@ -35,9 +38,10 @@ function need(call: string, field: string, ok: boolean): void {
 }
 
 /** A registry of the slots and the `UiApi` over it; `changed` runs whenever a slot is added, removed or re-read. */
-export function createUiRegistry(host: () => PanelHost | null, changed: () => void): { records: UiRecords; api: UiApi; dispose: Disposer } {
+export function createUiRegistry(host: () => PanelHost | null, changed: () => void): { records: UiRecords; api: UiApi & EditTokenSectionsApi; dispose: Disposer } {
   const records: UiRecords = {
     toolbar: new Map(), palette: new Map(), tiles: new Map(), viewMenus: new Set(), tokenMenus: new Set(), panels: new Map(), sceneTabSections: new Set(),
+    editTokenSections: new Set(),
   };
   const disposers = new Set<Disposer>();
   let disposed = false;
@@ -68,7 +72,7 @@ export function createUiRegistry(host: () => PanelHost | null, changed: () => vo
     return remove;
   };
 
-  const api: UiApi = Object.freeze({
+  const api: UiApi & EditTokenSectionsApi = Object.freeze({
     addToolbarItem: (item: ToolbarItem): Disposer => {
       need('ui.addToolbarItem', 'item', typeof item === 'object' && item !== null);
       need('ui.addToolbarItem', 'icon', isText(item.icon));
@@ -98,6 +102,10 @@ export function createUiRegistry(host: () => PanelHost | null, changed: () => vo
     addTokenMenuItems: (provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer => {
       need('ui.addTokenMenuItems', 'provider', typeof provider === 'function');
       return listed(records.tokenMenus, provider);
+    },
+    addEditTokenSection: (provider: EditTokenSectionProvider): Disposer => {
+      need('ui.addEditTokenSection', 'provider', typeof provider === 'function');
+      return listed(records.editTokenSections, provider);
     },
     addPanel: (panel: PanelSpec): PanelHandle => {
       need('ui.addPanel', 'panel', typeof panel === 'object' && panel !== null);

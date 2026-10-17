@@ -155,7 +155,7 @@ describe('projectWheels', () => {
   it('holds values players could not draw to the wire range', () => {
     const wheels = projectWheels(holder({ huge: { current: 5e9, max: Number.NaN } }), [define('huge', { slot: 2 })]);
     for (const wheel of wheels) {
-      expect(Math.abs(wheel.current)).toBeLessThanOrEqual(1_000_000);
+      expect(Math.abs(wheel.current!)).toBeLessThanOrEqual(1_000_000);
       expect(Number.isFinite(wheel.max)).toBe(true);
     }
   });

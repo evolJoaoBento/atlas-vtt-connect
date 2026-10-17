@@ -102,15 +102,22 @@ const isUnit = inRange([0, 1]);
 function isResource(value: unknown): boolean {
   return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent)
     && optional(inRange(SCENE_RANGES.resourceValue))(value.current) && optional(inRange(SCENE_RANGES.resourceValue))(value.max)
-    && optional(isBoolean)(value.fixed);
+    && optional(isBoolean)(value.fixed) && (value.bar === undefined || value.bar === false);
 }
 function isResources(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((bar) => isResource(bar));
 }
 function isWheel(value: unknown): boolean {
   return isFields(value) && Number.isInteger(value.slot) && inRange(SCENE_RANGES.wheelSlot)(value.slot)
-    && typeof value.color === 'string' && HEX_COLOR.test(value.color)
-    && inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && isBoolean(value.fixed);
+    && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isBoolean(value.fixed)
+    && (value.ring === undefined || value.ring === false)
+    // Its numbers, how full it is where the GM keeps them back, or the one number shown alone.
+    && (value.ring === false
+      ? value.share === undefined && (value.current !== undefined || value.max !== undefined)
+        && optional(inRange(SCENE_RANGES.resourceValue))(value.current) && optional(inRange(SCENE_RANGES.resourceValue))(value.max)
+      : value.current === undefined && value.max === undefined
+        ? isUnit(value.share)
+        : inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && value.share === undefined);
 }
 function isWheels(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((wheel) => isWheel(wheel));

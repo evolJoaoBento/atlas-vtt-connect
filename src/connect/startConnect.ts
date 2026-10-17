@@ -7,6 +7,7 @@ import { openJoinSessionModal } from '../app/online/obsidian/ui/JoinSessionModal
 import { OnlineSessionService, type Deps } from '../app/online/OnlineSessionService';
 import { registerGmUi } from '../app/online/gm-ui/registerGmUi';
 import { registerOnline } from '../app/online/registerOnline';
+import { ResourceVisibilityStore, resourceVisibilityFile } from '../app/online/scene/resourceVisibility';
 import { SHARE_PROPERTY } from '../app/online/sharing/model/shareRule';
 import { PeopleBook } from '../app/online/sharing/people/PeopleBook';
 import type { SharingLifetime } from '../app/online/sharing/sharingLifetime';
@@ -52,11 +53,23 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   // Atlas went (and may be back) while the folder was asked for: a newer setup owns the service and the commands.
   if (!paths || gone()) return { service: null, stop: () => undefined };
   const people = PeopleBook.forApp(plugin.app, paths);
-  const deps: Deps = { ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) }), people, isJoined: () => isInSession(joinedSessionStore.getState()), ...options.hosting };
+  // What players see of each resource per token and statblock: the GM's choices, kept beside Connect's other files.
+  const storage = need(api, atlas, 'storage');
+  const adapter = plugin.app.vault.adapter;
+  const resourceVisibility = storage ? new ResourceVisibilityStore(resourceVisibilityFile(async () => `${await storage.folder()}/resource-visibility.json`, adapter)) : undefined;
+  void resourceVisibility?.load();
+  const deps: Deps = {
+    ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) }),
+    people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), ...options.hosting,
+  };
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
-  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views, on: atlas.on.bind(atlas) }, service, { presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app) }) : undefined;
+  const resources = deps.resources;
+  const gmUi = ui ? registerGmUi({ ui, presentation: atlas.presentation, views: atlas.views, on: atlas.on.bind(atlas) }, service, {
+    presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app),
+    ...(resourceVisibility && resources ? { resourceVisibility: { store: resourceVisibility, resources } } : {}),
+  }) : undefined;
   const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), ...(gmUi ? { gmUi } : {}) });
   return {
     service,

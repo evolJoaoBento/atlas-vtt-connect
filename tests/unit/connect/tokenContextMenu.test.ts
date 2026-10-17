@@ -73,6 +73,22 @@ describe("Connect in Atlas's right-click menu of a token", () => {
     expect(t.players.has('Ana')).toBe(false);
   });
 
+  it('keeps one list open at a time, so the menu stays short', async () => {
+    const list = (label: string): MenuItem => ({ label, submenu: [{ label: `${label} choice`, keepOpen: true, onClick: () => undefined }] });
+    const t = setup({ items: () => [list('HP for players'), list('Ki for players')] });
+    t.rightPress();
+    atlasMenu();
+    await vi.advanceTimersByTimeAsync(0);
+    const subs = (): boolean[] => [...document.querySelectorAll<HTMLElement>('.atlas-connect-ctx-sub')].map((sub) => sub.hidden);
+    t.rows().find((row) => row.textContent === 'HP for players')!.click();
+    expect(subs()).toEqual([false, true]);
+    t.rows().find((row) => row.textContent === 'Ki for players')!.click();
+    expect(subs()).toEqual([true, false]);
+    // A choice redraws the menu: the list chosen in stays the open one.
+    t.rows().find((row) => row.textContent === 'Ki for players choice')!.click();
+    expect(subs()).toEqual([true, false]);
+  });
+
   it('puts the entries back when React draws the menu anew', async () => {
     const t = setup();
     t.rightPress();

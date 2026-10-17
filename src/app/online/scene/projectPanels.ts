@@ -9,12 +9,21 @@ import { isWidgetOn } from '../../utils/widgetActivation';
 import { finiteOr, oneOf, textOr, textOrNull } from './coerce';
 import type { PlayerViewRules } from './playerViewRules';
 import { initiativeShare } from './projectResources';
+import { COLLECTION_SHOWS, type TokenResourceShows } from './resourceVisibility';
 import {
   PLAYER_SIDES, PLAYER_WIDGET_TYPES, type PlayerInitiative, type PlayerInitiativeSides, type PlayerToken, type PlayerWidget,
 } from './sceneTypes';
 import { SCENE_LIMITS } from './sceneLimits';
 import { setOwn } from './sceneDiff';
 import { isSceneId } from './sceneValidation';
+
+/** The initiative list's bar for the token `tokenId`, by what the GM lets players see of its `hp`. */
+function hpShareOf(tokens: Readonly<Record<string, TokenEntity>>, tokenId: string, definitions: readonly ResourceDefinition[], resourceShows: TokenResourceShows): number | null {
+  const token = Object.hasOwn(tokens, tokenId) ? tokens[tokenId] : undefined;
+  if (!token) return null;
+  const showOf = resourceShows(tokenId, token.kind === 'character' ? token : {});
+  return initiativeShare(token, definitions, showOf);
+}
 
 type WidgetState = Pick<SceneSnapshot, 'widgets'>;
 type InitiativeState = Pick<SceneSnapshot, 'initiative' | 'initiativeTrackerOpen'>;
@@ -84,6 +93,7 @@ export function projectInitiative(
   rules: PlayerViewRules,
   definitions: readonly ResourceDefinition[] = [],
   initiativeRules: InitiativeRules = DEFAULT_INITIATIVE_RULES,
+  resourceShows: TokenResourceShows = COLLECTION_SHOWS,
 ): PlayerInitiative | null {
   const initiative = state.initiative;
   if (!rules.showInitiative || !state.initiativeTrackerOpen || !initiative) return null;
@@ -101,7 +111,7 @@ export function projectInitiative(
       name: rules.showTokenNameplates ? textOrNull(entry.name) : null,
       // Entries keep no HP since Atlas 0.5: the bar is the token's `hp` resource, as the player window draws it.
       hp: null,
-      hpShare: initiativeShare(Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId] : undefined, definitions),
+      hpShare: hpShareOf(tokens, entry.tokenId, definitions, resourceShows),
       isActive: !sides && combat && entry.isActive === true,
       ...(entry.sitsOut === true && { sitsOut: true as const }),
     }));

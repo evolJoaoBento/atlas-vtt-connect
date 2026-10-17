@@ -338,3 +338,14 @@ $connect-dock-z: 1000;
 /* Connect's tooltip over a toolbar button: fixed from the moment it is in the page, shown once placed (`nativeToolbar.ts`). */
 .tooltip-content.atlas-connect-tip { position: fixed; left: 0; top: 0; width: max-content; max-width: calc(100vw - 16px); pointer-events: none; visibility: hidden; }
 .tooltip-content.atlas-connect-tip.is-placed { visibility: visible; }
+
+/* "Players see" in Atlas's Edit Token dialog: a resource per row, a choice per column (this token, every token of its statblock). */
+.atlas-connect-edit-table {
+  display: grid;
+  grid-template-columns: auto repeat(var(--atlas-connect-edit-columns, 1), minmax(0, 1fr));
+  align-items: center;
+  gap: 6px 8px;
+}
+.atlas-connect-edit-table__heading { font-size: var(--font-ui-smaller); }
+.atlas-connect-edit-table__label { white-space: nowrap; }
+.atlas-connect-edit-table__choice { width: 100%; min-width: 0; }

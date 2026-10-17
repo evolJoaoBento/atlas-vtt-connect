@@ -1,7 +1,7 @@
 {
   "id": "atlas-vtt-connect",
   "name": "Atlas VTT Extension - Connect",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.8.7",
   "description": "Online play for Atlas VTT: host sessions, let players join from a web page or a tab, and share notes and maps.",
   "author": "João Bento",

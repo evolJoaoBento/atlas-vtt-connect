@@ -52,10 +52,15 @@ export function wheelCentre(slot: number): { x: number; y: number; left: boolean
   return { x, y, left };
 }
 
-/** Where the filled share of a wheel ends and its segments are divided, in radians clockwise from the top. */
+/**
+ * Where the filled share of a wheel ends and its segments are divided, in radians clockwise from the top; null for no
+ * gauge. A wheel the GM sends without numbers fills to its `share` with no segments; one sent as its number alone has none.
+ */
 export function wheelGauge(wheel: PlayerWheel): { share: number; ticks: number[] } | null {
+  if (wheel.ring === false) return null;
   if (wheel.fixed) return { share: 1, ticks: [] };
   const { current, max } = wheel;
+  if (current === undefined || max === undefined) return wheel.share === undefined ? null : { share: Math.max(0, Math.min(1, wheel.share)), ticks: [] };
   if (!(max > 0)) return null;
   const share = Math.max(0, Math.min(1, current / max));
   const segmented = Number.isInteger(max) && max > 1 && max <= WHEEL.maxSegments;
@@ -85,8 +90,9 @@ function drawWheel(surface: ViewSurface, x: number, y: number, wheel: PlayerWhee
   // Border and track as on a bar: the track covers the inner half of the border's stroke.
   surface.circle(x, y, outer, { stroke: css(BAR_STYLE.border), lineWidth: BAR_BORDER });
   surface.circle(x, y, outer - BAR_BORDER / 2, { fill: css(BAR_STYLE.inside) });
-  surface.circle(x, y, RING_RADIUS, { stroke: css(BAR_STYLE.tick), lineWidth: WHEEL.ringWidth, alpha: BAR_STYLE.tickAlpha });
   const gauge = wheelGauge(wheel);
+  // A wheel shown as its number alone keeps its disc, without the ring's track.
+  if (wheel.ring !== false) surface.circle(x, y, RING_RADIUS, { stroke: css(BAR_STYLE.tick), lineWidth: WHEEL.ringWidth, alpha: BAR_STYLE.tickAlpha });
   if (gauge) {
     if (gauge.share >= 1) {
       // A full ring is a circle: an arc that ends where it began leaves a seam.
@@ -108,7 +114,9 @@ function drawWheel(surface: ViewSurface, x: number, y: number, wheel: PlayerWhee
     ]);
     if (ticks.length > 0) surface.paths(ticks, false, { stroke: css(BAR_STYLE.inside), lineWidth: WHEEL.tickWidth });
   }
-  const label = String(wheel.fixed ? wheel.max : wheel.current);
+  const number = wheel.fixed ? wheel.max : wheel.current;
+  if (number === undefined) return;
+  const label = String(number);
   surface.push(x, y, 0, WHEEL_NUMBER.scale * Math.min(1, WHEEL.fullSizeCharacters / label.length));
   surface.text(label, 0, 0, { font: WHEEL_NUMBER.font, color: WHEEL_NUMBER.color, align: 'center', outline: WHEEL_NUMBER.outline });
   surface.pop();

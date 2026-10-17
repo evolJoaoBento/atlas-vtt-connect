@@ -6,6 +6,7 @@ import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { REMOTE_FOG_LIMITS } from '../../../src/app/online/scene/remoteFogLimits';
+import { ResourceVisibilityStore } from '../../../src/app/online/scene/resourceVisibility';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { readFileSync } from 'node:fs';
 import { createTabScenes } from '../../../src/app/online/atlas/tabScenes';
@@ -122,6 +123,8 @@ interface Harness {
   setResources(next: readonly ResourceDefinition[]): void;
   /** The GM edits the collection's initiative rules; announced the same way. */
   setInitiativeRules(next: InitiativeRules): void;
+  /** The GM's choices of what players see of each resource per token and statblock, read from an empty file. */
+  visibility: ResourceVisibilityStore;
 }
 
 function setup(options: { start?: boolean; images?: Record<string, string | Uint8Array> } = {}): Harness {
@@ -145,7 +148,9 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
   let definitions: readonly ResourceDefinition[] = [HP];
   let initiativeRules: InitiativeRules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
   const resourceListeners = new Set<() => void>();
-  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(),
+  const visibility = new ResourceVisibilityStore({ load: () => Promise.resolve(null), save: () => Promise.resolve() });
+  void visibility.load();
+  const broadcaster = new SceneHub({ tabs: null, assignments: new SceneAssignments(), resourceVisibility: visibility,
     session: gm, presented, settings, assets, notify: (message) => notices.push(message),
     resources: () => definitions,
     initiativeRules: () => initiativeRules,
@@ -164,7 +169,7 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
     initiativeRules = next;
     resourceListeners.forEach((listener) => listener());
   };
-  return { network, gm, requests, presented, broadcaster, notices, setRules, setResources, setInitiativeRules, files };
+  return { network, gm, requests, presented, broadcaster, notices, setRules, setResources, setInitiativeRules, files, visibility };
 }
 
 /** A player through `PlayerSession`, admitted by the GM. */
@@ -308,6 +313,23 @@ describe('SceneHub', () => {
     await tick();
     expect(player.scene?.tokens.hero?.resources).toEqual([HP_BAR]);
     h.setResources([HP]);
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([]);
+  });
+
+  it("sends players a token's bar again when the GM changes only what they see of it, and nothing else changed", async () => {
+    const h = setup();
+    const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140), goblin: character('goblin', 280, { statblockPath: 'B/Goblin.md' }) }));
+    h.presented.present(view, tavern);
+    const player = await join(h);
+    expect(player.scene?.tokens.hero?.resources).toEqual([]);
+    h.visibility.setTokenShow('maps/tavern.atlasmap', 'hero', 'hp', 'bar');
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#22c55e', share: 0.7, spent: false }]);
+    h.visibility.setStatblockShow('B/Goblin.md', 'hp', 'numbers');
+    await tick();
+    expect(player.scene?.tokens.goblin?.resources).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 7, bar: false }]);
+    h.visibility.setTokenShow('maps/tavern.atlasmap', 'hero', 'hp', null);
     await tick();
     expect(player.scene?.tokens.hero?.resources).toEqual([]);
   });
