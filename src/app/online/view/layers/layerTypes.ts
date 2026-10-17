@@ -18,6 +18,10 @@ export interface TokenOverlay {
   positions: ReadonlyMap<string, ScenePoint>;
   /** The token being dragged: it follows the pointer, where every other move glides. */
   held?: string | null;
+  /** The token the player selected with a click: its UI grows to a constant size on screen and shows its numbers. */
+  selected?: string | null;
+  /** The token under the pointer: its bar numbers show. */
+  hovered?: string | null;
 }
 
 export const NO_TOKEN_OVERLAY: TokenOverlay = { controlled: new Set(), positions: new Map() };
@@ -34,6 +38,8 @@ export interface LayerFrame {
   /** The map's area, or without a map size the scene's content; null for an empty scene. */
   bounds: WorldRect | null;
   overlay: TokenOverlay;
+  /** Whether the page is in a dark theme, as Atlas reads Obsidian's (`theme-dark`); dark when unset. */
+  dark?: boolean;
 }
 
 export interface PlayerLayer {

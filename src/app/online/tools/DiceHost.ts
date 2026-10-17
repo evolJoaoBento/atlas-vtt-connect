@@ -16,6 +16,41 @@ import type { SceneSession } from '../scene/sceneSources';
 import { admitted } from '../scene/slotAudience';
 import type { SlotProjection } from '../scene/slotViews';
 import { cleanSceneLabel, DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry } from './toolMessages';
+import type { AdvantageSide } from './sheets';
+
+/** What a roll from a player's sheet adds: the ability Atlas's toast names it after, and the side it is rolled with. */
+export interface SheetRollExtras {
+  abilityName?: string;
+  advantage?: AdvantageSide;
+}
+
+/** A player's roll as `DiceHostOptions.roll` gets it: Atlas's request and what a roll from a sheet adds. */
+export type PlayerRollRequest = DiceRollRequest & SheetRollExtras;
+
+/**
+ * Dice APIs that roll `SheetRollExtras` themselves (Connect's stand-in for a stock Atlas, whose dice tool takes the
+ * ability and the side). Any other is asked with Atlas's own request, the extras folded in (`foldedRequest`).
+ */
+export const SHEET_AWARE_DICE = new WeakSet<object>();
+
+/** Longest roll label Atlas's API takes (`rolledBy`). */
+const MAX_API_ROLLED_BY = 40;
+
+/**
+ * A sheet roll as an Atlas API without the extras takes it: the ability in the roller's name ("Anna: Dagger"), and the
+ * side as a d20 kept high or low, the dice of a d20 system's stat block (a bare bonus is added to `2d20kh1`).
+ */
+export function foldedRequest(request: PlayerRollRequest): DiceRollRequest {
+  const { abilityName, advantage, ...base } = request;
+  const rolledBy = base.rolledBy && abilityName ? `${base.rolledBy}: ${abilityName}`.slice(0, MAX_API_ROLLED_BY) : base.rolledBy;
+  let { formula } = base;
+  if (advantage) {
+    const keep = advantage === 'advantage' ? '2d20kh1' : '2d20kl1';
+    if (/^[+-]\d+$/.test(formula)) formula = `${keep}${formula}`;
+    else formula = formula.replace(/^1?d20(?![\d!k])/i, keep);
+  }
+  return { ...base, formula, ...(rolledBy !== undefined ? { rolledBy } : {}) };
+}
 
 /** Every roll Atlas's dice log gets (`dice.onRolled`), and a way to add one made elsewhere (`dice.publish`). */
 export interface DiceFeed {
@@ -28,9 +63,12 @@ export interface DiceHostOptions {
   /** Each player's scene, the one the GM's view shows, and how many are in use: names and labels come from them. */
   projection: Pick<SlotProjection, 'slotOf' | 'shownSlot' | 'scenesInUse'>;
   /** Rolls and logs by the rules of the collection holding `mapPath` (`dice.roll`); the feed hears the roll before this returns. */
-  roll(request: DiceRollRequest): DiceRollResult;
+  roll(request: PlayerRollRequest): DiceRollResult;
   feed: DiceFeed;
 }
+
+/** Longest name Atlas takes for who rolled (`DiceRollRequest.rolledBy`). */
+const MAX_ROLLED_BY = 40;
 
 /** Room left in a message for its envelope. */
 const ENVELOPE_BYTES = 1024;
@@ -95,19 +133,32 @@ export class DiceHost implements SessionHandler {
    * decides which dice are the default dice a crit or a `default` explosion looks at.
    */
   onMessage(player: SessionPlayer, message: ControlMessage): void {
-    if (message.type !== 'dice-roll' || !this.limit.allow(player.playerId, Date.now())) return;
+    if (message.type !== 'dice-roll') return;
     const formula = playerRollFormula(message.dice, message.modifier);
     if (formula === null) {
       console.warn('[Atlas VTT Connect] A player roll was ignored: Atlas does not roll that formula.');
       return;
     }
-    this.rolling = { playerId: player.playerId, name: player.name };
+    this.rollFor(player, formula);
+  }
+
+  /**
+   * Rolls `formula` for `player` through Atlas, logged under their name and marked theirs, named after the ability of
+   * their sheet it was rolled from and with its side (`extras`); false when it went over their rolls a second or Atlas
+   * refused it.
+   */
+  rollFor(player: SessionPlayer, formula: string, extras: SheetRollExtras = {}): boolean {
+    if (!this.limit.allow(player.playerId, Date.now())) return false;
+    const label = player.name.slice(0, MAX_ROLLED_BY);
+    this.rolling = { playerId: player.playerId, name: label };
     try {
       // The map of the player's own scene: what they see, live or parked; none while they have no scene.
-      this.options.roll({ formula, mapPath: this.options.projection.slotOf(player.playerId)?.mapPath || null, rolledBy: player.name });
+      this.options.roll({ formula, mapPath: this.options.projection.slotOf(player.playerId)?.mapPath || null, rolledBy: label, ...extras });
+      return true;
     } catch (error) {
       // Atlas refuses a formula it cannot roll by throwing; one player's roll must not stop the session's other messages.
       console.warn('[Atlas VTT Connect] A player roll was ignored:', error);
+      return false;
     } finally {
       this.rolling = null;
     }
@@ -119,7 +170,10 @@ export class DiceHost implements SessionHandler {
   }
 
   private rolled(result: DiceRollResult): void {
-    const base = diceLogEntry(result, result.rolledBy ? playerName(result.rolledBy) : GM_ROLLER_NAME);
+    // A roll from a player's sheet reads "Anna: Dagger" in the players' log, as Atlas's toast names its ability.
+    const ability = result.rolledBy ? result.source?.abilityName?.trim() : undefined;
+    const roller = result.rolledBy ? playerName(result.rolledBy) : GM_ROLLER_NAME;
+    const base = diceLogEntry(result, ability ? `${roller}: ${ability}` : roller);
     if (!base) return;
     const { rolling } = this;
     const rolledBy = rolling && result.rolledBy === rolling.name ? rolling.playerId : null;

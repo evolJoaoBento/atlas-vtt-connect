@@ -159,6 +159,6 @@ describe('tags in the join page and Canvas tab dice log', () => {
   it('shows the same in the toast', () => {
     const { view, toast } = setup();
     view.receive([entry([{ die: 'd6', value: 4, color: '#ff6a00', colorName: 'Fire' }])], false);
-    expect(toast.querySelector('.die-badge')?.textContent).toBe('d6: 4 · ● Fire');
+    expect(toast.querySelector('.dice-card-die')?.textContent).toBe('d6: 4 · ● Fire');
   });
 });

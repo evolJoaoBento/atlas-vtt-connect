@@ -5,6 +5,10 @@
  * session's status and offers Follow GM, Fit map and Reconnect. It is Connect's player view on an Atlas without the
  * remote view; it needs nothing of Atlas's map.
  */
+import { SheetView } from '../../../../online-client/sheetView.mts';
+import type { TokenSheet } from '../tools/sheets';
+import type { PlayerPing } from '../tools/pings';
+import type { MapTemplate } from '../tools/templates';
 import { DiceLogView } from '../../../../online-client/diceLogView.mts';
 import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
@@ -21,7 +25,7 @@ import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
 import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
-export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser'>;
+export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -42,6 +46,7 @@ export class CanvasScene implements OnlineSceneSink {
   readonly map: MapView | null;
   private readonly tray: DiceTrayView;
   private readonly log: DiceLogView;
+  private readonly sheetView: SheetView;
   private readonly toolbar: PageToolbar;
   private readonly listeners = new AbortController();
   private state: PlayerSessionState | null = null;
@@ -61,7 +66,14 @@ export class CanvasScene implements OnlineSceneSink {
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),
+        sendPing: (x, y) => service.sendPing(x, y),
+        sendTemplate: (change) => service.sendTemplate(change),
         notice: dom.moveNotice,
+        hoverCard: dom.hoverCard,
+        turnNotice: dom.turnNotice,
+        initiative: dom.initiative,
+        statblockPreview: dom.statblockPreview,
+        handout: dom.handout,
         onToolsChange: () => this.syncToolbar(),
         ...(options.frames ? { frames: options.frames } : {}),
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),
@@ -81,10 +93,18 @@ export class CanvasScene implements OnlineSceneSink {
       ...(options.active ? { active: options.active } : {}),
       doc,
     });
+    this.sheetView = new SheetView({
+      panel: dom.sheetPanel, body: dom.sheetBody, tabs: dom.sheetTabs, closeButton: dom.sheetClose, toggleButton: dom.sheetButton,
+      onRoll: (tokenId, roll) => service.sendSheetRoll(tokenId, roll),
+      ...(options.active ? { active: options.active } : {}),
+      doc,
+    });
     this.toolbar = new PageToolbar({
       root: dom.toolbar,
       onTool: (tool) => this.map?.selectTool(tool),
       onShape: (shape) => this.map?.selectShape(shape),
+      onTemplateShape: (shape) => this.map?.selectTemplateShape(shape),
+      onClearTemplates: () => this.map?.clearOwnTemplates(),
       onLaserColor: (color) => this.map?.selectLaserColor(color),
       onDice: () => this.setDiceOpen(!this.tray.isOpen),
       ...(options.active ? { active: options.active } : {}),
@@ -171,6 +191,22 @@ export class CanvasScene implements OnlineSceneSink {
     if (laser.sceneId === this.shown?.sceneId) this.map?.receiveLaser(laser);
   }
 
+  /** Every lasting template on the scene `sceneId`. */
+  templates(sceneId: string, templates: readonly MapTemplate[]): void {
+    this.map?.receiveTemplates(sceneId, templates);
+  }
+
+  /** Someone else's ping on the scene shown. */
+  ping(ping: PlayerPing): void {
+    if (ping.sceneId === this.shown?.sceneId) this.map?.receivePing(ping);
+  }
+
+  /** The sheets of the tokens this player controls: the drawer, and the Ctrl+hover preview of their stat blocks. */
+  sheets(entries: readonly TokenSheet[]): void {
+    this.sheetView.receive(entries);
+    this.map?.setSheets(entries);
+  }
+
   /** Images arrived, failed or went. */
   images(): void {
     this.map?.refresh();
@@ -192,6 +228,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.detachSession = null;
     this.listeners.abort();
     this.log.dispose();
+    this.sheetView.dispose();
     this.toolbar.dispose();
     this.map?.dispose();
   }

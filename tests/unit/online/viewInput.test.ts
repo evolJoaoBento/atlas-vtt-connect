@@ -175,6 +175,17 @@ describe('ViewInput', () => {
     expect(grabs).toEqual(['grab 10,10', 'cancel']);
   });
 
+  it('hands a press released without moving to a tool that takes taps, rather than cancelling it', () => {
+    const grabs: string[] = [];
+    const input = new ViewInput({ pan: () => undefined, zoomAt: () => undefined }, {
+      grab: () => true, move: () => undefined, drop: () => grabs.push('drop'), cancel: () => grabs.push('cancel'),
+      tap: (point) => grabs.push(`tap ${point.x},${point.y}`),
+    });
+    input.down(mouse(10, 10));
+    input.up(mouse(11, 10));
+    expect(grabs).toEqual(['tap 11,10']);
+  });
+
   it('turns a second finger into a pinch that cancels the token drag, and the finger left pans', () => {
     const { input, moves, grabs } = tokenSetup();
     input.down(touch(1, 10, 10));

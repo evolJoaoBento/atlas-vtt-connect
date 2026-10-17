@@ -2,6 +2,9 @@
 export const ONLINE_SESSION_LABEL = 'Online session';
 export const START_SESSION_LABEL = 'Start online session';
 export const STOP_SESSION_LABEL = 'Stop online session';
+export const SHOW_HANDOUT_LABEL = 'Show image to players…';
+export const STOP_HANDOUT_LABEL = 'Stop showing image to players';
+export const CLEAR_TEMPLATES_LABEL = "Clear players' templates";
 export const PRESENT_LABEL = 'Present to players';
 export const STOP_PRESENTING_LABEL = 'Stop presenting';
 export const REMOVE_PLAYER_LABEL = 'Remove player';

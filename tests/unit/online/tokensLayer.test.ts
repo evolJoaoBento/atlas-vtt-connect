@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { DARKNESS_FOG_ID } from '../../../src/app/online/scene/darknessFog';
+import { CONTROLLED_RING_COLOR, createTokensLayer, TOKEN_MARKER_COLOR, TURN_RING_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { DOWNED_MOTION } from '../../../src/app/online/view/layers/downedFades';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
 import type { TokenOverlay } from '../../../src/app/online/view/layers/layerTypes';
@@ -11,24 +13,40 @@ const images = (id: string | null): typeof art | null => (id === 'asset-1' ? art
 
 function draw(tokens: Record<string, PlayerToken>, withImages = false): RecordingSurface {
   const surface = new RecordingSurface();
-  createTokensLayer().draw(surface, frame(playerScene({ tokens }), withImages ? { images } : {}));
+  // No fight: the turn ring has its own test.
+  createTokensLayer().draw(surface, frame({ ...playerScene({ tokens }), initiative: null }, withImages ? { images } : {}));
   return surface;
 }
 
 describe('tokens layer', () => {
-  it("clips the art to its circle, cover-fit, and draws Atlas's ring texture over it at Atlas's size", () => {
+  it("clips the art to its circle, cover-fit, under Atlas's glass dome and ring texture at Atlas's size", () => {
     expect(draw({ t1: playerToken() }, true).calls).toEqual([
       { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
       { op: 'image', image: art.image, x: -62, y: -31, width: 124, height: 62, clip: { x: 0, y: 0, radius: 31 } },
-      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
-      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#ffffff' },
       { op: 'pop' },
+      { op: 'glassDome', x: 100, y: 100, size: 62 },
+      // The art's 62 plus the 4 px stroke on each side, as SpriteFactory.createTokenRing sizes its sprite.
+      { op: 'tokenRing', x: 100, y: 100, diameter: 70, artSize: 62, color: '#ffffff' },
     ]);
   });
 
   it('draws the ring in the colour the GM chose for the token', () => {
     expect(draw({ t1: playerToken({ ring: '#e93147' }) }, true).ops('tokenRing')).toEqual([
-      { op: 'tokenRing', x: 0, y: 0, diameter: 70, artSize: 62, color: '#e93147' },
+      { op: 'tokenRing', x: 100, y: 100, diameter: 70, artSize: 62, color: '#e93147' },
+    ]);
+  });
+
+  it('turns only the art with the rotation, as Atlas turns its sprite: the dome and ring stay upright', () => {
+    const calls = draw({ t1: playerToken({ rotation: 90 }) }, true).calls;
+    expect(calls[0]).toMatchObject({ op: 'push', rotation: expect.closeTo(Math.PI / 2) });
+    expect(calls.findIndex((call) => call.op === 'pop')).toBeLessThan(calls.findIndex((call) => call.op === 'tokenRing'));
+  });
+
+  it("shows ring-less art whole, contain-fit, without the dome, as Atlas shows unframed art", () => {
+    expect(draw({ t1: playerToken({ ring: null }) }, true).calls).toEqual([
+      { op: 'push', x: 100, y: 100, rotation: 0, scale: 1 },
+      { op: 'image', image: art.image, x: -31, y: -15.5, width: 62, height: 31, clip: null },
+      { op: 'pop' },
     ]);
   });
 
@@ -71,23 +89,79 @@ describe('tokens layer', () => {
     expect(fills.filter((style) => style.fill === '#ef4444')).toEqual([]);
   });
 
-  it('greys a downed token out and marks it with a skull, upright, whether or not it shows a bar', () => {
+  it("greys a downed token's art and ring as Atlas does and marks it with Atlas's skull, upright, whether or not it shows a bar", () => {
     const surface = draw({ t1: playerToken({ rotation: 90, downed: true }) }, true);
-    expect(surface.ops('circle').find(({ style }) => style.fill === DOWNED_VEIL.color)).toMatchObject({ x: 100, y: 100, style: { alpha: DOWNED_VEIL.alpha } });
-    expect(surface.calls.filter((call) => call.op === 'icon')).toEqual([
-      expect.objectContaining({ op: 'icon', name: 'skull', x: 100, y: 100 }),
-    ]);
-    expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'icon')).toBe(false);
+    expect(surface.ops('image').map(({ look }) => look)).toEqual([undefined, { lifeless: true, alpha: 1 }]);
+    expect(surface.ops('tokenRing').map(({ look }) => look)).toEqual([undefined, { lifeless: true, alpha: 1 }]);
+    expect(surface.ops('downedEmblem')).toEqual([{ op: 'downedEmblem', x: 100, y: 100, size: 62, alpha: DOWNED_MOTION.emblemOpacity }]);
+    expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'downedEmblem')).toBe(false);
   });
 
-  it('draws neutral condition badges on the ring with the value in a pip, the last slot counting the rest', () => {
+  it('fades the downed look in over half a second when a token goes down, and out when it is healed', () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const emblem = (downed: boolean): { size: number; alpha: number } | null => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame(playerScene({ tokens: { t1: playerToken({ downed }) } })));
+      const found = surface.ops('downedEmblem')[0];
+      return found ? { size: found.size, alpha: found.alpha } : null;
+    };
+    expect(emblem(false)).toBeNull();
+    expect(emblem(true)).toBeNull();
+    now = 250;
+    const mid = emblem(true)!;
+    expect(mid.alpha).toBeGreaterThan(0);
+    expect(mid.alpha).toBeLessThan(DOWNED_MOTION.emblemOpacity);
+    expect(mid.size).toBeGreaterThan(62);
+    now = 500;
+    expect(emblem(true)).toEqual({ size: 62, alpha: DOWNED_MOTION.emblemOpacity });
+    expect(layer.animating?.()).toBe(false);
+    emblem(false);
+    now = 850;
+    expect(emblem(false)).toBeNull();
+  });
+
+  it('draws condition badges on the ring with the value in a pip, the last slot counting the rest', () => {
     const conditions = ['a', 'b', 'c', 'd', 'e'].map((id, index) => ({ id, value: index === 1 ? 2 : null }));
     const surface = draw({ t1: playerToken({ conditions }) });
-    expect(surface.ops('circle').filter(({ style }) => style.fill === NEUTRAL_BADGE_COLOR)).toHaveLength(2);
+    // Unnamed (an older GM): the neutral colour, lit from above, and no glyph.
+    const discs = surface.ops('circle').filter(({ style }) => style.gradient?.stops.some(([, color]) => color === NEUTRAL_BADGE_COLOR));
+    expect(discs).toHaveLength(2);
     expect(surface.ops('text').map(({ text }) => text)).toEqual(['2', '+3']);
-    const badges = surface.ops('push').slice(1);
+    const badges = surface.ops('push').slice(1).filter(({ scale }) => scale !== 0.333);
     expect(badges).toHaveLength(3);
     expect(badges.every(({ x, y }) => Math.hypot(x - 100, y - 100) > 32 && Math.hypot(x - 100, y - 100) < 34)).toBe(true);
+  });
+
+  it("draws a condition as Atlas does: in its colour, with its icon, else its initial, dark on a light colour", () => {
+    const surface = draw({ t1: playerToken({ conditions: [
+      { id: 'scared', value: null, name: 'Scared', color: '#7c3aed', icon: 'terror' },
+      { id: 'blessed', value: null, name: 'blessed', color: '#fde047' },
+    ] }) });
+    expect(surface.ops('glyph')).toMatchObject([{ name: 'terror', color: '#ffffff' }]);
+    expect(surface.ops('text')).toMatchObject([{ text: 'B', style: { color: '#16161a' } }]);
+    const stops = surface.ops('circle').flatMap(({ style }) => (style.gradient ? [style.gradient.stops.map(([, color]) => color)] : []));
+    expect(stops[0]).toEqual(['#aa68ff', '#7c3aed', '#4907ba']);
+  });
+
+  it('animates a badge in when a token that was drawn gains it, never on a token that just appeared', () => {
+    let now = 0;
+    const layer = createTokensLayer({ now: () => now });
+    const scaleOf = (conditions: PlayerToken['conditions']): number[] => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame(playerScene({ tokens: { t1: playerToken({ conditions }) } })));
+      return surface.ops('push').slice(1).map(({ scale }) => scale);
+    };
+    const prone = { id: 'prone', value: null, name: 'Prone', color: '#aa3300' };
+    const settled = scaleOf([prone])[0]!;
+    const scared = { id: 'scared', value: null, name: 'Scared', color: '#7c3aed' };
+    const entering = scaleOf([prone, scared]);
+    expect(entering[0]).toBeCloseTo(settled);
+    expect(entering[1]).toBeCloseTo(settled * 0.5);
+    expect(layer.animating?.()).toBe(true);
+    now = 200;
+    expect(scaleOf([prone, scared])[1]).toBeCloseTo(settled);
+    expect(layer.animating?.()).toBe(false);
   });
 
   it('draws tokens lowest layer first and skips those off screen', () => {
@@ -126,20 +200,64 @@ describe('tokens layer', () => {
     };
     expect(at({ t1: playerToken({ x: 100 }) })).toBe(100);
     expect(layer.animating?.()).toBe(false);
-    // 200 px at 400 px/s: half a second, eased in and out.
+    // Atlas's glide: about two thirds of the way left behind every 50 ms, there within a few frames.
     expect(at({ t1: playerToken({ x: 300 }) })).toBe(100);
     expect(layer.animating?.()).toBe(true);
-    now = 250;
-    expect(at({ t1: playerToken({ x: 300 }) })).toBe(200);
-    now = 500;
+    now = 50;
+    expect(at({ t1: playerToken({ x: 300 }) })).toBeCloseTo(300 - 200 * Math.exp(-1));
+    for (let i = 0; i < 20; i++) {
+      now += 50;
+      at({ t1: playerToken({ x: 300 }) });
+    }
     expect(at({ t1: playerToken({ x: 300 }) })).toBe(300);
     expect(layer.animating?.()).toBe(false);
     // Dragged: straight under the pointer.
     expect(at({ t1: playerToken({ x: 300 }) }, { controlled: new Set(['t1']), positions: new Map([['t1', { x: 900, y: 100 }]]), held: 't1' })).toBe(900);
-    // Dropped there and snapped by the GM a little away: the shortest glide, 150 ms.
+    // Dropped there and snapped by the GM a little away: it slides the rest of the way.
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(900);
-    now = 650;
+    // A frame steps by at most 100 ms.
+    now += 300;
+    expect(at({ t1: playerToken({ x: 910 }) })).toBeCloseTo(910 - 10 * Math.exp(-2));
+    for (let i = 0; i < 6; i++) {
+      now += 50;
+      at({ t1: playerToken({ x: 910 }) });
+    }
     expect(at({ t1: playerToken({ x: 910 }) })).toBe(910);
+  });
+
+  it("puts another's token in place at once on a lit scene, where a glide would show players where it came from", () => {
+    const layer = createTokensLayer({ now: () => 0 });
+    const dark = { [DARKNESS_FOG_ID]: { type: 'rectangle' as const, erase: false, order: 1, x: 0, y: 0, width: 1, height: 1 } };
+    const at = (x: number, controlled: ReadonlySet<string>): number => {
+      const surface = new RecordingSurface();
+      layer.draw(surface, frame({ ...playerScene({ tokens: { t1: playerToken({ x }) } }), fog: dark }, { overlay: { controlled, positions: new Map(), held: null } }));
+      return surface.ops('push')[0]!.x;
+    };
+    at(100, new Set());
+    expect(at(300, new Set())).toBe(300);
+    expect(layer.animating?.()).toBe(false);
+    // The player's own token still glides.
+    expect(at(500, new Set(['t1']))).toBe(300);
+    expect(layer.animating?.()).toBe(true);
+  });
+
+  it('draws every token before any bars, so a token on a higher layer never covers a neighbour’s', () => {
+    const surface = new RecordingSurface();
+    const bar = { color: '#22c55e', share: 0.5, spent: false };
+    createTokensLayer().draw(surface, frame(playerScene({ tokens: {
+      low: playerToken({ layer: 0, resources: [bar] }), high: playerToken({ x: 110, layer: 1, ring: '#e93147' }),
+    } })));
+    const ops = surface.calls.map((call) => call.op);
+    const lastRing = ops.lastIndexOf('tokenRing');
+    const firstBar = surface.calls.findIndex((call) => call.op === 'roundRect' && call.style.fill === '#22c55e');
+    expect(lastRing).toBeGreaterThan(-1);
+    expect(firstBar).toBeGreaterThan(lastRing);
+  });
+
+  it("rings the token whose turn it is, for every player", () => {
+    const surface = new RecordingSurface();
+    createTokensLayer().draw(surface, frame(playerScene({ tokens: { t1: playerToken(), t2: playerToken({ x: 300 }) } })));
+    expect(surface.ops('circle').filter(({ style }) => style.stroke === TURN_RING_COLOR).map(({ x }) => x)).toEqual([100]);
   });
 
   it('never draws a token smaller than a pixel, even under half a cell', () => {

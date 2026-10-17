@@ -10,6 +10,8 @@ function setup(available = 1000) {
     root,
     onTool: (tool) => calls.push(`tool ${tool}`),
     onShape: (shape) => calls.push(`shape ${shape}`),
+    onTemplateShape: (shape) => calls.push(`template ${shape}`),
+    onClearTemplates: () => calls.push('clear templates'),
     onLaserColor: (color) => calls.push(`color ${color}`),
     onDice: () => calls.push('dice'),
     measure: (element) => (element.dataset.control === 'measure' ? 56 : 36),
@@ -54,6 +56,21 @@ describe('the join page toolbar', () => {
     expect(button('Measure').querySelector<HTMLElement>('.tool-icon')?.style.getPropertyValue('--icon')).toBe(toolIconUrl('triangle'));
   });
 
+  it("offers the Template tool's own shapes and Clear my templates, only while the player has some", () => {
+    const { toolbar, calls, button, entries } = setup();
+    button('Template options').click();
+    const items = entries('[data-control="template"]');
+    expect(items.map((entry) => entry.textContent)).toEqual(['Line', 'Circle/Sphere', 'Square/Cube', 'Cone', 'Clear my templates']);
+    expect(items[4]!.disabled).toBe(true);
+    items[2]!.click();
+    toolbar.update({ tool: 'template', templateShape: 'square', ownTemplates: true });
+    expect(button('Template').querySelector<HTMLElement>('.tool-icon')?.style.getPropertyValue('--icon')).toBe(toolIconUrl('square'));
+    expect(items[4]!.disabled).toBe(false);
+    button('Template options').click();
+    items[4]!.click();
+    expect(calls).toEqual(['template square', 'clear templates']);
+  });
+
   it('moves what does not fit into More tools, and keeps the tool in use in the bar', () => {
     const { root, toolbar, calls, button, entries } = setup(170);
     toolbar.fit();
@@ -61,9 +78,9 @@ describe('the join page toolbar', () => {
     expect(['move', 'measure', 'laser', 'dice'].map(shown)).toEqual([true, true, false, false]);
     expect(button('More tools').closest<HTMLElement>('.toolbar-more')!.hidden).toBe(false);
     const more = entries('.toolbar-more').filter((entry) => !entry.hidden);
-    expect(more.map((entry) => entry.textContent)).toEqual(['Laser', 'Dice']);
+    expect(more.map((entry) => entry.textContent)).toEqual(['Template', 'Laser', 'Ping', 'Dice']);
     button('More tools').click();
-    more[1]!.click();
+    more[3]!.click();
     expect(calls).toEqual(['dice']);
     toolbar.update({ tool: 'laser' });
     expect(shown('laser')).toBe(true);
@@ -82,7 +99,7 @@ describe('the join page toolbar', () => {
     expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(0);
     available = 170;
     toolbar.fit();
-    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(2);
+    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(4);
   });
 
   it('closes an open menu on Escape before the rest of the page hears it', () => {

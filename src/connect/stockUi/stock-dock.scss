@@ -191,10 +191,49 @@ $connect-dock-z: 1000;
 
 // Other people's lasers, drawn over a map view's canvas: it takes no pointer and sits under the dock.
 .atlas-connect-lasers {
-  position: fixed;
-  z-index: 20;
+  // Placed beside the map's canvas (absolute) or, without one, over the page (fixed); see `LaserOverlay`.
+  position: absolute;
   display: none;
   pointer-events: none;
+}
+
+// The GM's erase button on each player template (`LaserOverlay.placeHandles`): a small round button in Atlas's surface,
+// rimmed in the template's colour, centred on the template's far edge. Only the buttons take the pointer.
+.atlas-connect-template-handles {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.atlas-connect-template-erase {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid var(--template-color, var(--interactive-accent));
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-s);
+  transition: transform 100ms cubic-bezier(0.23, 1, 0.32, 1), background-color 100ms;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: var(--background-modifier-error);
+    color: var(--text-on-accent);
+    transform: translate(-50%, -50%) scale(1.1);
+  }
 }
 
 // Connect in Atlas's own toolbar: a group of Atlas's tool buttons, and Atlas's own tray and dropdown for what they open.

@@ -25,6 +25,12 @@ export const SCENE_LIMITS = {
   points: 5_000,
   records: 10_000,
   conditions: 64,
+  /** Longest condition name players get. */
+  conditionName: 64,
+  /** Readable pins players get of one scene. */
+  pins: 200,
+  pinLabel: 8,
+  pinTitle: 120,
   /** A token has this many resource sockets; the window draws the first two. */
   resources: 6,
   widgets: 64,
@@ -48,4 +54,12 @@ export const SCENE_RANGES = {
   opacity: [0, 1],
   unitDistance: [0, 1_000_000],
   rangeBand: [1, 1_000_000],
+  /** A wheel's current and maximum values. */
+  resourceValue: [-1_000_000, 1_000_000],
+  /** A wheel's socket: the first two are bars. */
+  wheelSlot: [2, 5],
+  /** The number on a look-alike's badge. */
+  instance: [1, 9_999],
+  /** The map's ring size setting (`tokenRingSize`). */
+  ringScale: [0.25, 4],
 } as const satisfies Record<string, Range>;

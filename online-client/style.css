@@ -57,7 +57,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
 .top-notes:not(:has(> :not([hidden]))) { display: none; }
-.dice-toast, .dice-throws { pointer-events: auto; }
+.dice-throws { pointer-events: auto; }
 .move-notice {
   margin: 0;
   padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
@@ -250,14 +250,14 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tray-roll { flex: 1; }
 
 /* The dice log: a side panel on the left, a bottom sheet on narrow screens, like the menu. */
-.dice-log {
+.sheet-panel, .dice-log {
   position: absolute; top: 0; left: 0; bottom: 0; z-index: 2; width: min(360px, 100%); overflow-y: auto; touch-action: pan-y;
   display: grid; align-content: start; gap: var(--inset);
   padding: max(var(--inset), env(safe-area-inset-top)) var(--inset) max(var(--inset), env(safe-area-inset-bottom)) max(var(--inset), env(safe-area-inset-left));
   background: var(--card); border-right: 1px solid var(--border);
 }
-.dice-log-header { display: flex; align-items: center; gap: 12px; }
-.dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.sheet-header, .dice-log-header { display: flex; align-items: center; gap: 12px; }
+.sheet-header h2, .dice-log-header h2 { flex: 1; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 .dice-log-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--inset); }
 .dice-log-empty { margin: 0; padding: 24px; color: var(--muted); text-align: center; }
 .dice-entry { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
@@ -276,13 +276,94 @@ button:disabled { opacity: 0.5; cursor: default; }
 .dice-entry.is-crit-success { border-color: #2f9e44; box-shadow: inset 3px 0 0 #2f9e44; }
 .dice-entry.is-crit-fail { border-color: #e03131; box-shadow: inset 3px 0 0 #e03131; }
 
-/* A new roll, at the top while the log is closed; a tap opens the log. */
-.dice-toast {
-  margin: 0; min-height: 0; min-width: 200px; max-width: 100%; padding: var(--inset); text-align: left;
-  background: var(--card); color: var(--text); font-weight: 400; border: var(--panel-border) solid var(--border);
-  border-radius: 16px; box-shadow: var(--shadow);
+/* A new roll as Atlas's result card (dice-toast.scss): knotwork corners, the roller, the ability in small caps, and a
+   hero total in the accent that lands after a beat; yellow for a critical success, red for a failure. Cards stack. */
+.dice-toasts { display: flex; flex-direction: column; align-items: center; gap: var(--inset); max-width: 100%; pointer-events: none; }
+.dice-toasts[hidden] { display: none; }
+.dice-card-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+@keyframes atlas-connect-card-enter { from { opacity: 0; transform: translateY(-48px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes atlas-connect-card-exit { to { opacity: 0; transform: translateY(-16px); } }
+@keyframes atlas-connect-card-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes atlas-connect-card-land {
+  from { opacity: 0; transform: scale(1.8); filter: blur(6px); }
+  60% { opacity: 1; transform: scale(0.94); filter: blur(0); }
+  to { opacity: 1; transform: scale(1); filter: blur(0); }
 }
-.dice-toast .dice-entry { padding: 4px; border: 0; }
+@keyframes atlas-connect-card-flare {
+  from { filter: drop-shadow(0 0 0 transparent); }
+  40% { filter: drop-shadow(0 0 14px color-mix(in oklch, var(--card-accent) 70%, transparent)); }
+  to { filter: drop-shadow(0 0 6px color-mix(in oklch, var(--card-accent) 30%, transparent)); }
+}
+.dice-card {
+  --card-accent: var(--accent);
+  position: relative; overflow: hidden; display: flex; align-items: stretch; gap: 12px; box-sizing: border-box;
+  padding: 16px; min-width: min(280px, calc(100vw - 32px)); max-width: min(360px, calc(100vw - 32px)); width: max-content;
+  border-radius: 12px; color: var(--text); text-align: left; font-size: 13px;
+  border: 1.5px solid color-mix(in oklch, var(--card-accent) 35%, color-mix(in oklch, #ffffff 18%, transparent));
+  background:
+    radial-gradient(120% 90% at 100% 50%, color-mix(in oklch, var(--card-accent) 14%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklch, #ffffff 5%, transparent), transparent 45%),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, #ffffff 12%, transparent),
+    0 1px 2px color-mix(in oklch, #000 30%, transparent),
+    0 12px 32px color-mix(in oklch, #000 45%, transparent),
+    0 0 28px color-mix(in oklch, var(--card-accent) 18%, transparent);
+  pointer-events: auto; cursor: pointer; transition: transform 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dice-card:active { transform: scale(0.98); }
+.dice-card.is-entering { animation: atlas-connect-card-enter 0.35s cubic-bezier(0.23, 1, 0.32, 1) both; }
+.dice-card.is-exiting { animation: atlas-connect-card-exit 0.2s cubic-bezier(0.23, 1, 0.32, 1) both; }
+.dice-card.is-crit-success { --card-accent: #eab308; }
+.dice-card.is-crit-fail { --card-accent: #ef4444; }
+.dice-card-corner {
+  position: absolute; width: 40px; height: 40px; color: var(--card-accent); opacity: 0.6; pointer-events: none;
+  -webkit-mask-image: linear-gradient(135deg, black 10%, transparent 60%); mask-image: linear-gradient(135deg, black 10%, transparent 60%);
+}
+.dice-card-corner--tl { top: -5px; left: -5px; }
+.dice-card-corner--tr { top: -5px; right: -5px; transform: scaleX(-1); }
+.dice-card-corner--bl { bottom: -5px; left: -5px; transform: scaleY(-1); }
+.dice-card-corner--br { bottom: -5px; right: -5px; transform: scale(-1); }
+.dice-card-body { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; }
+.dice-card-main { position: relative; min-height: 48px; display: flex; align-items: center; gap: 12px; }
+.dice-card-avatar {
+  width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--card-accent) 60%, transparent), 0 2px 6px color-mix(in oklch, #000 45%, transparent);
+  background: var(--accent); color: #fff; font-weight: 600; font-size: 18px; user-select: none;
+  animation: atlas-connect-card-rise 0.3s cubic-bezier(0.23, 1, 0.32, 1) 80ms both;
+}
+.dice-card-content { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; animation: atlas-connect-card-rise 0.3s cubic-bezier(0.23, 1, 0.32, 1) 120ms both; }
+.dice-card-name, .dice-card-ability { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dice-card-name { font-size: 13px; font-weight: 600; }
+.dice-card-ability { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklch, var(--card-accent) 75%, var(--text)); }
+.dice-card-advantage { align-self: flex-start; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.dice-card-formula { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dice-card-result { flex-shrink: 0; min-width: 48px; display: flex; align-items: center; justify-content: flex-end; animation: atlas-connect-card-flare 0.7s cubic-bezier(0.23, 1, 0.32, 1) 300ms both; }
+.dice-card-total {
+  display: block; font-size: 36px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  padding-top: 0.06em; color: var(--card-accent); animation: atlas-connect-card-land 0.5s cubic-bezier(0.23, 1, 0.32, 1) 300ms both;
+}
+.dice-card-toggle {
+  display: flex; align-items: center; gap: 4px; align-self: flex-start; min-height: 0; height: auto; padding: 4px 0; margin: -4px 0;
+  background: none; border: 0; box-shadow: none; cursor: pointer; color: var(--muted); font: inherit; transition: color 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dice-card-toggle:hover { color: var(--muted); background: none; }
+.dice-card-toggle .tool-icon { width: 12px; height: 12px; transition: transform 100ms cubic-bezier(0.4, 0, 0.2, 1); }
+.dice-card-toggle.is-open .tool-icon { transform: rotate(180deg); }
+.dice-card-toggle-label { font-size: 11px; font-weight: 500; }
+.dice-card-details { display: flex; flex-wrap: wrap; gap: 4px; }
+.dice-card-details[hidden] { display: none; }
+.dice-card-die {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 4px; box-sizing: border-box;
+  font-size: 12px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; border-radius: 4px;
+  background: var(--hover); box-shadow: inset 0 1px 0 color-mix(in oklch, #ffffff 8%, transparent); color: var(--text);
+}
+.dice-card-die.is-max { background: color-mix(in oklch, #22c55e 15%, transparent); color: #22c55e; }
+.dice-card-die.is-min { background: color-mix(in oklch, #ef4444 15%, transparent); color: #ef4444; }
+.dice-card-die.is-dropped { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); text-decoration: line-through; }
+@media (prefers-reduced-motion: reduce) {
+  .dice-card, .dice-card-avatar, .dice-card-content, .dice-card-result, .dice-card-total { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+}
 
 /* The player's own roll, thrown as Atlas's 3D dice at the top of the map (`dice3d/throwPanel.mts`). */
 .dice-throws { display: contents; }
@@ -330,15 +411,186 @@ button:disabled { opacity: 0.5; cursor: default; }
 .icon-button .tool-icon { width: 20px; height: 20px; }
 
 @media (max-width: 720px) {
-  .dice-log {
+  .sheet-panel, .dice-log {
     top: auto; right: 0; width: auto; max-height: 70%; border-right: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
     padding-right: max(var(--inset), env(safe-area-inset-right));
   }
   /* Follow GM and Fit map move above the toolbar. */
   .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
 }
-#initiative:has(li.side) { list-style: none; padding-left: 0; }
-#initiative li.side { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--muted, inherit); list-style: none; }
-#initiative li.side[aria-current="true"] { color: var(--accent); }
-#initiative li.sitting-out { opacity: 0.45; }
-#initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }
+
+/* The card beside a hovered token, as Atlas's ConditionHoverPanel draws it: its elevated surface (radius 12, a 1.5 px
+   border in the text colour at 0.18, a soft three-layer shadow), 8 px padding and gap, one row per condition, 13 px at
+   weight 500; it fades in over 100 ms while it slides 4 px out of the token and grows from 0.97. Placed by `HoverCardView`. */
+.hover-card {
+  position: fixed; left: var(--hover-x, 0); top: var(--hover-y, 0); z-index: 5; max-width: 260px; box-sizing: border-box;
+  padding: 8px; display: grid; gap: 8px; pointer-events: none;
+  background: color-mix(in srgb, var(--card) 97%, transparent); color: var(--text);
+  border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 500; line-height: 1.3;
+  box-shadow: 0 5px 2px rgba(0, 0, 0, 0.05), 0 7px 4px rgba(0, 0, 0, 0.05), 0 9px 6px rgba(0, 0, 0, 0.05);
+  opacity: 0; transform: translateX(-4px) scale(0.97); transform-origin: left center;
+  transition: opacity 100ms cubic-bezier(0.23, 1, 0.32, 1), transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.hover-card[hidden] { display: none; }
+.hover-card.is-open { opacity: 1; transform: none; }
+.hover-card-row { display: flex; align-items: center; gap: 8px; }
+.hover-card-badge { flex: none; width: 20px; height: 20px; margin: -2px; }
+.hover-card-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hover-card-title { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .hover-card { transition: none; } }
+
+/* "Your turn": the move notice's look, in the accent colour. */
+.turn-notice {
+  margin: 0; padding: var(--gap); background: var(--bar); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none;
+  color: var(--accent); font-weight: 600;
+}
+
+/* The player's sheets: their tokens' numbers and stat blocks, with buttons that ask the GM to roll. */
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.sheet-tab { min-height: 32px; padding: 4px 10px; background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+.sheet-tab[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sheet-body { display: grid; gap: 8px; font-size: 14px; line-height: 1.45; user-select: text; -webkit-user-select: text; }
+.sheet-body p, .sheet-body h3, .sheet-body h4 { margin: 0; }
+.sheet-name { font-size: 18px; }
+.sheet-subtitle, .sheet-empty { color: var(--muted); font-style: italic; }
+.sheet-numbers { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.sheet-number { display: flex; align-items: center; gap: 8px; }
+.sheet-number-name { flex: 1; color: var(--muted); }
+.sheet-number-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sheet-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sheet-dot); }
+.sheet-label { color: var(--muted); font-weight: 600; }
+.sheet-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-align: center; }
+.sheet-stat { display: grid; gap: 2px; padding: 4px 0; border: 1px solid var(--border); border-radius: 8px; }
+.sheet-stat-name { color: var(--muted); font-size: 11px; font-weight: 600; }
+.sheet-stat-score { font-weight: 700; }
+.sheet-bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sheet-section { margin-top: 4px !important; padding-bottom: 2px; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+.sheet-roll {
+  display: inline; min-height: 0; line-height: inherit; vertical-align: baseline; padding: 0 2px; margin: 0 -2px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--accent); font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
+  text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: color-mix(in oklch, var(--accent) 40%, transparent); text-underline-offset: 3px;
+  transition: background-color 100ms cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sheet-stat .sheet-roll { justify-self: center; }
+/* Atlas's dice links (`.atlas-dice-link`): accent text, a faint underline that gives way to a wash on hover. */
+.sheet-roll:hover, .sheet-roll:focus-visible { background: color-mix(in oklch, var(--accent) 14%, transparent); text-decoration-color: transparent; outline: none; }
+.sheet-roll:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.sheet-roll:active { background: color-mix(in oklch, var(--accent) 24%, transparent); }
+/* A roll's right-click menu, where it was opened inside the drawer. */
+.sheet-roll-menu { top: var(--menu-y, 0); left: var(--menu-x, 0); bottom: auto; right: auto; min-width: 220px; }
+
+/* The image the GM shows players, as Atlas's image display (image-display.scss): over the whole map on a dark scrim,
+   the image at most nine tenths of it with the floating surfaces' corners, a round close button at the top right.
+   The title is read out, not shown. Motion and pan and zoom: `HandoutView`. */
+.handout {
+  position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.9); cursor: grab; -webkit-user-select: none; user-select: none; touch-action: none; overflow: hidden;
+}
+.handout[hidden] { display: none; }
+.handout.is-dragging { cursor: grabbing; }
+.handout.is-leaving { pointer-events: none; }
+.handout-header { position: static; }
+.handout-header h2 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.handout-header .icon-button {
+  position: absolute; top: 20px; right: 20px; z-index: 1; width: 40px; height: 40px; min-height: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; box-shadow: none;
+  background: rgb(38, 38, 38); border: 1px solid rgba(255, 255, 255, 0.3); color: #ffffff; transition: all 0.2s;
+}
+.handout-header .icon-button:hover { background: rgb(64, 64, 64); transform: scale(1.1); }
+.handout-status { margin: 0; color: rgba(255, 255, 255, 0.7); text-align: center; }
+.handout-canvas {
+  display: block; width: auto; height: auto; max-width: 90%; max-height: 90%; border-radius: 24px; pointer-events: none;
+  transform: translate(var(--handout-x, 0), var(--handout-y, 0)) scale(var(--handout-scale, 1)); transform-origin: center center;
+}
+.handout-status:not([hidden]) + .handout-canvas { display: none; }
+
+/* The initiative column, as Atlas's player window floats it (player-initiative.scss): an elevated surface at the
+   right edge, one card per combatant with its portrait, value, name and a thin health bar. */
+.initiative-panel {
+  position: absolute; top: 50%; right: max(12px, env(safe-area-inset-right)); transform: translateY(-50%); z-index: 1;
+  width: 96px; max-height: calc(100% - 2 * 160px); box-sizing: border-box; overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--inset); padding: var(--inset);
+  background: var(--card); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius); box-shadow: var(--shadow);
+  color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.initiative-panel[hidden] { display: none; }
+.initiative-list, .initiative-side { display: flex; flex-direction: column; gap: var(--inset); min-height: 0; }
+.initiative-list { overflow-y: auto; scrollbar-width: none; }
+.initiative-list::-webkit-scrollbar { display: none; }
+.initiative-side-label { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
+.initiative-side.is-active .initiative-side-label { color: var(--accent); }
+.initiative-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
+  background: var(--hover); border: 1px solid var(--border); border-radius: 12px;
+}
+/* The first card's top corners run concentric with the panel's. */
+.initiative-list > .initiative-card:first-child, .initiative-list > .initiative-side:first-child > .initiative-card:nth-child(2) {
+  border-top-left-radius: var(--inset-radius); border-top-right-radius: var(--inset-radius);
+}
+.initiative-card.is-active, .initiative-side.is-active .initiative-card:not(.is-sitting-out) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.initiative-card.is-sitting-out { opacity: 0.45; }
+.initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
+.initiative-value { font-weight: 600; }
+.initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 12px; }
+.initiative-hp { width: 100%; height: 4px; accent-color: #22c55e; }
+.initiative-round { text-align: center; color: var(--muted); font-size: 12px; }
+
+/* A resource on a sheet as Atlas's stat block gauge (TrackView, _sheet-numbers.scss): a thin track filled in the accent,
+   with "current / max" beside it. */
+.sheet-gauge { display: inline-flex; align-items: center; gap: 8px; }
+.sheet-gauge-track { display: block; width: 96px; height: 6px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.sheet-gauge-fill { display: block; height: 100%; background: var(--accent); transform: scaleX(var(--sheet-gauge-share, 0)); transform-origin: left center; }
+.sheet-roll.is-static { cursor: default; text-decoration: none; }
+/* Atlas's Ctrl/Cmd+hover stat block preview (statblock-preview-window.scss): the sheet as a stat block card on the
+   elevated shadow, by the pointer, easing in. Placed by `StatblockPreviewView`. */
+@keyframes atlas-connect-preview-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.statblock-preview {
+  position: fixed; left: var(--preview-x, 0); top: var(--preview-y, 0); z-index: 6; pointer-events: none;
+  box-sizing: border-box; width: max-content; max-width: min(420px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: hidden;
+  padding: 16px; border-radius: 12px; background: var(--card); color: var(--text); font-size: 13px;
+  border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.statblock-preview[hidden] { display: none; }
+.statblock-preview.is-open { animation: atlas-connect-preview-in 200ms cubic-bezier(0.23, 1, 0.32, 1); transform-origin: left top; }
+@media (prefers-reduced-motion: reduce) { .statblock-preview.is-open { animation: none; } }
+
+/* Atlas's tooltip (primitives/tooltip.css): a 12 px card with a 1.5 px border in the text colour at 0.18, 1.4 line
+   height, fading in over 120 ms while it grows from 0.96 and rises 4 px towards its button. */
+@keyframes atlas-connect-tip-in { from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.96); } }
+@media (hover: hover) {
+  .tool-button[data-label]:hover::after, .tool-button[data-label]:focus-visible::after,
+  .tray-face[data-label]:hover::after, .tray-face[data-label]:focus-visible::after {
+    border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent); line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+    animation: atlas-connect-tip-in 120ms ease-out;
+  }
+}
+/* Atlas's notice (_notices.scss), for "Your turn": its elevated surface, 12 px padding at 13 px, easing in 4 px from
+   above over 200 ms. The text keeps the accent, as the turn is the player's. */
+@keyframes atlas-connect-notice-in { from { opacity: 0; transform: translateY(-4px); } }
+.turn-notice {
+  padding: 12px; background: var(--card); border: 1.5px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 24px; box-shadow: var(--shadow); font-size: 13px; line-height: 1.3;
+  animation: atlas-connect-notice-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* Atlas's dice tray (dice-dropdown.scss) slides up 8 px as it opens; a die's count pops in from nothing. */
+@keyframes atlas-connect-tray-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes atlas-connect-badge-pop { from { transform: scale(0); } }
+.dice-tray:not([hidden]) { animation: atlas-connect-tray-in 0.2s ease-out both; }
+.tray-count { animation: atlas-connect-badge-pop 0.15s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .tool-button[data-label]::after, .tray-face[data-label]::after, .turn-notice,
+  .dice-tray:not([hidden]), .tray-count { animation: none; }
+}
+
+/* The frame of the scene before, over the map while it fades into the next (Atlas's scene-transition.scss). */
+.scene-transition-snapshot { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; pointer-events: none; }
+
+/* Clear my templates, under the Template tool's shapes: set apart by a rule, faint while the player has none. */
+.menu-entry--separated { position: relative; margin-top: 5px; }
+.menu-entry--separated::before { content: ''; position: absolute; left: 8px; right: 8px; top: -3px; border-top: 1px solid var(--border); }
+.menu-entry:disabled { opacity: 0.45; cursor: default; background: transparent; }

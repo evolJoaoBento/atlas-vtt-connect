@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SCENE_LAYER_ORDER, type SceneLayer } from '@atlas-vtt/shared/draw';
-import { GLIDE_MS } from '../../../src/app/online/view/camera';
+import { CAMERA_SETTLE_MS } from '../../../src/app/online/view/CameraController';
 import { CameraController } from '../../../src/app/online/view/CameraController';
 import { NO_TOKEN_OVERLAY, type PlayerLayer, type TokenOverlay } from '../../../src/app/online/view/layers/layerTypes';
 import { pixelRatioFor, PlayerViewRenderer, VIEW_BACKGROUND } from '../../../src/app/online/view/PlayerViewRenderer';
@@ -121,7 +121,7 @@ describe('PlayerViewRenderer', () => {
     t.camera.setGmCamera({ sceneId: 'scene-1', centerX: 200, centerY: 200, width: 400, height: 300 });
     t.frames.run();
     expect(t.frames.pending).toBe(1);
-    t.advance(GLIDE_MS);
+    t.advance(CAMERA_SETTLE_MS);
     t.frames.run();
     expect(t.frames.pending).toBe(0);
   });

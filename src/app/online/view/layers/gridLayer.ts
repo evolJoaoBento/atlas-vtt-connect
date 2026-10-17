@@ -15,6 +15,7 @@ import type { PlayerGrid, PlayerMap } from '../../scene/sceneTypes';
 import { intersection, type WorldRect } from '../camera';
 import type { TextStyle, ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
+import { contrastGridColor, gridMarkerArmLength, lineDrawing, styleGrid, type StyledGrid } from './gridStyle';
 
 const DEFAULT_NUMBER_COLOR = '#ffffff';
 /**
@@ -93,23 +94,37 @@ export function createGridLayer(): PlayerLayer {
         : frame.visible;
       if (!area) return;
       const tile = snapArea(frame.visible, map);
-      if (tile) drawLines(surface, frame, linesOf(grid, map, tile));
+      if (tile) drawLines(surface, frame, grid, linesOf(grid, map, tile));
       drawCellNumbers(surface, frame, grid, numbersOf(grid, map));
     },
   };
 }
 
-function drawLines(surface: ViewSurface, frame: LayerFrame, lines: GridLines | null): void {
+/** The lines in Atlas's style (`gridStyle.ts`), in the GM's colour or, without one, Atlas's black or white for the map. */
+function drawLines(surface: ViewSurface, frame: LayerFrame, grid: PlayerGrid, lines: GridLines | null): void {
   if (!lines) return;
-  const style = {
-    stroke: lines.color,
-    alpha: lines.alpha,
-    lineWidth: Math.max(lines.width, frame.pixel),
-    // The dash pattern is in screen pixels, so dashes keep their look at any zoom.
-    dash: lines.dash.map((length) => length / frame.zoom),
-  };
-  if (lines.segments.length > 0) surface.paths(lines.segments, false, style);
-  if (lines.hexes.length > 0) surface.paths(lines.hexes, true, style);
+  const art = grid.color === null ? frame.images(frame.scene.map.asset) : null;
+  const color = grid.color ?? contrastGridColor(art ? surface.meanLuminance(art.image) : null);
+  const drawing = lineDrawing(grid.lineType, lines.width, gridMarkerArmLength(grid.size), frame.pixel);
+  const styled = styledOf(lines, grid, drawing.width, drawing.arm);
+  const alpha = lines.alpha * drawing.ink;
+  const stroke = { stroke: color, alpha, lineWidth: drawing.width, round: true };
+  if (styled.strokes.length > 0) surface.paths(styled.strokes, false, stroke);
+  if (styled.outlines.length > 0) surface.paths(styled.outlines, true, stroke);
+  if (styled.markers.length > 0) surface.paths(styled.markers, true, { fill: color, alpha });
+}
+
+/** Styled lines by the lines built for a tile and the marker size, kept while those stay the same. */
+const styledCache = new WeakMap<GridLines, { key: string; styled: StyledGrid }>();
+
+function styledOf(lines: GridLines, grid: PlayerGrid, thickness: number, arm: number): StyledGrid {
+  // Only a dotted grid's markers depend on the drawn width; edges and dashes are the same at every zoom.
+  const key = grid.lineType === 'dotted' ? `dotted:${thickness}:${arm}` : grid.lineType;
+  const kept = styledCache.get(lines);
+  if (kept?.key === key) return kept.styled;
+  const styled = styleGrid(lines, grid, thickness, arm);
+  styledCache.set(lines, { key, styled });
+  return styled;
 }
 
 /** The lattice `GridSystem` numbers for this grid. */

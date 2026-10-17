@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
-import type { CollectionGridDefaults, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
+import { handouts, type HandoutSource } from './handouts';
+import type { CollectionGridDefaults, ConditionDefinition, InitiativeRules, ResourceDefinition, ViewsApi } from '@atlas-vtt/api-types';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import type { GmSession, SessionPlayer } from './GmSession';
 import { hostSession, type HostedSession, type HostedSharingHooks, type OptionalParts } from './hostedSession';
@@ -49,11 +50,14 @@ export interface Deps extends OptionalParts {
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
   coneAngle?: (mapPath: string | null) => number;
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Tells when those resources or rules may have changed. */
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of a map's collection (Atlas's `dice.lookFor`, API 1.18), sent to players; without it none is. */
   diceLook?: DiceLookSource;
+  /** The image the GM shows players. */
+  handout?: HandoutSource;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -117,6 +121,9 @@ export class OnlineSessionService {
       const hosted = await hostSession({
         ...(deps.tokenControl ? { tokenControl: deps.tokenControl } : {}),
         ...(deps.dice ? { dice: deps.dice } : {}),
+        ...(deps.sheets ? { sheets: deps.sheets } : {}),
+        ...(deps.pings ? { pings: deps.pings } : {}),
+        ...(deps.templates ? { templates: deps.templates } : {}),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
@@ -133,9 +140,11 @@ export class OnlineSessionService {
           ...(deps.collectionGrid ? { collectionGrid: deps.collectionGrid } : {}),
           ...(deps.coneAngle ? { coneAngle: deps.coneAngle } : {}),
           ...(deps.resources ? { resources: deps.resources } : {}),
+          ...(deps.conditions ? { conditions: deps.conditions } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
           ...(deps.watchResources ? { watchResources: deps.watchResources } : {}),
           ...(deps.diceLook ? { diceLook: deps.diceLook } : {}),
+          ...(deps.handout ? { handout: deps.handout } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,
@@ -161,8 +170,15 @@ export class OnlineSessionService {
     const hosted = this.hosted;
     this.hosted = null;
     hosted?.stop();
+    // A handout belongs to the session: the next one starts without it.
+    handouts.show(null);
     resetOnlineSessionStore();
   }
+
+  /** Takes every player's lasting template off every scene. */
+  clearTemplates(): void { this.hosted?.templates?.clear(); }
+  /** Whether players have left any template on a scene. */
+  hasTemplates(): boolean { return this.hosted?.templates?.hasAny() ?? false; }
 
   /** Admits a waiting player: as who their device is for an Obsidian player, as before for a web player. */
   allow(playerId: string): void { this.hosted?.requests.allow(playerId); }

@@ -8,6 +8,9 @@ import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, Scene
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
+import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
+import { isPingPoint } from './tools/pings';
+import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -107,11 +110,21 @@ export type ControlMessage =
    * it with `from`, the sender's session id (`gm` for the GM's own). `dt` times the points: the
    * milliseconds from each to the one before it in the stroke, so receivers can play the motion back smoothly.
    */
-  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string };
+  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string }
+  /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
+  | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
+  /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
+  | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
+  /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
+  | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string }
+  /** Player to GM: add a lasting template on the scene they have, remove one of their own, or clear all of theirs (`tools/templates.ts`). */
+  | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
+  /** GM to players: every template on the scene, whenever they change. */
+  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template',
 ]);
 
 export type Decoded =
@@ -169,6 +182,13 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
+  'token-sheets': (m) => isTokenSheets(m.entries),
+  'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
+  'map-template': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1
+    && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
+    && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
+  'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
+  'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
 };
 
 export function encodeControl(message: ControlMessage): string {

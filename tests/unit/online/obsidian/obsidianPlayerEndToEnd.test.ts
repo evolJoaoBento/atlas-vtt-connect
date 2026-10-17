@@ -148,7 +148,7 @@ describe('an Obsidian player end to end', () => {
     expect(entries[0]!.textContent).toContain('d20+2');
     expect(entries[0]!.textContent).toContain('13');
     // The player's own roll shows as a result card: no second three.js beside Atlas's.
-    const card = view().contentEl.querySelector('.dice-toast')!;
+    const card = view().contentEl.querySelector('.dice-toasts')!;
     expect(card.hasAttribute('hidden')).toBe(false);
     expect(card.textContent).toContain('13');
     service.dispose();
@@ -167,14 +167,14 @@ describe('an Obsidian player end to end', () => {
     expect(w.shown().at(-1)).toMatchObject({ from: playerId(), lifted: false });
     pointer(canvas, 'pointerup', at.x + 5, at.y + 5);
     await vi.advanceTimersByTimeAsync(200);
-    // The map draws it: the next frame has a stroke through the GM's last point.
+    // The map draws it: the next frame has a beam over the GM's last point.
     const next = surface.calls.length;
     for (const [x, y] of [[70, 80], [90, 100], [110, 120]] as const) w.emitLocal({ kind: 'point', x, y });
     await vi.advanceTimersByTimeAsync(100);
     expect(seen.lasers.flatMap((laser) => laser.points)).toEqual(expect.arrayContaining([{ x: 110, y: 120 }]));
     frames.run();
-    const strokes = surface.calls.slice(next).flatMap((call) => (call.op === 'paths' ? call.paths.flat() : []));
-    expect(strokes.some((point) => point.x === 110 && point.y === 120)).toBe(true);
+    const beams = surface.calls.slice(next).filter((call) => call.op === 'raster');
+    expect(beams.some((beam) => beam.x < 110 && beam.x + beam.width > 110 && beam.y < 120 && beam.y + beam.height > 120)).toBe(true);
     service.dispose();
     w.finish();
   });

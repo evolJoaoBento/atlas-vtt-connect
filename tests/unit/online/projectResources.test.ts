@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
-import { initiativeShare, isDowned, projectBars } from '../../../src/app/online/scene/projectResources';
+import { initiativeShare, isDowned, projectBars, projectWheels } from '../../../src/app/online/scene/projectResources';
 import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
 import type { Character, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
@@ -20,8 +20,8 @@ describe('projectBars', () => {
   it('sends a bar for each resource players see, in socket order, as a share', () => {
     const definitions = [define('stress', { direction: 'fills', color: '#a855f7', slot: 1 }), define('ammo', { color: '#f59e0b', slot: 0 })];
     expect(projectBars(holder({ stress: { current: 3, max: 6 }, ammo: { current: 7, max: 12 } }), definitions)).toEqual([
-      { color: '#f59e0b', share: 0.58, spent: false },
-      { color: '#a855f7', share: 0.5, spent: false },
+      { color: '#f59e0b', share: 0.58, spent: false, current: 7, max: 12 },
+      { color: '#a855f7', share: 0.5, spent: false, current: 3, max: 6 },
     ]);
   });
 
@@ -30,7 +30,7 @@ describe('projectBars', () => {
     expect(projectBars(holder({ gm: { current: 1, max: 4 }, empty: { current: 0, max: 0 } }), definitions)).toEqual([]);
   });
 
-  it('draws bars only: a resource in a wheel socket is not sent, as the window has no wheels for players', () => {
+  it('sends bars only as bars: a resource in a wheel socket goes as a wheel (projectWheels)', () => {
     const definitions = [define('a', { slot: 0 }), define('b', { slot: 1 }), define('wheel', { slot: 2 }), define('wheel2', { slot: 5 })];
     const values = { a: { current: 1, max: 2 }, b: { current: 1, max: 2 }, wheel: { current: 1, max: 2 }, wheel2: { current: 1, max: 2 } };
     expect(projectBars(holder(values), definitions)).toHaveLength(2);
@@ -38,11 +38,11 @@ describe('projectBars', () => {
 
   it('stacks the bars that are shown, whatever their sockets: a hidden first resource lets the second move up', () => {
     const definitions = [define('gm', { visibleToPlayers: false, slot: 0 }), define('seen', { color: '#3b82f6', slot: 1 })];
-    expect(projectBars(holder({ gm: { current: 1, max: 4 }, seen: { current: 2, max: 4 } }), definitions)).toEqual([{ color: '#3b82f6', share: 0.5, spent: false }]);
+    expect(projectBars(holder({ gm: { current: 1, max: 4 }, seen: { current: 2, max: 4 } }), definitions)).toEqual([{ color: '#3b82f6', share: 0.5, spent: false, current: 2, max: 4 }]);
   });
 
   it('shows a static value as a full bar, with no share to give away', () => {
-    expect(projectBars(holder({ ac: { current: 3, max: 15 } }), [define('ac', { direction: 'static', color: '#94a3b8' })])).toEqual([{ color: '#94a3b8', share: 1, spent: false }]);
+    expect(projectBars(holder({ ac: { current: 3, max: 15 } }), [define('ac', { direction: 'static', color: '#94a3b8' })])).toEqual([{ color: '#94a3b8', share: 1, spent: false, current: 3, max: 15, fixed: true }]);
   });
 
   it('sends the colour the window shows: a resource that defeats the token warns as it runs low', () => {
@@ -55,7 +55,7 @@ describe('projectBars', () => {
   it('darkens the first spent bar that defeats the token, and only that one', () => {
     const definitions = [HP, define('sanity', { direction: 'fills', defeatedWhenSpent: true, color: '#a855f7' })];
     const bars = projectBars(holder({ hp: { current: 0, max: 10 }, sanity: { current: 6, max: 6 } }), definitions);
-    expect(bars).toEqual([{ color: '#ef4444', share: 0, spent: true }, { color: '#ef4444', share: 1, spent: false }]);
+    expect(bars).toEqual([{ color: '#ef4444', share: 0, spent: true, current: 0, max: 10 }, { color: '#ef4444', share: 1, spent: false, current: 6, max: 6 }]);
     expect(projectBars(holder({ hp: { current: 1, max: 10 }, sanity: { current: 6, max: 6 } }), definitions).map((bar) => bar.spent)).toEqual([false, true]);
   });
 
@@ -67,9 +67,9 @@ describe('projectBars', () => {
 
   it('reads messy values the way the validator needs: clamped, with a neutral colour for a bad one', () => {
     const odd = { resources: { hp: { current: '9', max: '4' } } } as unknown as Pick<Character, 'resources'>;
-    expect(projectBars(odd, [HP])).toEqual([{ color: '#22c55e', share: 1, spent: false }]);
+    expect(projectBars(odd, [HP])).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 9, max: 4 }]);
     const [bar] = projectBars(holder({ hp: { current: -5, max: 10 } }), [define('hp', { color: 'url(javascript:alert(1))' })]);
-    expect(bar).toEqual({ color: '#888888', share: 0, spent: false });
+    expect(bar).toEqual({ color: '#888888', share: 0, spent: false, current: -5, max: 10 });
   });
 });
 
@@ -117,12 +117,14 @@ describe('resources in the projection', () => {
     expect(JSON.stringify(scene)).not.toContain('spy');
   });
 
-  it('keeps the GM’s resource names, keys and numbers off the wire', () => {
+  it('keeps the GM’s resource names and keys off the wire, and the numbers of resources the collection keeps from players', () => {
     const secret = define('secret-key', { name: 'SECRET name', field: 'SECRET.field', color: '#123456', slot: 0 });
-    const scene = project({ hero: hero({ resources: { 'secret-key': { current: 3, max: 9 } }, overriddenMax: ['secret-key'] }) }, [secret]);
+    const hidden = define('hidden-key', { name: 'HIDDEN', color: '#654321', slot: 1, visibleToPlayers: false });
+    const scene = project({ hero: hero({ resources: { 'secret-key': { current: 3, max: 9 }, 'hidden-key': { current: 777, max: 999 } }, overriddenMax: ['secret-key'] }) }, [secret, hidden]);
     const json = JSON.stringify(scene);
-    expect(scene.tokens.hero?.resources).toEqual([{ color: '#123456', share: 0.33, spent: false }]);
-    for (const leak of ['SECRET', 'secret-key', 'overriddenMax', '"current"', '"max"', '"key"']) expect(json).not.toContain(leak);
+    // A resource players see shows its numbers on hover and selection, as on Atlas's own scene.
+    expect(scene.tokens.hero?.resources).toEqual([{ color: '#123456', share: 0.33, spent: false, current: 3, max: 9 }]);
+    for (const leak of ['SECRET', 'secret-key', 'HIDDEN', 'hidden-key', '777', '999', 'overriddenMax', '"key"']) expect(json).not.toContain(leak);
   });
 
   it('projects every mode into messages players accept, in snapshots and within the limits', () => {
@@ -134,5 +136,42 @@ describe('resources in the projection', () => {
     expect(message.kind).toBe('message');
     expect(fog).toEqual({});
     expect(drawings).toEqual({});
+  });
+});
+
+describe('projectWheels', () => {
+  it('sends the wheels players see, in socket order, with the numbers the window shows in them', () => {
+    const definitions = [
+      define('bar', { slot: 0 }), define('ki', { color: '#3b82f6', slot: 3 }), define('ac', { direction: 'static', color: '#94a3b8', slot: 2 }),
+      define('secret', { visibleToPlayers: false, slot: 4 }),
+    ];
+    const values = { bar: { current: 1, max: 2 }, ki: { current: 2, max: 5 }, ac: { current: 0, max: 16 }, secret: { current: 1, max: 1 } };
+    expect(projectWheels(holder(values), definitions)).toEqual([
+      { slot: 2, color: '#94a3b8', current: 0, max: 16, fixed: true },
+      { slot: 3, color: '#3b82f6', current: 2, max: 5, fixed: false },
+    ]);
+  });
+
+  it('holds values players could not draw to the wire range', () => {
+    const wheels = projectWheels(holder({ huge: { current: 5e9, max: Number.NaN } }), [define('huge', { slot: 2 })]);
+    for (const wheel of wheels) {
+      expect(Math.abs(wheel.current)).toBeLessThanOrEqual(1_000_000);
+      expect(Number.isFinite(wheel.max)).toBe(true);
+    }
+  });
+
+  it('goes out on the token for a scene players accept, and a token without wheels has no field an older page would not know', () => {
+    const project = (resources: NonNullable<Character['resources']>, definitions: readonly ResourceDefinition[]) => projectForPlayers(snapshotOf({
+      background: 'maps/tavern.png',
+      objects: { tokens: { hero: { id: 'hero', kind: 'character', x: 70, y: 70, imagePath: 'hero.png', name: 'Hero', resources } }, fog: {}, texts: {}, drawings: {} },
+    }), {
+      sceneId: 's', rules: { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }, coverage: FogCoverage.EMPTY,
+      assets: fakeAssetIds(), mapSize: { width: 1000, height: 800 }, resources: definitions,
+    });
+    const withWheel = project({ ki: { current: 2, max: 5 } }, [define('ki', { slot: 2 })]);
+    expect(withWheel.tokens.hero?.wheels).toEqual([{ slot: 2, color: '#22c55e', current: 2, max: 5, fixed: false }]);
+    const { fog: _fog, drawings: _drawings, ...body } = withWheel;
+    expect(isPlayerSceneBody(body)).toBe(true);
+    expect(project({ hp: { current: 2, max: 5 } }, [HP]).tokens.hero).not.toHaveProperty('wheels');
   });
 });

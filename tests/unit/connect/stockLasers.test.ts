@@ -201,13 +201,18 @@ describe('the lasers of other people', () => {
       return { overlay, step, places, calls, advance: (ms: number) => { now += ms; }, canvas, frames };
     }
 
-    it('lays a canvas over the view while a laser shows, and takes it away when nothing is left', () => {
+    it('lays a canvas over the view, right after its canvas, while a laser shows, and takes it away when nothing is left', () => {
       const t = overlayOf();
+      Object.defineProperty(t.canvas, 'offsetLeft', { value: 10 });
+      Object.defineProperty(t.canvas, 'offsetTop', { value: 20 });
       t.overlay.show(laser());
       expect(document.querySelector('.atlas-connect-lasers')).toBeNull();
       t.step();
       const element = document.querySelector<HTMLElement>('.atlas-connect-lasers')!;
       expect(element).not.toBeNull();
+      // Beside the map's canvas, below the view's panels: placed in their shared containing block.
+      expect(element.previousElementSibling).toBe(t.canvas);
+      expect(element.style.position).toBe('absolute');
       expect(element.style.left).toBe('10px');
       expect(element.style.top).toBe('20px');
       expect(element.style.display).toBe('block');

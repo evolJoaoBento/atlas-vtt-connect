@@ -5,6 +5,8 @@
  * Images stay until the session is left, so the tab keeps the last scene after the session ends and
  * Reconnect still has them. Nothing here reads or writes the vault.
  */
+import type { SheetRollRef } from '../tools/sheets';
+import type { TemplateChange } from '../view/tools/PlayerTools';
 import { Notice, type App } from 'obsidian';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import type { ConnectSettingsStore } from '../../../connect/settingsStore';
@@ -154,7 +156,7 @@ export class OnlineJoinService {
     });
     const joined: Joined = {
       target, name: cleaned, playerKey: this.playerKeyFor(target.hostId), loader, session: null,
-      opened: false, scene: null, camera: null, control: [], dice: [], paused: false, diceLook: null,
+      opened: false, scene: null, camera: null, control: [], dice: [], paused: false, diceLook: null, sheets: [], templates: null,
       ids: new JoinIdentity(target, this.identityCrypto, this.deviceKeys),
     };
     this.joined = joined;
@@ -214,6 +216,21 @@ export class OnlineJoinService {
 
   sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
     return this.joined?.session?.sendDiceRoll(dice, modifier) ?? false;
+  }
+
+  /** Asks the GM to add a template or remove one of the player's own. */
+  sendTemplate(change: TemplateChange): boolean {
+    return this.joined?.session?.sendTemplate(change) ?? false;
+  }
+
+  /** Sends a ping at a world point of the scene shown. */
+  sendPing(x: number, y: number): boolean {
+    return this.joined?.session?.sendPing(x, y) ?? false;
+  }
+
+  /** Asks the GM to roll something on the player's own sheet. */
+  sendSheetRoll(tokenId: string, roll: SheetRollRef): boolean {
+    return this.joined?.session?.sendSheetRoll(tokenId, roll) ?? false;
   }
 
   sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string): boolean {

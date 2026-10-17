@@ -40,6 +40,8 @@ export interface LoggedDie {
   exploded?: true;
   color?: string;
   colorName?: string;
+  /** Counted for nothing: a die advantage or a keep mark dropped (Atlas 0.8's `RolledDie.dropped`); an older page ignores it. */
+  dropped?: true;
 }
 
 /** One roll in the shared dice log. */
@@ -65,6 +67,13 @@ export interface DiceLogEntry {
    * trimmed, at most 64 characters (`cleanSceneLabel`). A label that is not well-formed is dropped, never the roll.
    */
   scene?: string;
+  /**
+   * The ability a stat block roll is named after ("Mace", "Wisdom save"), as Atlas's toast labels it. A player's roll
+   * also carries it in its name ("Ana: Mace") for older pages; a page that shows it takes it off the name.
+   */
+  ability?: string;
+  /** Rolled with advantage or disadvantage, as Atlas's toast tags it. */
+  advantage?: 'advantage' | 'disadvantage';
 }
 
 /** Someone's laser as a player receives it: new points of it, and whether it was let go. */
@@ -120,7 +129,7 @@ function isLoggedDie(value: unknown): value is LoggedDie {
   if (!isFields(value) || typeof value.die !== 'string') return false;
   const sides = DIE.exec(value.die)?.[1];
   return sides !== undefined && Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= Number(sides)
-    && isFlag(value.negative) && isFlag(value.exploded);
+    && isFlag(value.negative) && isFlag(value.exploded) && isFlag(value.dropped);
 }
 
 export function isDiceLogEntry(value: unknown): value is DiceLogEntry {
@@ -130,6 +139,8 @@ export function isDiceLogEntry(value: unknown): value is DiceLogEntry {
     && (value.unlisted === undefined || (Number.isSafeInteger(value.unlisted) && (value.unlisted as number) > 0))
     && (value.crit === undefined || value.crit === 'high' || value.crit === 'low')
     && isFlag(value.mine)
+    && (value.ability === undefined || isText(value.ability, 1, DICE_LIMITS.nameLength))
+    && (value.advantage === undefined || value.advantage === 'advantage' || value.advantage === 'disadvantage')
     && isFiniteNumber(value.modifier) && isFiniteNumber(value.total) && isFiniteNumber(value.at);
 }
 
@@ -167,7 +178,8 @@ export function isLaserColor(value: unknown): value is string {
 export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry | null {
   const all = result.rolls.map((rolled): LoggedDie => {
     const { die, value, negative, exploded } = rolled;
-    return { die, value, ...(negative && { negative }), ...(exploded && { exploded }), ...dieTagOf(rolled) };
+    const dropped = (rolled as { dropped?: unknown }).dropped === true;
+    return { die, value, ...(negative && { negative }), ...(exploded && { exploded }), ...(dropped && { dropped: true as const }), ...dieTagOf(rolled) };
   });
   const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
   // A roll made elsewhere (physical dice) may come with dice its own list leaves out already.
@@ -183,8 +195,19 @@ export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry
     total: result.total,
     ...(result.crit && { crit: result.crit }),
     at: result.timestamp,
+    ...abilityOf(result),
   };
   return isDiceLogEntry(entry) ? entry : null;
+}
+
+/** The ability and the side a roll names (Atlas 0.8's `source.abilityName` and `advantage`), as far as they are well-formed. */
+function abilityOf(result: DiceRollResult): Pick<DiceLogEntry, 'ability' | 'advantage'> {
+  const ability = typeof result.source?.abilityName === 'string' ? result.source.abilityName.trim().slice(0, DICE_LIMITS.nameLength) : '';
+  const side = (result as { advantage?: unknown }).advantage;
+  return {
+    ...(ability ? { ability } : {}),
+    ...(side === 'advantage' || side === 'disadvantage' ? { advantage: side } : {}),
+  };
 }
 
 export const SCENE_LABEL_MAX = 64;

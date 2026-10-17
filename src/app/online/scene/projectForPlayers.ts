@@ -7,8 +7,11 @@
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
-import type { Character, CollectionGridDefaults, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
+import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
+import { resolvePinIcon } from '../view/pinIcons';
+import { badgeNumberInView, NO_INSTANCE_NUMBERS, numberTokensInView, type TokenInView } from './instanceNumbers';
 import type { AssetIds } from './sceneContracts';
+import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
 import { closedFrame, type LightingFrame } from './lightingFrame';
@@ -16,15 +19,19 @@ import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
-import { isDowned, projectBars } from './projectResources';
+import { isDowned, projectBars, projectWheels } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES,
-  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
+  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerPin, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
+import { WIDGET_ICON_PATHS } from '../../types/widgetIcons';
 
 /** The part of a `SceneSnapshot` the projection reads; `mapPath` is the GM's own path and is never sent. */
-export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'>;
+export type ProjectionInput = Pick<SceneSnapshot, 'background' | 'grid' | 'objects' | 'widgets' | 'initiative' | 'initiativeTrackerOpen' | 'mapPath' | 'lighting'> & {
+  /** The map's token settings where the host reads them (a stock Atlas): instance badges and the ring's size. */
+  tokenSettings?: Partial<Pick<TokenSettings, 'showInstanceBadges' | 'tokenRingSize'>>;
+};
 
 export interface ProjectionContext {
   sceneId: string;
@@ -52,6 +59,10 @@ export interface ProjectionContext {
    * them nothing is shown, so a map whose collection is unknown shows no resource.
    */
   resources?: readonly ResourceDefinition[];
+  /** The collection's condition definitions: what names a token's conditions for players. */
+  conditions?: readonly ConditionDefinition[];
+  /** The image the GM shows players, or null; undefined where the session has no handouts (the field is then left out). */
+  handout?: Handout | null;
   /**
    * The initiative rules of the map's collection, which decide whether the list is by sides before
    * a fight starts (`projectSides`); without them the default rules apply: turn order.
@@ -78,7 +89,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
   const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
   const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules);
-  const tokens = withCombatantSides(seen, initiative, objects?.tokens);
+  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state, memo);
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
@@ -92,7 +103,53 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     widgets: projectWidgets(state, context.rules),
     initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
+    // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
+    ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
+    ...(context.handout !== undefined ? { handout: context.handout ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
   };
+}
+
+function hasPins(objects: unknown): boolean {
+  const pins = (objects as { pins?: unknown } | undefined)?.pins;
+  return typeof pins === 'object' && pins !== null;
+}
+
+/** A pin's title from its note link: the heading when it names one, else the file name, without folders or extension. */
+function pinTitle(notePath: string): string | null {
+  const [path = '', heading] = notePath.split('#');
+  const name = heading?.trim() || (path.split('/').pop() ?? '').replace(/\.md$/i, '').trim();
+  return name ? name.slice(0, SCENE_LIMITS.pinTitle) : null;
+}
+
+/**
+ * The note pins players may read, as Atlas's own online play chooses them (`ReadablePins`): marked readable, not for
+ * the GM only, linking a note (never a scene), and only where players see the map (the fog, and the lighting of a lit
+ * scene). Atlas's API has no pins; a stock Atlas's snapshot carries them. Each gets an alias in place of its id.
+ */
+function projectPins(objects: unknown, visible: Shows, cellSize: number): PlayerPin[] {
+  const record = (objects as { pins?: unknown } | undefined)?.pins;
+  if (typeof record !== 'object' || record === null) return [];
+  const found: PlayerPin[] = [];
+  const entries = Object.entries(record as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const [, value] of entries) {
+    if (found.length >= SCENE_LIMITS.pins) break;
+    if (typeof value !== 'object' || value === null) continue;
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown; icon?: unknown };
+    if (pin.readable !== true || pin.gmOnly === true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
+    const x = finiteOrNull(pin.x);
+    const y = finiteOrNull(pin.y);
+    const around = { x: (x ?? 0) - cellSize / 4, y: (y ?? 0) - cellSize / 4, width: cellSize / 2, height: cellSize / 2 };
+    if (x === null || y === null || !visible.shows(around)) continue;
+    found.push({
+      id: `pin-${found.length}`,
+      x: finiteOr(x, 0, SCENE_RANGES.coordinate),
+      y: finiteOr(y, 0, SCENE_RANGES.coordinate),
+      label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
+      title: pinTitle(pin.notePath),
+      icon: resolvePinIcon(pin.icon),
+    });
+  }
+  return found;
 }
 
 /**
@@ -199,6 +256,8 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
+  // Sent only when there are some, so a scene without wheels is what an older GM sent.
+  const wheels = character ? projectWheels(character, definitions) : [];
   return {
     x: wire.x,
     y: wire.y,
@@ -207,14 +266,45 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     layer: finiteOr(token.layer, 0),
     image: context.assets.idFor(token.imagePath),
     ring: token.showRing === false ? null : textOr(token.ringColor, DEFAULT_RING),
-    conditions: character ? projectConditions(token) : [],
+    conditions: character ? projectConditions(token, context.conditions ?? []) : [],
     name: character && rules.showTokenNameplates ? displayName(character) : null,
     // Atlas 0.5 replaced HP and stress with the collection's resources; the old fields stay null for older players.
     hp: null,
     stress: null,
     resources: character ? projectBars(character, definitions) : [],
+    ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
   };
+}
+
+/**
+ * The instance badges and ring size of the tokens players see, as Atlas's players' picture shows them
+ * (`PlayerInstanceBadges`): look-alikes numbered among the tokens sent, each keeping its number while it stays in view.
+ */
+function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput, memo: ProjectionMemo): Record<string, PlayerToken> {
+  const settings = state.tokenSettings;
+  const ring = finiteOr(settings?.tokenRingSize, 1, SCENE_RANGES.ringScale);
+  const previous = memo.instances?.map === state.mapPath ? memo.instances.numbers : NO_INSTANCE_NUMBERS;
+  const inView: TokenInView[] = [];
+  for (const id of Object.keys(tokens)) {
+    const token = state.objects?.tokens?.[id];
+    if (token) inView.push({ id, art: typeof token.imagePath === 'string' ? token.imagePath : '', rank: finiteOr(token.instanceNumber, 1) });
+  }
+  const numbers = numberTokensInView(previous, inView);
+  memo.instances = { map: state.mapPath, numbers };
+  const badgesOn = settings?.showInstanceBadges ?? true;
+  let changed: Record<string, PlayerToken> | null = null;
+  for (const [id, token] of Object.entries(tokens)) {
+    const number = badgeNumberInView(numbers, id, badgesOn);
+    if (number === null && ring === 1) continue;
+    changed ??= { ...tokens };
+    changed[id] = {
+      ...token,
+      ...(number !== null ? { instance: finiteOr(number, 1, SCENE_RANGES.instance) } : {}),
+      ...(ring !== 1 ? { ringScale: ring } : {}),
+    };
+  }
+  return changed ?? tokens;
 }
 
 /** The nameplate text `TokenUIRenderer` shows: the name, the statblock's name, or a placeholder for a statblock. */
@@ -222,13 +312,28 @@ function displayName(token: Character): string | null {
   return textOrNull(token.name) ?? (token.statblockPath ? textOrNull(token.statblockName) ?? 'Unknown Creature' : null);
 }
 
-function projectConditions(token: TokenEntity): PlayerCondition[] {
+/** A condition's colour as players may receive it. */
+const CONDITION_COLOR = /^#[0-9a-f]{6}$/i;
+
+function projectConditions(token: TokenEntity, definitions: readonly ConditionDefinition[]): PlayerCondition[] {
   const ids: unknown[] = Array.isArray(token.conditions) ? token.conditions : [];
   const values: Record<string, unknown> = typeof token.conditionValues === 'object' && token.conditionValues !== null
     ? token.conditionValues
     : {};
   return ids
     .filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= SCENE_LIMITS.idLength)
+    // Atlas draws no badge for a condition the collection no longer defines; without definitions (a collection
+    // unknown yet) every id goes, unnamed.
+    .filter((id) => definitions.length === 0 || definitions.some((candidate) => candidate.id === id))
     .slice(0, SCENE_LIMITS.conditions)
-    .map((id) => ({ id, value: Object.hasOwn(values, id) ? finiteOrNull(values[id]) : null }));
+    .map((id) => {
+      const condition: PlayerCondition = { id, value: Object.hasOwn(values, id) ? finiteOrNull(values[id]) : null };
+      // Named, coloured and drawn as the GM's collection defines it, for the badge and the player's hover card.
+      const definition = definitions.find((candidate) => candidate.id === id);
+      const name = typeof definition?.name === 'string' ? definition.name.trim().slice(0, SCENE_LIMITS.conditionName) : '';
+      if (name) condition.name = name;
+      if (typeof definition?.color === 'string' && CONDITION_COLOR.test(definition.color)) condition.color = definition.color;
+      if (typeof definition?.icon === 'string' && Object.hasOwn(WIDGET_ICON_PATHS, definition.icon)) condition.icon = definition.icon;
+      return condition;
+    });
 }

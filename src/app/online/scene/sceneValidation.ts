@@ -100,17 +100,30 @@ function isLegacyBar(value: unknown): boolean {
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const isUnit = inRange([0, 1]);
 function isResource(value: unknown): boolean {
-  return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent);
+  return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent)
+    && optional(inRange(SCENE_RANGES.resourceValue))(value.current) && optional(inRange(SCENE_RANGES.resourceValue))(value.max)
+    && optional(isBoolean)(value.fixed);
 }
 function isResources(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((bar) => isResource(bar));
+}
+function isWheel(value: unknown): boolean {
+  return isFields(value) && Number.isInteger(value.slot) && inRange(SCENE_RANGES.wheelSlot)(value.slot)
+    && typeof value.color === 'string' && HEX_COLOR.test(value.color)
+    && inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && isBoolean(value.fixed);
+}
+function isWheels(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((wheel) => isWheel(wheel));
 }
 /** An optional field: a GM of an older version sends none. */
 function optional(check: Check): Check {
   return (value) => value === undefined || check(value);
 }
 function isCondition(value: unknown): boolean {
-  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value));
+  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value))
+    && optional((name: unknown) => isText(name, SCENE_LIMITS.conditionName))(value.name)
+    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color)
+    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(value.icon);
 }
 
 function isPlayerMap(value: unknown): boolean {
@@ -133,7 +146,9 @@ function isPlayerToken(value: unknown): boolean {
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
-    && optional(isResources)(value.resources) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side);
+    && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
+    && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)
+    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale);
 }
 
 function isPlayerFogOp(value: unknown): boolean {
@@ -218,12 +233,25 @@ function isPlayerMeasurement(value: unknown): boolean {
     && optional(nullable(isSnapGrid))(value.snapGrid);
 }
 
+function isPlayerPins(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SCENE_LIMITS.pins && value.every((pin) => isFields(pin)
+    && isText(pin.id, SCENE_LIMITS.idLength) && isCoordinate(pin.x) && isCoordinate(pin.y)
+    && (pin.label === null || isText(pin.label, SCENE_LIMITS.pinLabel)) && (pin.title === null || isText(pin.title, SCENE_LIMITS.pinTitle))
+    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(pin.icon));
+}
+
+function isPlayerHandout(value: unknown): boolean {
+  return isFields(value) && (value.asset === null || isText(value.asset, SCENE_LIMITS.idLength)) && isText(value.title, SCENE_LIMITS.pinTitle);
+}
+
 const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   map: isPlayerMap,
   grid: nullable(isPlayerGrid),
   widgets: isPlayerWidgets,
   initiative: nullable(isPlayerInitiative),
   measurement: isPlayerMeasurement,
+  pins: isPlayerPins,
+  handout: nullable(isPlayerHandout),
 };
 const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
   tokens: isPlayerToken,
@@ -236,7 +264,7 @@ const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
 export function isPlayerSceneBody(value: unknown): boolean {
   return isFields(value) && isSceneId(value.sceneId)
     // An older GM sends no measurement; the mirror fills it in.
-    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement'))
+    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins' || key === 'handout'))
     && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText);
 }
 

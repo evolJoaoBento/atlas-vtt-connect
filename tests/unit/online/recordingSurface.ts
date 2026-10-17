@@ -2,7 +2,7 @@ import type { DecodedImage } from '../../../src/app/online/assets/AssetLoader';
 import { sceneWorldBounds } from '../../../src/app/online/preview/previewLayout';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 import { NO_TOKEN_OVERLAY, type LayerFrame } from '../../../src/app/online/view/layers/layerTypes';
-import type { ImageClip, LayerSurface, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
+import type { ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from '../../../src/app/online/view/ViewSurface';
 
 export type SurfaceCall =
   | { op: 'begin'; width: number; height: number; background: string | null }
@@ -13,10 +13,15 @@ export type SurfaceCall =
   | { op: 'roundRect'; x: number; y: number; width: number; height: number; radius: number; style: ShapeStyle }
   | { op: 'circle'; x: number; y: number; radius: number; style: ShapeStyle }
   | { op: 'paths'; paths: ScenePoint[][]; closed: boolean; style: ShapeStyle }
-  | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null }
-  | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string }
+  | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null; look?: ImageLook }
+  | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string; look?: ImageLook }
+  | { op: 'downedEmblem'; x: number; y: number; size: number; alpha: number }
+  | { op: 'glassDome'; x: number; y: number; size: number }
+  | { op: 'pinGlyph'; name: string; x: number; y: number; size: number; color: string }
   | { op: 'text'; text: string; x: number; y: number; style: TextStyle }
   | { op: 'icon'; name: string; x: number; y: number; size: number; color: string; alpha: number }
+  | { op: 'glyph'; name: string; x: number; y: number; size: number; color: string; alpha: number }
+  | { op: 'raster'; image: RasterImage; x: number; y: number; width: number; height: number }
   | { op: 'drawLayer'; layer: number; x: number; y: number; width: number; height: number };
 
 export type CallOf<K extends SurfaceCall['op']> = Extract<SurfaceCall, { op: K }>;
@@ -42,10 +47,15 @@ export class RecordingSurface implements ViewSurface {
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void {
     this.calls.push({ op: 'paths', paths: paths.map((path) => [...path]), closed, style });
   }
-  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null): void {
-    this.calls.push({ op: 'image', image, x, y, width, height, clip });
+  image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void {
+    this.calls.push({ op: 'image', image, x, y, width, height, clip, ...(look ? { look } : {}) });
   }
-  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string): void { this.calls.push({ op: 'tokenRing', x, y, diameter, artSize, color }); }
+  tokenRing(x: number, y: number, diameter: number, artSize: number, color: string, look?: ImageLook): void {
+    this.calls.push({ op: 'tokenRing', x, y, diameter, artSize, color, ...(look ? { look } : {}) });
+  }
+  downedEmblem(x: number, y: number, size: number, alpha: number): void { this.calls.push({ op: 'downedEmblem', x, y, size, alpha }); }
+  glassDome(x: number, y: number, size: number): void { this.calls.push({ op: 'glassDome', x, y, size }); }
+  pinGlyph(name: string, x: number, y: number, size: number, color: string): void { this.calls.push({ op: 'pinGlyph', name, x, y, size, color }); }
   text(text: string, x: number, y: number, style: TextStyle): void { this.calls.push({ op: 'text', text, x, y, style }); }
   measureText(text: string, font: string): number {
     const size = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 10);
@@ -53,6 +63,15 @@ export class RecordingSurface implements ViewSurface {
   }
   icon(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
     this.calls.push({ op: 'icon', name, x, y, size, color, alpha });
+  }
+  glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void {
+    this.calls.push({ op: 'glyph', name, x, y, size, color, alpha });
+  }
+  /** What `meanLuminance` answers; tests set it. */
+  luminance: number | null = null;
+  meanLuminance(_image: SurfaceImage): number | null { return this.luminance; }
+  raster(image: RasterImage, x: number, y: number, width: number, height: number): void {
+    this.calls.push({ op: 'raster', image, x, y, width, height });
   }
   createLayer(width: number, height: number): LayerSurface {
     const layer = new RecordingLayer(this.layers.length + 1, width, height);

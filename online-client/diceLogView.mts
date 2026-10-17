@@ -1,8 +1,8 @@
 // online-client/diceLogView.mts
 /**
  * The dice log on the join page: a side panel, and a bottom sheet on narrow screens. It opens
- * from the top bar's Dice log button or a tap on the toast, and closes with its close button or
- * Escape. It shows every roll's name, formula, dice and total, newest first, as text only, the
+ * from the top bar's Dice log button, and closes with its close button or Escape. A new roll
+ * shows as Atlas's result card while the log is closed (`DiceToastView`). It shows every roll's name, formula, dice and total, newest first, as text only, the
  * dice written as Atlas's log writes them (`6!` exploded, `−d10: 7` subtracted by an explosion),
  * a critical roll marked, and "+N more" for dice a large roll does not list. The log's rules live
  * in `PlayerDiceLog` (`src/app/online/page/diceLogModel.ts`).
@@ -10,9 +10,9 @@
 import { dieExtreme, entryRolls, PlayerDiceLog, rollerLabel, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
 import { dieLabel } from '@atlas-vtt/shared/rules';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
-import { dieTagOf, dieTagText } from '../src/app/online/tools/diceTags';
 import type { DiceLogEntry } from '../src/app/online/tools/toolMessages';
 import { iconElement } from './icons.mts';
+import { DiceToastView, tagElement } from './diceToastView.mts';
 
 export interface DiceLogViewOptions {
   panel: HTMLElement;
@@ -20,7 +20,8 @@ export interface DiceLogViewOptions {
   empty: HTMLElement;
   closeButton: HTMLButtonElement;
   toggleButton: HTMLButtonElement;
-  toast: HTMLButtonElement;
+  /** Where new rolls show as result cards (`DiceToastView`). */
+  toast: HTMLElement;
   /** The player's own new roll: true when it is thrown as dice instead of toasted. */
   onOwnRoll?: PlayerDiceLogOptions['onOwnRoll'];
   /** Whether this log's surface has the keyboard: inside Obsidian other panes' Escape must not close it. The page always does. */
@@ -36,24 +37,6 @@ function text(className: string, content: string): HTMLSpanElement {
   return element;
 }
 
-/**
- * A tagged die's tag as Atlas's log writes it: " · ● Fire", the colour dot (decorative) and the name as text, or the
- * colour code when it has no name, so colour is never the only signal. Checked again here; null for an untagged die.
- */
-function tagElement(die: DiceLogEntry['dice'][number]): HTMLSpanElement | null {
-  const tag = dieTagOf(die);
-  const label = dieTagText(tag);
-  if (label === null) return null;
-  const element = text('die-tag', ' · ');
-  if (tag.color) {
-    const dot = text('die-tag-dot', '●');
-    dot.setAttribute('aria-hidden', 'true');
-    dot.style.setProperty('--die-tag-colour', tag.color);
-    element.append(dot, ' ');
-  }
-  element.append(label);
-  return element;
-}
 
 function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
   const item = document.createElement(tag);
@@ -82,14 +65,17 @@ export class DiceLogView {
   readonly log: PlayerDiceLog;
   private shown: readonly DiceLogEntry[] | null = null;
   private readonly listeners = new AbortController();
+  private readonly cards: DiceToastView;
+  /** The roll whose card was shown last, so a redraw does not show it again. */
+  private carded: string | null = null;
 
   constructor(private readonly options: DiceLogViewOptions) {
+    this.cards = new DiceToastView(options.toast);
     this.log = new PlayerDiceLog({ onChange: () => this.render(), ...(options.onOwnRoll ? { onOwnRoll: options.onOwnRoll } : {}) });
     const { signal } = this.listeners;
     options.toggleButton.replaceChildren(iconElement(toolIconUrl('dices')));
     options.toggleButton.addEventListener('click', () => this.setOpen(!this.log.isOpen), { signal });
     options.closeButton.addEventListener('click', () => this.close(), { signal });
-    options.toast.addEventListener('click', () => this.setOpen(true), { signal });
     // An open log takes Escape first: closing it is all Escape does then.
     (options.doc ?? document).addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !this.log.isOpen || this.options.active?.() === false) return;
@@ -114,6 +100,7 @@ export class DiceLogView {
   dispose(): void {
     this.listeners.abort();
     this.log.dispose();
+    this.cards.dispose();
   }
 
   private close(): void {
@@ -122,15 +109,17 @@ export class DiceLogView {
   }
 
   private render(): void {
-    const { list, empty, toast } = this.options;
+    const { list, empty } = this.options;
     const entries = this.log.entries;
     if (entries !== this.shown) {
       this.shown = entries;
       list.replaceChildren(...entries.map((entry) => entryElement(entry, 'li')));
     }
     empty.hidden = entries.length > 0;
+    // An open log shows every roll: no card stays over it.
+    if (this.log.isOpen) this.cards.clear();
     const latest = this.log.toast;
-    toast.hidden = latest === null;
-    toast.replaceChildren(...(latest ? [entryElement(latest, 'div')] : []));
+    if (latest && latest.id !== this.carded) this.cards.show(latest);
+    this.carded = latest?.id ?? this.carded;
   }
 }

@@ -5,6 +5,7 @@
  * which the join dialog and Obsidian's own settings replace. The class names are the page's, scoped by
  * `styles/online-scene-canvas.scss`.
  */
+import type { HandoutViewOptions } from '../../../../online-client/handoutView.mts';
 import { toolIconUrl, type ToolIconName } from '../page/toolIcons';
 
 export interface SceneDom {
@@ -19,7 +20,17 @@ export interface SceneDom {
   followButton: HTMLButtonElement;
   fitButton: HTMLButtonElement;
   moveNotice: HTMLElement;
-  diceToast: HTMLButtonElement;
+  hoverCard: HTMLElement;
+  initiative: HTMLElement;
+  statblockPreview: HTMLElement;
+  sheetButton: HTMLButtonElement;
+  sheetPanel: HTMLElement;
+  sheetClose: HTMLButtonElement;
+  sheetTabs: HTMLElement;
+  sheetBody: HTMLElement;
+  handout: HandoutViewOptions;
+  turnNotice: HTMLElement;
+  diceToast: HTMLElement;
   diceTray: HTMLElement;
   toolbar: HTMLElement;
   diceLog: HTMLElement;
@@ -56,6 +67,15 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const diceLogButton = actions.createEl('button', {
     cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Dice log', 'aria-expanded': 'false' },
   });
+  // Under the dice log's: the player's sheets, while they have any.
+  const sheetButton = actions.createEl('button', {
+    cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Your sheets', 'aria-expanded': 'false' },
+  });
+  sheetButton.hidden = true;
+  const handoutButton = actions.createEl('button', {
+    cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Shown image', 'aria-expanded': 'false' },
+  });
+  handoutButton.hidden = true;
   // Follow GM and Fit map are icon buttons of the toolbar: they start here and the scene moves them into it once the toolbar
   // has drawn its own controls (`CanvasScene`).
   const viewButtons = root.createDiv({ cls: 'toolbar-item view-buttons' });
@@ -64,13 +84,33 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const fitButton = toolButton(viewButtons, 'Fit map', 'maximize');
   const stack = root.createDiv({ cls: 'top-stack' });
   const notes = stack.createDiv({ cls: 'top-notes' });
+  const turnNotice = notes.createEl('p', { cls: 'turn-notice', attr: { role: 'status' } });
+  turnNotice.hidden = true;
   const moveNotice = notes.createEl('p', { cls: 'move-notice', attr: { role: 'status' } });
   moveNotice.hidden = true;
-  const diceToast = notes.createEl('button', { cls: 'dice-toast', attr: { type: 'button', 'aria-live': 'polite' } });
+  const diceToast = notes.createDiv({ cls: 'dice-toasts', attr: { 'aria-live': 'polite' } });
   diceToast.hidden = true;
   const diceTray = root.createDiv({ cls: 'dice-tray', attr: { role: 'group', 'aria-label': 'Dice tray' } });
   diceTray.hidden = true;
   const toolbar = root.createEl('nav', { cls: 'toolbar', attr: { 'aria-label': 'Tools' } });
+  // The image the GM shows players (`HandoutView`).
+  const handout = root.createEl('section', { cls: 'handout', attr: { 'aria-label': 'Shown image' } });
+  handout.hidden = true;
+  const handoutHeader = handout.createDiv({ cls: 'handout-header' });
+  const handoutTitle = handoutHeader.createEl('h2');
+  const handoutClose = handoutHeader.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close image' } });
+  icon(handoutClose, 'x');
+  const handoutStatus = handout.createEl('p', { cls: 'handout-status', text: 'Loading…' });
+  const handoutCanvas = handout.createEl('canvas', { cls: 'handout-canvas', attr: { role: 'img', 'aria-label': 'Shown image' } });
+  // The token card under the mouse (`HoverCardView`), placed in the window's coordinates.
+  const hoverCard = root.createDiv({ cls: 'hover-card' });
+  hoverCard.hidden = true;
+  // The fight's order, as Atlas's player window floats it at the right edge (`InitiativeView`).
+  const initiative = root.createDiv({ cls: 'initiative-panel', attr: { role: 'region', 'aria-label': 'Initiative order' } });
+  initiative.hidden = true;
+  // Atlas's Ctrl/Cmd+hover stat block preview of the player's tokens (`StatblockPreviewView`), in the window's coordinates.
+  const statblockPreview = root.createDiv({ cls: 'statblock-preview' });
+  statblockPreview.hidden = true;
   const diceLog = root.createEl('aside', { cls: 'dice-log', attr: { 'aria-label': 'Dice log' } });
   diceLog.hidden = true;
   const header = diceLog.createDiv({ cls: 'dice-log-header' });
@@ -80,8 +120,20 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   header.createEl('h2', { text: 'Dice log' });
   const diceLogEmpty = diceLog.createEl('p', { cls: 'dice-log-empty', text: 'No rolls yet' });
   const diceLogList = diceLog.createEl('ol', { cls: 'dice-log-list', attr: { 'aria-label': 'Rolls' } });
+  // The player's sheets (`SheetView`): the same drawer as the dice log.
+  const sheetPanel = root.createEl('aside', { cls: 'sheet-panel', attr: { 'aria-label': 'Your sheets' } });
+  sheetPanel.hidden = true;
+  const sheetHeader = sheetPanel.createDiv({ cls: 'sheet-header' });
+  const sheetClose = sheetHeader.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close sheets' } });
+  icon(sheetClose, 'chevron-right');
+  sheetHeader.createEl('h2', { text: 'Your sheets' });
+  const sheetTabs = sheetPanel.createDiv({ cls: 'sheet-tabs' });
+  sheetTabs.hidden = true;
+  const sheetBody = sheetPanel.createDiv({ cls: 'sheet-body' });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
-    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList,
+    diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice, initiative, statblockPreview,
+    sheetButton, sheetPanel, sheetClose, sheetTabs, sheetBody,
+    handout: { panel: handout, title: handoutTitle, canvas: handoutCanvas, status: handoutStatus, closeButton: handoutClose, openButton: handoutButton },
   };
 }

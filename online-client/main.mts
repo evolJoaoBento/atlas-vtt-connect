@@ -18,7 +18,7 @@ import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
 import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
-import { initiativeLines, playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
+import { playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
 import { normalizePlayerName } from '../src/app/online/protocol';
 import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
 import { createPeerClient } from '../src/app/online/transport/PeerTransport';
@@ -26,6 +26,7 @@ import { AssetsPanel, rememberedKeep } from './assetsPanel.mts';
 import { createCanvasSurface } from '../src/app/online/view/canvasSurface';
 import { DiceDisplayView } from './diceDisplayView.mts';
 import { DiceLogView } from './diceLogView.mts';
+import { SheetView } from './sheetView.mts';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
@@ -50,7 +51,6 @@ const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
 const playerList = element<HTMLUListElement>('players');
 const widgetList = element<HTMLUListElement>('widgets');
-const initiativeList = element<HTMLOListElement>('initiative');
 const canvas = element<HTMLCanvasElement>('map');
 
 const cache = new AssetCache({ keep: rememberedKeep(), openStore: openIndexedDbImageStore });
@@ -67,9 +67,19 @@ const map = surface
     viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendLaser: (points, lifted, dt, color) => session?.sendLaser(points, lifted, dt, color) ?? false,
+    sendPing: (x, y) => session?.sendPing(x, y) ?? false,
+    sendTemplate: (change) => session?.sendTemplate(change) ?? false,
     laserColor: loadLaserColor(() => localStorage),
     onLaserColor: (color) => saveLaserColor(color, () => localStorage),
     notice: element('move-notice'),
+    hoverCard: element('hover-card'),
+    turnNotice: element('turn-notice'),
+    initiative: element('initiative-panel'),
+    statblockPreview: element('statblock-preview'),
+    handout: {
+      panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
+      status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
+    },
     onToolsChange: () => syncToolbar(),
   })
   : null;
@@ -94,6 +104,11 @@ const ownRolls = new OwnRollThrows({
   }).then((chunk) => chunk.diceThrows),
   fallback: (entry) => diceLog.log.toastRoll(entry),
 });
+const sheets = new SheetView({
+  panel: element('sheet-panel'), body: element('sheet-body'), tabs: element('sheet-tabs'),
+  closeButton: element('sheet-close'), toggleButton: element('sheet-button'),
+  onRoll: (tokenId, roll) => session?.sendSheetRoll(tokenId, roll) ?? false,
+});
 const diceLog = new DiceLogView({
   panel: element('dice-log'), list: element('dice-log-list'), empty: element('dice-log-empty'),
   closeButton: element('dice-log-close'), toggleButton: element('dice-log-button'), toast: element('dice-toast'),
@@ -103,6 +118,8 @@ const toolbar = new PageToolbar({
   root: element('toolbar'),
   onTool: (tool) => map?.selectTool(tool),
   onShape: (shape) => map?.selectShape(shape),
+  onTemplateShape: (shape) => map?.selectTemplateShape(shape),
+  onClearTemplates: () => map?.clearOwnTemplates(),
   onLaserColor: (color) => map?.selectLaserColor(color),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
@@ -229,7 +246,6 @@ function renderScene(): void {
     map?.setScene(shown);
   }
   fillList(widgetList, shown ? widgetLines(shown.widgets) : []);
-  fillList(initiativeList, shown ? initiativeLines(shown.initiative, shown.tokens) : []);
   // Read-only, for checking in the developer tools what this page received.
   (window as unknown as { atlasScene: PlayerScene | null }).atlasScene = shown;
 }
@@ -299,6 +315,12 @@ if (!target) {
       },
       // Not logged: lasers arrive up to twenty times a second per person.
       onLaser: (laser) => map.receiveLaser(laser),
+      onPing: (ping) => map.receivePing(ping),
+      onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
+      onSheets: (entries) => {
+        sheets.receive(entries);
+        map.setSheets(entries);
+      },
     });
     session.start();
   });

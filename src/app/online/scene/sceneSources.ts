@@ -1,5 +1,6 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
-import type { CollectionGridDefaults, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
+import type { HandoutSource } from '../handouts';
+import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
@@ -38,12 +39,16 @@ export interface SceneProjectionOptions {
   coneAngle?: (mapPath: string | null) => number;
   /** The resources of the collection holding the map at `mapPath`, which decide the bars players see; without it none show. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  /** The condition definitions of the collection holding the map at `mapPath`, which name the conditions players see; without it they go unnamed. */
+  conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   /** The initiative rules of the collection holding the map at `mapPath`, which say whether the list is by sides before a fight; without it the list is in turn order. */
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
   /** Calls `listener` when a collection's rules change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of each scene's collection, sent to its players; without it (an Atlas before API 1.18) none is sent. */
   diceLook?: DiceLookSource;
+  /** The image the GM shows players; without it no scene carries a handout. */
+  handout?: HandoutSource;
 }
 
 /** The dice look of a map's collection, as the GM's Atlas has it (`dice.lookFor`, API 1.18); players are sent it with the scene. */
@@ -66,6 +71,10 @@ export function sliceOf(snapshot: SceneSnapshot): Slice {
     snapshot.background, snapshot.grid, snapshot.objects.tokens, snapshot.objects.texts, snapshot.objects.drawings,
     snapshot.objects.fog, snapshot.widgets.settings, snapshot.widgets.values, snapshot.initiative,
     snapshot.initiativeTrackerOpen, snapshot.lighting,
+    // A stock Atlas's snapshot carries its note pins (an Atlas API's has none): the readable ones go to players.
+    (snapshot.objects as { pins?: unknown }).pins,
+    // And its token settings: the instance badges and ring size players see follow them.
+    (snapshot as { tokenSettings?: unknown }).tokenSettings,
   ];
 }
 
@@ -109,8 +118,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
@@ -119,6 +128,8 @@ export function sceneContext(
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
+    conditions: options.conditions?.(mapPath) ?? [],
+    ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),
   };
 }

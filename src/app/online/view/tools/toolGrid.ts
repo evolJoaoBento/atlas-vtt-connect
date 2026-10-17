@@ -1,7 +1,7 @@
 /**
  * The grid the player's measuring tools use: the grid the GM's drop snaps to (`snapGridOf`), which is
- * the grid players see when they see one. The measure tool snaps to its cell centres only while players
- * see the grid, like the GM's measure tool (`cellCenterAt`). A dragged token's ruler ends where the GM's
+ * the grid players see when they see one. The measure tool snaps to its cell centres while the GM's
+ * snap-to-grid is on, seen or not, as Atlas's measure tool does (`MeasureRenderer`). A dragged token's ruler ends where the GM's
  * drop puts a token of its size (`snapTokenCenter`: where cells meet for Large and Gargantuan), also on a
  * hidden grid, while the GM's snap-to-grid is on; on a map without a grid it does not snap. Without a
  * grid, distances count squares of the map's cell size. Distances are labelled with the GM's measurement
@@ -17,6 +17,8 @@ export interface ToolGrid {
   geometry: GridGeometry;
   /** Where a measured point lands. */
   snap(point: ScenePoint): ScenePoint;
+  /** Where a square template's corner lands: the nearest corner of a square grid's cells while snapping is on. */
+  snapCorner(point: ScenePoint): ScenePoint;
   /** Where a drag ruler point of a token of `tokenSize` lands: the GM's snap-to-grid decides, as for a dropped token, even if the grid is hidden. */
   snapDrag(point: ScenePoint, tokenSize: number): ScenePoint;
   /** The distance along `points`, e.g. "30ft" or a range band's name. */
@@ -32,7 +34,12 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     ?? (grid ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY } : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 });
   return {
     geometry,
-    snap: (point) => (grid ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snapCorner: (point) => {
+      if (!scene.measurement.snapToGrid || !(grid || snapGrid) || geometry.type !== 'square' || !(geometry.size > 0)) return { x: point.x, y: point.y };
+      const corner = (value: number, offset: number): number => offset + Math.round((value - offset) / geometry.size) * geometry.size;
+      return { x: corner(point.x, geometry.offsetX ?? 0), y: corner(point.y, geometry.offsetY ?? 0) };
+    },
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),

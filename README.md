@@ -9,6 +9,8 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 1. Obsidian 1.8.7 or newer, on desktop.
 2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
 
+**Updating to 0.2.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. An older Connect drops all templates once someone places a square.
+
 ## For the GM
 
 ### Start a session
@@ -22,14 +24,19 @@ The panel lists who is connected. **Remove player** (×) sends someone out; they
 
 ### What players see
 
-Players see the scene you present, with what Atlas's own player window would show: hidden tokens, fog and line of sight stay hidden.
+Players see the scene you present, with what Atlas's own player window would show: hidden tokens, fog and line of sight stay hidden. It is drawn as that window draws it, following your map's settings: token rings and their ring size, numbered badges on look-alike tokens, the grid's colour and line style, pin icons, downed tokens greyed under a skull, and a fade when you present another scene.
 
 - **Present a scene:** present it in Atlas as usual (the eye on its scene tab).
 - **Dynamic lighting:** turn on Atlas's dynamic lighting experiment and players see only what their tokens see, plus the places they explored before.
+- **Health bars:** the resources a collection marks **visible to players** (its settings, Resources) show as bars on tokens, as in Atlas's player window. Resources in the other slots (2 to 5) show as small wheels beside the token.
+- **Whose turn:** with the initiative list shown to players, they see the order as a column at the right of their map, the token whose turn it is gets a white ring, and its player reads "Your turn".
+- **Readable pins:** a note pin you mark readable (right-click the pin) shows on players' maps with the note's title, where they can see that spot.
 
 ### Let players move tokens
 
 Right-click a token on the map → **Controlled by** → tick the players. They can now drag it. Moves snap to your grid, stop at walls on a lit scene, and are refused while you are dragging.
+
+**Sheets:** a player sees the stat block of every token they control, with its exact numbers (HP 19 / 27), and can roll its abilities, saves, skills and attacks from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster or NPC you hand to a player.
 
 **Player characters:** mark a token as a player character in Atlas (right-click → player character), then give it to a player with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions. Untick them to take it back.
 
@@ -37,6 +44,11 @@ Right-click a token on the map → **Controlled by** → tick the players. They 
 
 - Players' rolls are rolled by Atlas's own dice, by the map's rules, thrown on your screen and logged under their name. Your rolls reach their dice log.
 - Your laser pointer shows on players' maps, and theirs on yours.
+- Players' pings and lasting templates show on your map too. Each template has a small **×** on its edge: click it to erase that template for everyone. **Clear players' templates** (command palette) takes them all away.
+
+### Show an image
+
+Run **Show image to players…**, pick an image from your vault, and every player sees it over their map (they can close it and open it again). **Stop showing image to players** takes it away.
 
 ### Split the party
 
@@ -59,15 +71,23 @@ A player who reconnects from the same browser or Obsidian takes their old place,
 
 ### Join from Obsidian
 
-Install Atlas VTT and Connect, run **Join online session…**, paste the link, type your name and click **Join**. The scene opens in its own tab.
+Install Atlas VTT and Connect, run **Join online session…**, paste the link, type your name and click **Join**. The scene opens in its own tab. Keep Connect on the same version as your GM's.
 
 ### At the table
 
 - **Move:** drag the tokens the GM gave you (they have a yellow ring). Pan by dragging the map, zoom with the wheel or a pinch.
-- **Measure:** pick **Measure** and choose a line, cone or circle; it measures in the GM's units.
+- **Select a token:** click it with **Move** to select it: its bars, name and wheels grow and its bars show their numbers (hovering shows the numbers too). Press Escape or click the map to let go.
+- **Measure:** pick **Measure** and choose a line, cone or circle; it measures in the GM's units, snaps to the grid when the GM has snapping on, and stays two seconds after you let go.
 - **Laser:** pick **Laser** and draw to point at something; everyone sees it.
+- **Ping:** pick **Ping** and tap the map: rings show at that spot for everyone.
+- **Template:** pick **Template** and drag to leave a spell area on the map for everyone. The arrow beside the button opens its menu: **Line**, **Circle/Sphere**, **Square/Cube** or **Cone**. A circle grows from its centre, a square from one corner (snapping to the grid's corners). Each template shows its size in the GM's units: a line's or cone's length, a circle's radius, a square's side. Tap one of yours to remove it, or pick **Clear my templates** in the menu to remove them all. You can keep up to 10.
+- **Hover a token** for its name and conditions, and the exact numbers of your own tokens.
+- **Your sheets:** the scroll icon on the right edge opens the stat blocks of your tokens; click a highlighted number to roll it. Shift-click rolls with advantage, Alt-click with disadvantage, and a right-click offers both.
+- **Initiative:** during a fight the turn order shows as a column at the right of the map, with the current turn highlighted.
 - **Dice:** open the dice tray, pick dice and roll. The GM's Atlas rolls them and everyone sees the result.
+- **Roll cards:** a new roll shows as a card for a few seconds; **Details** shows the dice, a click dismisses it.
 - **Dice log:** the dice icon on the right edge opens every roll of the session.
+- **An image from the GM** covers the map: scroll to zoom, drag to pan, double-click to reset, and press Escape or click beside it to close it.
 - **Follow GM** puts your view back on the GM's camera; **Fit map** shows the whole map.
 
 ## Settings
@@ -86,6 +106,7 @@ On Atlas from Community plugins, Connect reads what Atlas leaves reachable, so a
 
 - Footprints of tokens seen in the dark aren't shown to players, and edges of sight are a little rougher than in Atlas's window.
 - A map with a stretch-fit grid may not line up for players. Running timers show their last saved value. Atlas's marks and pings aren't relayed.
+- Templates show their size to players only; the GM sees them without the label.
 - **Sharing notes and maps** (People…, Share with…, Ask to pull…, Shared with me…) and per-collection rules need an Atlas build with the extension API, which no released Atlas has yet. That build is installed with BRAT from `evolJoaoBento/atlas-vtt`.
 
 ## Privacy

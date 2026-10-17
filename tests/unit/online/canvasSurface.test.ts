@@ -117,7 +117,8 @@ describe("Atlas's token ring on the canvas", () => {
     surface.tokenRing(10, 20, 70, 62, '#e93147');
     const tint = created.find((entry) => entry.tag === 'canvas')!;
     expect(tint.calls).toEqual(expect.arrayContaining(['globalCompositeOperation=multiply', 'fillStyle=#e93147', 'globalCompositeOperation=destination-in']));
-    expect(calls).toEqual(['drawImage(object,-25,-15,70,70)']);
+    expect(calls).toContain('drawImage(object,-25,-15,70,70)');
+    expect(calls.filter((call) => call.startsWith('drawImage'))).toHaveLength(1);
     surface.tokenRing(10, 20, 70, 62, '#e93147');
     expect(created.filter((entry) => entry.tag === 'canvas')).toHaveLength(1);
     spy.mockRestore();

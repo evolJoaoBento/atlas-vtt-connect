@@ -72,12 +72,40 @@ export interface PlayerResource {
   share: number;
   /** The window darkens this bar: a resource that defeats the token is spent. At most one bar per token. */
   spent: boolean;
+  /**
+   * The bar's numbers, which show on it while the token is hovered or selected, as on Atlas's own scene
+   * (`ResourceBarLabel`); absent from an older GM. A static resource shows only its maximum (`fixed`).
+   */
+  current?: number;
+  max?: number;
+  fixed?: boolean;
+}
+
+/**
+ * A resource in a wheel socket (2 to 5) as the player window draws it beside the token: a ring gauge in its colour with
+ * its number in the middle (`ResourceWheelView`). The window shows players these numbers, so they are sent as they are.
+ */
+export interface PlayerWheel {
+  /** Its socket: 2 and 3 on the token's right, 4 and 5 on its left, the first of a side the upper one. */
+  slot: number;
+  /** `#rrggbb`. */
+  color: string;
+  current: number;
+  max: number;
+  /** A static resource: a whole ring around its maximum. */
+  fixed: boolean;
 }
 
 export interface PlayerCondition {
   id: string;
   /** The number of a valued condition; null when the token stores none. */
   value: number | null;
+  /** The collection's name for it ("Frightened"); absent from an older GM or for a condition the collection no longer defines. */
+  name?: string;
+  /** Its colour, `#rrggbb`; absent as `name` is. */
+  color?: string;
+  /** Its badge's glyph, one of Atlas's widget icons; absent when it has none (the badge shows the name's initial). */
+  icon?: string;
 }
 
 /** The two sides of a fight by sides, as `InitiativeSide` (a parity test keeps them equal). */
@@ -102,10 +130,19 @@ export interface PlayerToken {
   stress: PlayerLegacyBar | null;
   /** The bars the window draws on the token; absent from a GM of an older version, which sent none. */
   resources?: PlayerResource[];
+  /** The wheels the window draws beside the token, in socket order; absent when it has none or from an older GM. */
+  wheels?: PlayerWheel[];
   /** The window greys the token out and marks it with a skull: a resource that defeats it is spent, whether players see that resource or not. */
   downed?: boolean;
   /** The side the list by sides puts this combatant under; sent only for a token with an initiative entry while the list is by sides. */
   side?: PlayerSide;
+  /**
+   * The number on Atlas's instance badge, counted among the look-alikes (same art) players see; sent only while two or
+   * more are in view and the map shows badges.
+   */
+  instance?: number;
+  /** The map's ring size setting, which scales the ring and what sits on it; sent only when it is not 1. */
+  ringScale?: number;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */
@@ -253,6 +290,30 @@ export interface PlayerScene {
   widgets: PlayerWidget[];
   initiative: PlayerInitiative | null;
   measurement: PlayerMeasurement;
+  /** The map pins the GM made readable, where players see them; absent from an older GM. */
+  pins?: PlayerPin[];
+  /** The image the GM shows players, or null; absent from an older GM. */
+  handout?: PlayerHandout | null;
+}
+
+/** The image the GM shows players: its asset (null while the GM is still reading it) and its title. */
+export interface PlayerHandout {
+  asset: string | null;
+  title: string;
+}
+
+/** A note pin players may read: its place, its number or letter, and its note's title. Never the note's path. */
+export interface PlayerPin {
+  /** An alias, not Atlas's pin id. */
+  id: string;
+  x: number;
+  y: number;
+  /** The pin's number or letter, for pins that show one. */
+  label: string | null;
+  /** The linked note's title (its file name, or its heading). */
+  title: string | null;
+  /** Atlas's pin icon (`resolvePinIcon`), or `number` / `letter` for a labelled pin; absent from an older GM. */
+  icon?: string;
 }
 
 /** A snapshot's scene: everything but the fog and the drawings, which follow in parts. */
@@ -262,7 +323,7 @@ export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
-export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement'] as const;
+export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout'] as const;
 export type SceneFieldKey = typeof SCENE_FIELD_KEYS[number];
 
 export interface ScenePatchBody {

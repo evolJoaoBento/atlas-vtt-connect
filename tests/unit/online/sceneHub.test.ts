@@ -10,6 +10,24 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import { readFileSync } from 'node:fs';
 import { createTabScenes } from '../../../src/app/online/atlas/tabScenes';
 import { applied, recordFlows, replay, segment, seqsUnbroken, states, type StreamHandlerInput, type Streams } from './sceneStreamFlows';
+
+/** `value` with the numbers of every token bar (`current`, `max`, `fixed` in a `resources` list) taken out. */
+function withoutBarNumbers<T>(value: T): T {
+  const strip = (node: unknown, inResources: boolean): unknown => {
+    if (Array.isArray(node)) return node.map((item) => strip(item, inResources));
+    if (typeof node === 'string' && node.includes('"resources"')) {
+      try {
+        return JSON.stringify(strip(JSON.parse(node), false));
+      } catch {
+        return node;
+      }
+    }
+    if (typeof node !== 'object' || node === null) return node;
+    const entries = Object.entries(node).filter(([key]) => !(inResources && (key === 'current' || key === 'max' || key === 'fixed')));
+    return Object.fromEntries(entries.map(([key, inner]) => [key, strip(inner, key === 'resources')]));
+  };
+  return strip(value, false) as T;
+}
 import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneHub } from '../../../src/app/online/scene/SceneHub';
 import { SceneAssignments } from '../../../src/app/online/split/SceneAssignments';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
@@ -89,7 +107,7 @@ const HP: ResourceDefinition = {
   key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false,
 };
 const SHOWN_HP: ResourceDefinition = { ...HP, visibleToPlayers: true };
-const HP_BAR = { color: '#22c55e', share: 0.7, spent: false };
+const HP_BAR = { color: '#22c55e', share: 0.7, spent: false, current: 7, max: 10 };
 
 interface Harness {
   files: MemoryImageFiles;
@@ -362,14 +380,14 @@ describe('SceneHub', () => {
     const player = await join(h);
     h.setResources([{ ...SHOWN_HP, slot: 0 }, stress]);
     await tick();
-    expect(player.scene?.tokens.hero?.resources).toEqual([HP_BAR, { color: '#a855f7', share: 0.5, spent: false }]);
+    expect(player.scene?.tokens.hero?.resources).toEqual([HP_BAR, { color: '#a855f7', share: 0.5, spent: false, current: 3, max: 6 }]);
     h.setResources([{ ...SHOWN_HP, slot: 1, color: '#3b82f6' }, { ...stress, slot: 0 }]);
     await tick();
-    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false }, { color: '#3b82f6', share: 0.7, spent: false }]);
+    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false, current: 3, max: 6 }, { color: '#3b82f6', share: 0.7, spent: false, current: 7, max: 10 }]);
     // Moved to a wheel socket, the window no longer draws it
     h.setResources([{ ...SHOWN_HP, slot: 4 }, stress]);
     await tick();
-    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false }]);
+    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false, current: 3, max: 6 }]);
   });
 
   it('follows the GM editing a token\'s resource, and sends no resource of a hidden token', async () => {
@@ -838,7 +856,8 @@ describe('SceneHub', () => {
 
     it('with no assignments every player gets exactly what SceneBroadcaster sent', async () => {
       const recorded = JSON.parse(readFileSync('tests/unit/online/fixtures/broadcasterStream.json', 'utf8')) as Streams;
-      const streams = await recordFlows(hubOf, tabs);
+      // The recording predates the numbers bars carry for hover and selection: they are left out of the comparison.
+      const streams = withoutBarNumbers(await recordFlows(hubOf, tabs));
       // Live all along: the same messages, in the same order, with the same seq.
       expect(streams.edits).toEqual(recorded.edits);
       expect(streams.secrets).toEqual(recorded.secrets);

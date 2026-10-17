@@ -77,6 +77,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
       assets.onChange(scheduleLive),
       // A collection's resources or initiative rules changed: the live tick, and parked scenes too (D8).
       this.options.watchResources?.(() => this.rulesChanged()) ?? (() => undefined),
+      // The GM showed players an image or took it away: every scene in use carries it.
+      this.options.handout?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
       // A collection's dice look (or the default's) changed: every scene in use reads its own again.
       this.options.diceLook?.watch(() => { for (const slot of this.slots.values()) slot.readLook(); }) ?? (() => undefined),
       assignments.onChange(() => { this.update(); this.changes.emit({ kind: 'assignments' }); }),

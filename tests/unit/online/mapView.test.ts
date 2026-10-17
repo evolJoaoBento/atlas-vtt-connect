@@ -57,7 +57,8 @@ describe('MapView', () => {
     const listeners = new Set<() => void>();
     const matchMedia = vi.fn((query: string) => ({
       matches: false, media: query,
-      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      // Only the pixel ratio's queries count: the theme's is watched apart.
+      addEventListener: (_type: string, listener: () => void) => query.startsWith('(resolution') && listeners.add(listener),
       removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
     }));
     vi.stubGlobal('matchMedia', matchMedia);
@@ -71,6 +72,33 @@ describe('MapView', () => {
     expect(listeners.size).toBe(1);
     t.view.dispose();
     expect(listeners.size).toBe(0);
+  });
+
+  it("fades the frame players saw into another scene, as Atlas's player window crossfades, and clears it after", () => {
+    const drawn: unknown[] = [];
+    const context = { drawImage: (source: unknown) => drawn.push(source), globalAlpha: 1 };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never);
+    const animation = { onfinish: null as null | (() => void), cancel: vi.fn() };
+    const animate = vi.fn(() => animation);
+    Object.defineProperty(HTMLCanvasElement.prototype, 'animate', { value: animate, configurable: true });
+    try {
+      const t = setup();
+      t.canvas.width = 80;
+      t.canvas.height = 60;
+      t.view.setScene(playerScene({ sceneId: 'one' }));
+      t.view.setScene(playerScene({ sceneId: 'one' }));
+      expect(document.querySelector('.scene-transition-snapshot')).toBeNull();
+      t.view.setScene(playerScene({ sceneId: 'two' }));
+      const snapshot = document.querySelector<HTMLCanvasElement>('.scene-transition-snapshot');
+      expect(snapshot?.previousElementSibling).toBe(t.canvas);
+      expect(drawn).toEqual([t.canvas]);
+      expect(animate).toHaveBeenCalledWith([{ opacity: 1 }, { opacity: 0 }], expect.objectContaining({ duration: 300 }));
+      animation.onfinish?.();
+      expect(document.querySelector('.scene-transition-snapshot')).toBeNull();
+    } finally {
+      vi.restoreAllMocks();
+      delete (HTMLCanvasElement.prototype as { animate?: unknown }).animate;
+    }
   });
 
   it('breaks away on a drag on the map, and Follow GM brings it back', () => {

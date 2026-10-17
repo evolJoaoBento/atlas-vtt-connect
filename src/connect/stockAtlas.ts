@@ -14,12 +14,13 @@
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
-  MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, ViewCamera, ViewInfo,
+  MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
 } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { stockLightingApi } from './stockLighting/stockLighting';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
+import { stockMapRules } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
@@ -50,6 +51,8 @@ interface StockSceneState {
   initiative: SceneSnapshot['initiative'];
   initiativeTrackerOpen: boolean;
   lighting: SceneSnapshot['lighting'];
+  /** The map's token settings: instance badges and the ring's size reach players from here. */
+  tokenSettings?: Partial<TokenSettings>;
   remoteView?: unknown;
 }
 interface StockViewport {
@@ -182,6 +185,7 @@ function snapshot(view: StockView): SceneSnapshot {
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
     lighting: state.lighting,
+    ...(state.tokenSettings ? { tokenSettings: state.tokenSettings } : {}),
   });
 }
 
@@ -199,8 +203,8 @@ function camera(view: StockView): ViewCamera | null {
 /** The slice of a view's stores a snapshot is made of; unchanged by reference means no new snapshot. */
 function snapshotSlice(view: StockView): readonly unknown[] {
   const s = view.atlasStore.getState();
-  return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings,
-    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting];
+  return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
+    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings];
 }
 
 function guard(what: string, call: () => void): void {
@@ -573,6 +577,21 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       }));
       const ref = app.workspace.on('atlas-vtt:collection-settings-changed' as never, ((id: string | null) => events.emit('rules-changed', id ?? null)) as never);
       disposers.add(() => app.workspace.offref(ref));
+      // A map's rules are read from its view's token renderer and the asset index (`stockRules.ts`), neither of which
+      // says when it is ready: a loaded map and a loaded index are when the rules may read differently.
+      const rulesMayChange = (): void => { events.emit('rules-changed', null); };
+      disposers.add(events.on('map-loaded', rulesMayChange));
+      let indexAsked = false;
+      const askIndex = (): void => {
+        if (indexAsked) return;
+        const assets = mapViews(app).map((view) => (view.serviceManager as { getAssetService?: () => unknown } | undefined)?.getAssetService?.())
+          .find((found): found is { initialize: () => Promise<unknown> } => typeof (found as { initialize?: unknown } | null)?.initialize === 'function');
+        if (!assets) return;
+        indexAsked = true;
+        assets.initialize().then(rulesMayChange, () => undefined);
+      };
+      askIndex();
+      disposers.add(events.on('map-loaded', askIndex));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
       const extensionId = plugin.manifest.id;
       // Asked for by Connect and by the player character links at once: made once.
@@ -631,7 +650,17 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         id: extensionId,
         views: viewsApi(app, disposers),
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
-        rules: Object.freeze({ forMap: (): MapRules => defaultRules() }),
+        rules: Object.freeze({
+          forMap: (mapPath: string | null): MapRules => {
+            try {
+              const views = mapViews(app).map((view) => ({ mapPath: () => view.atlasStore.getState().mapPath, serviceManager: view.serviceManager }));
+              return stockMapRules(views, mapPath, defaultRules());
+            } catch (error) {
+              console.warn('[Atlas VTT Connect] Could not read the rules of a stock Atlas map; using the defaults:', error);
+              return defaultRules();
+            }
+          },
+        }),
         ui: ui.api,
         lasers: stockLasersApi({
           view: (viewId) => trackedView(app, viewId),

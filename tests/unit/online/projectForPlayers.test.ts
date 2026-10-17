@@ -60,7 +60,7 @@ describe('projectForPlayers', () => {
     expect(scene.tokens.hero).toEqual({
       x: 140, y: 140, size: 1, rotation: 0, layer: 0, image: expect.any(String), ring: '#3366ff',
       conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: null, stress: null,
-      resources: [{ color: '#22c55e', share: 0.7, spent: false }, { color: '#a855f7', share: 0.33, spent: false }], downed: false,
+      resources: [{ color: '#22c55e', share: 0.7, spent: false, current: 7, max: 10 }, { color: '#a855f7', share: 0.33, spent: false, current: 2, max: 6 }], downed: false,
     });
     expect(scene.tokens.hero?.image).not.toContain('hero');
   });
@@ -205,13 +205,18 @@ describe('projectForPlayers', () => {
       'isHidden', 'notePath', 'statblockPath', 'statblockName', 'tags', 'playerLinked', 'playerId', 'playerCharacterId',
       'hasVision', 'visionInnerRadius', 'visionOuterRadius', 'instanceNumber', 'showNameplate', 'hope', 'difficulty',
       'maxHpOverridden', 'maxStressOverridden', 'statblockResources', 'conditionValues', 'imagePath', 'kind', 'futureField',
-      'pins', 'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
+      'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
       'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
-      'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
+      'defeatedWhenSpent', 'field', 'key', 'slot',
     ];
+    // Numbers go out only on the bars of resources players see (shown on hover and selection, as on Atlas's scene).
+    const barNumbers = Object.values(scene.tokens).flatMap((token) => token.resources ?? []).length;
+    expect(json.match(/"current"/g) ?? []).toHaveLength(barNumbers);
     // The grid and the snap grid are geometry players are meant to have (an offset among it).
     const keys = keysOf({ ...scene, grid: null, measurement: { ...scene.measurement, snapGrid: null }, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);
+    // The scene's one pin is for the GM only.
+    expect(scene.pins).toEqual([]);
     expect(Object.keys(scene.measurement.snapGrid!).sort()).toEqual(['offsetX', 'offsetY', 'size', 'type']);
     expect(scene.initiative?.entries[0]).not.toHaveProperty('stress');
     expect(keysOf(scene.widgets).has('color')).toBe(false);
@@ -321,6 +326,38 @@ describe('projectForPlayers fix round 1', () => {
     expect(projectForPlayers(withTokens({ hero: unlinked }), context()).tokens.hero?.name).toBeNull();
     const linked = hero({ name: '', statblockPath: 'b.md' });
     expect(projectForPlayers(withTokens({ hero: linked }), context()).tokens.hero?.name).toBe('Unknown Creature');
+  });
+
+  it("names, colours and draws a character's conditions as the collection does, and drops one it no longer defines, as Atlas", () => {
+    const named = hero({ conditions: ['prone', 'gone', 'scared'], conditionValues: { prone: 2 } } as Partial<Character>);
+    const conditions = [
+      { id: 'prone', name: ' Prone ', color: '#AA3300' }, { id: 'odd', name: 'x'.repeat(200), color: 'red' },
+      { id: 'scared', name: 'Scared', color: '#123456', icon: 'terror' }, { id: 'weird', name: 'Weird', color: '#123456', icon: 'not-an-icon' },
+    ] as never;
+    expect(projectForPlayers(withTokens({ hero: named }), context({ conditions })).tokens.hero?.conditions).toEqual([
+      { id: 'prone', value: 2, name: 'Prone', color: '#AA3300' },
+      { id: 'scared', value: null, name: 'Scared', color: '#123456', icon: 'terror' },
+    ]);
+    // A collection not known yet: every id, unnamed.
+    expect(projectForPlayers(withTokens({ hero: named }), context()).tokens.hero?.conditions.map((condition) => condition.id)).toEqual(['prone', 'gone', 'scared']);
+  });
+
+  it('sends the pins the GM made readable, where players see the map, by title only', () => {
+    const pins = {
+      a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md#The Cellar', readable: true, label: '1', icon: 'number' },
+      b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Secrets/Guard.md' },
+      c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gm.md', readable: true, gmOnly: true },
+      d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'scenes/Cave.atlasmap', readable: true },
+      e: { id: 'e', kind: 'pin', x: 700, y: 700, notePath: 'Fogged.md', readable: true },
+      f: { id: 'f', kind: 'pin', x: 300, y: 100, notePath: 'Dock.md', readable: true, icon: 'coins' },
+    };
+    const scene = projectForPlayers(withTokens({}, { pins } as never), context({ coverage: fogOver(600, 600, 300, 200) }));
+    expect(scene.pins).toEqual([
+      { id: 'pin-0', x: 100, y: 100, label: '1', title: 'The Cellar', icon: 'number' },
+      // A legacy Lucide icon reads as Atlas's pin icon for it.
+      { id: 'pin-1', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
+    ]);
+    expect(JSON.stringify(scene.pins)).not.toContain('Secrets');
   });
 
   it('sends no conditions for plain tokens', () => {
