@@ -7,6 +7,7 @@ import type { Character, MenuItem, ResourceDefinition, SceneSnapshot, TokenMenuC
 import {
   collectionDefaultLabel, everyTokenLabel, resourceMenuLabel, resourceVisibilityProvider, sameAsStatblockLabel, THIS_TOKEN_LABEL,
 } from '../../../src/app/online/gm-ui/resourceVisibilityMenu';
+import { atlasBars, SHARE_SCALE } from '../../../src/app/online/obsidian/convertResources';
 import { ResourceVisibilityStore } from '../../../src/app/online/scene/resourceVisibility';
 import { drawTokenUi } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import { drawWheels } from '../../../src/app/online/view/layers/tokenWheels';
@@ -81,6 +82,12 @@ describe('the player view draws', () => {
     expect(surface.ops('roundRect')).toEqual([]);
   });
 
+  it("numbers alone at the selected token's scale, so they read at any zoom", () => {
+    const surface = new RecordingSurface();
+    drawTokenUi(surface, playerToken({ resources: [{ color: '#22c55e', share: 0.5, spent: false, current: 4, max: 8, bar: false }] }), geometry, { uiScale: 0.5, numbersAloneScale: 2 });
+    expect(surface.ops('push').map((call) => call.scale)).toContain(4);
+  });
+
   it('a bar alone with no numbers, even hovered', () => {
     const surface = new RecordingSurface();
     drawTokenUi(surface, playerToken({ resources: [{ color: '#22c55e', share: 0.5, spent: false }] }), geometry, { numbers: 1 });
@@ -97,5 +104,14 @@ describe('the player view draws', () => {
     drawWheels(number, { x: 0, y: 0 }, [{ slot: 2, color: '#3b82f6', current: 3, max: 5, fixed: false, ring: false }], 62, 33, 70);
     expect(texts(number)).toEqual(['3']);
     expect(number.calls.some((call) => (call.op === 'paths' || call.op === 'circle') && call.style.stroke === '#3b82f6')).toBe(false);
+  });
+});
+
+describe("Atlas's remote view (an Obsidian player on Atlas's API)", () => {
+  it('draws a bar shown alone as its share, and numbers shown alone with the token\'s own numbers', () => {
+    const alone = atlasBars(playerToken({ resources: [{ color: '#22c55e', share: 0.5, spent: false }] }));
+    expect(alone?.values.bar0).toEqual({ current: 50, max: SHARE_SCALE });
+    const numbers = atlasBars(playerToken({ resources: [{ color: '#22c55e', share: 0.5, spent: false, current: 4, max: 8, bar: false }] }));
+    expect(numbers?.values.bar0).toEqual({ current: 4, max: 8 });
   });
 });

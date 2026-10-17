@@ -75,6 +75,11 @@ export interface TokenUiLook {
   uiScale?: number;
   /** The bar numbers' opacity, shown while the token is hovered or selected; 0 when unset. */
   numbers?: number;
+  /**
+   * The UI scale numbers the GM shows alone are read at, never below the bars' (`uiScale`): the selected token's,
+   * so they are readable at any zoom, as a hovered bar's numbers are. The bars' when unset.
+   */
+  numbersAloneScale?: number;
   /** The nameplate in Atlas's dark-theme colours, or its light ones; dark when unset. */
   dark?: boolean;
 }
@@ -88,21 +93,25 @@ export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: 
     // Anchored on the token's bottom edge, in UI units, like Atlas's `belowToken` container.
     surface.push(token.x, token.y + geometry.size / 2, 0, scale);
     if (token.name) drawNameplate(surface, token.name, look.dark ?? true);
-    drawBars(surface, bars, look.barFrame ?? ((_slot, share) => ({ fill: share, trail: share })), look.numbers ?? 0);
+    drawBars(surface, bars, look.barFrame ?? ((_slot, share) => ({ fill: share, trail: share })), look.numbers ?? 0, Math.max(1, (look.numbersAloneScale ?? scale) / scale));
     surface.pop();
   }
   drawWheels(surface, token, token.wheels ?? [], geometry.size, geometry.ringRadius, geometry.cellSize, scale);
   if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, resting, look.badgeFrame ?? (() => ({ scale: 1, alpha: 1 })));
 }
 
-function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFrame: BarFrameOf, numbers: number): void {
+function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFrame: BarFrameOf, numbers: number, aloneScale: number): void {
   const rects = barStackRects(bars.length);
   bars.forEach((bar, index) => {
     const rect = rects[index];
     if (!rect) return;
     // The GM shows this resource's numbers alone: always shown, with no bar under them.
     if (bar.bar === false) {
-      if (bar.current !== undefined && bar.max !== undefined) drawBarNumbers(surface, rect, bar, 1);
+      if (bar.current === undefined || bar.max === undefined) return;
+      // Grown from the bar's middle, below the token.
+      surface.push(rect.x + rect.width / 2, rect.y, 0, aloneScale);
+      drawBarNumbers(surface, { ...rect, x: -rect.width / 2, y: 0 }, bar, 1);
+      surface.pop();
       return;
     }
     drawBar(surface, rect, barFrame(index, bar.share), bar.color);

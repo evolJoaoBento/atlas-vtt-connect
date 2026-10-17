@@ -38,6 +38,8 @@ function barDefinition(bar: PlayerResource, slot: number): ResourceDefinition {
 }
 
 function barValue(bar: PlayerResource): ResourceValue {
+  // Numbers the GM shows alone are the token's own: Atlas's bar has no numbers-only form, so it draws them as a bar of them.
+  if (bar.bar === false && bar.current !== undefined && bar.max !== undefined && bar.max > 0) return { current: bar.current, max: bar.max };
   const current = bar.spent && bar.share < 1 ? 0 : Math.round(bar.share * SHARE_SCALE);
   return { current, max: SHARE_SCALE };
 }
