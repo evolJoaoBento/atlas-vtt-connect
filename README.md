@@ -9,7 +9,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 1. Obsidian 1.8.7 or newer, on desktop.
 2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
 
-**Updating to 0.2.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. An older Connect drops all templates once someone places a square.
+**Updating to 0.3.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. An older Connect may drop the whole scene once you show a resource as a bar without numbers.
 
 ## For the GM
 
