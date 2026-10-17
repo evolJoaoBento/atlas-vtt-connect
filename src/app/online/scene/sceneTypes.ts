@@ -80,7 +80,10 @@ export interface PlayerResource {
   current?: number;
   max?: number;
   fixed?: boolean;
-  /** The GM shows the numbers alone: no bar is drawn, and the numbers always show. */
+  /**
+   * The GM shows the number alone: no bar is drawn, the number always shows, and only it is sent: `current`, or a
+   * static resource's `max`.
+   */
   bar?: false;
 }
 
@@ -93,7 +96,10 @@ export interface PlayerWheel {
   slot: number;
   /** `#rrggbb`. */
   color: string;
-  /** Its numbers; both absent where the GM shows the wheel without them, which then has `share`. */
+  /**
+   * Its numbers; both absent where the GM shows the wheel without them, which then has `share`, and only the one shown
+   * (`current`, or a static resource's `max`) where the GM shows the number alone (`ring: false`).
+   */
   current?: number;
   max?: number;
   /** How full the wheel is, from 0 to 1, where the GM shows it without its numbers (and so without segments). */

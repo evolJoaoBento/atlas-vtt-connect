@@ -11,7 +11,8 @@ import { onlineSessionStore } from '../onlineSessionStore';
 import { ONLINE_SESSION_LABEL, PRESENT_LABEL, STOP_PRESENTING_LABEL } from '../ui/onlineCopy';
 import { presentedSceneSummaries } from '../ui/presentedSceneSummary';
 import { controlledByProvider } from './controlledByMenu';
-import { resourceVisibilityProvider, type ResourceVisibilityMenuDeps } from './resourceVisibilityMenu';
+import { hasEditTokenSections } from './editTokenSection';
+import { resourceVisibilitySection, type ResourceVisibilityMenuDeps } from './resourceVisibilitySection';
 import { mountPanel } from './mountPanel';
 import { onlinePaletteSection } from './onlinePalette';
 import { presentingActions } from './presentingHere';
@@ -28,7 +29,7 @@ export interface GmUiOptions {
   presented: PresentedSceneSource;
   /** Opens "Join online session…"; without it the panel offers no join. */
   joinSession?: () => void;
-  /** What players see of each resource, set from a token's menu; without it the menu has no such entries. */
+  /** What players see of each resource, set in the Edit Token dialog of a stock Atlas; without it the dialog has no such section. */
   resourceVisibility?: Pick<ResourceVisibilityMenuDeps, 'store' | 'resources'>;
 }
 
@@ -75,11 +76,7 @@ export function registerGmUi(atlas: GmUiAtlas, service: PanelService, options: G
       ];
     }),
     ui.addTokenMenuItems(controlledByProvider()),
-    ...(options.resourceVisibility ? [
-      ui.addTokenMenuItems(resourceVisibilityProvider({ views, ...options.resourceVisibility })),
-      // An open menu shows the choice just made.
-      options.resourceVisibility.store.subscribe(invalidate),
-    ] : []),
+    ...(options.resourceVisibility && hasEditTokenSections(ui) ? [ui.addEditTokenSection(resourceVisibilitySection({ views, ...options.resourceVisibility }))] : []),
     () => panel.dispose(),
   ];
 

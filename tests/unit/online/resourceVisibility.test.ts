@@ -112,11 +112,15 @@ describe('what each choice sends', () => {
     expect(wheelGauge(wheel!)).toEqual({ share: 0.4, ticks: [] });
   });
 
-  it('numbers only: the numbers, marked to be drawn without the bar or ring', () => {
-    expect(projectBars(values, [HP], showAll('numbers'))).toEqual([{ color: '#22c55e', share: 0.58, spent: false, current: 7, max: 12, bar: false }]);
+  it('numbers only: the current number alone, with nothing that tells the maximum, drawn without the bar or ring', () => {
+    expect(projectBars(values, [HP], showAll('numbers'))).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 7, bar: false }]);
     const [wheel] = projectWheels(values, [KI], showAll('numbers'));
-    expect(wheel).toEqual({ slot: 2, color: '#22c55e', current: 2, max: 5, fixed: false, ring: false });
+    expect(wheel).toEqual({ slot: 2, color: '#22c55e', current: 2, fixed: false, ring: false });
     expect(wheelGauge(wheel!)).toBeNull();
+    // A static resource's number is its value; a low one keeps its own colour, never the warning red; nor is it marked spent.
+    expect(projectBars(holder({ ac: { current: 0, max: 15 } }), [define('ac', { direction: 'static' })], showAll('numbers'))).toEqual([{ color: '#22c55e', share: 1, spent: false, max: 15, fixed: true, bar: false }]);
+    const low = projectBars(holder({ hp: { current: 0, max: 12 } }), [define('hp', { defeatedWhenSpent: true })], showAll('numbers'));
+    expect(low).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 0, bar: false }]);
   });
 
   it('hidden: nothing, and the next bar moves up', () => {
@@ -158,7 +162,7 @@ describe('the scene players receive', () => {
     const scene = project(data);
     expect(scene.tokens.g1?.resources).toEqual([{ color: '#22c55e', share: 0.57, spent: false }]);
     expect(scene.tokens.g1).not.toHaveProperty('wheels');
-    expect(scene.tokens.g2?.resources).toEqual([{ color: '#22c55e', share: 0.57, spent: false, current: 4, max: 7, bar: false }]);
+    expect(scene.tokens.g2?.resources).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 4, bar: false }]);
     expect(scene.initiative?.entries[0]?.hpShare).toBe(0.57);
     const { fog: _fog, drawings: _drawings, ...body } = scene;
     expect(isPlayerSceneBody(body)).toBe(true);

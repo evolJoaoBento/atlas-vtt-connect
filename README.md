@@ -29,12 +29,12 @@ Players see the scene you present, with what Atlas's own player window would sho
 - **Present a scene:** present it in Atlas as usual (the eye on its scene tab).
 - **Dynamic lighting:** turn on Atlas's dynamic lighting experiment and players see only what their tokens see, plus the places they explored before.
 - **Health bars:** the resources a collection marks **visible to players** (its settings, Resources) show as bars on tokens, as in Atlas's player window. Resources in the other slots (2 to 5) show as small wheels beside the token.
-- **Per token:** right-click a character token → **HP for players** (one entry per resource the token has) and pick **Bar and numbers**, **Bar only**, **Numbers only** or **Hidden**:
+- **Per token:** right-click a character token → **Edit Token**. Under **Players see**, each resource the token has gets two dropdowns: **Bar and numbers**, **Bar only**, **Number only** or **Hidden**. They apply when you click **Save**.
   - **This token:** applies to that token only.
   - **Every *Goblin*:** applies to every token with that statblock, on every map.
   - The token's own choice wins over its statblock's, and the statblock's over the map default (the collection's setting). **Same as every *Goblin*** and **Map default** undo a choice.
   - A choice can also show a resource the collection hides, so you can hide HP for the whole collection and show it only on the tokens you pick.
-  - **Bar only:** the exact numbers never reach players. **Hidden:** the bar also disappears from the initiative column.
+  - **Bar only:** players see how full it is, never the numbers. **Number only:** players see the current value alone (19, never 19 / 27). **Hidden:** the bar also disappears from the initiative column.
   - Choices are saved with your vault and kept between sessions, so you can set them while preparing.
   - A downed token is still greyed with a skull. A player's own sheet still shows its exact numbers.
 - **Whose turn:** with the initiative list shown to players, they see the order as a column at the right of their map, the token whose turn it is gets a white ring, and its player reads "Your turn".

@@ -38,8 +38,6 @@ function barDefinition(bar: PlayerResource, slot: number): ResourceDefinition {
 }
 
 function barValue(bar: PlayerResource): ResourceValue {
-  // Numbers the GM shows alone are the token's own: Atlas's bar has no numbers-only form, so it draws them as a bar of them.
-  if (bar.bar === false && bar.current !== undefined && bar.max !== undefined && bar.max > 0) return { current: bar.current, max: bar.max };
   const current = bar.spent && bar.share < 1 ? 0 : Math.round(bar.share * SHARE_SCALE);
   return { current, max: SHARE_SCALE };
 }
@@ -47,7 +45,8 @@ function barValue(bar: PlayerResource): ResourceValue {
 /** The stand-ins of a token's bars and downed state; null when it has neither. */
 export function atlasBars(token: PlayerToken): AtlasBars | null {
   // The window draws two bars for players, so the stand-ins never reach a wheel socket
-  const bars = (token.resources ?? []).slice(0, BAR_SLOTS);
+  // A number the GM shows alone has no bar to stand in for: Atlas's token UI has no number-only form.
+  const bars = (token.resources ?? []).filter((bar) => bar.bar !== false).slice(0, BAR_SLOTS);
   if (bars.length === 0 && token.downed !== true) return null;
   const values: Record<string, ResourceValue> = {};
   const definitions = bars.map((bar, slot) => {

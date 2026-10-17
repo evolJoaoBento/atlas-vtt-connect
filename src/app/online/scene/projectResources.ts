@@ -47,6 +47,23 @@ function hexOr(color: unknown): string {
   return typeof color === 'string' && HEX_COLOR.test(color) ? color : NEUTRAL_COLOR;
 }
 
+/**
+ * The numbers that go out with a resource: both with its bar or wheel, none with the bar or wheel alone, and, shown
+ * alone, only the one a player reads: the current value, or a static resource's value (its maximum).
+ */
+function numbersOf(show: ResourceShow, fixed: boolean, value: ResourceValue): { current?: number; max?: number } {
+  const current = finiteOr(value.current, 0, SCENE_RANGES.resourceValue);
+  const max = finiteOr(value.max, 0, SCENE_RANGES.resourceValue);
+  if (show === 'bar') return {};
+  if (show === 'numbers') return fixed ? { max } : { current };
+  return { current, max };
+}
+
+/** The colour a resource goes out in: the one the window shows, or its own where only its number is shown (a warning colour tells how full it is). */
+function colorOf(show: ResourceShow, definition: ResourceDefinition, value: ResourceValue): string {
+  return hexOr(show === 'numbers' ? definition.color : resourceColor(definition, value));
+}
+
 /** The bars the player window draws on `token`, top to bottom. */
 export function projectBars(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): PlayerResource[] {
   let darkened = false;
@@ -58,9 +75,10 @@ export function projectBars(token: ResourceHolder, definitions: readonly Resourc
     const dark: boolean = !darkened && definition.defeatedWhenSpent === true && isSpent(definition, value);
     darkened ||= dark;
     bars.push({
-      color: hexOr(resourceColor(definition, value)), share: fixed ? 1 : shareOf(value), spent: dark,
+      // A number shown alone gives away nothing of its maximum: no share, no warning colour, no spent mark.
+      color: colorOf(show, definition, value), share: fixed || show === 'numbers' ? 1 : shareOf(value), spent: dark && show !== 'numbers',
       // The numbers Atlas's scene shows on the bar on hover and selection; a bar shown alone never carries them.
-      ...(show !== 'bar' ? { current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue) } : {}),
+      ...numbersOf(show, fixed, value),
       ...(fixed ? { fixed: true } : {}),
       ...(show === 'numbers' ? { bar: false as const } : {}),
     });
@@ -79,11 +97,9 @@ export function projectWheels(token: ResourceHolder, definitions: readonly Resou
     const fixed = definition.direction === 'static';
     wheels.push({
       slot: finiteOr(slot, 2, SCENE_RANGES.wheelSlot),
-      color: hexOr(resourceColor(definition, value)),
+      color: colorOf(show, definition, value),
       // A wheel shown alone carries how full it is, never its numbers (nor its segments, which would tell its maximum).
-      ...(show === 'bar'
-        ? { share: fixed ? 1 : shareOf(value) }
-        : { current: finiteOr(value.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(value.max, 0, SCENE_RANGES.resourceValue) }),
+      ...(show === 'bar' ? { share: fixed ? 1 : shareOf(value) } : numbersOf(show, fixed, value)),
       fixed,
       ...(show === 'numbers' ? { ring: false as const } : {}),
     });

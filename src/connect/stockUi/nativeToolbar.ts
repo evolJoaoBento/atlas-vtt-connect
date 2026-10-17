@@ -11,6 +11,7 @@
 import type { Disposer, MenuItem, PanelSpec, SceneTabMenuContext, TokenMenuContext, ToolbarItemContext, ViewContext } from '@atlas-vtt/api-types';
 import type { DockEnv, DockToken, DockView } from './floatingDock';
 import type { PanelHost, UiRecords } from './uiRegistry';
+import type { EditTokenSectionSpec } from '../../app/online/gm-ui/editTokenSection';
 import { watchTokenContextMenu } from './tokenContextMenu';
 
 const END = '.atlas-main-toolbar > .atlas-toolbar-end';
@@ -201,7 +202,11 @@ export class NativeToolbar implements PanelHost {
     const { root } = bar.view;
     const win = bar.view.doc.defaultView;
     if (!root || !win) return;
-    bar.stops.push(watchTokenContextMenu(bar.view, { items: (view, token) => this.tokenItems(view, [token]), setIcon: (element, name) => this.env.setIcon(element, name) }));
+    bar.stops.push(watchTokenContextMenu(bar.view, {
+      items: (view, token) => this.tokenItems(view, [token]),
+      setIcon: (element, name) => this.env.setIcon(element, name),
+      editTokenSections: (view, token) => this.editTokenSections(view, token),
+    }));
     let queued = false;
     const again = (): void => {
       if (queued) return;
@@ -514,6 +519,14 @@ export class NativeToolbar implements PanelHost {
       const items = forToken(token);
       return items.length === 0 ? [] : [{ label: `${token.label} (${index + 1})`, icon: 'user', submenu: items }];
     });
+  }
+
+  private editTokenSections(view: DockView, token: DockToken): EditTokenSectionSpec[] {
+    const ctx: TokenMenuContext = { viewId: view.viewId, kind: 'map', isPlayerView: false, tokenId: token.id, tokenKind: token.kind };
+    return [...this.records.editTokenSections].flatMap((provider) => guarded('An Edit Token section', [] as EditTokenSectionSpec[], () => {
+      const section = provider(ctx);
+      return section ? [section] : [];
+    }));
   }
 
   private sceneItems(view: DockView): MenuItem[] {

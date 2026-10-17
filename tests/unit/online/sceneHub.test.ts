@@ -328,7 +328,7 @@ describe('SceneHub', () => {
     expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#22c55e', share: 0.7, spent: false }]);
     h.visibility.setStatblockShow('B/Goblin.md', 'hp', 'numbers');
     await tick();
-    expect(player.scene?.tokens.goblin?.resources).toEqual([{ ...HP_BAR, bar: false }]);
+    expect(player.scene?.tokens.goblin?.resources).toEqual([{ color: '#22c55e', share: 1, spent: false, current: 7, bar: false }]);
     h.visibility.setTokenShow('maps/tavern.atlasmap', 'hero', 'hp', null);
     await tick();
     expect(player.scene?.tokens.hero?.resources).toEqual([]);

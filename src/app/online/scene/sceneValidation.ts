@@ -111,10 +111,13 @@ function isWheel(value: unknown): boolean {
   return isFields(value) && Number.isInteger(value.slot) && inRange(SCENE_RANGES.wheelSlot)(value.slot)
     && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isBoolean(value.fixed)
     && (value.ring === undefined || value.ring === false)
-    // Its numbers, or how full it is where the GM keeps them back.
-    && (value.current === undefined && value.max === undefined
-      ? isUnit(value.share) && value.ring === undefined
-      : inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && value.share === undefined);
+    // Its numbers, how full it is where the GM keeps them back, or the one number shown alone.
+    && (value.ring === false
+      ? value.share === undefined && (value.current !== undefined || value.max !== undefined)
+        && optional(inRange(SCENE_RANGES.resourceValue))(value.current) && optional(inRange(SCENE_RANGES.resourceValue))(value.max)
+      : value.current === undefined && value.max === undefined
+        ? isUnit(value.share)
+        : inRange(SCENE_RANGES.resourceValue)(value.current) && inRange(SCENE_RANGES.resourceValue)(value.max) && value.share === undefined);
 }
 function isWheels(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((wheel) => isWheel(wheel));

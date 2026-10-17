@@ -107,10 +107,11 @@ function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFram
     if (!rect) return;
     // The GM shows this resource's numbers alone: always shown, with no bar under them.
     if (bar.bar === false) {
-      if (bar.current === undefined || bar.max === undefined) return;
-      // Grown from the bar's middle, below the token.
-      surface.push(rect.x + rect.width / 2, rect.y, 0, aloneScale);
-      drawBarNumbers(surface, { ...rect, x: -rect.width / 2, y: 0 }, bar, 1);
+      const number = bar.fixed ? bar.max : bar.current;
+      if (number === undefined) return;
+      // The one number, grown from the bar's middle, below the token.
+      surface.push(rect.x + rect.width / 2, rect.y + rect.height / 2, 0, aloneScale * WHEEL_NUMBER.scale);
+      surface.text(String(number), 0, 0, { font: WHEEL_NUMBER.font, color: WHEEL_NUMBER.color, outline: WHEEL_NUMBER.outline, alpha: 1, align: 'center' });
       surface.pop();
       return;
     }
