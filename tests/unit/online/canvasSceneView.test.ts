@@ -93,6 +93,41 @@ describe('CanvasSceneView', () => {
     expect(leaf.detach).not.toHaveBeenCalled();
   });
 
+  it("claims Escape while it is the active tab, after its own handlers, so Obsidian does not leave it for the last note", async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const escape = (): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      document.body.dispatchEvent(event);
+      return event;
+    };
+    // Another tab has the keys: its Escape is Obsidian's.
+    expect(escape().defaultPrevented).toBe(false);
+    w.ws.focus.view = view;
+    const sink = w.sinks[0]!;
+    sink.session(admitted);
+    sink.scene(playerScene());
+    // Nothing of the scene's is open: Escape reaches Obsidian handled.
+    const reached: KeyboardEvent[] = [];
+    const obsidian = (event: KeyboardEvent): void => { reached.push(event); };
+    window.addEventListener('keydown', obsidian);
+    expect(escape().defaultPrevented).toBe(true);
+    expect(reached.at(-1)?.defaultPrevented).toBe(true);
+    // An open tray takes Escape itself and closes; Obsidian never hears it.
+    const tray = view.contentEl.querySelector<HTMLElement>('.dice-tray')!;
+    view.contentEl.querySelector<HTMLButtonElement>('.toolbar button[aria-label="Dice"]')?.click();
+    expect(tray.hidden).toBe(false);
+    const before = reached.length;
+    escape();
+    expect(tray.hidden).toBe(true);
+    expect(reached.length).toBe(before);
+    window.removeEventListener('keydown', obsidian);
+    await view.onClose();
+    // Closed: its Escape is Obsidian's again.
+    expect(escape().defaultPrevented).toBe(false);
+  });
+
   it('shows the paused banner over the map while the scene is paused', async () => {
     const w = world();
     const { view } = w.open();

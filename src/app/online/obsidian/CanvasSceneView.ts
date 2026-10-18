@@ -14,6 +14,7 @@ import { ONLINE_SCENE_TITLE, ONLINE_SCENE_VIEW_TYPE } from './onlineSceneTab';
 export class CanvasSceneView extends ItemView {
   private scene: CanvasScene | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private keys: AbortController | null = null;
   private closed = false;
 
   /** `drawing` replaces the canvas, frames and 3D dice; Obsidian opens the view with none. */
@@ -55,6 +56,8 @@ export class CanvasSceneView extends ItemView {
     this.closed = true;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.keys?.abort();
+    this.keys = null;
     this.scene?.dispose();
     this.scene = null;
     // Closing the tab leaves the session, also when it closed before attaching; only a copy that gives way to
@@ -104,6 +107,13 @@ export class CanvasSceneView extends ItemView {
       return;
     }
     this.scene = scene;
+    // Obsidian takes an Escape nothing claimed in a tab without navigation (as this one is) as leaving a side pane, and
+    // moves to the last note. Escape here is the scene's own (deselect, close the tray, a menu, the dice log): once the
+    // scene's handlers, registered before this one, have had it, it is claimed so the player stays in the game.
+    this.keys = new AbortController();
+    this.contentEl.ownerDocument.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && this.app.workspace.getActiveViewOfType(CanvasSceneView) === this) event.preventDefault();
+    }, { signal: this.keys.signal });
     scene.resize();
     this.resizeObserver = new ResizeObserver(() => scene.resize());
     this.resizeObserver.observe(this.contentEl);
