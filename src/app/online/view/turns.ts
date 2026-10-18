@@ -34,8 +34,38 @@ export function turnOf(scene: PlayerScene | null, controlled: ReadonlySet<string
   return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
 }
 
-/** The note a player reads on their turn. */
-export function turnNotice(turn: Turn): string | null {
-  if (!turn.mine) return null;
-  return turn.name ? `Your turn: ${turn.name}` : 'Your turn';
+/**
+ * Whose turn comes next, as players can tell it: in turn order the entry after the active one that does not sit out,
+ * the first again after the last (the next round); by sides the other side. Worked out from the entries players see,
+ * so a hidden combatant between makes it come a turn early, and tells nothing of that combatant.
+ */
+export function nextTurnOf(scene: PlayerScene | null, controlled: ReadonlySet<string>): Turn {
+  const initiative = scene?.initiative;
+  if (!scene || !initiative?.active) return NO_TURN;
+  const sides = initiative.sides;
+  if (sides) {
+    if (!sides.active) return NO_TURN;
+    const next = sides.active === 'players' ? 'opponents' : 'players';
+    const mine = initiative.entries
+      .filter((entry) => controlled.has(entry.tokenId) && scene.tokens[entry.tokenId]?.side === next && entry.sitsOut !== true);
+    const named = mine.map((entry) => scene.tokens[entry.tokenId]?.name ?? entry.name).find((name) => !!name) ?? null;
+    return { tokenId: null, mine: mine.length > 0, name: named };
+  }
+  const acting = initiative.entries.findIndex((candidate) => candidate.isActive);
+  if (acting === -1) return NO_TURN;
+  const count = initiative.entries.length;
+  for (let step = 1; step < count; step++) {
+    const entry = initiative.entries[(acting + step) % count]!;
+    if (entry.sitsOut === true || !scene.tokens[entry.tokenId]) continue;
+    const mine = controlled.has(entry.tokenId);
+    return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
+  }
+  return NO_TURN;
+}
+
+/** The note a player reads on their turn, and on the turn before it ("Your turn is next"). */
+export function turnNotice(turn: Turn, next: Turn = NO_TURN): string | null {
+  if (turn.mine) return turn.name ? `Your turn: ${turn.name}` : 'Your turn';
+  if (next.mine) return next.name ? `Your turn is next: ${next.name}` : 'Your turn is next';
+  return null;
 }

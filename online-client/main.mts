@@ -80,6 +80,8 @@ const map = surface
       panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
       status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
     },
+    note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
+    requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
     onToolsChange: () => syncToolbar(),
   })
   : null;
@@ -321,6 +323,7 @@ if (!target) {
         sheets.receive(entries);
         map.setSheets(entries);
       },
+      onPinNote: (answer) => map.receiveNote(answer),
     });
     session.start();
   });

@@ -1,3 +1,5 @@
+import { readPinNote } from './atlas/pinNoteReader';
+import { NoteHost } from './tools/NoteHost';
 import type { ResourceVisibilitySource } from './scene/resourceVisibility';
 import type { App } from 'obsidian';
 import { handouts, type HandoutSource } from './handouts';
@@ -127,6 +129,8 @@ export class OnlineSessionService {
         ...(deps.sheets ? { sheets: deps.sheets } : {}),
         ...(deps.pings ? { pings: deps.pings } : {}),
         ...(deps.templates ? { templates: deps.templates } : {}),
+        // The vault's notes: a readable pin's note goes to the player who opens it.
+        notes: deps.notes ?? (({ session, projection }) => new NoteHost({ session, projection, read: (notePath, mapPath) => readPinNote(this.app, notePath, mapPath) })),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,

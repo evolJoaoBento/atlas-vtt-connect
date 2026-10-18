@@ -6,6 +6,7 @@
  * `styles/online-scene-canvas.scss`.
  */
 import type { HandoutViewOptions } from '../../../../online-client/handoutView.mts';
+import type { NoteViewOptions } from '../../../../online-client/noteView.mts';
 import { toolIconUrl, type ToolIconName } from '../page/toolIcons';
 
 export interface SceneDom {
@@ -29,6 +30,7 @@ export interface SceneDom {
   sheetTabs: HTMLElement;
   sheetBody: HTMLElement;
   handout: HandoutViewOptions;
+  note: NoteViewOptions;
   turnNotice: HTMLElement;
   diceToast: HTMLElement;
   diceTray: HTMLElement;
@@ -130,10 +132,18 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   const sheetTabs = sheetPanel.createDiv({ cls: 'sheet-tabs' });
   sheetTabs.hidden = true;
   const sheetBody = sheetPanel.createDiv({ cls: 'sheet-body' });
+  // A readable pin's note (`NoteView`): the same drawer as the sheets.
+  const notePanel = root.createEl('aside', { cls: 'sheet-panel note-panel', attr: { 'aria-label': 'Note' } });
+  notePanel.hidden = true;
+  const noteHeader = notePanel.createDiv({ cls: 'sheet-header' });
+  const noteTitle = noteHeader.createEl('h2', { text: 'Note' });
+  const noteClose = noteHeader.createEl('button', { cls: 'icon-button', attr: { type: 'button', 'aria-label': 'Close note' } });
+  const noteBody = notePanel.createDiv({ cls: 'note-body' });
   return {
     root, canvas, sessionName, connection, message, reconnect, diceLogButton, viewButtons, followButton, fitButton, moveNotice,
     diceToast, diceTray, toolbar, diceLog, diceLogClose, diceLogEmpty, diceLogList, hoverCard, turnNotice, initiative, statblockPreview,
     sheetButton, sheetPanel, sheetClose, sheetTabs, sheetBody,
     handout: { panel: handout, title: handoutTitle, canvas: handoutCanvas, status: handoutStatus, closeButton: handoutClose, openButton: handoutButton },
+    note: { panel: notePanel, title: noteTitle, body: noteBody, closeButton: noteClose },
   };
 }

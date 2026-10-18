@@ -5,7 +5,7 @@ import { isDrawingRecords, isFogRecords, isPlayerSceneBody } from '../../../src/
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { SCENE_RANGES } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import type { ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
+import { notePathOf, type ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
@@ -358,6 +358,9 @@ describe('projectForPlayers fix round 1', () => {
       { id: 'pin-1', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
     ]);
     expect(JSON.stringify(scene.pins)).not.toContain('Secrets');
+    // The note each sent pin links stays on the GM's side, for a player who opens it (`NoteHost`).
+    expect(scene.pins?.map((pin) => notePathOf(pin))).toEqual(['Secrets/Tavern.md#The Cellar', 'Dock.md']);
+    expect(notePathOf({ id: 'pin-0', x: 100, y: 100, label: null, title: 'The Cellar' })).toBeNull();
   });
 
   it('sends no conditions for plain tokens', () => {
