@@ -37,8 +37,16 @@ export interface AccessSources {
   readMap(mapPath: string): Promise<SharedMapSource | null>;
 }
 
-export async function accessFor(sources: AccessSources, recipient: Recipient, people: Pick<PeopleBook, 'byName' | 'byKey' | 'isPlaceholder'> & Partial<Pick<PeopleBook, 'unlinkedKey'>>): Promise<Access> {
+export async function accessFor(
+  sources: AccessSources, recipient: Recipient, people: Pick<PeopleBook, 'byName' | 'byKey' | 'isPlaceholder'> & Partial<Pick<PeopleBook, 'unlinkedKey'>>,
+  /** Notes sent to this recipient with Send to… (`SendGrants`): theirs whatever their rule says. */
+  sent: readonly string[] = [],
+): Promise<Access> {
   const notes = new Map(sources.notes().filter((note) => ruleReaches(note.rule, recipient, people)).map((note) => [note.path, note]));
+  for (const path of sent) {
+    const note = notes.has(path) ? null : sources.note(path);
+    if (note) notes.set(path, note);
+  }
   const maps: MapAccess[] = [];
   for (const entry of await sources.maps()) {
     if (!mapShareReaches(entry.share, recipient, people)) continue;

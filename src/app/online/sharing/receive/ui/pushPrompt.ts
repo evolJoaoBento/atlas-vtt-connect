@@ -1,13 +1,18 @@
 import { showConfirmNotice } from '../../../ui/confirmNotice';
 import type { PushRequest } from '../../shareSessionStore';
 
-/** "Ana asks you to pull Goblin cave." with Pull and Not now, until answered. Names are text, never HTML. */
+/** The prompt's line: "Ana is sending you a note: Cellar." */
+export function pushPromptText(push: Pick<PushRequest, 'kind' | 'title'>, personName: string): string {
+  return `${personName} is sending you ${push.kind === 'map' ? 'a map' : 'a note'}: ${push.title}`;
+}
+
+/** "Ana is sending you a note: Cellar" with Allow and Decline, until answered. Names are text, never HTML. */
 export function showPushPrompt(push: PushRequest, personName: string, answer: (pull: boolean) => void): { hide(): void } {
   return showConfirmNotice({
-    text: (line) => line.setText(`${personName} asks you to pull ${push.title}.`),
+    text: (line) => line.setText(pushPromptText(push, personName)),
     answers: [
-      { label: 'Pull', cta: true, run: () => answer(true) },
-      { label: 'Not now', run: () => answer(false) },
+      { label: 'Allow', cta: true, run: () => answer(true) },
+      { label: 'Decline', run: () => answer(false) },
     ],
   });
 }

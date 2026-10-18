@@ -1,3 +1,4 @@
+import { pushPromptText } from './pushPrompt';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../../ui/primitives/Button';
 import type { PushRequest, SessionPerson } from '../../shareSessionStore';
@@ -87,17 +88,17 @@ export function SharedWithMeList({ service, people, pushes, dismissPush, onPulle
   return (
     <div className="atlas-shared">
       {pushes.length > 0 && (
-        <section className="atlas-shared__person" aria-label="Asked to pull">
-          <h3 className="atlas-shared__heading">Asked to pull</h3>
+        <section className="atlas-shared__person" aria-label="Sent to you">
+          <h3 className="atlas-shared__heading">Sent to you</h3>
           <ul className="atlas-shared__items">
             {pushes.map((push) => (
               <li key={`${push.from}/${push.item}`} className="atlas-shared__row">
-                <span className="atlas-shared__title">{`${nameOf(push.from)} asks you to pull ${push.title}.`}</span>
+                <span className="atlas-shared__title">{pushPromptText(push, nameOf(push.from))}</span>
                 <Button variant="cta" size="sm" onClick={() => {
                   dismissPush(push);
                   pullAcceptedPush(service, push, { pulled: onPulled, failed: onProblem });
-                }}>Pull</Button>
-                <Button variant="default" size="sm" onClick={() => dismissPush(push)}>Not now</Button>
+                }}>Allow</Button>
+                <Button variant="default" size="sm" onClick={() => dismissPush(push)}>Decline</Button>
               </li>
             ))}
           </ul>

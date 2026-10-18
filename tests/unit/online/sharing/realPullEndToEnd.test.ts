@@ -169,8 +169,8 @@ describe('pulling as the plugin wires it', () => {
     const service = sharedWithMe();
     const catalogue = await service.refresh('gm');
     expect(catalogue.items.map((item) => [item.title, item.state])).toEqual([['Coin', 'new']]);
-    expect(await service.pull('gm', catalogue.items[0]!)).toEqual({ kind: 'created', path: 'Shared/Morgan/Coin.md' });
-    expect(player.vault.files.get('Shared/Morgan/Coin.md')).toBe(
+    expect(await service.pull('gm', catalogue.items[0]!)).toEqual({ kind: 'created', path: 'Shared/Game Master/Coin.md' });
+    expect(player.vault.files.get('Shared/Game Master/Coin.md')).toBe(
       '---\ntags: lore\n---\n#lore\nsummary:: **Coin** of the realm\n## 💱 _Coin_: money\n\n- Minted in Capital, the port.\n\n### 🌐 Symbols\n\nShown with Queen Ada.\n\ncoin 20250708.png\n',
     );
     expect((await service.refresh('gm')).items[0]?.state).toBe('current');

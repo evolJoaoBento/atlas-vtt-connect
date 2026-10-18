@@ -9,14 +9,18 @@ import { PulledItems } from '../app/online/sharing/receive/PulledItems';
 import { registerSharing } from '../app/online/sharing/registerSharing';
 import type { SharingLifetime } from '../app/online/sharing/sharingLifetime';
 import { need } from './capabilities';
+import { NO_SCENES } from '../app/online/sharing/noScenes';
 import { connectStorage } from './connectStorage';
 import type { JoinSettings } from './startJoining';
 
-/** Shown in Connect's settings while the bound Atlas has no `scenes` or `bundles`. */
+/** Shown in Connect's settings while the bound Atlas cannot share at all. */
 export const UPDATE_ATLAS_TO_SHARE = 'Update Atlas VTT to share notes and maps.';
 
-/** Sharing needs Atlas's scenes and bundles, its rules and settings, and a storage folder for Connect's files. */
-const SHARING = ['scenes', 'bundles', 'rules', 'settings', 'storage'] as const;
+/**
+ * Sharing notes needs Atlas's rules and settings and a storage folder for Connect's files, which a stock Atlas has too.
+ * Maps also need its `scenes`: without them (`NO_SCENES`) only notes are shared.
+ */
+const SHARING = ['rules', 'settings', 'storage'] as const;
 
 export function canShare(api: AtlasApi, atlas: AtlasExtension): boolean {
   return SHARING.every((capability) => need(api, atlas, capability) !== null);
@@ -38,8 +42,9 @@ export async function startConnectSharing(plugin: Plugin, api: AtlasApi, atlas: 
   const sessions = await start.sessions;
   if (!paths || start.gone()) return () => undefined;
   const views = need(api, atlas, 'views');
+  const scenes = need(api, atlas, 'scenes');
   return registerSharing(plugin, {
-    atlas: { scenes: atlas.scenes, rules: atlas.rules, playerView: () => atlas.settings.get('playerView'), ...(views ? { views } : {}) },
+    atlas: { scenes: scenes ?? NO_SCENES, maps: scenes !== null, rules: atlas.rules, playerView: () => atlas.settings.get('playerView'), ...(views ? { views } : {}) },
     lifetime: start.lifetime,
     joins: start.joins,
     people: PeopleBook.forApp(plugin.app, paths),

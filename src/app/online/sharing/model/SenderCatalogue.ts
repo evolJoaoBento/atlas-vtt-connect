@@ -4,6 +4,7 @@
  * would be sent, so an edit to a part they never get never shows them an update. Calls name `self`, this
  * Atlas's person id at the recipient's table, so parts meant for some people arrive marked for the sender too.
  */
+import { SendGrants } from './sendGrants';
 import type { CollectionGridDefaults, InitiativeRules } from '@atlas-vtt/api-types';
 import { mimeForPath, sha256Id, type AssetMime, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
@@ -69,6 +70,9 @@ function utf8(text: string): ArrayBuffer {
 }
 
 export class SenderCatalogue {
+  /** Notes sent to one person with Send to…, which they may pull whatever their rule says. */
+  readonly sent = new SendGrants();
+
   constructor(
     private readonly sources: CatalogueSources,
     private readonly items: Pick<ShareItems, 'idFor' | 'pathOf' | 'ready'>,
@@ -80,7 +84,7 @@ export class SenderCatalogue {
   /** The access of one recipient, once the stored ids and people are read. */
   private async access(recipient: Recipient, people: PreviewPeople = this.people): Promise<Access> {
     await Promise.all([this.items.ready(), this.people.ready()]);
-    return accessFor(this.sources, recipient, people);
+    return accessFor(this.sources, recipient, people, this.sent.paths(recipient));
   }
 
   async list(recipient: Recipient, self?: string): Promise<CatalogueItem[]> {

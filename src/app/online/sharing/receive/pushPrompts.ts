@@ -1,6 +1,6 @@
 /**
- * Push requests become prompts, one per sender and item, shown while the request is pending. A
- * push never writes anything: Not now only dismisses it, and Pull is the one way in, through
+ * Push requests ("Ana is sending you a note: Cellar") become prompts, one per sender and item, shown while the
+ * request is pending. A push never writes anything: Decline only dismisses it, and Allow is the one way in, through
  * `pullPushed`, the same pull the receiver would start from the dialog.
  */
 import { dismissPush, type PushRequest, type ShareSessionState } from '../shareSessionStore';

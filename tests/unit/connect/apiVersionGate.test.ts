@@ -26,12 +26,11 @@ describe('an extension API 1.0.0', () => {
     expect(sharing).toEqual([true]);
   });
 
-  it('without scenes and bundles: hosting and joining start, sharing degrades', async () => {
+  it('without scenes and bundles: hosting, joining and sharing notes start', async () => {
     const { connect, sharing } = connected([...HOSTING, 'dice', 'ui'], undefined, undefined, { version: '1.0.0' });
     await vi.advanceTimersByTimeAsync(0);
-    expect([...connect.commands.keys()]).toEqual(expect.arrayContaining(['join-online-session', ...HOSTING_COMMANDS]));
-    expect([...connect.commands.keys()]).not.toContain('share-with');
-    expect(sharing).toEqual([false]);
+    expect([...connect.commands.keys()]).toEqual(expect.arrayContaining(['join-online-session', ...HOSTING_COMMANDS, 'share-with', 'send-to']));
+    expect(sharing).toEqual([true]);
   });
 
   it('with only joining what it needs: joining starts alone', async () => {

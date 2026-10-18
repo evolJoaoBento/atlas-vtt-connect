@@ -5,7 +5,7 @@ import { onlineSessionStore } from '../onlineSessionStore';
 import type { OnlineSessionService } from '../OnlineSessionService';
 import type { SenderCatalogue } from './model/SenderCatalogue';
 import type { PeopleBook } from './people/PeopleBook';
-import { GM_PERSON_ID } from './people/peopleTypes';
+import { GM_PERSON_ID, GM_SHARE_NAME } from './people/peopleTypes';
 import { recordSessionPeople } from './people/sessionPeople';
 import type { SharingScope } from './sharingScope';
 import { addPush, shareSessionStore } from './shareSessionStore';
@@ -77,7 +77,8 @@ function registerTransport(plugin: Pick<SharingScope, 'register'>, { joins, peop
     const others = (joinedSessionStore.getState().session?.players ?? [])
       .filter((player) => player.personId && player.personId !== identity.personId)
       .map((player) => ({ personId: player.personId!, name: nameOf(identity.tableId, player.personId!, player.name) }));
-    shareSessionStore.setState({ people: [{ personId: GM_PERSON_ID, name: nameOf(identity.tableId, GM_PERSON_ID, identity.gmName) }, ...others] });
+    // The GM is the Game Master to every player, never a name their people list numbers ("Guy (3)").
+    shareSessionStore.setState({ people: [{ personId: GM_PERSON_ID, name: GM_SHARE_NAME }, ...others] });
   };
   plugin.register(joins.onIdentity((identity) => {
     if (!identity) {

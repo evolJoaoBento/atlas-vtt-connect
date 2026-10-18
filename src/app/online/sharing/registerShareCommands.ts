@@ -25,14 +25,16 @@ export interface ShareCommandServices {
   sections: SectionTrust;
   /** The vault's renames and deletions, heard for the plugin's lifetime. */
   vaultChanges: Pick<VaultChanges, 'attach'>;
+  /** Whether maps can be shared (an Atlas with `scenes`); without, only notes are offered. */
+  maps?: boolean;
 }
 
-/** Notes and maps are what can be shared. */
-export const shareable = (file: TAbstractFile | null): file is TFile =>
-  file instanceof TFile && (file.extension === 'md' || file.extension === 'atlasmap');
+/** Notes and maps are what can be shared; maps only where Atlas has `scenes` (`maps` false leaves notes only). */
+export const shareable = (file: TAbstractFile | null, maps = true): file is TFile =>
+  file instanceof TFile && (file.extension === 'md' || (maps && file.extension === 'atlasmap'));
 
 /** Registers the sending commands; returns the catalogue of what this Atlas shares, which sessions answer from. */
-export function registerShareCommands(plugin: SharingScope, { people, items, atlas, ownTableId, sections, vaultChanges }: ShareCommandServices): SenderCatalogue {
+export function registerShareCommands(plugin: SharingScope, { people, items, atlas, ownTableId, sections, vaultChanges, maps = true }: ShareCommandServices): SenderCatalogue {
   plugin.addCommand({
     id: 'people', name: 'People…',
     callback: () => openPeopleModal(plugin.app, people, ownTableId()),
@@ -49,13 +51,13 @@ export function registerShareCommands(plugin: SharingScope, { people, items, atl
     id: 'share-with', name: 'Share with…',
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
-      if (!shareable(file)) return false;
+      if (!shareable(file, maps)) return false;
       if (!checking) share(file);
       return true;
     },
   });
   plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
-    if (!shareable(file)) return;
+    if (!shareable(file, maps)) return;
     menu.addItem((item) => item.setTitle('Share with…').setIcon('share-2').onClick(() => share(file)));
   }));
   // Note item ids and ticked map notes follow the vault, so a renamed note keeps its updates and its place on a map, and no path is ever sent.
@@ -67,6 +69,8 @@ export function registerShareCommands(plugin: SharingScope, { people, items, atl
   plugin.register(vaultChanges.attach((change) => {
     if ('rename' in change) items.renamed(change.rename[0], change.rename[1]);
     else items.deleted(change.removed);
+    if ('rename' in change) catalogue.sent.moved(change.rename[0], change.rename[1]);
+    else catalogue.sent.moved(change.removed, null);
     follow(change);
   }));
   return catalogue;
