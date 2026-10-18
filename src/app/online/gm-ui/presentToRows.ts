@@ -8,7 +8,7 @@ import type { SessionPlayer } from '../GmSession';
 import type { OnlineSessionState } from '../onlineSessionStore';
 import { resolveScene } from '../split/SceneAssignments';
 import {
-  CAP_NOTE, EVERYONE_BACK_LABEL, PRESENT_TO_HEADING, badge, presentSceneToHeading, presentToLabel, rowLabel, type RowPlace,
+  CAP_NOTE, EVERYONE_BACK_LABEL, PRESENT_TO_HEADING, badge, rowLabel, type RowPlace,
 } from '../split/splitCopy';
 import { sameTab, type TabKey } from '../split/tabKey';
 
@@ -76,11 +76,6 @@ export function viewersOf(view: SplitView, tab: TabKey): SessionPlayer[] {
   return listedPlayers(view.players).filter((player) => sameTab(sceneOfPlayer(view, player.playerId), tab));
 }
 
-/** The "Present to:" button's label for `tab`. */
-export function presentToButtonLabel(view: SplitView, tab: TabKey): string {
-  return presentToLabel(viewersOf(view, tab).map((player) => player.name), listedPlayers(view.players).length, sameTab(tab, view.presented));
-}
-
 /** The mark after `tab`'s eye while anyone is assigned: how many players see it; none otherwise (spec 3.7). */
 export function tabBadgeText(view: SplitView, tab: TabKey): string | null {
   if (view.assignedCount === 0) return null;
@@ -111,10 +106,10 @@ function rowFor(view: SplitView, tab: RowTab, player: SessionPlayer, actions: Sp
 }
 
 /** Both menus for `tab`: the heading, one row per listed player, the cap note and "Everyone back". */
-export function presentToMenu(tab: RowTab, view: SplitView, actions: SplitActions, headingKind: 'section' | 'panel'): PresentToMenu {
+export function presentToMenu(tab: RowTab, view: SplitView, actions: SplitActions): PresentToMenu {
   const built = listedPlayers(view.players).map((player) => rowFor(view, tab, player, actions));
   return {
-    heading: headingKind === 'panel' ? presentSceneToHeading(tab.name) : PRESENT_TO_HEADING,
+    heading: PRESENT_TO_HEADING,
     rows: built.map(({ row }) => row),
     capNote: built.some(({ capped }) => capped) ? CAP_NOTE : null,
     everyoneBack: {

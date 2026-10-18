@@ -319,12 +319,35 @@ $connect-dock-z: 1000;
     transform: rotate(90deg);
   }
 
+  /* A list under its row: its heading lines up with the row's label, its rows step in under the heading. */
   .atlas-connect-menu__sub {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    padding-left: 48px;
+  }
+
+  .atlas-connect-menu__sub[hidden] {
+    display: none;
+  }
+
+  .atlas-connect-menu__sub .atlas-connect-menu__heading {
     padding-left: 12px;
   }
+
+  .atlas-dropdown-menu-item.atlas-connect-menu__nested--bare {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+  }
+}
+
+/* A menu opened at the pointer (a scene tab's right-click): placed by its own left and top, not over the toolbar. */
+.atlas-dropdown-content.atlas-connect-menu--at {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  transform: none;
+  max-width: min(420px, calc(100vw - 16px));
+  z-index: var(--layer-menu, 50);
 }
 
 /* Connect's entries in Atlas's own token menu (`tokenContextMenu.ts`). */

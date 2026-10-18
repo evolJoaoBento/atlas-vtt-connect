@@ -4,33 +4,10 @@
  */
 import { SPLIT_LIMITS } from './splitLimits';
 
-/** Names in the "Present to:" label before the rest is counted ("Anna, Ben and 3 more"). */
-const LABEL_NAMES = 3;
 const MAX_SCENES = SPLIT_LIMITS.scenesInUse;
-
-/**
- * The "Present to:" button's label for the GM's active tab. `names`: the players who see that tab, in the panel's
- * order; `total`: every player the panel lists; `presented`: the tab is the presented one. "everyone" when the tab is
- * presented and nobody is elsewhere (so also before anyone joined), "nobody" when no player sees it.
- */
-export function presentToLabel(names: readonly string[], total: number, presented: boolean): string {
-  if (presented && names.length === total) return 'Present to: everyone';
-  if (names.length === 0) return 'Present to: nobody';
-  if (names.length <= LABEL_NAMES) return `Present to: ${names.join(', ')}`;
-  const shown = names.slice(0, LABEL_NAMES - 1);
-  return `Present to: ${shown.join(', ')} and ${names.length - shown.length} more`;
-}
-
-/** The button with no GM map view or no active tab (it is disabled). */
-export const PRESENT_TO_NO_SCENE = 'Present to: no scene open';
 
 /** The heading row of the eye menu's section. */
 export const PRESENT_TO_HEADING = 'Present to';
-
-/** The popover's heading. */
-export function presentSceneToHeading(name: string): string {
-  return `Present ${name} to`;
-}
 
 /** Where a row's player is, from the row's tab: on it, on another scene, or on none (nothing presented). */
 export type RowPlace = { kind: 'here' } | { kind: 'on'; scene: string } | { kind: 'no-scene' };

@@ -1,8 +1,8 @@
 /**
  * The `ui` namespace of the stock Atlas stand-in: what an extension adds to Atlas's UI slots, kept in a registry that
  * the floating dock draws. Stock Atlas has no slots to add to, so the dock (`floatingDock.ts`) stands in for the
- * toolbar, the command palette section, the "More options" menu, the token context menu, the scene tab menu and the
- * floating panels. Validation follows the API's contract: a malformed item throws, naming the call and the field.
+ * toolbar, the token context menu, the scene tab menu and the floating panels; view menu items and palette sections
+ * are kept but not drawn on a stock Atlas, where each is an Obsidian command too. Validation follows the API's contract: a malformed item throws, naming the call and the field.
  */
 import type {
   DashboardTile, Disposer, MenuItem, PaletteSection, PanelHandle, PanelSpec, SceneTabMenuContext, SceneTabMenuSection, TokenMenuContext,

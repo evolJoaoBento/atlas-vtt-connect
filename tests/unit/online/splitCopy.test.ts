@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   badge, CAP_NOTE, capPanelNote, closedNotice, couldntOpen, diceRollerLabel, EVERYONE_BACK_COMMAND, EVERYONE_BACK_LABEL,
-  NO_PLAYERS_ROW, PAUSED_BANNER, PRESENT_TO_HEADING, PRESENT_TO_NO_SCENE, presentSceneToHeading, presentToLabel, rowLabel,
+  NO_PLAYERS_ROW, PAUSED_BANNER, PRESENT_TO_HEADING, rowLabel,
   sceneChip, splitStatus, UPDATE_ATLAS_NOTE,
 } from '../../../src/app/online/split/splitCopy';
 
@@ -22,8 +22,7 @@ function expectSentence(sentence: string, text: string): void {
 describe('the split party wording', () => {
   it('writes every label in sentence case', () => {
     const texts = [
-      presentToLabel([], 2, true), presentToLabel(['Anna', 'Ben'], 3, true), presentToLabel(['Anna', 'Ben', 'Cara', 'Dan', 'Eve'], 6, false),
-      presentToLabel([], 2, false), PRESENT_TO_NO_SCENE, PRESENT_TO_HEADING, presentSceneToHeading('Cave'),
+      PRESENT_TO_HEADING,
       rowLabel('Anna', { kind: 'here' }, false), rowLabel('Anna', { kind: 'on', scene: 'Tower' }, true), rowLabel('Anna', { kind: 'no-scene' }, false),
       NO_PLAYERS_ROW, EVERYONE_BACK_LABEL, EVERYONE_BACK_COMMAND, CAP_NOTE, capPanelNote(), splitStatus(1), splitStatus(2),
       sceneChip('Cave'), closedNotice(['Anna', 'Ben'], 'Cave'), PAUSED_BANNER, UPDATE_ATLAS_NOTE, couldntOpen('Cave'), badge(1), badge(3),
@@ -32,28 +31,8 @@ describe('the split party wording', () => {
     for (const text of texts) expectSentenceCase(text);
   });
 
-  it('Present to: Anna, Ben and 3 more', () => {
-    expect(presentToLabel(['Anna', 'Ben', 'Cara', 'Dan', 'Eve'], 6, false)).toBe('Present to: Anna, Ben and 3 more');
-    expect(presentToLabel(['Anna', 'Ben', 'Cara', 'Dan'], 4, false)).toBe('Present to: Anna, Ben and 2 more');
-    expect(presentToLabel(['Anna', 'Ben', 'Cara'], 4, true)).toBe('Present to: Anna, Ben, Cara');
-    expect(presentToLabel(['Anna', 'Ben'], 3, true)).toBe('Present to: Anna, Ben');
-    expect(presentToLabel(['Anna'], 3, false)).toBe('Present to: Anna');
-  });
-
-  it('says everyone only for a presented tab every player sees, and nobody for a tab no player sees', () => {
-    expect(presentToLabel(['Anna', 'Ben'], 2, true)).toBe('Present to: everyone');
-    // Presented with nobody connected yet: whoever joins follows it.
-    expect(presentToLabel([], 0, true)).toBe('Present to: everyone');
-    // Everyone assigned to a tab that is not presented: named, since followers would not see it.
-    expect(presentToLabel(['Anna', 'Ben'], 2, false)).toBe('Present to: Anna, Ben');
-    expect(presentToLabel([], 2, true)).toBe('Present to: nobody');
-    expect(presentToLabel([], 0, false)).toBe('Present to: nobody');
-    expect(PRESENT_TO_NO_SCENE).toBe('Present to: no scene open');
-  });
-
   it('labels the menus and their rows', () => {
     expect(PRESENT_TO_HEADING).toBe('Present to');
-    expect(presentSceneToHeading('Cave')).toBe('Present Cave to');
     expect(rowLabel('Anna', { kind: 'here' }, false)).toBe('Anna');
     expect(rowLabel('Anna', { kind: 'on', scene: 'Cave' }, false)).toBe('Anna · on Cave');
     expect(rowLabel('Anna', { kind: 'no-scene' }, false)).toBe('Anna · no scene');

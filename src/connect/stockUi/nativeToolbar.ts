@@ -9,7 +9,7 @@
  * Everything of Atlas's CSS is scoped to `.atlas-vtt-plugin`, the view's root, so what is added stays inside it.
  */
 import type { Disposer, MenuItem, PanelSpec, SceneTabMenuContext, TokenMenuContext, ToolbarItemContext, ViewContext } from '@atlas-vtt/api-types';
-import type { DockEnv, DockToken, DockView } from './floatingDock';
+import type { DockEnv, DockTab, DockToken, DockView } from './floatingDock';
 import type { PanelHost, UiRecords } from './uiRegistry';
 import type { EditTokenSectionSpec } from '../../app/online/gm-ui/editTokenSection';
 import { watchTokenContextMenu } from './tokenContextMenu';
@@ -31,7 +31,10 @@ interface Bar {
   /** Item elements by toolbar item id, and the three menu buttons by name. */
   items: Map<string, HTMLElement>;
   panels: Map<string, OpenPanel>;
-  menu: { name: string; element: HTMLElement; stop: Disposer } | null;
+  /** The open dropdown; `at` is set for one opened at the pointer (a scene tab's right-click), which is not in the group. */
+  menu: { name: string; element: HTMLElement; stop: Disposer; at?: { x: number; y: number } } | null;
+  /** The lists open in the menu, by their labels from the top: kept while it is redrawn after a choice. */
+  openLists: Set<string>;
   observer: MutationObserver | null;
   stops: Disposer[];
 }
@@ -58,6 +61,16 @@ function keepInView(element: HTMLElement): void {
   if (rect.width === 0) return;
   const shift = rect.left < EDGE ? EDGE - rect.left : rect.right > win.innerWidth - EDGE ? win.innerWidth - EDGE - rect.right : 0;
   element.setCssProps({ '--atlas-keep-in-view-x': `${Math.round(shift)}px` });
+}
+
+/** Puts a menu opened at the pointer at `at`, kept inside the window. */
+function placeAt(element: HTMLElement, at: { x: number; y: number }): void {
+  const win = element.ownerDocument.defaultView;
+  if (!win) return;
+  const rect = element.getBoundingClientRect();
+  const left = Math.max(EDGE, Math.min(at.x, win.innerWidth - rect.width - EDGE));
+  const top = Math.max(EDGE, Math.min(at.y, win.innerHeight - rect.height - EDGE));
+  element.setCssProps({ left: `${Math.round(left)}px`, top: `${Math.round(top)}px` });
 }
 
 export class NativeToolbar implements PanelHost {
@@ -91,7 +104,7 @@ export class NativeToolbar implements PanelHost {
       if (!view.root?.isConnected) continue;
       let bar = this.bars.get(view.viewId);
       if (!bar) {
-        bar = { view, group: null, items: new Map(), panels: new Map(), menu: null, observer: null, stops: [] };
+        bar = { view, group: null, items: new Map(), panels: new Map(), menu: null, openLists: new Set(), observer: null, stops: [] };
         this.bars.set(view.viewId, bar);
         this.watch(bar);
       }
@@ -207,6 +220,23 @@ export class NativeToolbar implements PanelHost {
       setIcon: (element, name) => this.env.setIcon(element, name),
       editTokenSections: (view, token) => this.editTokenSections(view, token),
     }));
+    // A stock Atlas opens no menu on a scene tab: right-clicking one opens Connect's sections for that tab there.
+    const tabMenu = (event: MouseEvent): void => {
+      const hit = this.tabAt(bar.view, event.target);
+      if (!hit) return;
+      // Each section is a list under its heading ("Present to" › the players), as under the scene in the Scenes menu.
+      const items = (): MenuItem[] => {
+        const live = (this.env.view(bar.view.viewId) ?? bar.view).tabs().find((candidate) => candidate.tabId === hit.tab.tabId);
+        return live ? this.tabSections(bar.view, live).map(({ heading, items: rows }): MenuItem => ({ label: heading, icon: 'users', submenu: rows })) : [];
+      };
+      if (items().length === 0) return;
+      event.preventDefault();
+      // Under the tab, clear of the tooltip Atlas shows over it.
+      const rect = hit.element.getBoundingClientRect();
+      this.openMenu(bar, 'tab', items, { x: rect.left, y: rect.bottom + 6 });
+    };
+    root.addEventListener('contextmenu', tabMenu, true);
+    bar.stops.push(() => root.removeEventListener('contextmenu', tabMenu, true));
     let queued = false;
     const again = (): void => {
       if (queued) return;
@@ -275,12 +305,9 @@ export class NativeToolbar implements PanelHost {
         badge: guarded<string | number | true | null>(`Toolbar item ${item.id} badge`, null, () => item.badge?.(ctx) ?? null),
         onClick: () => guarded(`Toolbar item ${item.id}`, undefined, () => item.onClick(ctx)) });
     });
+    // View menu items and palette sections have no button here: each is an Obsidian command too, and the panels and
+    // menus beside it cover the rest.
     let order = wanted.length;
-    const more = this.moreItems(ctx);
-    if (more.length > 0) {
-      keep.add('menu:more');
-      this.draw(bar, 'menu:more', order++, { icon: 'ellipsis', label: 'More options', active: bar.menu?.name === 'more', badge: null, onClick: () => this.toggleMenu(bar, 'more', () => this.moreItems(ctx)) });
-    }
     const tokens = bar.view.selectedTokens();
     if (tokens.length > 0 && this.tokenItems(bar.view, tokens).length > 0) {
       keep.add('menu:token');
@@ -299,7 +326,7 @@ export class NativeToolbar implements PanelHost {
     }
     // Panels and the open menu sit last in the group, so the buttons keep their order. One already in its place is left
     // alone: moving a node removes it, and a panel taken out and put back plays its slide-up again, which shows as a flash.
-    const after: HTMLElement[] = [...[...bar.panels.values()].map((open) => open.tray), ...(bar.menu ? [bar.menu.element] : [])];
+    const after: HTMLElement[] = [...[...bar.panels.values()].map((open) => open.tray), ...(bar.menu && !bar.menu.at ? [bar.menu.element] : [])];
     after.forEach((element, offset) => {
       if (group.children[bar.items.size + offset] !== element) group.insertBefore(element, group.children[bar.items.size + offset] ?? null);
     });
@@ -401,15 +428,32 @@ export class NativeToolbar implements PanelHost {
       this.closeMenu(bar);
       return;
     }
+    this.openMenu(bar, name, items);
+  }
+
+  /** Opens a dropdown over the group's buttons, or at `at` (window coordinates) for a right-click. */
+  private openMenu(bar: Bar, name: string, items: () => MenuItem[], at?: { x: number; y: number }): void {
     this.closeMenu(bar);
-    const element = make('div', 'atlas-dropdown-content atlas-dropdown-content--top atlas-dropdown-content--right atlas-connect-menu');
+    const element = make('div', at
+      ? 'atlas-dropdown-content atlas-connect-menu atlas-connect-menu--at'
+      : 'atlas-dropdown-content atlas-dropdown-content--top atlas-dropdown-content--right atlas-connect-menu');
     const fill = (): void => {
       element.replaceChildren();
-      this.fillMenu(bar, element, items(), 0, fill);
+      const entries = items();
+      // A menu of one list (one scene) opens with that list unfolded: the chevron is there to fold it.
+      const only = entries.length === 1 ? entries[0] : undefined;
+      if (only?.submenu && !bar.menu) bar.openLists.add(`/${only.label}`);
+      this.fillMenu(bar, element, entries, 0, fill, '');
     };
+    bar.openLists.clear();
     fill();
-    bar.group?.appendChild(element);
-    keepInView(element);
+    if (at) {
+      bar.view.root?.appendChild(element);
+      placeAt(element, at);
+    } else {
+      bar.group?.appendChild(element);
+      keepInView(element);
+    }
     const doc = bar.view.doc;
     const outside = (event: Event): void => {
       if (event.target instanceof Node && (element.contains(event.target) || bar.group?.contains(event.target))) return;
@@ -425,7 +469,7 @@ export class NativeToolbar implements PanelHost {
     doc.addEventListener('keydown', escape, true);
     // The panels stay mounted but out of the way while a menu is open: they would lie under it.
     for (const open of bar.panels.values()) open.tray.hidden = true;
-    bar.menu = { name, element, stop: () => { doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('keydown', escape, true); } };
+    bar.menu = { name, element, stop: () => { doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('keydown', escape, true); }, ...(at ? { at } : {}) };
   }
 
   private closeMenu(bar: Bar): void {
@@ -436,7 +480,7 @@ export class NativeToolbar implements PanelHost {
     for (const open of bar.panels.values()) open.tray.hidden = false;
   }
 
-  private fillMenu(bar: Bar, into: HTMLElement, items: MenuItem[], depth: number, refill: () => void): void {
+  private fillMenu(bar: Bar, into: HTMLElement, items: MenuItem[], depth: number, refill: () => void, path: string): void {
     let section = make('div', 'atlas-dropdown-section');
     into.appendChild(section);
     for (const entry of items) {
@@ -453,9 +497,14 @@ export class NativeToolbar implements PanelHost {
       const check = make('span', 'atlas-dropdown-menu-item__check');
       if (entry.checked === true) this.env.setIcon(check, 'check');
       row.appendChild(check);
-      const icon = make('span', 'atlas-connect-menu__icon');
-      if (entry.icon) this.env.setIcon(icon, entry.icon);
-      row.appendChild(icon);
+      // A nested row without an icon has no icon column: its label follows the check, under the heading above it.
+      if (depth === 0 || entry.icon) {
+        const icon = make('span', 'atlas-connect-menu__icon');
+        if (entry.icon) this.env.setIcon(icon, entry.icon);
+        row.appendChild(icon);
+      } else {
+        row.classList.add('atlas-connect-menu__nested--bare');
+      }
       row.appendChild(make('span', '', entry.label));
       const arrow = make('span', 'atlas-connect-menu__arrow');
       if (entry.submenu) this.env.setIcon(arrow, 'chevron-right');
@@ -463,13 +512,21 @@ export class NativeToolbar implements PanelHost {
       if (depth > 0) row.classList.add('atlas-connect-menu__nested');
       if (entry.disabled === true) row.disabled = true;
       if (entry.submenu) {
+        const key = `${path}/${entry.label}`;
         const sub = make('div', 'atlas-connect-menu__sub');
-        sub.hidden = true;
-        this.fillMenu(bar, sub, entry.submenu, depth + 1, refill);
+        sub.hidden = !bar.openLists.has(key);
+        arrow.classList.toggle('is-open', !sub.hidden);
+        row.setAttribute('aria-expanded', String(!sub.hidden));
+        this.fillMenu(bar, sub, entry.submenu, depth + 1, refill, key);
         row.addEventListener('click', () => {
           sub.hidden = !sub.hidden;
           arrow.classList.toggle('is-open', !sub.hidden);
-          keepInView(into.closest<HTMLElement>('.atlas-connect-menu') ?? into);
+          row.setAttribute('aria-expanded', String(!sub.hidden));
+          if (sub.hidden) bar.openLists.delete(key);
+          else bar.openLists.add(key);
+          const menu = into.closest<HTMLElement>('.atlas-connect-menu') ?? into;
+          if (bar.menu?.at) placeAt(menu, bar.menu.at);
+          else keepInView(menu);
         });
         section.append(row, sub);
         continue;
@@ -486,27 +543,6 @@ export class NativeToolbar implements PanelHost {
       });
       section.appendChild(row);
     }
-  }
-
-  private moreItems(ctx: ViewContext): MenuItem[] {
-    const items: MenuItem[] = [];
-    // A command registered both as a menu item and in the palette shows once, under the first.
-    const seen = new Set<string>();
-    const join = (group: MenuItem[]): void => {
-      const fresh = group.filter((entry, index) => (index === 0 && entry.disabled === true && !entry.onClick) || !seen.has(entry.label));
-      for (const entry of fresh) seen.add(entry.label);
-      // A palette section left with only its heading has nothing to show.
-      if (fresh.length === 0 || (fresh.length === 1 && fresh[0]!.disabled === true && !fresh[0]!.onClick)) return;
-      if (items.length > 0) items.push({ label: '-' });
-      items.push(...fresh);
-    };
-    for (const provider of this.records.viewMenus) join(guarded('A menu provider', [] as MenuItem[], () => provider(ctx)));
-    for (const section of this.records.palette.values()) {
-      const commands = guarded(`Palette section ${section.id}`, [], () => section.commands(ctx));
-      if (commands.length === 0) continue;
-      join([{ label: section.title, disabled: true }, ...commands.map((command): MenuItem => ({ label: command.label, icon: command.icon, onClick: () => command.run() }))]);
-    }
-    return items;
   }
 
   private tokenItems(view: DockView, tokens: DockToken[]): MenuItem[] {
@@ -531,13 +567,35 @@ export class NativeToolbar implements PanelHost {
 
   private sceneItems(view: DockView): MenuItem[] {
     return view.tabs().flatMap((tab) => {
-      const ctx: SceneTabMenuContext = { viewId: view.viewId, tabId: tab.tabId, mapPath: tab.mapPath, name: tab.name, active: tab.active, presented: tab.presented };
-      const sections = [...this.records.sceneTabSections].flatMap((section) => {
-        const items = guarded(`Scene tab section ${section.heading}`, [] as MenuItem[], () => section.items(ctx));
-        return items.length === 0 ? [] : [{ label: section.heading.slice(0, 40), disabled: true }, ...items];
-      });
-      return sections.length === 0 ? [] : [{ label: tab.presented ? `${tab.name} (presented)` : tab.name, ...(tab.active ? { icon: 'eye' } : {}), submenu: sections }];
+      const sections = this.tabSectionItems(view, tab);
+      // Every scene has its eye, open or shut as on its tab, so the names line up.
+      return sections.length === 0 ? [] : [{ label: tab.presented ? `${tab.name} (presented)` : tab.name, icon: tab.presented ? 'eye' : 'eye-off', submenu: sections }];
     });
+  }
+
+  /** What the scene tab sections give for one tab, each under its heading; empty when none gives anything. */
+  private tabSectionItems(view: DockView, tab: DockTab): MenuItem[] {
+    return this.tabSections(view, tab).flatMap(({ heading, items }) => [{ label: heading, disabled: true }, ...items]);
+  }
+
+  /** The scene tab sections that give something for one tab, with their headings. */
+  private tabSections(view: DockView, tab: DockTab): Array<{ heading: string; items: MenuItem[] }> {
+    const ctx: SceneTabMenuContext = { viewId: view.viewId, tabId: tab.tabId, mapPath: tab.mapPath, name: tab.name, active: tab.active, presented: tab.presented };
+    return [...this.records.sceneTabSections].flatMap((section) => {
+      const items = guarded(`Scene tab section ${section.heading}`, [] as MenuItem[], () => section.items(ctx));
+      return items.length === 0 ? [] : [{ heading: section.heading.slice(0, 40), items }];
+    });
+  }
+
+  /** The scene tab of Atlas's tab bar that `target` is in (not the add button), matched to the view's tabs by position. */
+  private tabAt(view: DockView, target: EventTarget | null): { tab: DockTab; element: Element } | null {
+    const element = target instanceof Element ? target.closest('.atlas-scene-tab') : null;
+    if (!element || element.classList.contains('atlas-scene-tab-bar__add')) return null;
+    const strip = element.parentElement;
+    if (!strip) return null;
+    const index = Array.from(strip.children).filter((child) => child.classList.contains('atlas-scene-tab') && !child.classList.contains('atlas-scene-tab-bar__add')).indexOf(element);
+    const tab = view.tabs()[index];
+    return tab ? { tab, element } : null;
   }
 }
 

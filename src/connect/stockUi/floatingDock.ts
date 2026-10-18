@@ -1,7 +1,7 @@
 /**
- * The floating, draggable dock that stands in for the slots stock Atlas does not have: the main toolbar, the command
- * palette section, the "More options" menu, the token context menu, the scene tab menu and the floating panels. It
- * follows the map view the GM works in, in that view's own window (a popout has its own document), and is laid out
+ * The floating, draggable dock that stands in for the slots stock Atlas does not have: the main toolbar, the token
+ * context menu, the scene tab menu and the floating panels. View menu items and palette sections have no menu here:
+ * each is an Obsidian command too. It follows the map view the GM works in, in that view's own window (a popout has its own document), and is laid out
  * like the dice panel of Atlas's interactive dice extension: a fixed panel with a grip, a title and a collapse button.
  * Positions and the collapsed state are remembered. Nothing it adds to the page outlives `stop()`.
  */
@@ -230,7 +230,7 @@ export class FloatingDock implements PanelHost {
 
   private hasSlots(): boolean {
     const { records } = this;
-    return records.toolbar.size > 0 || records.palette.size > 0 || records.viewMenus.size > 0 || records.tokenMenus.size > 0
+    return records.toolbar.size > 0 || records.tokenMenus.size > 0
       || records.sceneTabSections.size > 0;
   }
 
@@ -280,8 +280,6 @@ export class FloatingDock implements PanelHost {
       .filter((item) => (item.views ?? ['map']).includes('map') && (item.isVisible === undefined || guarded(`Toolbar item ${item.id} isVisible`, false, () => item.isVisible!(ctx)) === true))
       .sort((a, b) => (b.priority ?? LABEL_PRIORITY) - (a.priority ?? LABEL_PRIORITY));
     for (const item of items) body.appendChild(this.toolbarButton(doc, item, ctx));
-    const more = this.moreItems(ctx);
-    if (more.length > 0) body.appendChild(this.menuButton(doc, 'ellipsis', 'More options', () => this.moreItems(ctx)));
     const tokens = view.selectedTokens();
     if (tokens.length > 0 && this.tokenItems(view, tokens).length > 0) {
       body.appendChild(this.menuButton(doc, 'user', tokens.length === 1 ? `Token: ${tokens[0]!.label}` : `${tokens.length} tokens`, () => this.tokenItems(this.env.view(view.viewId) ?? view, (this.env.view(view.viewId) ?? view).selectedTokens())));
@@ -355,27 +353,6 @@ export class FloatingDock implements PanelHost {
       });
       if (flatten && entry.submenu) this.fill(menu, entry.submenu.map((child) => ({ ...child, label: `${entry.label} › ${child.label}` })), reopen);
     }
-  }
-
-  private moreItems(ctx: ViewContext): MenuItem[] {
-    const items: MenuItem[] = [];
-    // A command registered both as a menu item and in the palette shows once, under the first.
-    const seen = new Set<string>();
-    const join = (group: MenuItem[]): void => {
-      const fresh = group.filter((entry, index) => (index === 0 && entry.disabled === true && !entry.onClick) || !seen.has(entry.label));
-      for (const entry of fresh) seen.add(entry.label);
-      // A palette section left with only its heading has nothing to show.
-      if (fresh.length === 0 || (fresh.length === 1 && fresh[0]!.disabled === true && !fresh[0]!.onClick)) return;
-      if (items.length > 0) items.push({ label: '-' });
-      items.push(...fresh);
-    };
-    for (const provider of this.records.viewMenus) join(guarded('A menu provider', [] as MenuItem[], () => provider(ctx)));
-    for (const section of this.records.palette.values()) {
-      const commands = guarded(`Palette section ${section.id}`, [], () => section.commands(ctx));
-      if (commands.length === 0) continue;
-      join([{ label: section.title, disabled: true }, ...commands.map((command): MenuItem => ({ label: command.label, icon: command.icon, onClick: () => command.run() }))]);
-    }
-    return items;
   }
 
   private tokenItems(view: DockView, tokens: DockToken[]): MenuItem[] {
