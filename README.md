@@ -11,7 +11,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 1. Obsidian 1.8.7 or newer, on desktop.
 2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
 
-**Updating:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself.
+**Updating to 0.4.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. With an older GM, clicking a readable pin says the note couldn't be opened, and a note sent with Send to… never arrives.
 
 ## Start a session (GM)
 
