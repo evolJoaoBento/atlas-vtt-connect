@@ -1,4 +1,5 @@
 /** What the scene tab takes from a joined session, what it asks of it, and why a join may not start. */
+import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
@@ -31,6 +32,8 @@ export interface OnlineSceneSink {
   templates?(sceneId: string, templates: readonly MapTemplate[]): void;
   /** Someone else's ping; a view that shows none leaves it out. */
   ping?(ping: PlayerPing): void;
+  /** The GM's answer to a pin this player opened; a view that opens none leaves it out. */
+  pinNote?(answer: PinNoteAnswer): void;
   /** Images arrived, failed or went. */
   images(): void;
   /** The session was left from elsewhere (a new join, the plugin unloading): close the tab. */

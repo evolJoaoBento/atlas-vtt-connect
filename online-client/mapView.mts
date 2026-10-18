@@ -28,6 +28,8 @@ import { whenTokenRingLoaded } from '../src/app/online/view/canvasSurface';
 import { bindMapInput } from './mapInput.mts';
 import { HoverCardView } from './hoverCardView.mts';
 import { HandoutView, type HandoutViewOptions } from './handoutView.mts';
+import { NoteView, type NoteViewOptions } from './noteView.mts';
+import type { PinNoteAnswer } from '../src/app/online/tools/pinNotes';
 import { InitiativeView } from './initiativeView.mts';
 import { StatblockPreviewView } from './statblockPreviewView.mts';
 import type { TokenSheet } from '../src/app/online/tools/sheets';
@@ -35,7 +37,7 @@ import { conditionRows, tokenAt } from '../src/app/online/view/tokenHover';
 import type { TokenOverlay } from '../src/app/online/view/layers/layerTypes';
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';
 
-import { turnNotice, turnOf } from '../src/app/online/view/turns';
+import { nextTurnOf, turnNotice, turnOf } from '../src/app/online/view/turns';
 import { createPinsLayer, pinAt } from '../src/app/online/view/layers/pinsLayer';
 
 /** A press that moves further than this, in CSS pixels, pans or drags instead of selecting. */
@@ -93,7 +95,14 @@ export interface MapViewOptions {
   initiative?: HTMLElement;
   /** Atlas's Ctrl/Cmd+hover stat block preview of the player's tokens (`StatblockPreviewView`); without it none shows. */
   statblockPreview?: HTMLElement;
+  /** The drawer of a readable pin's note (`NoteView`); without it, or without `requestNote`, clicking a pin opens nothing. */
+  note?: NoteViewOptions;
+  /** Asks the GM for the note of a pin of the scene shown; false when it cannot go. */
+  requestNote?: (pinId: string) => boolean;
 }
+
+/** How long the GM is waited for before a note is said to be unavailable (an older Connect never answers). */
+export const NOTE_WAIT_MS = 10_000;
 
 export class MapView {
   private readonly camera: CameraController;
@@ -105,6 +114,9 @@ export class MapView {
   private scene: PlayerScene | null = null;
   private readonly hoverCard: HoverCardView | null;
   private readonly handout: HandoutView | null;
+  private readonly note: NoteView | null;
+  /** The pin whose note is on its way, and the timer that gives up on it. */
+  private awaitedNote: { sceneId: string; pinId: string; timer: number } | null = null;
   private readonly initiative: InitiativeView | null;
   private readonly preview: StatblockPreviewView | null;
   /** The player's sheets by token (`token-sheets`): what the Ctrl+hover preview shows. */
@@ -164,6 +176,9 @@ export class MapView {
     this.input = new ViewInput(this.camera, this.tools);
     this.hoverCard = options.hoverCard ? new HoverCardView(options.hoverCard) : null;
     this.handout = options.handout ? new HandoutView({ ...options.handout, ...(options.active ? { active: options.active } : {}) }) : null;
+    this.note = options.note && options.requestNote
+      ? new NoteView({ ...options.note, ...(options.active ? { active: options.active } : {}), ...(options.doc ? { doc: options.doc } : {}) })
+      : null;
     this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
     this.preview = options.statblockPreview ? new StatblockPreviewView(options.statblockPreview) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
@@ -273,6 +288,14 @@ export class MapView {
   }
 
   /** Every lasting template on the scene `sceneId`. */
+  /** The GM's answer to a pin the player opened; one for a pin no longer awaited (another opened since) is dropped. */
+  receiveNote(answer: PinNoteAnswer): void {
+    const awaited = this.awaitedNote;
+    if (!awaited || awaited.sceneId !== answer.sceneId || awaited.pinId !== answer.pinId) return;
+    this.stopAwaitingNote();
+    this.note?.show(answer.note);
+  }
+
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void {
     this.tools.receiveTemplates(sceneId, templates);
     // Clear my templates is offered only while the player has some.
@@ -305,6 +328,8 @@ export class MapView {
     this.transition?.cancel();
     this.listeners.abort();
     this.handout?.dispose();
+    this.stopAwaitingNote();
+    this.note?.dispose();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.unwatchPixelRatio();
@@ -464,11 +489,12 @@ export class MapView {
     canvas.classList.toggle('can-grab', canGrab);
   }
 
-  /** "Your turn" while a token the player controls (or its side) has the turn. */
+  /** "Your turn" while a token the player controls (or its side) has the turn, "Your turn is next" on the turn before. */
   private updateTurn(): void {
     const element = this.options.turnNotice;
     if (!element) return;
-    const text = turnNotice(turnOf(this.scene, this.moves.overlay().controlled));
+    const { controlled } = this.moves.overlay();
+    const text = turnNotice(turnOf(this.scene, controlled), nextTurnOf(this.scene, controlled));
     element.textContent = text ?? '';
     element.hidden = text === null;
   }
@@ -517,6 +543,32 @@ export class MapView {
     else card.hide();
   }
 
+  /** Opens the note of the readable pin under a click, when no token is there; false when there is none to open. */
+  private openPinAt(point: ScreenPoint): boolean {
+    const scene = this.scene;
+    if (!scene || !this.note || !this.options.requestNote) return false;
+    const world = this.camera.toWorld(point);
+    if (tokenAt(scene, this.moves.overlay().positions, world)) return false;
+    const pin = pinAt(scene, world, this.camera.current().zoom);
+    if (!pin || !this.options.requestNote(pin.id)) return false;
+    this.stopAwaitingNote();
+    const win = this.options.canvas.ownerDocument.defaultView ?? window;
+    const awaited = { sceneId: scene.sceneId, pinId: pin.id, timer: 0 };
+    awaited.timer = win.setTimeout(() => {
+      if (this.awaitedNote !== awaited) return;
+      this.awaitedNote = null;
+      this.note?.show(null);
+    }, NOTE_WAIT_MS);
+    this.awaitedNote = awaited;
+    this.note.loading(pin.title ?? 'Note');
+    return true;
+  }
+
+  private stopAwaitingNote(): void {
+    if (this.awaitedNote) (this.options.canvas.ownerDocument.defaultView ?? window).clearTimeout(this.awaitedNote.timer);
+    this.awaitedNote = null;
+  }
+
   /** Selects the token under a click with Move, or none on the map, as a click in Atlas's scene does. */
   private select(point: ScreenPoint): void {
     const scene = this.scene;
@@ -551,7 +603,9 @@ export class MapView {
       this.pressedAt = null;
       if (this.tools.tool !== 'move' || (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > CLICK_TOLERANCE)) return;
       const rect = canvas.getBoundingClientRect();
-      this.select({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+      const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      // A readable pin opens its note when no token is there: tokens win, as in Atlas.
+      if (!this.openPinAt(point)) this.select(point);
     }, { signal });
     const doc = this.options.doc ?? document;
     const modifierFrom = (event: KeyboardEvent | MouseEvent): void => {

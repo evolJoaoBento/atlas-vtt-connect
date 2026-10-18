@@ -199,16 +199,22 @@ describe('the stock stand-in\'s ui namespace', () => {
   });
 
   describe('menus', () => {
-    it('gathers view menu items and palette sections, and runs what is chosen', () => {
+    it('has no More options menu: view menu items and palette sections are Obsidian commands too', () => {
       const t = setup();
+      t.ui.addViewMenuItems(() => [{ label: 'Open', onClick: () => undefined }]);
+      t.ui.addPaletteSection({ id: 's', title: 'Online', commands: () => [{ id: 'c', icon: 'play', label: 'Start', run: () => undefined }] });
+      expect(t.root()).toBeNull();
+      t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'One', onClick: () => undefined });
+      expect(t.labels()).toEqual(['One']);
+    });
+
+    it('runs what is chosen, separated and headed as given', () => {
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       const ran: string[] = [];
-      t.ui.addViewMenuItems((ctx) => [{ label: `Open ${ctx.viewId}`, icon: 'radio', onClick: () => ran.push('open') }]);
-      t.ui.addViewMenuItems(() => []);
-      t.ui.addPaletteSection({ id: 's', title: 'Online', commands: () => [{ id: 'c', icon: 'play', label: 'Start', run: () => ran.push('start') }] });
-      t.ui.addPaletteSection({ id: 'e', title: 'Empty', commands: () => [] });
-      t.buttons().find((button) => button.dataset.icon === 'ellipsis')!.click();
+      t.ui.addTokenMenuItems(() => [{ label: 'Open', icon: 'radio', onClick: () => ran.push('open') }, { label: '-' }, { label: 'Online', disabled: true }, { label: 'Start', onClick: () => ran.push('start') }]);
+      t.buttons().find((button) => button.dataset.icon === 'user')!.click();
       const menu = t.shown[0]!.menu;
-      expect(menu.titles()).toEqual(['Open v1', 'Online', 'Start']);
+      expect(menu.titles()).toEqual(['Open', 'Online', 'Start']);
       expect(menu.separators).toBe(1);
       expect(menu.entries[1]!.disabled).toBe(true);
       menu.entries[0]!.click!();
@@ -217,20 +223,20 @@ describe('the stock stand-in\'s ui namespace', () => {
     });
 
     it('shows a menu again after an item that keeps it open, with what it reads now', () => {
-      const t = setup();
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       let ticked = false;
-      t.ui.addViewMenuItems(() => [{ label: 'Tick', checked: ticked, keepOpen: true, onClick: () => { ticked = !ticked; } }]);
-      t.buttons().find((button) => button.dataset.icon === 'ellipsis')!.click();
+      t.ui.addTokenMenuItems(() => [{ label: 'Tick', checked: ticked, keepOpen: true, onClick: () => { ticked = !ticked; } }]);
+      t.buttons().find((button) => button.dataset.icon === 'user')!.click();
       t.shown[0]!.menu.entries[0]!.click!();
       vi.advanceTimersByTime(1);
       expect(t.shown).toHaveLength(2);
       expect(t.shown[1]!.menu.entries[0]!.checked).toBe(true);
     });
 
-    it('lists submenus in place under the parent\'s name where Obsidian has none', () => {
-      const t = setup({ submenus: false });
-      t.ui.addViewMenuItems(() => [{ label: 'Parent', submenu: [{ label: 'Child', onClick: () => undefined }] }]);
-      t.buttons().find((button) => button.dataset.icon === 'ellipsis')!.click();
+    it("lists submenus in place under the parent's name where Obsidian has none", () => {
+      const t = setup({ submenus: false, selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
+      t.ui.addTokenMenuItems(() => [{ label: 'Parent', submenu: [{ label: 'Child', onClick: () => undefined }] }]);
+      t.buttons().find((button) => button.dataset.icon === 'user')!.click();
       expect(t.shown[0]!.menu.titles()).toEqual(['Parent', 'Parent › Child']);
     });
 

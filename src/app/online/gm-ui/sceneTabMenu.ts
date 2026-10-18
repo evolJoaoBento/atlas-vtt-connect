@@ -25,7 +25,7 @@ export function presentToSection(deps: PresentToSectionDeps): SceneTabMenuSectio
       const state = onlineSessionStore.getState();
       if (!splitShown(state)) return [];
       const view = splitViewOf(state, deps.presentation, (tab) => tabNameIn(deps.views, tab));
-      const menu = presentToMenu({ viewId: ctx.viewId, tabId: ctx.tabId, name: ctx.name }, view, deps.actions, 'section');
+      const menu = presentToMenu({ viewId: ctx.viewId, tabId: ctx.tabId, name: ctx.name }, view, deps.actions);
       const rows: MenuItem[] = menu.rows.length === 0
         ? [{ label: NO_PLAYERS_ROW, disabled: true }]
         : menu.rows.map((row) => ({ label: row.label, checked: row.checked, disabled: row.disabled, keepOpen: true, onClick: () => row.choose() }));

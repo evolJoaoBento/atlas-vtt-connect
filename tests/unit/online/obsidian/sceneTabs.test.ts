@@ -13,7 +13,7 @@ import { admitted } from './remoteSceneFixtures';
 afterEach(() => { vi.restoreAllMocks(); });
 
 function world(capabilities: readonly AtlasCapability[], session = true) {
-  const leaf = { setViewState: vi.fn(async () => undefined) };
+  const leaf = { view: { containerEl: document.createElement('div') }, setViewState: vi.fn(async () => undefined) };
   const workspace = { getLeavesOfType: vi.fn(() => []), getLeaf: vi.fn(() => leaf), revealLeaf: vi.fn(async () => undefined) };
   const app = { workspace } as unknown as App;
   const service = new OnlineJoinService(app, memorySettings(), '0.1.0', { openStore: async () => null, isHosting: () => false });

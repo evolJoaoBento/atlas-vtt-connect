@@ -553,3 +553,29 @@
 .atlas-connect-scene .menu-entry--separated { position: relative; margin-top: 5px; }
 .atlas-connect-scene .menu-entry--separated::before { content: ''; position: absolute; left: 8px; right: 8px; top: -3px; border-top: 1px solid var(--background-modifier-border); }
 .atlas-connect-scene .menu-entry:disabled { opacity: 0.45; cursor: default; background: transparent; }
+
+// A readable pin's note (`NoteView`): the sheets' drawer, its title as a heading and its text as Obsidian reads a note.
+.atlas-connect-scene {
+  .note-panel .sheet-header h2 { color: var(--text-normal); font-size: var(--font-ui-medium); letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
+  .note-body { display: grid; gap: 8px; font-size: var(--font-ui-small); line-height: 1.5; user-select: text; overflow-wrap: anywhere; }
+  .note-body > *, .note-body blockquote > * { margin: 0; }
+  .note-body h3, .note-body h4, .note-body h5, .note-body h6 { margin-top: 4px; font-weight: var(--font-semibold); }
+  .note-body h3 { font-size: var(--font-ui-medium); }
+  .note-body ul, .note-body ol { padding-left: 20px; }
+  .note-body .note-task { list-style: none; margin-left: -16px; }
+  .note-body .note-indent-1 { margin-left: 16px; }
+  .note-body .note-indent-2 { margin-left: 32px; }
+  .note-body .note-indent-3, .note-body .note-indent-4 { margin-left: 48px; }
+  .note-body blockquote { display: grid; gap: 6px; padding: 6px 10px; border-left: 3px solid var(--background-modifier-border); color: var(--text-muted); }
+  .note-body .note-callout { border-left-color: var(--interactive-accent); background: var(--background-modifier-hover); border-radius: var(--radius-s); color: var(--text-normal); }
+  .note-body .note-callout-title { font-weight: var(--font-semibold); }
+  .note-body code { padding: 0 4px; border-radius: 4px; background: var(--background-modifier-hover); font-family: var(--font-monospace); font-size: 0.92em; }
+  .note-body pre { overflow-x: auto; padding: 8px; border-radius: var(--radius-s); background: var(--background-modifier-hover); }
+  .note-body pre code { padding: 0; background: none; }
+  .note-body hr { border: 0; border-top: 1px solid var(--background-modifier-border); }
+  .note-body mark { background: var(--text-highlight-bg); color: inherit; }
+  .note-body .note-table { overflow-x: auto; }
+  .note-body table { border-collapse: collapse; }
+  .note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--background-modifier-border); text-align: left; }
+  .note-body .note-status { color: var(--text-muted); font-style: italic; }
+}

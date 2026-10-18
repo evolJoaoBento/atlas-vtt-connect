@@ -16,16 +16,17 @@ function renderList(pullPushed: () => Promise<{ kind: 'created'; path: string }>
 }
 
 describe('Shared with me list push requests', () => {
-  it('Pull dismisses the request and reports where it landed', async () => {
+  it('Allow dismisses the request and reports where it landed', async () => {
     const props = renderList(async () => ({ kind: 'created', path: 'Shared/Ana/Cave.md' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pull' }));
+    expect(screen.getByText('Ana is sending you a note: Cave')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     await waitFor(() => expect(props.onPulled).toHaveBeenCalledWith('Shared/Ana/Cave.md'));
     expect(props.dismissPush).toHaveBeenCalledWith(PUSH);
   });
 
-  it('Pull that fails tells the receiver why instead of failing silently', async () => {
+  it('Allow that fails tells the receiver why instead of failing silently', async () => {
     const props = renderList(async () => { throw new ShareError('not-shared'); });
-    fireEvent.click(screen.getByRole('button', { name: 'Pull' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     await waitFor(() => expect(props.onProblem).toHaveBeenCalledWith('That is not shared with you any more.'));
     expect(props.onPulled).not.toHaveBeenCalled();
   });
@@ -34,7 +35,7 @@ describe('Shared with me list push requests', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const cause = new TypeError('vault.create is not a function');
     const props = renderList(async () => { throw cause; });
-    fireEvent.click(screen.getByRole('button', { name: 'Pull' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     await waitFor(() => expect(props.onProblem).toHaveBeenCalledWith('Could not pull that item.'));
     expect(logged).toHaveBeenCalledWith('[Atlas VTT Connect] Pull failed:', cause);
     logged.mockRestore();
@@ -52,10 +53,10 @@ describe('Shared with me list push requests', () => {
     logged.mockRestore();
   });
 
-  it('Not now only dismisses', () => {
+  it('Decline only dismisses', () => {
     const pullPushed = vi.fn(async () => ({ kind: 'created' as const, path: 'x' }));
     const props = renderList(pullPushed);
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
     expect(props.dismissPush).toHaveBeenCalledWith(PUSH);
     expect(pullPushed).not.toHaveBeenCalled();
   });

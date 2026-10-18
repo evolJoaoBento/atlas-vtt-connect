@@ -70,6 +70,8 @@ export interface OptionalParts {
   pings?: (context: HostedContext) => HostedPart;
   /** Players' lasting templates, kept per scene and shown in the GM's view where Connect can draw on it. */
   templates?: (context: HostedContext) => HostedPart & { clear(): void; hasAny(): boolean };
+  /** The notes of readable pins, sent to a player who opens one. Without it opening a pin shows nothing. */
+  notes?: (context: HostedContext) => HostedPart;
 }
 
 export interface HostEnvironment extends OptionalParts {
@@ -190,6 +192,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
+  const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
@@ -203,7 +206,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSharing = null;
     stopErrors();
     assetServer.stop();
-    for (const part of given([templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -221,7 +224,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSplit = syncSplitState(hub);
     cameraSender.start();
     assetServer.start();
-    for (const part of given([tokenControl, dice, laser, sheets, pings, templates])) {
+    for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
       part.start();
       parts.push(part);
     }

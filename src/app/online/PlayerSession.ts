@@ -10,6 +10,7 @@ import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
 import type { SheetRollRef, TokenSheet } from './tools/sheets';
+import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
 import type { TemplateChange } from './view/tools/PlayerTools';
@@ -79,6 +80,8 @@ export interface PlayerSessionOptions {
   onPing?(ping: PlayerPing): void;
   /** Every lasting template on the scene `sceneId`, whenever they change. */
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
+  /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
+  onPinNote?(answer: PinNoteAnswer): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -163,6 +166,14 @@ export class PlayerSession {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'map-ping', sceneId: scene.sceneId, x, y }));
+    return true;
+  }
+
+  /** Asks the GM for the note of a readable pin of the scene the player has; false when it cannot go. */
+  sendNoteRequest(pinId: string): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'note-request', sceneId: scene.sceneId, pinId }));
     return true;
   }
 
@@ -279,6 +290,9 @@ export class PlayerSession {
         break;
       case 'map-templates':
         this.options.onTemplates?.(message.sceneId, message.templates);
+        break;
+      case 'pin-note':
+        this.options.onPinNote?.({ sceneId: message.sceneId, pinId: message.pinId, note: message.note });
         break;
       case 'map-ping':
         // Only the GM's relays carry `from` and a colour.

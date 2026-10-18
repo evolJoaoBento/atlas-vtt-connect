@@ -32,9 +32,11 @@ export interface AskToPullServices {
   people: Pick<PeopleBook, 'byName' | 'allByName' | 'ready'>;
   sections: SectionTrust;
   scenes: Pick<ScenesApi, 'findByMap' | 'getData'>;
+  /** Whether maps can be shared (an Atlas with `scenes`); without, only notes are offered. */
+  maps?: boolean;
 }
 
-export function registerAskToPull(plugin: SharingScope, { items, people, sections, scenes }: AskToPullServices): void {
+export function registerAskToPull(plugin: SharingScope, { items, people, sections, scenes, maps = true }: AskToPullServices): void {
   const itemOf = async (file: TFile): Promise<PushableItem | null> => {
     if (file.extension === 'md') return { item: items.idFor(file.path), kind: 'note' };
     const scene = await scenes.findByMap(file.path);
@@ -91,13 +93,13 @@ export function registerAskToPull(plugin: SharingScope, { items, people, section
     id: 'ask-to-pull', name: 'Ask to pull…',
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
-      if (!shareable(file) || !shareSessionStore.getState().session) return false;
+      if (!shareable(file, maps) || !shareSessionStore.getState().session) return false;
       if (!checking) void askToPull(file);
       return true;
     },
   });
   plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
-    if (!shareable(file) || !shareSessionStore.getState().session) return;
+    if (!shareable(file, maps) || !shareSessionStore.getState().session) return;
     menu.addItem((item) => item.setTitle('Ask to pull…').setIcon('send').onClick(() => { void askToPull(file); }));
   }));
 }

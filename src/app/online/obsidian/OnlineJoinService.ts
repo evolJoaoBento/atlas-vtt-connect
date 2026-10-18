@@ -228,6 +228,11 @@ export class OnlineJoinService {
     return this.joined?.session?.sendPing(x, y) ?? false;
   }
 
+  /** Asks the GM for the note of a readable pin of the scene shown. */
+  sendNoteRequest(pinId: string): boolean {
+    return this.joined?.session?.sendNoteRequest(pinId) ?? false;
+  }
+
   /** Asks the GM to roll something on the player's own sheet. */
   sendSheetRoll(tokenId: string, roll: SheetRollRef): boolean {
     return this.joined?.session?.sendSheetRoll(tokenId, roll) ?? false;

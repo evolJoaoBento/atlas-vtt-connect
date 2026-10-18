@@ -33,8 +33,14 @@ describe('sharing, through startConnect', () => {
     expect(atlas.bundles.exportNote({ 'atlas-share': ['Ana'], tags: ['x'] })).toEqual({ tags: ['x'] });
   });
 
-  it('without scenes or bundles: no share commands, and the settings tab is told sharing needs a newer Atlas', async () => {
+  it('without scenes or bundles: notes are still shared; without rules, settings or storage nothing is, and the settings tab says so', async () => {
     for (const missing of ['scenes', 'bundles'] as const) {
+      const { connect, sharing } = connected(SHARING.filter((capability) => capability !== missing));
+      await vi.advanceTimersByTimeAsync(0);
+      expect([...connect.commands.keys()]).toEqual(expect.arrayContaining(['share-with', 'send-to']));
+      expect(sharing).toEqual([true]);
+    }
+    for (const missing of ['rules', 'settings', 'storage'] as const) {
       const { connect, sharing } = connected(SHARING.filter((capability) => capability !== missing));
       await vi.advanceTimersByTimeAsync(0);
       expect([...connect.commands.keys()].filter((id) => SHARE_COMMANDS.includes(id))).toEqual([]);

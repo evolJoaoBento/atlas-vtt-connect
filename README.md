@@ -2,6 +2,8 @@
 
 Play [Atlas VTT](https://github.com/ByteMirror/atlas-vtt) maps online with your group. You host from Obsidian; players join from a web page or from their own Obsidian. No accounts, no server to run.
 
+![A player joins and the GM's map opens for them](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/04-allow-player.gif)
+
 Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It changes nothing in Atlas.
 
 ## Install
@@ -9,100 +11,148 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 1. Obsidian 1.8.7 or newer, on desktop.
 2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
 
-**Updating to 0.3.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. An older Connect may drop the whole scene once you show a resource as a bar without numbers.
+**Updating:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself.
 
-## For the GM
+## Start a session (GM)
 
-### Start a session
+Open a map, click **Online session** in Atlas's toolbar, then **Start online session** and **Copy link**. Send the link to your players.
 
-1. Open a map in Atlas.
-2. Click the **Online session** button Connect adds to Atlas's toolbar (or run **Online session** from the command palette), then **Start online session**.
-3. Copy the join link and send it to your players.
-4. When a player asks to join, a notice says so: click **Allow** or **Deny**. The same requests show in the session panel.
+![Start a session and copy the link](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/02-start-session.gif)
 
-The panel lists who is connected. **Remove player** (×) sends someone out; they must be allowed again. **Stop online session** ends it for everyone.
+When a player asks to join, a notice says so: **Allow** or **Deny**.
 
-### What players see
+The panel lists who is connected. **×** sends a player out (they must be allowed again); **Stop online session** ends it for everyone.
 
-Players see the scene you present, with what Atlas's own player window would show: hidden tokens, fog and line of sight stay hidden. It is drawn as that window draws it, following your map's settings: token rings and their ring size, numbered badges on look-alike tokens, the grid's colour and line style, pin icons, downed tokens greyed under a skull, and a fade when you present another scene.
+![Remove a player and stop the session](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/06-session-panel.gif)
 
-- **Present a scene:** present it in Atlas as usual (the eye on its scene tab).
-- **Dynamic lighting:** turn on Atlas's dynamic lighting experiment and players see only what their tokens see, plus the places they explored before.
-- **Health bars:** the resources a collection marks **visible to players** (its settings, Resources) show as bars on tokens, as in Atlas's player window. Resources in the other slots (2 to 5) show as small wheels beside the token.
-- **Per token:** right-click a character token → **Edit Token**. Under **Players see**, each resource the token has gets two dropdowns: **Bar and numbers**, **Bar only**, **Number only** or **Hidden**. They apply when you click **Save**.
-  - **This token:** applies to that token only.
-  - **Every *Goblin*:** applies to every token with that statblock, on every map.
-  - The token's own choice wins over its statblock's, and the statblock's over the map default (the collection's setting). **Same as every *Goblin*** and **Map default** undo a choice.
-  - A choice can also show a resource the collection hides, so you can hide HP for the whole collection and show it only on the tokens you pick.
-  - **Bar only:** players see how full it is, never the numbers. **Number only:** players see the current value alone (19, never 19 / 27). **Hidden:** the bar also disappears from the initiative column.
-  - Choices are saved with your vault and kept between sessions, so you can set them while preparing.
-  - A downed token is still greyed with a skull. A player's own sheet still shows its exact numbers.
-- **Whose turn:** with the initiative list shown to players, they see the order as a column at the right of their map, the token whose turn it is gets a white ring, and its player reads "Your turn".
-- **Readable pins:** a note pin you mark readable (right-click the pin) shows on players' maps with the note's title, where they can see that spot.
+A player who reconnects from the same browser or Obsidian takes their old place without asking again. If someone joins with a name already in the session from another device, the request warns you.
 
-### Let players move tokens
+## Join (players)
 
-Right-click a token on the map → **Controlled by** → tick the players. They can now drag it. Moves snap to your grid, stop at walls on a lit scene, and are refused while you are dragging.
+**From a browser:** open the link, type your name (tick **Remember this name** to skip it next time), click **Join** and wait for the GM.
 
-**Sheets:** a player sees the stat block of every token they control, with its exact numbers (HP 19 / 27), and can roll its abilities, saves, skills and attacks from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster or NPC you hand to a player.
+**From Obsidian:** install Atlas VTT and Connect, run **Join online session…**, paste the link and click **Join**. The scene opens in its own tab. Keep Connect on the same version as your GM's.
 
-**Player characters:** mark a token as a player character in Atlas (right-click → player character), then give it to a player with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions. Untick them to take it back.
+![Join from Obsidian](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/05-join-obsidian.gif)
 
-### Dice and lasers
+## What players see
 
-- Players' rolls are rolled by Atlas's own dice, by the map's rules, thrown on your screen and logged under their name. Your rolls reach their dice log.
-- Your laser pointer shows on players' maps, and theirs on yours.
-- Players' pings and lasting templates show on your map too. Each template has a small **×** on its edge: click it to erase that template for everyone. **Clear players' templates** (command palette) takes them all away.
+Players see the scene you present, as Atlas's own player window shows it: hidden tokens, fog and line of sight stay hidden, and your map's look (rings, grid style, pin icons, numbered look-alike tokens) carries over.
+
+**Present a scene:** click the eye on its scene tab; players' maps fade over to it.
+
+![Present another scene](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/08-present-scene.gif)
+
+**Hidden stays hidden:** hide a token and it is gone from players' maps.
+
+![Hide a token](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/09-hide-token.gif)
+
+**Dynamic lighting:** with Atlas's dynamic lighting experiment on, players see only what their tokens see, plus the places they explored.
+
+### Health bars, per token
+
+Resources a collection marks **visible to players** (its settings, Resources) show as bars and small wheels on tokens. To choose per token, right-click it → **Edit Token** → **Players see**. Each resource gets two choices, applied on **Save**:
+
+- **This token**, or **Every *Cleric*** (every token with that statblock, on every map). The token's choice wins over its statblock's, which wins over the collection's.
+- **Bar and numbers**, **Bar only**, **Number only** (the current value alone: 19, never 19 / 27) or **Hidden**.
+
+**Bar only:** players see how full it is, not the numbers.
+
+![Bar only](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/13-players-see-per-token.gif)
+
+**Number only:** players read the current value under the token.
+
+![Number only](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/14-number-only.gif)
+
+Choices are kept with your vault, so you can set them while preparing. A token at 0 is greyed under a skull, and comes back when healed:
+
+![Downed and healed](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/17-downed.gif)
+
+### Whose turn
+
+Right-click tokens → **Add to Initiative**, roll, and **Start combat** in Atlas's tracker. With the initiative list shown to players, they get the order at the right of their map, "Your turn is next" on the turn before theirs, and "Your turn" with a white ring when it comes.
+
+![Initiative, "Your turn is next" and "Your turn"](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/15-initiative.gif)
+
+### Readable pins
+
+Right-click a note pin → **Readable by players**. Players see it where they can see that spot, and clicking it opens the note in a side panel: the whole note, or only the heading the pin links, without frontmatter, your `%% %%` comments or embeds.
+
+![Make a pin readable; the player reads its note](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/16-readable-pin.gif)
+
+## Hand over tokens
+
+Right-click a token → **Controlled by** → tick the player. They can drag it (yellow ring); moves snap to your grid, stop at walls on a lit scene, and are refused while you drag.
+
+![Controlled by, then the player moves it](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/18-controlled-by.gif)
+
+Players see the stat block of every token they control, with exact numbers, and roll from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster you hand to a player.
+
+**Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions.
+
+## At the table (players)
+
+<table>
+<tr>
+<td width="50%"><b>Move around.</b> Drag the map to pan, scroll to zoom; <b>Follow GM</b> goes back to the GM's view.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/21-pan-zoom-follow.gif" alt="Pan, zoom, Follow GM"></td>
+<td width="50%"><b>Hover and select.</b> Hover a token for its conditions; click to select it and see its numbers. Escape lets go.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/22-select-hover.gif" alt="Hover and select a token"></td>
+</tr>
+<tr>
+<td><b>Measure.</b> Line, cone or circle, in the GM's units, snapping to the grid. It stays two seconds.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/23-measure.gif" alt="Measure"></td>
+<td><b>Templates.</b> Line, Circle/Sphere, Square/Cube or Cone, with its size. Tap one of yours to remove it.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/26-templates.gif" alt="Templates"></td>
+</tr>
+<tr>
+<td><b>Laser.</b> Draw to point; everyone sees it, the GM too.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/24-laser.gif" alt="Laser"></td>
+<td><b>Ping.</b> Tap the map: rings show there for everyone.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/25-ping.gif" alt="Ping"></td>
+</tr>
+<tr>
+<td><b>Clear my templates</b> in the template menu removes all of yours (you can keep up to 10).<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/27-clear-my-templates.gif" alt="Clear my templates"></td>
+<td><b>GM side:</b> each player template has a <b>×</b> on your map; <b>Clear players' templates</b> (command palette) removes them all.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/28-gm-erase-template.gif" alt="GM erases templates"></td>
+</tr>
+</table>
+
+### Sheets and dice
+
+<table>
+<tr>
+<td width="50%"><b>Your sheets.</b> The scroll icon opens your tokens' stat blocks; click a highlighted number to roll it on the GM's Atlas.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/29-sheet-roll.gif" alt="Roll from a sheet"></td>
+<td width="50%"><b>Advantage.</b> Shift-click rolls with advantage, Alt-click with disadvantage, right-click offers both.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/30-advantage.gif" alt="Advantage"></td>
+</tr>
+<tr>
+<td><b>Dice tray.</b> Pick dice and roll; the GM's Atlas throws them and everyone sees the result.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/31-dice-tray.gif" alt="Dice tray"></td>
+<td><b>Roll cards and log.</b> <b>Details</b> shows the dice, a click dismisses the card; the dice icon opens every roll of the session.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/32-roll-card-log.gif" alt="Roll card and dice log"></td>
+</tr>
+</table>
+
+Connect follows Obsidian's light or dark theme:
+
+![Light and dark](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/37-theme.gif)
+
+## More for the GM
 
 ### Show an image
 
-Run **Show image to players…**, pick an image from your vault, and every player sees it over their map (they can close it and open it again). **Stop showing image to players** takes it away.
+Run **Show image to players…** and pick an image. Players can zoom, pan, close and reopen it; **Stop showing image to players** takes it away.
+
+![Show an image](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/33-show-image.gif)
 
 ### Split the party
 
-Show different players different scene tabs: open **Present to** in the session panel, or right-click the eye of a scene tab, and tick players for that tab. Untick them, or use **Everyone back to the presented scene**, to bring them back.
+Right-click a scene tab → **Present to** → tick players to show them that tab. **Scenes** in Connect's toolbar buttons lists every tab the same way, and **Everyone back to the presented scene** brings them all back. Up to 4 scenes at once; players on a tab you are not on keep its last view.
 
-- Up to 4 scenes at once. The tab you have open is live; players on other tabs keep their last view and are told you are on another scene.
-- A badge on a tab's eye says how many players are on it.
+![Split the party and bring everyone back](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/34-split-party.gif)
 
-### A player comes back
+### Send a note
 
-A player who reconnects from the same browser or Obsidian takes their old place, with their tokens, without asking you again. If someone joins with a name already in the session from a different browser or device, the join request warns you; allowing it gives them that player's place.
+During a session, right-click a note → **Send to…** and pick anyone who plays in Obsidian. They are asked to **Allow** or **Decline**; allowed notes land in `Shared/<sender>/`. Players can send notes too, to the GM or each other. Parts you keep private (part tags) stay out.
 
-## For players
-
-### Join from a browser
-
-1. Open the link the GM sent.
-2. Type your name (tick **Remember this name** to skip this next time) and click **Join**.
-3. Wait for the GM to let you in; the map opens by itself.
-
-### Join from Obsidian
-
-Install Atlas VTT and Connect, run **Join online session…**, paste the link, type your name and click **Join**. The scene opens in its own tab. Keep Connect on the same version as your GM's.
-
-### At the table
-
-- **Move:** drag the tokens the GM gave you (they have a yellow ring). Pan by dragging the map, zoom with the wheel or a pinch.
-- **Select a token:** click it with **Move** to select it: its bars, name and wheels grow and its bars show their numbers (hovering shows the numbers too). Press Escape or click the map to let go.
-- **Measure:** pick **Measure** and choose a line, cone or circle; it measures in the GM's units, snaps to the grid when the GM has snapping on, and stays two seconds after you let go.
-- **Laser:** pick **Laser** and draw to point at something; everyone sees it.
-- **Ping:** pick **Ping** and tap the map: rings show at that spot for everyone.
-- **Template:** pick **Template** and drag to leave a spell area on the map for everyone. The arrow beside the button opens its menu: **Line**, **Circle/Sphere**, **Square/Cube** or **Cone**. A circle grows from its centre, a square from one corner (snapping to the grid's corners). Each template shows its size in the GM's units: a line's or cone's length, a circle's radius, a square's side. Tap one of yours to remove it, or pick **Clear my templates** in the menu to remove them all. You can keep up to 10.
-- **Hover a token** for its name and conditions, and the exact numbers of your own tokens.
-- **Your sheets:** the scroll icon on the right edge opens the stat blocks of your tokens; click a highlighted number to roll it. Shift-click rolls with advantage, Alt-click with disadvantage, and a right-click offers both.
-- **Initiative:** during a fight the turn order shows as a column at the right of the map, with the current turn highlighted.
-- **Dice:** open the dice tray, pick dice and roll. The GM's Atlas rolls them and everyone sees the result.
-- **Roll cards:** a new roll shows as a card for a few seconds; **Details** shows the dice, a click dismisses it.
-- **Dice log:** the dice icon on the right edge opens every roll of the session.
-- **An image from the GM** covers the map: scroll to zoom, drag to pan, double-click to reset, and press Escape or click beside it to close it.
-- **Follow GM** puts your view back on the GM's camera; **Fit map** shows the whole map.
+![Send a note](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/35-send-note.gif)
 
 ## Settings
 
 Settings → Atlas VTT Extension - Connect:
 
-- **Signaling server / My own server:** how players find your session. The default works; set your own server if you prefer.
+- **Signaling server / My own server:** how players find your session. The default works.
 - **Relay (TURN) servers:** add one if players can't connect from strict networks (some offices, schools, mobile data).
 - **Player page:** the web address in join links. Leave the default unless you host your own (see [DEVELOPING.md](DEVELOPING.md)).
 - **Keep online images on this device:** a player's Obsidian keeps map images, so the next session loads faster.
@@ -115,7 +165,7 @@ On Atlas from Community plugins, Connect reads what Atlas leaves reachable, so a
 - Footprints of tokens seen in the dark aren't shown to players, and edges of sight are a little rougher than in Atlas's window.
 - A map with a stretch-fit grid may not line up for players. Running timers show their last saved value. Atlas's marks and pings aren't relayed.
 - Templates show their size to players only; the GM sees them without the label.
-- **Sharing notes and maps** (People…, Share with…, Ask to pull…, Shared with me…) and per-collection rules need an Atlas build with the extension API, which no released Atlas has yet. That build is installed with BRAT from `evolJoaoBento/atlas-vtt`.
+- **Sharing maps** and per-collection rules need an Atlas build with the extension API, which no released Atlas has yet. Notes are shared on any Atlas (Send to…, Share with…, Shared with me…).
 
 ## Privacy
 

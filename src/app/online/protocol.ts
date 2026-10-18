@@ -10,6 +10,7 @@ import {
 } from './scene/sceneValidation';
 import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
+import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
@@ -120,11 +121,15 @@ export type ControlMessage =
   /** Player to GM: add a lasting template on the scene they have, remove one of their own, or clear all of theirs (`tools/templates.ts`). */
   | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
   /** GM to players: every template on the scene, whenever they change. */
-  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] };
+  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] }
+  /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
+  | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
+  /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
+  | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request',
 ]);
 
 export type Decoded =
@@ -189,6 +194,8 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
   'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
+  'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
+  'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),
 };
 
 export function encodeControl(message: ControlMessage): string {

@@ -1,7 +1,7 @@
 /**
  * Sharing between Obsidian clients, the sending side: the share commands, the part commands, the tag and property
- * display, Ask to pull and the session hooks. It lives as long as Connect is bound to an Atlas with `scenes` and
- * `bundles`; the returned disposer takes everything off again. Receiving (Shared with me, pulls, merges and push
+ * display, Ask to pull, Send to and the session hooks. It lives as long as Connect is bound to an Atlas; one without
+ * `scenes` (a stock Atlas) shares notes only. The returned disposer takes everything off again. Receiving (Shared with me, pulls, merges and push
  * prompts) registers in the same scope.
  */
 import type { Disposer, RulesApi, ScenesApi, ViewsApi } from '@atlas-vtt/api-types';
@@ -16,6 +16,7 @@ import { registerPartCommands } from './parts/registerPartCommands';
 import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems } from './receive/PulledItems';
 import { registerAskToPull } from './registerAskToPull';
+import { registerSendTo } from './registerSendTo';
 import { registerReceiving } from './registerReceiving';
 import { registerSessionHooks } from './registerSessionHooks';
 import { registerShareCommands } from './registerShareCommands';
@@ -25,7 +26,10 @@ import { VaultChangeFanOut } from './vaultChanges';
 
 /** The Atlas namespaces sharing needs. */
 export interface SharingAtlas {
+  /** Atlas's scenes, or `NO_SCENES` where it has none. */
   scenes: ScenesApi;
+  /** Whether maps can be shared: false on an Atlas without `scenes`, where only notes are offered. */
+  maps?: boolean;
   rules: Pick<RulesApi, 'forMap'>;
   /** Atlas's player view rules (`settings.get('playerView')`). */
   playerView: () => PlayerViewRules;
@@ -62,13 +66,14 @@ export function registerSharing(plugin: ScopePlugin, services: SharingServices):
   const vaultChanges = new VaultChangeFanOut();
   try {
     const catalogue = registerShareCommands(scope, {
-      people, items, sections, vaultChanges, ownTableId: settings.ownTableId,
+      people, items, sections, vaultChanges, ownTableId: settings.ownTableId, maps: atlas.maps !== false,
       atlas: { scenes: atlas.scenes, rules: atlas.rules, playerView: atlas.playerView, shareableProperties: settings.shareableProperties },
     });
     registerPartCommands(scope, people);
     registerTagDisplay(scope);
     registerSharePropertyDisplay(scope, people);
-    registerAskToPull(scope, { items, people, sections, scenes: atlas.scenes });
+    registerAskToPull(scope, { items, people, sections, scenes: atlas.scenes, maps: atlas.maps !== false });
+    registerSendTo(scope, { items, sections, catalogue });
     registerReceiving(scope, { pulled, people, history, scenes: atlas.scenes, vaultChanges, ...(atlas.views ? { isOpen: mapOpenIn(atlas.views) } : {}) });
     registerSessionHooks(scope, { joins, people, sessions, catalogue });
     scope.register(lifetime.vaultChanges.attach(vaultChanges.dispatch));

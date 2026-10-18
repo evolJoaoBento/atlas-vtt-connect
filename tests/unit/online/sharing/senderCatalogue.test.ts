@@ -71,6 +71,19 @@ describe('SenderCatalogue', () => {
     expect(await catalogue.open(ana, items.idFor('Notes/Lair.md'))).toBeNull();
   });
 
+  it('offers a note sent with Send to only to the one it was sent to, filtered for them, whatever its rule', async () => {
+    const { catalogue, items } = setup();
+    // Lair has no rule: nobody may have it until it is sent.
+    expect(await catalogue.open(ben, items.idFor('Notes/Lair.md'))).toBeNull();
+    catalogue.sent.grant(ben, 'Notes/Lair.md');
+    expect((await catalogue.list(ben)).map((item) => item.title)).toContain('Lair');
+    expect(text((await catalogue.open(ben, items.idFor('Notes/Lair.md')))!.bytes)).toBe('No property: private by default.');
+    expect(await catalogue.open(ana, items.idFor('Notes/Lair.md'))).toBeNull();
+    // A part kept from Ben stays kept from him when the note is sent to him.
+    catalogue.sent.grant(ben, 'Notes/Cave.md');
+    expect(text((await catalogue.open(ben, items.idFor('Notes/Cave.md')))!.bytes)).not.toContain('Dragon');
+  });
+
   it('an edit to a part the person never gets does not change their version', async () => {
     const { catalogue, notes } = setup();
     const before = (await catalogue.list(ana))[0]!.version;

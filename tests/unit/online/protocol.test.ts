@@ -109,7 +109,7 @@ describe('online protocol', () => {
     });
   });
 
-  it('names what players may send: a resync, a token move, a dice roll, a laser, a roll from their sheet, a ping and a template', () => {
-    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['dice-roll', 'laser', 'map-ping', 'map-template', 'scene-resync', 'sheet-roll', 'token-move']);
+  it('names what players may send: a resync, a token move, a dice roll, a laser, a roll from their sheet, a ping, a template and a pin they open', () => {
+    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['dice-roll', 'laser', 'map-ping', 'map-template', 'note-request', 'scene-resync', 'sheet-roll', 'token-move']);
   });
 });

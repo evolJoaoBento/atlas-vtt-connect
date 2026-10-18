@@ -5,6 +5,9 @@ import { needsIds, parsePlaceholders, type Placeholder } from './placeholderType
 /** The GM's own person id at their table, in every player's list. */
 export const GM_PERSON_ID = 'gm';
 
+/** How players' sharing names the GM (prompts, the `Shared/` folder), whatever the GM calls themselves. */
+export const GM_SHARE_NAME = 'Game Master';
+
 export interface Person {
   tableId: string;
   /** Given by the table's GM; `gm` for the GM. */

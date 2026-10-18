@@ -2,11 +2,10 @@ import React from 'react';
 import type { ViewContext } from '@atlas-vtt/api-types';
 import { Button } from '../../ui/primitives/Button';
 import { SPLIT_LIMITS } from '../split/splitLimits';
-import { EVERYONE_BACK_LABEL, PRESENT_TO_NO_SCENE, UPDATE_ATLAS_NOTE, capPanelNote, splitStatus } from '../split/splitCopy';
+import { EVERYONE_BACK_LABEL, UPDATE_ATLAS_NOTE, capPanelNote, splitStatus } from '../split/splitCopy';
 import { PRESENT_LABEL, STOP_PRESENTING_LABEL } from '../ui/onlineCopy';
-import { PresentToButton } from './PresentToButton';
-import { presentToButtonLabel, presentToMenu, splitViewOf, type SplitActions, type SplitView } from './presentToRows';
-import { presentingActions, presentingHere, tabNameIn, type PresentingEnv } from './presentingHere';
+import { splitViewOf, type SplitActions, type SplitView } from './presentToRows';
+import { presentingActions, tabNameIn, type PresentingEnv } from './presentingHere';
 import { useActiveTabId, useOnlineSession, usePresentedSceneSummary, useViewTabsKey } from './useOnlineState';
 
 /** The split party as the panel reads it: the store's players and assignments, Atlas's presented tab, the tab names. */
@@ -21,7 +20,10 @@ interface OnlinePresentingProps {
   actions: SplitActions;
 }
 
-/** What players see, presenting this view's scene, stopping, and the split party: "Present to:" and "Everyone back". */
+/**
+ * What players see, presenting this view's scene, stopping, and "Everyone back". Who sees which scene is chosen from a
+ * scene tab's right-click or the Scenes menu, not here.
+ */
 export function OnlinePresenting({ env, ctx, actions }: OnlinePresentingProps): React.ReactElement {
   const { tabId, name } = usePresentedSceneSummary(env.summaries);
   useActiveTabId(env.views, ctx.viewId); // renders again when the view moves to another tab
@@ -45,15 +47,6 @@ export function OnlinePresenting({ env, ctx, actions }: OnlinePresentingProps): 
           <Button size="sm" disabled={view.presented === null} onClick={() => actions.everyoneBack()}>{EVERYONE_BACK_LABEL}</Button>
         )}
       </div>
-      {session.split === 'on' && <PresentToActiveTab env={env} ctx={ctx} view={view} actions={actions} />}
     </section>
   );
-}
-
-/** The "Present to:" button for the GM's active tab of this view (spec 3.2); disabled with no tab open. */
-function PresentToActiveTab({ env, ctx, view, actions }: OnlinePresentingProps & { view: SplitView }): React.ReactElement {
-  const { activeTabId } = presentingHere(env, ctx.viewId);
-  if (activeTabId === null) return <PresentToButton label={PRESENT_TO_NO_SCENE} disabled menu={null} />;
-  const tab = { viewId: ctx.viewId, tabId: activeTabId, name: tabNameIn(env.views, { viewId: ctx.viewId, tabId: activeTabId }) };
-  return <PresentToButton label={presentToButtonLabel(view, tab)} disabled={false} menu={presentToMenu(tab, view, actions, 'panel')} />;
 }

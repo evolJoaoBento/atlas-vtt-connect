@@ -132,6 +132,14 @@ function pinTitle(notePath: string): string | null {
  * the GM only, linking a note (never a scene), and only where players see the map (the fog, and the lighting of a lit
  * scene). Atlas's API has no pins; a stock Atlas's snapshot carries them. Each gets an alias in place of its id.
  */
+/** The note each sent pin links, by the pin as projected: kept on the GM's side only, for a player who opens the pin. */
+const pinNotePaths = new WeakMap<PlayerPin, string>();
+
+/** The note path of a pin this projection made (one in a slot's `lastSent`); null for any other. */
+export function notePathOf(pin: PlayerPin): string | null {
+  return pinNotePaths.get(pin) ?? null;
+}
+
 function projectPins(objects: unknown, visible: Shows, cellSize: number): PlayerPin[] {
   const record = (objects as { pins?: unknown } | undefined)?.pins;
   if (typeof record !== 'object' || record === null) return [];
@@ -146,14 +154,16 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
     const y = finiteOrNull(pin.y);
     const around = { x: (x ?? 0) - cellSize / 4, y: (y ?? 0) - cellSize / 4, width: cellSize / 2, height: cellSize / 2 };
     if (x === null || y === null || !visible.shows(around)) continue;
-    found.push({
+    const sent: PlayerPin = {
       id: `pin-${found.length}`,
       x: finiteOr(x, 0, SCENE_RANGES.coordinate),
       y: finiteOr(y, 0, SCENE_RANGES.coordinate),
       label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
       title: pinTitle(pin.notePath),
       icon: resolvePinIcon(pin.icon),
-    });
+    };
+    pinNotePaths.set(sent, pin.notePath);
+    found.push(sent);
   }
   return found;
 }

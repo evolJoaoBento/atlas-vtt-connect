@@ -165,7 +165,7 @@ describe('Connect in Atlas\'s own toolbar', () => {
     });
 
     it('are not taken out and put back when the group is drawn again, which would replay their slide-up as a flash', async () => {
-      const t = setup();
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       const handle = t.ui.addPanel({ id: 'p', title: 'P', mount: () => () => undefined });
       t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'A', onClick: () => undefined });
       handle.open('v1');
@@ -182,8 +182,8 @@ describe('Connect in Atlas\'s own toolbar', () => {
       t.native.sync();
       t.ui.invalidate();
       t.native.sync();
-      t.ui.addViewMenuItems(() => [{ label: 'One', onClick: () => undefined }]);
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      t.ui.addTokenMenuItems(() => [{ label: 'One', onClick: () => undefined }]);
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'Token: Ana')!.click();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       t.native.sync();
       await vi.advanceTimersByTimeAsync(10);
@@ -243,11 +243,14 @@ describe('Connect in Atlas\'s own toolbar', () => {
 
   describe('dropdowns', () => {
     it("open in Atlas's dropdown style, run the item chosen and close, and close on an outside press or Escape", () => {
-      const t = setup();
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       const ran: string[] = [];
-      t.ui.addViewMenuItems(() => [{ label: 'Start', icon: 'play', onClick: () => ran.push('start') }, { label: 'Tick', checked: true, onClick: () => undefined }]);
-      t.ui.addPaletteSection({ id: 's', title: 'Online play', commands: () => [{ id: 'c', icon: 'play', label: 'Start', run: () => ran.push('palette') }, { id: 'd', icon: 'x', label: 'Stop', run: () => ran.push('stop') }] });
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      t.ui.addTokenMenuItems(() => [
+        { label: 'Start', icon: 'play', onClick: () => ran.push('start') }, { label: 'Tick', checked: true, onClick: () => undefined },
+        { label: '-' }, { label: 'Online play', disabled: true }, { label: 'Stop', icon: 'x', onClick: () => ran.push('stop') },
+      ]);
+      const open = (): void => t.buttons().find((button) => button.getAttribute('aria-label') === 'Token: Ana')!.click();
+      open();
       const menu = t.root.querySelector('.atlas-dropdown-content.atlas-dropdown-content--top.atlas-connect-menu')!;
       expect(menu).not.toBeNull();
       expect([...menu.querySelectorAll('.atlas-dropdown-menu-item')].map((item) => item.textContent)).toEqual(['Start', 'Tick', 'Stop']);
@@ -257,22 +260,30 @@ describe('Connect in Atlas\'s own toolbar', () => {
       (menu.querySelectorAll<HTMLElement>('.atlas-dropdown-menu-item')[0]!).click();
       expect(ran).toEqual(['start']);
       expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      open();
       document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
       expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      open();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
     });
 
-    it('stay open for an item that keeps it open, with what is read now, and expand submenus in place', () => {
+    it('have no More options button: view menu items and palette sections are Obsidian commands too', () => {
       const t = setup();
+      t.ui.addViewMenuItems(() => [{ label: 'Start', onClick: () => undefined }]);
+      t.ui.addPaletteSection({ id: 's', title: 'Online play', commands: () => [{ id: 'c', icon: 'play', label: 'Start', run: () => undefined }] });
+      t.ui.addToolbarItem({ id: 'a', icon: 'x', label: 'A', onClick: () => undefined });
+      expect(t.labels()).toEqual(['A']);
+    });
+
+    it('stay open for an item that keeps it open, with what is read now, and expand submenus in place', () => {
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       let ticked = false;
-      t.ui.addViewMenuItems(() => [
+      t.ui.addTokenMenuItems(() => [
         { label: 'Tick', checked: ticked, keepOpen: true, onClick: () => { ticked = !ticked; } },
         { label: 'Parent', submenu: [{ label: 'Child', onClick: () => undefined }] },
       ]);
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'Token: Ana')!.click();
       const first = t.root.querySelectorAll<HTMLElement>('.atlas-dropdown-menu-item')[0]!;
       first.click();
       expect(t.root.querySelector('.atlas-connect-menu')).not.toBeNull();
@@ -284,12 +295,12 @@ describe('Connect in Atlas\'s own toolbar', () => {
     });
 
     it('put an open panel out of the way while they show, and bring it back', () => {
-      const t = setup();
+      const t = setup({ selected: [{ id: 'k1', kind: 'character', label: 'Ana' }] });
       const unmounted: string[] = [];
       t.ui.addPanel({ id: 'p', title: 'P', mount: () => () => unmounted.push('x') }).open('v1');
-      t.ui.addViewMenuItems(() => [{ label: 'One', onClick: () => undefined }]);
+      t.ui.addTokenMenuItems(() => [{ label: 'One', onClick: () => undefined }]);
       const tray = t.root.querySelector<HTMLElement>('.atlas-connect-tray')!;
-      t.buttons().find((button) => button.getAttribute('aria-label') === 'More options')!.click();
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'Token: Ana')!.click();
       expect(tray.hidden).toBe(true);
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       expect(tray.hidden).toBe(false);
@@ -308,6 +319,86 @@ describe('Connect in Atlas\'s own toolbar', () => {
       const text = t.root.querySelector('.atlas-connect-menu')!.textContent!;
       expect(text).toContain('Two (presented)');
       expect(text).toContain('Show One');
+    });
+
+    it('give every scene an eye, open or shut, and fold its list from the chevron, kept folded or open across a choice', () => {
+      const t = setup();
+      let ticked = false;
+      t.ui.addSceneTabMenuSection!({ heading: 'Present to', items: (ctx) => [{ label: `Ana on ${ctx.name}`, checked: ticked, keepOpen: true, onClick: () => { ticked = !ticked; } }] });
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'Scenes')!.click();
+      const menu = (): HTMLElement => t.root.querySelector<HTMLElement>('.atlas-connect-menu')!;
+      const scenes = (): HTMLElement[] => [...menu().querySelectorAll<HTMLElement>('.atlas-dropdown-menu-item')].filter((row) => row.parentElement?.parentElement === menu());
+      expect(scenes().map((row) => row.querySelector('.atlas-connect-menu__icon svg')?.getAttribute('data-icon'))).toEqual(['eye-off', 'eye']);
+      const subs = (): boolean[] => [...menu().querySelectorAll<HTMLElement>('.atlas-connect-menu__sub')].map((sub) => sub.hidden);
+      expect(subs()).toEqual([true, true]);
+      scenes()[0]!.click();
+      expect(subs()).toEqual([false, true]);
+      expect(scenes()[0]!.getAttribute('aria-expanded')).toBe('true');
+      // The players' rows have no icon column: their names follow the check, under the heading.
+      const ana = [...menu().querySelectorAll<HTMLElement>('.atlas-connect-menu__nested')].find((row) => row.textContent === 'Ana on One')!;
+      expect(ana.classList.contains('atlas-connect-menu__nested--bare')).toBe(true);
+      expect(ana.querySelector('.atlas-connect-menu__icon')).toBeNull();
+      ana.click();
+      expect(ticked).toBe(true);
+      expect(subs()).toEqual([false, true]);
+      scenes()[0]!.click();
+      expect(subs()).toEqual([true, true]);
+      // A hidden list is not shown: the list's own display must not win over `hidden`.
+      const css = readFileSync('src/connect/stockUi/stock-dock.scss', 'utf8');
+      expect(css).toMatch(/\.atlas-connect-menu__sub\[hidden\] \{\s*display: none;/);
+    });
+
+    it("open a menu of one scene with its list unfolded", () => {
+      const t = setup();
+      t.ui.addSceneTabMenuSection!({ heading: 'Present to', items: (ctx) => (ctx.active ? [{ label: 'Ana', onClick: () => undefined }] : []) });
+      t.buttons().find((button) => button.getAttribute('aria-label') === 'Scenes')!.click();
+      expect([...t.root.querySelectorAll<HTMLElement>('.atlas-connect-menu__sub')].map((sub) => sub.hidden)).toEqual([false]);
+    });
+
+    it("open Present to under a scene tab that is right-clicked, for that tab, and leave the add button and other places alone", () => {
+      const t = setup();
+      const strip = document.createElement('div');
+      strip.className = 'atlas-scene-tab-bar__strip';
+      strip.innerHTML = '<div class="atlas-scene-tab"><span class="atlas-scene-tab__name">One</span></div><div class="atlas-scene-tab"><span class="atlas-scene-tab__name">Two</span></div><button class="atlas-scene-tab atlas-scene-tab-bar__add"></button>';
+      t.root.appendChild(strip);
+      const chosen: string[] = [];
+      t.ui.addSceneTabMenuSection!({ heading: 'Present to', items: (ctx) => [{ label: `Ana on ${ctx.name}`, keepOpen: true, onClick: () => chosen.push(ctx.tabId) }] });
+      const rightClick = (target: Element): MouseEvent => {
+        const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 5, clientY: 5 });
+        target.dispatchEvent(event);
+        return event;
+      };
+      expect(rightClick(strip.querySelector('.atlas-scene-tab-bar__add')!).defaultPrevented).toBe(false);
+      expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
+      expect(rightClick(t.root).defaultPrevented).toBe(false);
+      expect(rightClick(strip.querySelectorAll('.atlas-scene-tab__name')[1]!).defaultPrevented).toBe(true);
+      const menu = t.root.querySelector<HTMLElement>('.atlas-connect-menu.atlas-connect-menu--at')!;
+      // Not in the toolbar's group, which places its menus over the buttons.
+      expect(menu.closest('.atlas-connect-group')).toBeNull();
+      const row = menu.querySelector<HTMLElement>('.atlas-dropdown-menu-item')!;
+      expect(row.textContent).toBe('Present to');
+      expect(row.querySelector('.atlas-connect-menu__arrow svg')?.getAttribute('data-icon')).toBe('chevron-right');
+      expect(menu.querySelector<HTMLElement>('.atlas-connect-menu__sub')!.hidden).toBe(false);
+      const ana = [...menu.querySelectorAll<HTMLElement>('.atlas-connect-menu__nested')].find((item) => item.textContent === 'Ana on Two')!;
+      ana.click();
+      expect(chosen).toEqual(['t2']);
+      // Drawing the group again leaves the menu where it was put.
+      t.ui.invalidate();
+      expect(t.root.querySelector('.atlas-connect-menu--at')?.closest('.atlas-connect-group')).toBeNull();
+      document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
+    });
+
+    it('open no menu on a scene tab when no section gives anything for it', () => {
+      const t = setup();
+      const strip = document.createElement('div');
+      strip.innerHTML = '<div class="atlas-scene-tab">One</div>';
+      t.root.appendChild(strip);
+      t.ui.addSceneTabMenuSection!({ heading: 'Present to', items: () => [] });
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      strip.firstElementChild!.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(t.root.querySelector('.atlas-connect-menu')).toBeNull();
     });
   });
 

@@ -594,3 +594,27 @@ button:disabled { opacity: 0.5; cursor: default; }
 .menu-entry--separated { position: relative; margin-top: 5px; }
 .menu-entry--separated::before { content: ''; position: absolute; left: 8px; right: 8px; top: -3px; border-top: 1px solid var(--border); }
 .menu-entry:disabled { opacity: 0.45; cursor: default; background: transparent; }
+
+/* A readable pin's note (`NoteView`): the sheets' drawer, its title as a heading and its text as Obsidian reads a note. */
+.note-panel .sheet-header h2 { color: var(--text); font-size: 16px; letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
+.note-body { display: grid; gap: 8px; font-size: 14px; line-height: 1.5; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
+.note-body > *, .note-body blockquote > * { margin: 0; }
+.note-body h3, .note-body h4, .note-body h5, .note-body h6 { margin-top: 4px; font-weight: 600; }
+.note-body h3 { font-size: 16px; }
+.note-body ul, .note-body ol { padding-left: 20px; }
+.note-body .note-task { list-style: none; margin-left: -16px; }
+.note-body .note-indent-1 { margin-left: 16px; }
+.note-body .note-indent-2 { margin-left: 32px; }
+.note-body .note-indent-3, .note-body .note-indent-4 { margin-left: 48px; }
+.note-body blockquote { display: grid; gap: 6px; padding: 6px 10px; border-left: 3px solid var(--border); color: var(--muted); }
+.note-body .note-callout { border-left-color: var(--accent); background: var(--hover); border-radius: 8px; color: var(--text); }
+.note-body .note-callout-title { font-weight: 600; }
+.note-body code { padding: 0 4px; border-radius: 4px; background: var(--hover); font-size: 0.92em; }
+.note-body pre { overflow-x: auto; padding: 8px; border-radius: 8px; background: var(--hover); }
+.note-body pre code { padding: 0; background: none; }
+.note-body hr { border: 0; border-top: 1px solid var(--border); }
+.note-body mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; }
+.note-body .note-table { overflow-x: auto; }
+.note-body table { border-collapse: collapse; }
+.note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
+.note-body .note-status { color: var(--muted); font-style: italic; }

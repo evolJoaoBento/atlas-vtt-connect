@@ -9,6 +9,7 @@ import { SheetView } from '../../../../online-client/sheetView.mts';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
+import type { PinNoteAnswer } from '../tools/pinNotes';
 import { DiceLogView } from '../../../../online-client/diceLogView.mts';
 import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
@@ -25,7 +26,8 @@ import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
 import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
-export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>;
+export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -74,6 +76,7 @@ export class CanvasScene implements OnlineSceneSink {
         initiative: dom.initiative,
         statblockPreview: dom.statblockPreview,
         handout: dom.handout,
+        ...(service.sendNoteRequest ? { note: { ...dom.note, doc }, requestNote: (pinId: string) => service.sendNoteRequest?.(pinId) ?? false } : {}),
         onToolsChange: () => this.syncToolbar(),
         ...(options.frames ? { frames: options.frames } : {}),
         ...(options.isHidden ? { isHidden: options.isHidden } : {}),
@@ -194,6 +197,11 @@ export class CanvasScene implements OnlineSceneSink {
   /** Every lasting template on the scene `sceneId`. */
   templates(sceneId: string, templates: readonly MapTemplate[]): void {
     this.map?.receiveTemplates(sceneId, templates);
+  }
+
+  /** The GM's answer to a pin this player opened. */
+  pinNote(answer: PinNoteAnswer): void {
+    this.map?.receiveNote(answer);
   }
 
   /** Someone else's ping on the scene shown. */

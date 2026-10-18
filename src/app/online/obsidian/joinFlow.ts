@@ -112,6 +112,7 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.sheets = entries;
       host.sink()?.sheets?.(entries);
     },
+    onPinNote: (answer) => { if (current()) host.sink()?.pinNote?.(answer); },
   });
   return session;
 }

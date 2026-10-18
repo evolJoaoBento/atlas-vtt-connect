@@ -121,3 +121,11 @@ export function connected(capabilities: AtlasCapability[] = HOSTING, gate?: Prom
   };
   return { atlas, connect, join, sharing, files: vault.files, fire: workspace.fire, vaultEvents, cacheEvents, workspace: app.workspace as unknown as ReturnType<typeof fakeEvents> };
 }
+
+/** Sharing's commands, which a stock-capable Atlas (rules, settings, storage) registers for notes beside hosting's. */
+export const SHARE_COMMANDS = ['people', 'share-with', 'part-private', 'part-only', 'part-except', 'part-everyone', 'ask-to-pull', 'send-to', 'shared-with-me', 'undo-shared-merge', 'forget-shared-choice'];
+
+/** The commands that are not sharing's. */
+export function withoutSharing<T extends string>(ids: Iterable<T>): T[] {
+  return [...ids].filter((id) => !SHARE_COMMANDS.includes(id));
+}
