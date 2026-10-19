@@ -4,7 +4,7 @@
  * `SHARE_HANDLE_MIN`. The GM stamps `from` on everything a player sends. Each validator returns
  * a fresh message of its named fields only. The web page and the image code ignore all of it.
  */
-import { ASSET_LIMITS, isAssetId, isAssetMime, type AssetMime } from '../../assets/assetIds';
+import { ASSET_LIMITS, isAssetId, isAssetMime, isModelMime, type AssetMime } from '../../assets/assetIds';
 import { binaryOf, MAX_HANDLE, type AssetChunk } from '../../assets/assetProtocol';
 import { isPersonId, PROTOCOL_VERSION } from '../../protocol';
 import type { CatalogueItem } from '../model/SenderCatalogue';
@@ -80,7 +80,8 @@ const VALIDATORS: Record<ShareMessage['type'], (m: Fields, r: Routed) => ShareMe
   'share-start': (m, r) => {
     if (!isRequestId(m.req) || !isHandle(m.handle) || !isKind(m.kind) || !isAssetId(m.version)) return null;
     if (!Number.isSafeInteger(m.size) || (m.size as number) < 0 || (m.size as number) > maxShareBytes(m.kind)) return null;
-    if (m.mime !== undefined && (m.kind !== 'image' || !isAssetMime(m.mime))) return null;
+    // An image share is an image: a mini's model (an asset type of online play only) is never shared.
+    if (m.mime !== undefined && (m.kind !== 'image' || !isAssetMime(m.mime) || isModelMime(m.mime))) return null;
     return { ...r, type: 'share-start', req: m.req, handle: m.handle, size: m.size as number, kind: m.kind, version: m.version, ...(m.mime !== undefined ? { mime: m.mime } : {}) };
   },
   'share-ack': (m, r) => (isHandle(m.handle) && Number.isSafeInteger(m.received) && (m.received as number) >= 0

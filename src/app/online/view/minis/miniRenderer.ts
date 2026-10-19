@@ -7,7 +7,6 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { WorldRect } from '../camera';
 
@@ -79,8 +78,10 @@ const findClip = (clips: readonly THREE.AnimationClip[], pattern: RegExp): THREE
 
 /** Reads a GLB, standing it on y = 0 on its origin (or its footprint's centre when the origin lies outside it). */
 async function parseModel(bytes: ArrayBuffer): Promise<LoadedModel> {
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  // Only what the GLB holds itself: a file it links to elsewhere is never fetched (no request leaves the player's device).
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => (/^(data|blob):/i.test(url) ? url : 'data:,'));
+  const loader = new GLTFLoader(manager);
   const gltf = await new Promise<GLTF>((resolve, reject) => loader.parse(bytes.slice(0), '', resolve, reject));
   const model = gltf.scene;
   model.updateMatrixWorld(true);

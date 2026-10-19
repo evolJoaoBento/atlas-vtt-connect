@@ -7,7 +7,8 @@ import { encodeAsset, encodeChunk } from '../../../src/app/online/assets/assetPr
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import type { ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
-import { fingerprintOf, imageBytes, nodeHash, settle } from './assetFixtures';
+import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
+import { fingerprintOf, imageBytes, memoryImageFiles, nodeHash, settle } from './assetFixtures';
 import { fakeAssetIds, playerScene, playerToken, projectForPlayers, snapshotOf } from './sceneFixtures';
 
 const RULES = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
@@ -63,8 +64,13 @@ describe('minis on tokens', () => {
     expect(sceneAssetIds(scene)).toEqual([map, art, mini]);
   });
 
-  it('knows a .glb as a model', () => {
+  it('knows a .glb as a model, which the GM fingerprints and serves like an image', async () => {
     expect(mimeForPath('atlas-vtt/assets/minis/Orc.GLB')).toBe('model/gltf-binary');
+    const files = memoryImageFiles({ 'atlas-vtt/assets/minis/orc.glb': 'glb bytes' });
+    const assets = new AssetRegistry({ files: files.source, notify: () => undefined, hash: nodeHash });
+    expect(assets.idFor('atlas-vtt/assets/minis/orc.glb')).toBeNull();
+    await vi.waitFor(() => expect(assets.idFor('atlas-vtt/assets/minis/orc.glb')).toBe(fingerprintOf('glb bytes')));
+    expect((await assets.read(fingerprintOf('glb bytes')))?.mime).toBe('model/gltf-binary');
   });
 
   it('keeps a mini\'s bytes once checked, without decoding them as an image', async () => {
