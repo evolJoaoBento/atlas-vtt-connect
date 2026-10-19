@@ -216,8 +216,8 @@ function putTokenArt(app: App, root: Element, art: TokenArt): void {
 /** Atlas's card of the note at `notePath`, with `art` in its header, ready for a player; null when this Atlas draws none. */
 export async function captureCard(app: App, notePath: string, art: TokenArt | null = null): Promise<SheetCard | null> {
   const doc = document;
-  // Rendered as a note renders it, without the note's margins around the card.
-  const container = createDiv({ cls: 'markdown-rendered' });
+  // Outside a note, as Atlas draws its own sheets: a note's table rules would widen the ability tables past the card.
+  const container = createDiv();
   container.style.cssText = `position: fixed; left: -100000px; top: 0; width: ${CARD_WIDTH}px; pointer-events: none;`;
   container.setAttribute('aria-hidden', 'true');
   doc.body.append(container);
