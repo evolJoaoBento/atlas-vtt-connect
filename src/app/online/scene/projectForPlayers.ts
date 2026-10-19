@@ -74,6 +74,15 @@ export interface ProjectionContext {
    * a fight starts (`projectSides`); without them the default rules apply: turn order.
    */
   initiativeRules?: InitiativeRules;
+  /** The minis standing on the map's tokens (the Tabletop extension's), by token id; without it no token carries one. */
+  minis?: Readonly<Record<string, MiniPlacement>>;
+}
+
+/** A mini on a token as the Tabletop extension places it: its GLB's vault path (never sent), size and turn. */
+export interface MiniPlacement {
+  readonly mini: string;
+  readonly scale: number;
+  readonly turn: number;
 }
 
 const DEFAULT_RING = '#ffffff';
@@ -291,6 +300,20 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
     resources: character && showOf ? projectBars(character, definitions, showOf) : [],
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
+    ...projectMini(context.minis?.[id], context),
+  };
+}
+
+/** A token's mini, for a token players are sent (a hidden or fogged one never is); the GLB goes by its fingerprint only. */
+function projectMini(placement: MiniPlacement | undefined, context: ProjectionContext): Pick<PlayerToken, 'mini'> {
+  if (!placement || typeof placement.mini !== 'string') return {};
+  const turn = finiteOr(placement.turn, 0);
+  return {
+    mini: {
+      asset: context.assets.idFor(placement.mini),
+      scale: finiteOr(placement.scale, 1, SCENE_RANGES.miniScale),
+      turn: Math.min(SCENE_RANGES.miniTurn[1], ((turn % 360) + 360) % 360),
+    },
   };
 }
 

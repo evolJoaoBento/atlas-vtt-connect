@@ -27,7 +27,7 @@ import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -64,7 +64,7 @@ export class CanvasScene implements OnlineSceneSink {
     const surface = options.surface === undefined ? createCanvasSurface(dom.canvas) : options.surface;
     this.map = surface
       ? new MapView({
-        canvas: dom.canvas, surface, images: (id) => service.image(id),
+        canvas: dom.canvas, surface, images: (id) => service.image(id), models: (id) => service.model?.(id) ?? null,
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),

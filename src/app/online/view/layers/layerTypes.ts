@@ -10,6 +10,9 @@ import type { ViewSurface } from '../ViewSurface';
  */
 export type ImageLookup = (id: string | null) => DecodedImage | null;
 
+/** The bytes of a model (a mini's GLB) for an asset id, or null while they are missing. Looked up at draw time, never kept. */
+export type ModelLookup = (id: string | null) => ArrayBuffer | null;
+
 /** What this player's own token moves change in the tokens layer; only their view has it. */
 export interface TokenOverlay {
   /** The tokens this player controls: drawn with a highlight ring. */
@@ -29,6 +32,8 @@ export const NO_TOKEN_OVERLAY: TokenOverlay = { controlled: new Set(), positions
 export interface LayerFrame {
   scene: PlayerScene;
   images: ImageLookup;
+  /** The minis' models; without it no mini is drawn. */
+  models?: ModelLookup;
   /** The world area on screen, with a margin; layers skip what lies outside it. */
   visible: WorldRect;
   /** Screen (CSS) pixels per world unit. */

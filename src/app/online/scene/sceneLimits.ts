@@ -62,4 +62,8 @@ export const SCENE_RANGES = {
   instance: [1, 9_999],
   /** The map's ring size setting (`tokenRingSize`). */
   ringScale: [0.25, 4],
+  /** A mini's size on its token's footprint. */
+  miniScale: [0.2, 4],
+  /** A mini's turn on its token, in degrees. */
+  miniTurn: [0, 360],
 } as const satisfies Record<string, Range>;

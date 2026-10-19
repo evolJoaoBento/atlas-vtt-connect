@@ -4,12 +4,12 @@
  * the cache, the rest are requested from the GM (at most 256 outstanding, 64
  * per message) and assembled from chunks. Every image is checked against its
  * fingerprint before it is decoded and shown; images the scene stops using
- * are cancelled and released.
+ * are cancelled and released. A mini's GLB is checked the same way, then kept as bytes (`model`) for the view to read.
  */
 import type { PlayerAssetHandler } from '../PlayerSession';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { AssetCache } from './AssetCache';
-import { ASSET_LIMITS, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
+import { ASSET_LIMITS, isModelMime, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
 import { decodeAsset, encodeAsset, type AssetChunk, type AssetMessage } from './assetProtocol';
 import { ProgressTally, type AssetProgress, type PendingImage } from './ProgressTally';
 import { TransferAssembler } from './TransferAssembler';
@@ -43,6 +43,8 @@ interface Wanted {
   /** Announced by `asset-start`; null until then. */
   size: number | null;
   image: DecodedImage | null;
+  /** A model's bytes (a mini's GLB), once checked; images have none. */
+  model?: ArrayBuffer;
 }
 
 type Outcome = 'shown' | 'mismatch' | 'undecodable' | 'gone';
@@ -63,6 +65,11 @@ export class AssetLoader implements PlayerAssetHandler {
   /** The decoded image for a fingerprint, once it is ready. */
   image(id: string | null): DecodedImage | null {
     return id === null ? null : this.wanted.get(id)?.image ?? null;
+  }
+
+  /** The bytes of a model (a mini's GLB) for a fingerprint, once they are checked. */
+  model(id: string | null): ArrayBuffer | null {
+    return id === null ? null : this.wanted.get(id)?.model ?? null;
   }
 
   progress(): AssetProgress {
@@ -148,6 +155,14 @@ export class AssetLoader implements PlayerAssetHandler {
     const matches = await this.hash(bytes).then((hash) => hash === id, () => false);
     if (!this.isCurrent(id, wanted)) return 'gone';
     if (!matches) return 'mismatch';
+    if (isModelMime(mime)) {
+      // Read by the view's mini layer, which parses it; nothing to decode here.
+      wanted.model = bytes;
+      wanted.phase = 'ready';
+      if (fromGm) void this.options.cache.put({ id, mime, bytes }).catch(() => undefined);
+      this.changed();
+      return 'shown';
+    }
     const decoded = await this.options.decode(bytes, mime).catch(() => null);
     if (!this.isCurrent(id, wanted)) {
       decoded?.release();

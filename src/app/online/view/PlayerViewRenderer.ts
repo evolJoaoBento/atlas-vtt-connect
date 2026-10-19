@@ -10,7 +10,7 @@ import { sceneWorldBounds } from '../preview/previewLayout';
 import type { PlayerScene } from '../scene/sceneTypes';
 import { visibleArea, type ScreenSize, type WorldRect } from './camera';
 import type { CameraController } from './CameraController';
-import { NO_TOKEN_OVERLAY, type ImageLookup, type LayerFrame, type OverlayLayer, type PlayerLayer, type TokenOverlay } from './layers/layerTypes';
+import { NO_TOKEN_OVERLAY, type ImageLookup, type LayerFrame, type ModelLookup, type OverlayLayer, type PlayerLayer, type TokenOverlay } from './layers/layerTypes';
 import type { ViewSurface } from './ViewSurface';
 
 /** Outside the map Atlas's canvas is black. */
@@ -30,6 +30,8 @@ export interface PlayerViewRendererOptions {
   surface: ViewSurface;
   camera: CameraController;
   images: ImageLookup;
+  /** The minis' models (GLB bytes); without it no mini is drawn. */
+  models?: ModelLookup;
   /** One per Atlas layer (`createSceneLayers()` on the page); a new Atlas layer fails the build until it has one. */
   layers: Record<SceneLayer, PlayerLayer>;
   /** Drawn over the scene and its fog, in order: the player's tools. */
@@ -105,6 +107,7 @@ export class PlayerViewRenderer {
     const frame: LayerFrame = {
       scene,
       images: this.options.images,
+      ...(this.options.models ? { models: this.options.models } : {}),
       visible: visibleArea(view, { width: this.screen.width + 2 * VISIBLE_MARGIN, height: this.screen.height + 2 * VISIBLE_MARGIN }),
       zoom: view.zoom,
       pixel: 1 / scale,

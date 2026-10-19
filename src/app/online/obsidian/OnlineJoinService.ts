@@ -210,6 +210,11 @@ export class OnlineJoinService {
     return this.joined?.loader.image(assetId) ?? null;
   }
 
+  /** A mini's GLB bytes, once they are here and checked. */
+  model(assetId: string | null): ArrayBuffer | null {
+    return this.joined?.loader.model(assetId) ?? null;
+  }
+
   sendTokenMove(tokenId: string, x: number, y: number): boolean {
     return this.joined?.session?.sendTokenMove(tokenId, x, y) ?? false;
   }

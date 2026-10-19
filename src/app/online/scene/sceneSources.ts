@@ -6,7 +6,7 @@ import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
-import type { ProjectionContext } from './projectForPlayers';
+import type { MiniPlacement, ProjectionContext } from './projectForPlayers';
 import type { ResourceVisibilitySource } from './resourceVisibility';
 import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import type { SceneSession } from './sceneContracts';
@@ -52,6 +52,16 @@ export interface SceneProjectionOptions {
   handout?: HandoutSource;
   /** What the GM lets players see of each resource per token and statblock; without it, what the collection shows. */
   resourceVisibility?: ResourceVisibilitySource;
+  /** The 3D minis on tokens (the Tabletop extension's); without it no token carries one. */
+  minis?: MiniSource;
+}
+
+/** The minis standing on each map's tokens, as the Tabletop extension keeps them (`connect/tabletopMinis.ts`). */
+export interface MiniSource {
+  /** The minis on the tokens of the map at `mapPath`, by token id. */
+  forMap(mapPath: string | null): Readonly<Record<string, MiniPlacement>>;
+  /** Calls `listener` when a mini is placed, changed or removed; returns the stop. */
+  subscribe(listener: () => void): () => void;
 }
 
 /** The dice look of a map's collection, as the GM's Atlas has it (`dice.lookFor`, API 1.18); players are sent it with the scene. */
@@ -121,8 +131,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis'> {
   const { mapPath } = snapshot;
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
@@ -135,5 +145,6 @@ export function sceneContext(
     conditions: options.conditions?.(mapPath) ?? [],
     ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),
+    ...(options.minis ? { minis: options.minis.forMap(mapPath) } : {}),
   };
 }
