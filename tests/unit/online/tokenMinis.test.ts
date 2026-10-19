@@ -62,6 +62,7 @@ describe('minis on tokens', () => {
     const mini = 'G'.repeat(43);
     const scene = playerScene({ map: { asset: map, width: 1000, height: 800, cellSize: 70 }, tokens: { t: playerToken({ image: art, mini: { asset: mini, scale: 1, turn: 0 } }) } });
     expect(sceneAssetIds(scene)).toEqual([map, art, mini]);
+    expect(sceneAssetIds(scene, { minis: false })).toEqual([map, art]);
   });
 
   it('knows a .glb as a model, which the GM fingerprints and serves like an image', async () => {
@@ -78,7 +79,7 @@ describe('minis on tokens', () => {
     const id = fingerprintOf(glb);
     const put = vi.fn(async (_image: StoredImage): Promise<void> => undefined);
     const decode = vi.fn(async () => null);
-    const loader = new AssetLoader({ cache: { get: async () => null, put }, decode, hash: nodeHash, onChange: () => undefined });
+    const loader = new AssetLoader({ cache: { get: async () => null, put }, decode, hash: nodeHash, onChange: () => undefined, models: true });
     loader.connected(() => undefined);
     loader.setScene(playerScene({ tokens: { t: playerToken({ image: null, mini: { asset: id, scale: 1, turn: 0 } }) } }));
     await settle();
@@ -91,5 +92,16 @@ describe('minis on tokens', () => {
     expect(new Uint8Array(loader.model(id) ?? new ArrayBuffer(0))).toEqual(glb);
     expect(loader.image(id)).toBeNull();
     expect(put).toHaveBeenCalledWith(expect.objectContaining({ id, mime: 'model/gltf-binary' }));
+  });
+
+  it('never asks for the model of a mini on a view that does not draw minis (the web page)', async () => {
+    const id = fingerprintOf(imageBytes(64, 3));
+    const sent: string[] = [];
+    const loader = new AssetLoader({ cache: { get: async () => null, put: async () => undefined }, decode: async () => null, hash: nodeHash, onChange: () => undefined });
+    loader.connected((data) => { sent.push(data); });
+    loader.setScene(playerScene({ tokens: { t: playerToken({ image: null, mini: { asset: id, scale: 1, turn: 0 } }) } }));
+    await settle();
+    expect(sent.some((data) => data.includes(id))).toBe(false);
+    expect(loader.model(id)).toBeNull();
   });
 });

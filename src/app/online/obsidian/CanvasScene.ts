@@ -20,6 +20,7 @@ import type { PlayerScene } from '../scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
 import type { ViewSurface } from '../view/ViewSurface';
 import { createCanvasSurface } from '../view/canvasSurface';
+import { createMiniLayer } from '../view/minis/miniLayer';
 import type { SceneDom } from './canvasSceneDom';
 import type { OnlineJoinService } from './OnlineJoinService';
 import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
@@ -65,6 +66,8 @@ export class CanvasScene implements OnlineSceneSink {
     this.map = surface
       ? new MapView({
         canvas: dom.canvas, surface, images: (id) => service.image(id), models: (id) => service.model?.(id) ?? null,
+        // Only Obsidian draws minis: on a bare copy of the map's canvas, made by its own document (a pop-out window's too).
+        minis: createMiniLayer({ canvas: () => dom.canvas.cloneNode(false) as HTMLCanvasElement }),
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),

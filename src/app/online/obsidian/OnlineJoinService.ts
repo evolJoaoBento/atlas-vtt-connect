@@ -151,7 +151,7 @@ export class OnlineJoinService {
     // Not remembered means not kept: the name is cleared, so it is not offered again.
     this.settings.set({ playerName: remember ? cleaned : '', rememberPlayerName: remember });
     const loader = new AssetLoader({
-      cache: this.imageCache(), decode: this.decode, ...(this.hash ? { hash: this.hash } : {}),
+      cache: this.imageCache(), decode: this.decode, ...(this.hash ? { hash: this.hash } : {}), models: true,
       onChange: () => { if (this.joined?.loader === loader) this.sink?.images(); },
     });
     const joined: Joined = {

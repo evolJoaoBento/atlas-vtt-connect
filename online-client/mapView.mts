@@ -17,7 +17,7 @@ import type { ScreenPoint } from '../src/app/online/view/camera';
 import { CameraController } from '../src/app/online/view/CameraController';
 import type { ImageLookup, ModelLookup } from '../src/app/online/view/layers/layerTypes';
 import { createSceneLayers } from '../src/app/online/view/layers/sceneLayers';
-import { createMiniLayer } from '../src/app/online/view/minis/miniLayer';
+import type { MiniLayer } from '../src/app/online/view/minis/miniLayer';
 import { pixelRatioFor, PlayerViewRenderer } from '../src/app/online/view/PlayerViewRenderer';
 import { TokenMoves } from '../src/app/online/view/TokenMoves';
 import type { MeasureChoice } from '../src/app/online/view/tools/MeasureTool';
@@ -58,8 +58,9 @@ export interface MapViewOptions {
   canvas: HTMLCanvasElement;
   surface: ViewSurface;
   images: ImageLookup;
-  /** The minis' models (GLB bytes); without it no mini is drawn. */
+  /** The minis' models (GLB bytes) and the layer that draws them; the web page has neither, so no mini is drawn there. */
   models?: ModelLookup;
+  minis?: MiniLayer;
   /** Holds Follow GM and Fit map, shown while the player has broken away. */
   viewButtons: HTMLElement;
   followButton: HTMLButtonElement;
@@ -152,8 +153,7 @@ export class MapView {
       camera: this.camera,
       images: options.images,
       ...(options.models ? { models: options.models } : {}),
-      // The minis draw on a bare copy of the map's canvas, made by its own document (a pop-out window's too).
-      layers: createSceneLayers({ minis: createMiniLayer({ canvas: () => options.canvas.cloneNode(false) as HTMLCanvasElement }) }),
+      layers: createSceneLayers(options.minis ? { minis: options.minis } : {}),
       // Read at draw time, once the tools exist.
       overlays: [createPinsLayer(), createToolsLayer({ overlay: () => this.tools.overlay(), isAnimating: () => this.tools.isAnimating() })],
       requestFrame: (draw) => frames.request(draw),

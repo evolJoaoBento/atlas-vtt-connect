@@ -86,14 +86,17 @@ export async function sha256Id(bytes: ArrayBuffer): Promise<string> {
   return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
 }
 
-/** The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), each once. */
-export function sceneAssetIds(scene: PlayerScene | null): string[] {
+/**
+ * The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), each once.
+ * `minis: false` leaves the minis' models out, for a player view that does not draw them (the web page).
+ */
+export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: boolean } = {}): string[] {
   if (!scene) return [];
   const ids = new Set<string>();
   if (isAssetId(scene.map.asset)) ids.add(scene.map.asset);
   for (const token of Object.values(scene.tokens)) {
     if (isAssetId(token.image)) ids.add(token.image);
-    if (isAssetId(token.mini?.asset)) ids.add(token.mini.asset);
+    if (options.minis !== false && isAssetId(token.mini?.asset)) ids.add(token.mini.asset);
   }
   // The GM's handout reaches the players of every scene in use.
   if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);

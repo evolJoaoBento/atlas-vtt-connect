@@ -32,6 +32,8 @@ export interface AssetLoaderOptions {
   hash?: Hasher;
   /** Images or progress changed: redraw. */
   onChange(): void;
+  /** Whether to fetch the minis' models: only a view that draws them (Obsidian's) does; the web page never asks for them. */
+  models?: boolean;
 }
 
 /** `refused`: denied, broken twice or undecodable; not asked for again while it stays in the scene. */
@@ -82,7 +84,7 @@ export class AssetLoader implements PlayerAssetHandler {
 
   setScene(scene: PlayerScene | null): void {
     if (this.disposed) return;
-    const ids = sceneAssetIds(scene);
+    const ids = sceneAssetIds(scene, { minis: this.options.models === true });
     const keep = new Set(ids);
     const cancelled: string[] = [];
     for (const [id, wanted] of [...this.wanted]) {

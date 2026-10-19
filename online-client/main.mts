@@ -63,7 +63,7 @@ let session: PlayerSession | null = null;
 // it asks the loader every time, so a released image is never drawn.
 const map = surface
   ? new MapView({
-    canvas, surface, images: (id) => loader.image(id), models: (id) => loader.model(id),
+    canvas, surface, images: (id) => loader.image(id),
     viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendLaser: (points, lifted, dt, color) => session?.sendLaser(points, lifted, dt, color) ?? false,

@@ -22,8 +22,11 @@ import { BadgeEntrances } from './badgeEntrances';
 import { DOWNED_MOTION, DownedFades } from './downedFades';
 import { TokenEmphasis } from './tokenEmphasis';
 import { restingTokenUIScale, selectedTokenUIScale } from '@atlas-vtt/shared/draw';
-import { createMiniLayer, type MiniLayer } from '../minis/miniLayer';
+import type { MiniLayer } from '../minis/miniLayer';
 import { prefersReducedMotion } from '../motion';
+
+/** Without a mini layer (the web page) no mini is drawn, and three.js is never part of the page. */
+const NO_MINIS: MiniLayer = { begin: () => undefined, add: () => undefined, draw: () => undefined, animating: () => false, dispose: () => undefined };
 
 /** The stand-in drawn until a token's art has loaded. */
 export const TOKEN_MARKER_COLOR = '#9aa0a6';
@@ -52,7 +55,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   // A selected token's UI grows, and its numbers show while it is hovered or selected, as on Atlas's scene.
   const emphasis = new TokenEmphasis(now, reducedMotion);
   // The 3D minis standing on tokens (the Tabletop extension's), over the art and under the bars and badges.
-  const minis = options.minis ?? createMiniLayer({ now, canvas: () => null });
+  const minis = options.minis ?? NO_MINIS;
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
