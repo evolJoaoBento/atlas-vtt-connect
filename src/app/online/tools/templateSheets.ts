@@ -18,7 +18,7 @@ const isObject = (value: unknown): value is Rec => typeof value === 'object' && 
 /** A stat block read from a note with `atlas-template`: its frontmatter, and its template when one was found. */
 export interface TemplatedStatblock {
   atlasTemplate: string;
-  /** The parsed `.atlastemplate` file; null when none has that id (or it is a built-in); undefined while the vault's templates are being read. */
+  /** The parsed `.atlastemplate` file; null when none has that id (or it is a built-in); undefined while the vault's templates are being read or where its file cannot be read. */
   template: unknown;
   fields: Rec;
 }
@@ -286,7 +286,13 @@ function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: n
         out.open('');
         break;
       }
-      // A track is a token resource, sent as one; images, dividers, scripts and blocks this file does not know show nothing.
+      case 'track': {
+        // A token resource's track reaches the player as that resource's gauge; any other shows its number.
+        const shown = typeof block.resource === 'string' && block.resource ? '' : values.text(block.field);
+        if (shown) out.add(label(), shown);
+        break;
+      }
+      // Images, dividers, scripts and blocks this file does not know show nothing.
       default:
         break;
     }
@@ -362,7 +368,7 @@ export function buildUntemplatedSheet(record: Rec, fallbackName: string | null =
 export function buildPlayerSheet(statblock: unknown, fallbackName: string | null = null): PlayerSheet | null {
   if (!isTemplatedStatblock(statblock)) return buildSheet(statblock, fallbackName);
   if (statblock.atlasTemplate.startsWith(BUILT_IN_PREFIX)) return buildSheet(statblock.fields, fallbackName);
-  // Not known yet whether the template exists: the name alone, never every field of a note whose template hides some.
+  // A template not read (yet): the name alone, never every field of a note whose template hides some.
   if (statblock.template === undefined) return buildUntemplatedSheet({ name: statblock.fields.name }, fallbackName);
   return statblock.template
     ? buildTemplateSheet(statblock.template, statblock.fields, fallbackName)

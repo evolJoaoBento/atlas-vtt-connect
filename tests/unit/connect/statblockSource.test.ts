@@ -15,6 +15,7 @@ function setup() {
       'atlas-vtt/statblock-templates/Adversario.atlastemplate': template('adv-1', 'PV'),
       'zzz/Copy.atlastemplate': template('adv-1', 'Later copy'),
       'broken.atlastemplate': '{ not json',
+      'odd.atlastemplate': JSON.stringify({ format: 'atlas-statblock-template', version: 1, id: 'odd-1', layout: 'none' }),
     },
   });
   vi.mocked(app.metadataCache.getFileCache).mockImplementation((file) => (file.path === 'Adversaries/Modelo NPC.md'
@@ -36,7 +37,7 @@ describe('the stat block a token links', () => {
       isResolved: () => true,
       getBestiaryCreatures: () => [{ path: 'Adversaries/Modelo NPC.md', name: 'Modelo NPC' }],
     };
-    const { source, token } = setup();
+    const { app, source, token } = setup();
     const listener = vi.fn();
     const stop = source.onChange(listener);
     // Not read yet: no template, and not "missing" either.
@@ -45,6 +46,11 @@ describe('the stat block a token links', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     // The lowest path wins where two files share an id; a file that is no JSON is left out.
     expect(source.read(token)).toMatchObject({ template: { id: 'adv-1', fields: [{ label: 'PV' }] } });
+    // A file claiming an id that is no template this reads: never "missing", which would show every field.
+    vi.mocked(app.metadataCache.getFileCache).mockReturnValue({ frontmatter: { statblock: true, 'atlas-template': 'odd-1' } });
+    expect(source.read(token)).toMatchObject({ atlasTemplate: 'odd-1', template: undefined });
+    vi.mocked(app.metadataCache.getFileCache).mockReturnValue({ frontmatter: { statblock: true, 'atlas-template': 'gone-1' } });
+    expect(source.read(token)).toMatchObject({ atlasTemplate: 'gone-1', template: null });
     stop();
   });
 
@@ -55,7 +61,8 @@ describe('the stat block a token links', () => {
     source.onChange(listener);
     source.read(token);
     await vi.runAllTimersAsync();
-    const onModify = vi.mocked(app.vault.on).mock.calls.find(([name]) => name === 'modify')?.[1] as ((file: unknown) => void) | undefined;
+    const calls = vi.mocked(app.vault.on).mock.calls as unknown as Array<[string, (file: unknown) => void]>;
+    const onModify = calls.find(([name]) => name === 'modify')?.[1];
     expect(onModify).toBeDefined();
     vi.mocked(app.vault.cachedRead).mockImplementation(async (file: TFile) => (file.path.endsWith('Adversario.atlastemplate') ? template('adv-1', 'Pontos de vida') : ''));
     onModify!(new (TFile as unknown as new (path: string) => TFile)('atlas-vtt/statblock-templates/Adversario.atlastemplate'));

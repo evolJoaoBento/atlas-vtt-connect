@@ -40,7 +40,7 @@ const ADVERSARY = {
       { id: 'a0000006', type: 'stat', field: 'atk', look: 'run-in', display: 'signed' },
       { id: 'a0000007', type: 'stat', field: 'attack', look: 'run-in', rollFrom: 'damage' },
       { id: 'a0000008', type: 'tags', field: 'experience', look: 'comma' },
-      { id: 'a0000009', type: 'track', field: 'fadiga', look: 'boxes', counts: 'up' },
+      { id: 'a0000009', type: 'track', field: 'fadiga', look: 'boxes', counts: 'up', resource: 'fadiga' },
       { id: 'a0000010', type: 'stat', field: 'secret', look: 'run-in', showWhen: { field: 'difficulty', is: 'above', value: 99 } },
       { id: 'a0000011', type: 'entries', field: 'features', heading: 'Features' },
       { id: 'a0000012', type: 'script', summary: 'x', fs: {} },
@@ -88,6 +88,12 @@ describe("a player's sheet of a templated stat block", () => {
   it('never sends what the template does not show: other keys, images, hidden blocks', () => {
     const json = JSON.stringify(buildTemplateSheet(ADVERSARY, NOTE));
     for (const secret of ['GM notes', 'GM only', 'secret/art.png', 'Solo', 'adversario', 'Fadiga']) expect(json).not.toContain(secret);
+  });
+
+  it("shows a track's number only where no token resource carries it", () => {
+    const blocks = [{ id: 'e1', type: 'track', field: 'fadiga', look: 'boxes', counts: 'up' }];
+    const sheet = buildTemplateSheet({ ...ADVERSARY, header: { hidden: ['hp', 'description', 'level'] }, layout: { maxColumns: 1, blocks } }, NOTE)!;
+    expect(sheet.sections).toEqual([{ title: '', items: [{ name: 'Fadiga', desc: '1' }] }]);
   });
 
   it('keeps every text to the limits a page checks', () => {

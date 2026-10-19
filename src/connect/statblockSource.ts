@@ -44,6 +44,7 @@ const notePath = (path: string): string => path.split('#')[0] ?? path;
 
 /** The vault's Atlas templates by id; read on first use and after any template file changes, then `loaded` is called. */
 class TemplateFiles {
+  /** By id; undefined where the file claiming it is no template this file reads. */
   private byId = new Map<string, unknown>();
   private state: 'unread' | 'reading' | 'read' = 'unread';
   /** A change heard while reading: read again once done. */
@@ -52,11 +53,14 @@ class TemplateFiles {
 
   constructor(private readonly app: App, private readonly loaded: () => void) {}
 
-  /** The template with `id`: null when the vault has none, undefined until the vault's templates were first read. */
+  /**
+   * The template with `id`: null when no file claims it, undefined until the vault's templates were first read or
+   * where the file claiming it cannot be read as a template (never "missing": that would show every field).
+   */
   get(id: string): unknown {
     if (this.state === 'unread') this.reload();
     if (!this.everRead) return undefined;
-    return this.byId.get(id) ?? null;
+    return this.byId.has(id) ? this.byId.get(id) : null;
   }
 
   reload(): void {
@@ -88,7 +92,9 @@ class TemplateFiles {
       try {
         const template: unknown = JSON.parse(await this.app.vault.cachedRead(file));
         const id = templateId(template);
+        const claimed = isObject(template) && typeof template.id === 'string' ? template.id.trim() : '';
         if (id && !byId.has(id)) byId.set(id, template);
+        else if (claimed && !byId.has(claimed)) byId.set(claimed, undefined);
       } catch {
         // Not a template Atlas would read either.
       }
