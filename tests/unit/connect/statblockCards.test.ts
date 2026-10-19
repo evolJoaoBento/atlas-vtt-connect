@@ -33,4 +33,18 @@ describe("drawing Atlas's cards for players", () => {
     expect(cards.get('B.md')).toEqual(card('B.md'));
     expect(draw).toHaveBeenCalledTimes(3);
   });
+
+  it('keeps giving a card out of date until its new drawing is ready', async () => {
+    let version = 1;
+    const draw = vi.fn(async (path: string) => card(`${path} v${version}`));
+    const cards = new StatblockCards(draw, () => undefined);
+    cards.get('A.md');
+    await vi.waitFor(() => expect(cards.get('A.md')).toEqual(card('A.md v1')));
+    version = 2;
+    cards.forget();
+    expect(cards.get('A.md')).toEqual(card('A.md v1'));
+    await vi.waitFor(() => expect(cards.get('A.md')).toEqual(card('A.md v2')));
+    expect(draw).toHaveBeenCalledTimes(2);
+  });
 });
+

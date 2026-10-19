@@ -60,7 +60,8 @@ export function renderCard(host: HTMLElement, card: SheetCard, bind: CardRollBin
   const doc = host.ownerDocument;
   const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
   const style = host.ownerDocument.createElement('style');
-  style.textContent = `:host { display: block; contain: layout paint; overflow: hidden; }\n${safeCss(card.css)}`;
+  // The guard after the card's rules, so none of them takes the card out of its box.
+  style.textContent = `${safeCss(card.css)}\n:host { display: block !important; position: relative !important; contain: layout paint !important; overflow: hidden !important; }`;
   const html = host.ownerDocument.createElement('div');
   html.setAttribute('data-connect-html', '');
   html.className = card.rootClasses;

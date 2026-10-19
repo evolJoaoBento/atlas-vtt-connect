@@ -130,8 +130,13 @@ function inheritedFor(container: Element): string {
 async function shrunk(url: string, longest = MAX_IMAGE_PX): Promise<string | null> {
   try {
     const image = createEl('img');
-    image.src = url;
-    await image.decode();
+    // Loaded, not decoded: `decode()` waits for a window that is not on screen, as the GM's may well be.
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => reject(new Error('timed out')), RENDER_TIMEOUT_MS);
+      image.onload = () => { window.clearTimeout(timer); resolve(); };
+      image.onerror = () => { window.clearTimeout(timer); reject(new Error('unreadable')); };
+      image.src = url;
+    });
     const scale = Math.min(1, longest / Math.max(image.naturalWidth, image.naturalHeight, 1));
     const canvas = createEl('canvas');
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -187,7 +192,8 @@ function settled(element: Element): Promise<void> {
 /** Atlas's card of the note at `notePath`, ready for a player; null when this Atlas draws none. */
 export async function captureCard(app: App, notePath: string): Promise<SheetCard | null> {
   const doc = document;
-  const container = createDiv({ cls: 'markdown-preview-view markdown-rendered' });
+  // Rendered as a note renders it, without the note's margins around the card.
+  const container = createDiv({ cls: 'markdown-rendered' });
   container.style.cssText = `position: fixed; left: -100000px; top: 0; width: ${CARD_WIDTH}px; pointer-events: none;`;
   container.setAttribute('aria-hidden', 'true');
   doc.body.append(container);
@@ -242,10 +248,12 @@ export async function captureCard(app: App, notePath: string): Promise<SheetCard
 
 /**
  * Cards by note path, drawn on demand one at a time: `get` answers from what is kept and asks for a drawing when
- * there is none, `drawn` is called once one is ready.
+ * there is none or it is out of date, `drawn` is called once one is ready. A card out of date is still given until
+ * its new drawing replaces it, so a player never sees it go while a note is edited.
  */
 export class StatblockCards {
   private readonly cards = new Map<string, SheetCard | null>();
+  private readonly stale = new Set<string>();
   private readonly queue: string[] = [];
   /** The note being drawn now. */
   private drawing: string | null = null;
@@ -253,19 +261,21 @@ export class StatblockCards {
 
   constructor(private readonly draw: (notePath: string) => Promise<SheetCard | null>, private readonly drawn: () => void) {}
 
-  /** The card of the note at `notePath`: undefined until it is drawn, null when Atlas draws none. */
+  /** The card of the note at `notePath`: undefined until it is first drawn, null when Atlas draws none. */
   get(notePath: string): SheetCard | null | undefined {
-    if (this.cards.has(notePath)) return this.cards.get(notePath);
-    if (this.drawing !== notePath && !this.queue.includes(notePath)) this.queue.push(notePath);
-    void this.next();
-    return undefined;
+    if (!this.cards.has(notePath) || this.stale.has(notePath)) this.request(notePath);
+    return this.cards.get(notePath);
   }
 
-  /** Forgets the card of `notePath`, or every card: they are drawn again when next asked for. */
+  /** Marks the card of `notePath`, or every card, out of date: each is drawn again when next asked for. */
   forget(notePath?: string): void {
     this.generation += 1;
-    if (notePath === undefined) this.cards.clear();
-    else this.cards.delete(notePath);
+    for (const path of notePath === undefined ? this.cards.keys() : [notePath]) if (this.cards.has(path)) this.stale.add(path);
+  }
+
+  private request(notePath: string): void {
+    if (this.drawing !== notePath && !this.queue.includes(notePath)) this.queue.push(notePath);
+    void this.next();
   }
 
   private async next(): Promise<void> {
@@ -280,8 +290,9 @@ export class StatblockCards {
     } catch (error) {
       console.warn('[Atlas VTT Connect] Could not draw a stat block card:', error);
     }
+    this.cards.set(notePath, card);
     // A change heard while drawing: the drawing may show the note as it was, so it is drawn again.
-    if (generation === this.generation) this.cards.set(notePath, card);
+    if (generation === this.generation) this.stale.delete(notePath);
     else if (!this.queue.includes(notePath)) this.queue.push(notePath);
     this.drawing = null;
     if (this.queue.length > 0) void this.next();
