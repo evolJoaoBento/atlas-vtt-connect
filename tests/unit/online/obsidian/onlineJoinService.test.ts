@@ -10,6 +10,9 @@ import { RECONNECT_GIVE_UP_MS, type PlayerSessionState } from '../../../../src/a
 import { MemoryNetwork } from '../../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../../src/app/online/transport/types';
 import { MemoryStore, nodeHash } from '../assetFixtures';
+import { playerScene, playerToken } from '../sceneFixtures';
+import type { PlayerScene } from '../../../../src/app/online/scene/sceneTypes';
+import type { MiniPainter } from '../../../../src/app/online/view/minis/miniLayer';
 
 const LINK = 'https://example.org/join/#id=gm';
 
@@ -71,7 +74,7 @@ function recordingSink(): OnlineSceneSink & {
   };
 }
 
-function world(options: { hosting?: boolean; store?: ImageStore } = {}) {
+function world(options: { hosting?: boolean; store?: ImageStore; minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void } } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let players: SessionPlayer[] = [];
@@ -85,7 +88,7 @@ function world(options: { hosting?: boolean; store?: ImageStore } = {}) {
   const decode: ImageDecoder = async () => ({ image: {} as HTMLImageElement, width: 1, height: 1, release: () => {} });
   const service = new OnlineJoinService({} as App, settings, '0.5.0', {
     createClient: () => client.transport, openStore: async () => options.store ?? null, decode, hash: nodeHash, openSceneTab: opened,
-    isHosting: () => options.hosting ?? false,
+    isHosting: () => options.hosting ?? false, ...(options.minis ? { minis: options.minis } : {}),
   });
   const admitLast = async (): Promise<void> => {
     await vi.advanceTimersByTimeAsync(0);
@@ -300,5 +303,29 @@ describe('OnlineJoinService', () => {
     expect(w.service.rememberedName()).toBe('Anna the Bold');
     w.settings.set({ playerName: '' });
     expect(w.service.rememberedName()).toBe('');
+  });
+
+  it('asks for the minis of the scene once Tabletop arrives, and lets them go when it leaves', async () => {
+    let painter: MiniPainter | null = null;
+    let changed: (() => void) | null = null;
+    const w = world({ minis: { current: () => painter, subscribe: (listener) => { changed = listener; return () => { changed = null; }; } } });
+    const asked: string[] = [];
+    w.gm.use({ onAssetData: (_player, data) => { if (typeof data === 'string') asked.push(data); } });
+    w.service.join(LINK, 'Ben');
+    await w.admitLast();
+    const mini = 'M'.repeat(43);
+    const scene = playerScene({ tokens: { t: playerToken({ image: null, mini: { asset: mini, scale: 1, turn: 0 } }) } });
+    // The scene arrived while Tabletop was away: its mini was not asked for.
+    const joined = (w.service as unknown as { joined: { scene: PlayerScene | null; loader: AssetLoader } }).joined;
+    joined.scene = scene;
+    joined.loader.setScene(scene);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(asked.some((data) => data.includes(mini))).toBe(false);
+    painter = { version: 1, create: vi.fn() };
+    changed!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(asked.some((data) => data.includes('asset-request') && data.includes(mini))).toBe(true);
+    w.service.dispose();
+    expect(changed).toBeNull();
   });
 });

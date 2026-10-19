@@ -86,16 +86,33 @@ describe('tabletopPainter', () => {
   it('offers the painter of Tabletop only while Tabletop is there with one this version understands', () => {
     const { app, plugins } = fakeApp();
     const painter = tabletopPainter(app);
-    expect(painter()).toBeNull();
+    expect(painter.current()).toBeNull();
     const tabletop = fakeTabletop({});
     const playerMinis = { version: 1, create: vi.fn() };
     plugins['atlas-vtt-tabletop'] = { api: { ...tabletop.api, playerMinis } };
-    expect(painter()).toBe(playerMinis);
+    expect(painter.current()).toBe(playerMinis);
     plugins['atlas-vtt-tabletop'] = { api: { ...tabletop.api, playerMinis: { version: 2, create: vi.fn() } } };
-    expect(painter()).toBeNull();
+    expect(painter.current()).toBeNull();
     plugins['atlas-vtt-tabletop'] = { api: tabletop.api };
-    expect(painter()).toBeNull();
+    expect(painter.current()).toBeNull();
     delete plugins['atlas-vtt-tabletop'];
-    expect(painter()).toBeNull();
+    expect(painter.current()).toBeNull();
+  });
+
+  it('tells when Tabletop arrives at once, and when it leaves on the next tick', () => {
+    vi.useFakeTimers();
+    const { app, trigger, handlers } = fakeApp();
+    const listener = vi.fn();
+    const stop = tabletopPainter(app).subscribe(listener);
+    trigger('atlas-vtt-tabletop:api-ready');
+    expect(listener).toHaveBeenCalledTimes(1);
+    trigger('atlas-vtt-tabletop:api-unload');
+    expect(listener).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(0);
+    expect(listener).toHaveBeenCalledTimes(2);
+    stop();
+    expect([...handlers.values()].every((set) => set.size === 0)).toBe(true);
+    vi.useRealTimers();
   });
 });
+
