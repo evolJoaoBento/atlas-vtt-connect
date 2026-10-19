@@ -19,6 +19,28 @@ const sheet = buildSheet({ name: 'Anna', stats: [10, 16, 10, 10, 10, 10], action
 const entry = (tokenId: string, name: string): TokenSheet => ({ tokenId, name, resources: [{ name: 'HP', current: 7, max: 12 }], sheet });
 
 describe('the sheet drawer', () => {
+  it("shows Atlas's card where the GM sent one, its dice links asking the GM to roll, the numbers after it", () => {
+    const t = setup();
+    t.view.receive([{
+      ...entry('a', 'Anna'),
+      card: {
+        html: '<div class="atlas-statblock"><h1>Anna</h1><span class="atlas-dice-link" data-connect-roll="0" role="button" tabindex="0">Claws</span></div>',
+        css: '', rootClasses: '', bodyClasses: 'theme-dark', rolls: [{ formula: '+4', text: 'Claws', label: 'Attack' }],
+      },
+    }]);
+    t.toggleButton.click();
+    const host = t.body.querySelector<HTMLElement>('.sheet-card')!;
+    expect(t.body.firstElementChild).toBe(host);
+    // The card in place of the text sheet: no second name, no text sheet's rolls.
+    expect(t.body.querySelector('.sheet-name')).toBeNull();
+    expect(t.body.querySelectorAll('.sheet-roll')).toHaveLength(0);
+    expect(t.body.textContent).toContain('HP7 / 12');
+    const link = host.shadowRoot!.querySelector<HTMLElement>('.atlas-dice-link')!;
+    expect(link.getAttribute('aria-label')).toBe('Roll Attack: +4');
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));
+    expect(t.onRoll).toHaveBeenLastCalledWith('a', { kind: 'card', index: 0, text: 'Claws', side: 'advantage' });
+  });
+
   it('shows its button only while the player has sheets', () => {
     const t = setup();
     expect(t.toggleButton.hidden).toBe(true);

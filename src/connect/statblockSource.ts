@@ -5,6 +5,8 @@
  * creature of the token's statblock name. What comes back is the creature as is; the player's sheet whitelists it
  * (`tools/sheets.ts`, `tools/templateSheets.ts`).
  *
+ * Each note's card, as Atlas draws it, is kept too (`statblockCards.ts`): what players see where their page can show it.
+ *
  * Atlas keeps its templates as `.atlastemplate` files (JSON) anywhere in the vault, the lowest path winning where two
  * share an id (`TemplateLibrary`). They are read once, and again when one changes.
  */
@@ -12,6 +14,7 @@ import { TFile, type App, type EventRef } from 'obsidian';
 import type { Character } from '@atlas-vtt/api-types';
 import type { StatblockSource } from '../app/online/atlas/toolParts';
 import { templateId, type TemplatedStatblock } from '../app/online/tools/templateSheets';
+import { captureCard, StatblockCards } from './statblockCards';
 
 interface FantasyStatblocksApi {
   isResolved?(): boolean;
@@ -105,7 +108,12 @@ class TemplateFiles {
 
 export function obsidianStatblocks(app: App): StatblockSource {
   const listeners = new Set<() => void>();
-  const templates = new TemplateFiles(app, () => listeners.forEach((listener) => listener()));
+  const notify = (): void => listeners.forEach((listener) => listener());
+  const cards = new StatblockCards((path) => captureCard(app, path), notify);
+  const templates = new TemplateFiles(app, () => {
+    cards.forget();
+    notify();
+  });
   const frontmatterOf = (path: string): { file: TFile; frontmatter: Rec } | null => {
     const file = app.vault.getAbstractFileByPath(notePath(path));
     if (!(file instanceof TFile)) return null;
@@ -142,6 +150,10 @@ export function obsidianStatblocks(app: App): StatblockSource {
       // A templated note before its bestiary entry: Fantasy Statblocks indexes it too, without the template.
       return (path ? byTemplate(path) ?? byPath(path) ?? byFrontmatter(path) : null) ?? (name ? byName(name) : null);
     },
+    card(token: Character) {
+      const path = typeof token.statblockPath === 'string' ? notePath(token.statblockPath) : '';
+      return path ? cards.get(path) : null;
+    },
     onChange(listener: () => void): () => void {
       // Once a second at most: a note being typed in changes the cache on every keystroke.
       let timer: number | null = null;
@@ -163,8 +175,14 @@ export function obsidianStatblocks(app: App): StatblockSource {
         app.vault.on('rename', (file, oldPath) => (oldPath.endsWith(`.${TEMPLATE_EXTENSION}`) ? templates.reload() : templateChanged(file))),
       ];
       const refs: EventRef[] = [
-        app.metadataCache.on('changed', () => changed()),
-        ...['fantasy-statblocks:bestiary:resolved', 'fantasy-statblocks:bestiary:updated'].map((name) => app.workspace.on(name as never, (() => changed()) as never)),
+        app.metadataCache.on('changed', (file) => {
+          cards.forget(file.path);
+          changed();
+        }),
+        ...['fantasy-statblocks:bestiary:resolved', 'fantasy-statblocks:bestiary:updated'].map((name) => app.workspace.on(name as never, (() => {
+          cards.forget();
+          changed();
+        }) as never)),
       ];
       return () => {
         if (timer !== null) window.clearTimeout(timer);

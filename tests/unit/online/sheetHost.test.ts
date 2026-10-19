@@ -3,12 +3,13 @@ import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSe
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { SheetHost } from '../../../src/app/online/tools/SheetHost';
+import type { SheetCard } from '../../../src/app/online/tools/sheetCards';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
 const HP = { key: 'hp', name: 'HP', field: 'hp', direction: 'drains' as const, color: '#22c55e', visibleToPlayers: false };
 
-function world() {
+function world(readCard?: (token: { name?: unknown }) => SheetCard | null | undefined) {
   const sent: Array<[string, ControlMessage]> = [];
   let handler: SessionHandler | null = null;
   const tokens: Record<string, unknown> = {
@@ -34,6 +35,7 @@ function world() {
     } as never,
     resources: () => [HP],
     readStatblock: (token) => ({ name: token.name, ac: 16, stats: [10, 14, 10, 10, 10, 10], actions: [{ name: 'Sword', desc: '+5 to hit. Hit: 1d8 + 3.' }] }),
+    ...(readCard ? { readCard } : {}),
     rollFor,
   });
   host.start();
@@ -93,5 +95,32 @@ describe('players\' own sheets', () => {
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'ogre', roll: { kind: 'check', index: 0 } });
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'save', index: 0 } });
     expect(w.rollFor).not.toHaveBeenCalled();
+  });
+
+  it("sends Atlas's card beside the text sheet, and rolls only what the card it drew holds", () => {
+    const card: SheetCard = {
+      html: '<div class="atlas-statblock"><span data-connect-roll="0">Claws</span></div>', css: '', rootClasses: '', bodyClasses: 'theme-dark',
+      rolls: [{ formula: '1d6+2', text: 'Claws', label: 'Attack' }],
+    };
+    const w = world((token) => (token.name === 'Anna' ? card : undefined));
+    w.control.set('hero', 'p1', true);
+    expect(w.sheetsFor('p1')[0]?.[0]).toMatchObject({ card, sheet: { name: 'Anna' } });
+    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'card', index: 0, text: 'Claws', side: 'advantage' } });
+    expect(w.rollFor).toHaveBeenCalledWith(ANA, '1d6+2', { abilityName: 'Attack', advantage: 'advantage' });
+    w.rollFor.mockClear();
+    // Other text at that place, or a place the card has no roll at, rolls nothing.
+    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'card', index: 0, text: '99d100' } });
+    w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'card', index: 1, text: 'Claws' } });
+    expect(w.rollFor).not.toHaveBeenCalled();
+  });
+
+  it('leaves out a card too large to send, and keeps the text sheet', () => {
+    const big: SheetCard = { html: 'x'.repeat(150_000), css: 'y'.repeat(60_000), rootClasses: '', bodyClasses: '', rolls: [] };
+    const w = world(() => big);
+    w.control.set('hero', 'p1', true);
+    w.control.set('ogre', 'p1', true);
+    const entries = w.sheetsFor('p1').at(-1);
+    expect(entries?.some((entry) => entry.card)).toBe(false);
+    expect(entries?.map((entry) => entry.sheet?.name)).toEqual(['Anna', 'Ogre']);
   });
 });
