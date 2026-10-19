@@ -9,6 +9,7 @@
 import { ABILITY_NAMES, modifierOf, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
 import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
 import { iconElement } from './icons.mts';
+import { renderCard } from './cardView.mts';
 
 export interface SheetViewOptions {
   panel: HTMLElement;
@@ -114,6 +115,12 @@ export class SheetView {
   private rollButton(tokenId: string, roll: SheetRollRef, label: string, title: string, advantage: boolean): HTMLButtonElement {
     const button = this.el('button', 'sheet-roll', label);
     button.type = 'button';
+    this.wireRoll(button, tokenId, roll, title, advantage);
+    return button;
+  }
+
+  /** Makes `button` (a sheet's roll button, or a dice link of Atlas's card) ask the GM to roll `roll`. */
+  private wireRoll(button: HTMLElement, tokenId: string, roll: SheetRollRef, title: string, advantage: boolean): void {
     button.setAttribute('aria-label', `Roll ${title}`);
     const send = (side: AdvantageSide | null): void => {
       this.options.onRoll(tokenId, side && advantage ? { ...roll, side } : roll);
@@ -132,7 +139,6 @@ export class SheetView {
       const at = event.button === 2 ? { x: event.clientX, y: event.clientY } : { x: box.left, y: box.bottom };
       this.openMenu(button, at, advantage ? MENU_CHOICES : MENU_CHOICES.slice(0, 1), send);
     });
-    return button;
   }
 
   /** Opens a roll's menu at a point of the page, inside the drawer. */
@@ -192,19 +198,26 @@ export class SheetView {
       tabs.append(tab);
     }
     const entry = this.entries.find((candidate) => candidate.tokenId === this.picked);
-    body.replaceChildren(...(entry ? sheetContent(entry, body.ownerDocument, (roll, label, title, advantage) => this.rollButton(entry.tokenId, roll, label, title, advantage)) : []));
+    body.replaceChildren(...(entry ? sheetContent(
+      entry,
+      body.ownerDocument,
+      (roll, label, title, advantage) => this.rollButton(entry.tokenId, roll, label, title, advantage),
+      (link, roll, title, advantage) => this.wireRoll(link, entry.tokenId, roll, title, advantage),
+    ) : []));
   }
 }
 
 /** What a roll on the sheet is drawn as: a button that asks the GM to roll it, or plain text in a preview. */
 export type RollMaker = (roll: SheetRollRef, label: string, title: string, advantage: boolean) => HTMLElement;
+/** What a dice link of Atlas's card does: asks the GM to roll it; nothing in a preview. */
+export type RollBinder = (link: HTMLElement, roll: SheetRollRef, title: string, advantage: boolean) => void;
 
 /**
  * A token's sheet as elements: its name, its resources as Atlas's stat block gauges (`TrackView`: a thin track filled in
  * the accent, with "current / max"), and its stat block, the rolls in it made by `roll`. The drawer and the Ctrl+hover
  * preview draw it alike.
  */
-export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker): HTMLElement[] {
+export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker, bindRoll?: RollBinder): HTMLElement[] {
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] => {
     const element = doc.createElement(tag);
     if (className) element.className = className;
@@ -218,9 +231,19 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker):
   };
   const parts: HTMLElement[] = [];
   const sheet = entry.sheet;
-  parts.push(el('h3', 'sheet-name', entry.name ?? sheet?.name ?? 'Token'));
-  if (sheet?.subtitle) parts.push(el('p', 'sheet-subtitle', sheet.subtitle));
-  if (entry.resources.length > 0) {
+  // Atlas's card, as the GM sees it, where the GM's Atlas drew one: it carries its own name.
+  const card = entry.card ? el('div', 'sheet-card') : null;
+  if (card && entry.card) {
+    renderCard(card, entry.card, (link, index, cardRoll) => {
+      if (!bindRoll) return;
+      link.classList.add('is-connect-roll');
+      bindRoll(link, { kind: 'card', index, text: cardRoll.text }, `${cardRoll.label}: ${cardRoll.formula}`, mayHaveAdvantage(cardRoll.formula));
+    });
+    parts.push(card);
+  } else parts.push(el('h3', 'sheet-name', entry.name ?? sheet?.name ?? 'Token'));
+  if (sheet?.subtitle && !card) parts.push(el('p', 'sheet-subtitle', sheet.subtitle));
+  // A card leaves out the numbers: the token's bars already show them, and Atlas's card has its own.
+  if (entry.resources.length > 0 && !card) {
     const numbers = el('div', 'sheet-numbers');
     for (const resource of entry.resources) {
       const row = el('div', 'sheet-number');
@@ -242,6 +265,7 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker):
     }
     parts.push(numbers);
   }
+  if (card) return parts;
   if (!sheet) {
     parts.push(el('p', 'sheet-empty', 'No stat block is linked to this token.'));
     return parts;
@@ -270,7 +294,8 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker):
   bonusRow('Skills', 'skill', sheet.skills);
   for (const entryLine of sheet.lines) parts.push(line(entryLine.label, entryLine.text));
   sheet.sections.forEach((section, sectionIndex) => {
-    parts.push(el('h4', 'sheet-section', section.title));
+    // A template's values before its first heading stand under none.
+    if (section.title) parts.push(el('h4', 'sheet-section', section.title));
     section.items.forEach((item, itemIndex) => {
       const paragraph = el('p', 'sheet-item');
       if (item.name) paragraph.append(el('strong', '', `${item.name}. `));

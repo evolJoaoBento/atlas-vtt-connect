@@ -8,6 +8,7 @@ import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
 import { TemplateHost } from '../tools/TemplateHost';
 import type { MapTemplate } from '../tools/templates';
+import type { SheetCard } from '../tools/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
@@ -36,6 +37,8 @@ export function laserRelayPart(lasers: LasersApi, settings: Pick<SettingsApi, 'g
 /** Reads the stat block a token links: Fantasy Statblocks' creature, or the note's own frontmatter (`statblockSource.ts`). */
 export interface StatblockSource {
   read(token: Character): unknown;
+  /** Atlas's card of the token's stat block (`sheetCards.ts`): undefined while it is drawn, null where there is none. */
+  card?(token: Character): SheetCard | null | undefined;
   /** Calls `listener` when stat blocks may read differently; returns the stop. */
   onChange(listener: () => void): () => void;
 }
@@ -49,6 +52,7 @@ export function sheetHostPart(atlas: Pick<AtlasExtension, 'rules'>, statblocks: 
     session, projection, control,
     resources: (mapPath) => atlas.rules.forMap(mapPath).resources,
     readStatblock: (token) => statblocks?.read(token) ?? null,
+    ...(statblocks?.card ? { readCard: (token: Character) => statblocks.card?.(token) ?? null } : {}),
     ...(statblocks ? { onStatblocksChanged: (listener: () => void) => statblocks.onChange(listener) } : {}),
     ...(rollFor ? { rollFor } : {}),
   });
