@@ -1,12 +1,15 @@
 /**
- * The minis the Tabletop extension (`atlas-vtt-tabletop`) stands on tokens, as a `MiniSource` for hosted sessions. The
- * extension publishes `app.plugins.plugins['atlas-vtt-tabletop'].api` and announces it with the workspace events
+ * The Tabletop extension (`atlas-vtt-tabletop`): the minis it stands on tokens, as a `MiniSource` for hosted sessions,
+ * and the painter that draws them in a joined player's view (`tabletopPainter`). The extension publishes
+ * `app.plugins.plugins['atlas-vtt-tabletop'].api` and announces it with the workspace events
  * `atlas-vtt-tabletop:api-ready` and `atlas-vtt-tabletop:api-unload`, so either plugin may load first. Without it,
- * or with an API this does not understand, no token has a mini. Everything is checked before use and nothing throws.
+ * or with an API this does not understand, no token has a mini and none is drawn. Everything is checked before use
+ * and nothing throws.
  */
 import type { App, EventRef } from 'obsidian';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { MiniSource } from '../app/online/scene/sceneSources';
+import type { MiniPainter } from '../app/online/view/minis/miniLayer';
 
 const PLUGIN_ID = 'atlas-vtt-tabletop';
 const READY = 'atlas-vtt-tabletop:api-ready';
@@ -29,6 +32,17 @@ function tabletopApi(app: App): TabletopApi | null {
   const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { api?: unknown } | undefined> } }).plugins?.plugins;
   const api = plugins?.[PLUGIN_ID]?.api;
   return isTabletopApi(api) ? api : null;
+}
+
+/**
+ * The painter that draws minis in a player's view, read fresh on every call: null while Tabletop is not installed,
+ * not enabled, or offers no painter this version of Connect understands. A player sees minis only with Tabletop.
+ */
+export function tabletopPainter(app: App): () => MiniPainter | null {
+  return () => {
+    const painter = (tabletopApi(app) as { playerMinis?: unknown } | null)?.playerMinis as Partial<MiniPainter> | undefined;
+    return painter && painter.version === 1 && typeof painter.create === 'function' ? painter as MiniPainter : null;
+  };
 }
 
 /** Keeps only well-formed placements: a vault path and finite numbers. */

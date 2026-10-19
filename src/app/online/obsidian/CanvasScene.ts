@@ -28,7 +28,7 @@ import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -66,8 +66,9 @@ export class CanvasScene implements OnlineSceneSink {
     this.map = surface
       ? new MapView({
         canvas: dom.canvas, surface, images: (id) => service.image(id), models: (id) => service.model?.(id) ?? null,
-        // Only Obsidian draws minis: on a bare copy of the map's canvas, made by its own document (a pop-out window's too).
-        minis: createMiniLayer({ canvas: () => dom.canvas.cloneNode(false) as HTMLCanvasElement }),
+        // Only Obsidian draws minis, and only with the Tabletop extension, which paints them: on a bare copy of the map's
+        // canvas, made by its own document (a pop-out window's too).
+        minis: createMiniLayer({ painter: () => service.miniPainter?.() ?? null, canvas: () => dom.canvas.cloneNode(false) as HTMLCanvasElement }),
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
-import { tabletopMinis } from '../../../src/connect/tabletopMinis';
+import { tabletopMinis, tabletopPainter } from '../../../src/connect/tabletopMinis';
 
 /** Just enough of Obsidian's app: the plugins map and workspace events. */
 function fakeApp() {
@@ -79,5 +79,23 @@ describe('tabletopMinis', () => {
     expect(tabletopMinis(app).forMap('m')).toEqual({ c: { mini: 'x.glb', scale: 1, turn: 0 } });
     plugins['atlas-vtt-tabletop'] = { api: { version: 2, placementsFor: () => ({ t: { mini: 'x.glb' } }), onChange: () => () => undefined } };
     expect(tabletopMinis(app).forMap('m')).toEqual({});
+  });
+});
+
+describe('tabletopPainter', () => {
+  it('offers the painter of Tabletop only while Tabletop is there with one this version understands', () => {
+    const { app, plugins } = fakeApp();
+    const painter = tabletopPainter(app);
+    expect(painter()).toBeNull();
+    const tabletop = fakeTabletop({});
+    const playerMinis = { version: 1, create: vi.fn() };
+    plugins['atlas-vtt-tabletop'] = { api: { ...tabletop.api, playerMinis } };
+    expect(painter()).toBe(playerMinis);
+    plugins['atlas-vtt-tabletop'] = { api: { ...tabletop.api, playerMinis: { version: 2, create: vi.fn() } } };
+    expect(painter()).toBeNull();
+    plugins['atlas-vtt-tabletop'] = { api: tabletop.api };
+    expect(painter()).toBeNull();
+    delete plugins['atlas-vtt-tabletop'];
+    expect(painter()).toBeNull();
   });
 });
