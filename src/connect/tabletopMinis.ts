@@ -34,14 +34,30 @@ function tabletopApi(app: App): TabletopApi | null {
   return isTabletopApi(api) ? api : null;
 }
 
-/**
- * The painter that draws minis in a player's view, read fresh on every call: null while Tabletop is not installed,
- * not enabled, or offers no painter this version of Connect understands. A player sees minis only with Tabletop.
- */
-export function tabletopPainter(app: App): () => MiniPainter | null {
-  return () => {
-    const painter = (tabletopApi(app) as { playerMinis?: unknown } | null)?.playerMinis as Partial<MiniPainter> | undefined;
-    return painter && painter.version === 1 && typeof painter.create === 'function' ? painter as MiniPainter : null;
+export interface TabletopPainter {
+  /**
+   * The painter that draws minis in a player's view, read fresh on every call: null while Tabletop is not installed,
+   * not enabled, or offers no painter this version of Connect understands. A player sees minis only with Tabletop.
+   */
+  current(): MiniPainter | null;
+  /** Calls `listener` when Tabletop arrives or leaves. */
+  subscribe(listener: () => void): () => void;
+}
+
+export function tabletopPainter(app: App): TabletopPainter {
+  return {
+    current: () => {
+      const painter = (tabletopApi(app) as { playerMinis?: unknown } | null)?.playerMinis as Partial<MiniPainter> | undefined;
+      return painter && painter.version === 1 && typeof painter.create === 'function' ? painter as MiniPainter : null;
+    },
+    subscribe: (listener) => {
+      const refs: EventRef[] = [
+        app.workspace.on(READY as never, (() => listener()) as never),
+        // Unload is announced before the API goes: it is read again on the next tick.
+        app.workspace.on(UNLOAD as never, (() => { window.setTimeout(listener, 0); }) as never),
+      ];
+      return () => { for (const ref of refs) app.workspace.offref(ref); };
+    },
   };
 }
 
