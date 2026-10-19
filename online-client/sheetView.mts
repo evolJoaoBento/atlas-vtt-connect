@@ -270,7 +270,8 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker):
   bonusRow('Skills', 'skill', sheet.skills);
   for (const entryLine of sheet.lines) parts.push(line(entryLine.label, entryLine.text));
   sheet.sections.forEach((section, sectionIndex) => {
-    parts.push(el('h4', 'sheet-section', section.title));
+    // A template's values before its first heading stand under none.
+    if (section.title) parts.push(el('h4', 'sheet-section', section.title));
     section.items.forEach((item, itemIndex) => {
       const paragraph = el('p', 'sheet-item');
       if (item.name) paragraph.append(el('strong', '', `${item.name}. `));

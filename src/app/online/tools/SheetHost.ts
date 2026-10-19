@@ -18,8 +18,9 @@ import type { SceneSession } from '../scene/sceneContracts';
 import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
-import { buildSheet, SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
+import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
 import type { SheetRollExtras } from './DiceHost';
+import { buildPlayerSheet } from './templateSheets';
 
 /** A sheets message stays under this, well inside a control message, with room for the envelope. */
 const SHEETS_BUDGET_BYTES = Math.floor(MAX_CONTROL_MESSAGE_BYTES * 0.75);
@@ -32,7 +33,7 @@ export interface SheetHostOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot' | 'audience' | 'onSlotChange'>;
   /** The resources of the collection holding the map at `mapPath`. */
   resources(mapPath: string | null): readonly ResourceDefinition[];
-  /** The creature a token links (Fantasy Statblocks' shape), or null: none linked, or it cannot be read. */
+  /** The creature a token links (Fantasy Statblocks' shape, or a templated note's `TemplatedStatblock`), or null: none linked, or it cannot be read. */
   readStatblock(token: Character): unknown;
   /** Calls `listener` when stat blocks may read differently (the statblock plugin updated); returns the stop. */
   onStatblocksChanged?(listener: () => void): () => void;
@@ -131,7 +132,7 @@ export class SheetHost implements SessionHandler {
     const token = scene?.snapshot.objects.tokens[message.tokenId];
     if (!scene || !isCharacter(token) || !Object.hasOwn(scene.shown, message.tokenId)) return;
     // Read afresh: the roll is what the stat block says now.
-    const sheet = buildSheet(this.read(token), displayName(token));
+    const sheet = buildPlayerSheet(this.read(token), displayName(token));
     const formula = sheet ? sheetRollFormula(sheet, message.roll) : null;
     if (!sheet || !formula) return;
     const { side } = message.roll;
@@ -180,7 +181,7 @@ export class SheetHost implements SessionHandler {
     if (!key) return null;
     const cached = this.cache.get(key);
     if (cached && this.now() - cached.at < SHEET_CACHE_MS) return cached.sheet;
-    const sheet = buildSheet(this.read(token), displayName(token));
+    const sheet = buildPlayerSheet(this.read(token), displayName(token));
     this.cache.set(key, { at: this.now(), sheet });
     return sheet;
   }

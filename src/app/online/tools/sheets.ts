@@ -106,7 +106,7 @@ const isObject = (value: unknown): value is Rec => typeof value === 'object' && 
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Plain text of at most `max` characters, or null: numbers become text, markup-looking brackets stay text. */
-function text(value: unknown, max: number): string | null {
+export function text(value: unknown, max: number): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value).slice(0, max);
   if (typeof value !== 'string') return null;
   // Control characters out (tabs and line breaks become spaces with the rest of the whitespace), runs to one space.
