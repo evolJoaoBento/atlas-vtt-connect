@@ -13,7 +13,7 @@ import type { PresentedSceneSource } from './atlas/presentedSource';
 import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
-import type { DiceLookSource, PlayerViewSettingsSource } from './scene/sceneSources';
+import type { DiceLookSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
@@ -63,6 +63,8 @@ export interface Deps extends OptionalParts {
   handout?: HandoutSource;
   /** What the GM lets players see of each resource per token and statblock. */
   resourceVisibility?: ResourceVisibilitySource;
+  /** The 3D minis on tokens, from the Tabletop extension; without it no token carries one. */
+  minis?: MiniSource;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -153,6 +155,7 @@ export class OnlineSessionService {
           ...(deps.diceLook ? { diceLook: deps.diceLook } : {}),
           ...(deps.handout ? { handout: deps.handout } : {}),
           ...(deps.resourceVisibility ? { resourceVisibility: deps.resourceVisibility } : {}),
+          ...(deps.minis ? { minis: deps.minis } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,

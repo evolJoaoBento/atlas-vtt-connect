@@ -155,7 +155,12 @@ function isPlayerToken(value: unknown): boolean {
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
     && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
     && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)
-    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale);
+    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale) && optional(isPlayerMini)(value.mini);
+}
+
+function isPlayerMini(value: unknown): boolean {
+  return isFields(value) && nullable(isString)(value.asset)
+    && inRange(SCENE_RANGES.miniScale)(value.scale) && inRange(SCENE_RANGES.miniTurn)(value.turn);
 }
 
 function isPlayerFogOp(value: unknown): boolean {

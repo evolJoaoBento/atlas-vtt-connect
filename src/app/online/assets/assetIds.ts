@@ -30,7 +30,7 @@ export const ASSET_LIMITS = {
   cacheBytes: 500 * MB,
 } as const;
 
-export const ASSET_MIMES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/avif', 'image/svg+xml'] as const;
+export const ASSET_MIMES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/avif', 'image/svg+xml', 'model/gltf-binary'] as const;
 export type AssetMime = typeof ASSET_MIMES[number];
 
 /** SHA-256 of some bytes as an asset id. */
@@ -44,6 +44,8 @@ const MIME_BY_EXTENSION: Readonly<Record<string, AssetMime>> = {
   gif: 'image/gif',
   avif: 'image/avif',
   svg: 'image/svg+xml',
+  // A mini the Tabletop extension stands on a token: its bytes are kept as they are, never decoded as an image.
+  glb: 'model/gltf-binary',
 };
 
 /** A fingerprint: unpadded base64url SHA-256, 43 characters. */
@@ -57,6 +59,11 @@ export function isAssetMime(value: unknown): value is AssetMime {
   return typeof value === 'string' && (ASSET_MIMES as readonly string[]).includes(value);
 }
 
+/** Whether an asset is a 3D model (a mini's GLB) rather than an image. */
+export function isModelMime(mime: AssetMime): boolean {
+  return mime === 'model/gltf-binary';
+}
+
 /** The image type a vault path stands for, by its extension; null for anything else. */
 export function mimeForPath(path: string): AssetMime | null {
   const dot = path.lastIndexOf('.');
@@ -66,7 +73,7 @@ export function mimeForPath(path: string): AssetMime | null {
 }
 
 const EXTENSION_BY_MIME: Readonly<Record<AssetMime, string>> = {
-  'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg',
+  'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg', 'model/gltf-binary': 'glb',
 };
 
 /** The file extension an image type is saved under (the inverse of `mimeForPath`). */
@@ -79,12 +86,18 @@ export async function sha256Id(bytes: ArrayBuffer): Promise<string> {
   return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
 }
 
-/** The fingerprints a scene shows: the map's first, then the tokens' in record order, each once. */
-export function sceneAssetIds(scene: PlayerScene | null): string[] {
+/**
+ * The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), each once.
+ * `minis: false` leaves the minis' models out, for a player view that does not draw them (the web page).
+ */
+export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: boolean } = {}): string[] {
   if (!scene) return [];
   const ids = new Set<string>();
   if (isAssetId(scene.map.asset)) ids.add(scene.map.asset);
-  for (const token of Object.values(scene.tokens)) if (isAssetId(token.image)) ids.add(token.image);
+  for (const token of Object.values(scene.tokens)) {
+    if (isAssetId(token.image)) ids.add(token.image);
+    if (options.minis !== false && isAssetId(token.mini?.asset)) ids.add(token.mini.asset);
+  }
   // The GM's handout reaches the players of every scene in use.
   if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);
   return [...ids];

@@ -126,6 +126,16 @@ export interface PlayerCondition {
 export const PLAYER_SIDES = ['players', 'opponents'] as const;
 export type PlayerSide = typeof PLAYER_SIDES[number];
 
+/** A 3D mini standing on a token (the Tabletop extension's): its GLB, its size on the token's footprint and its turn. */
+export interface PlayerMini {
+  /** The GLB's fingerprint; null while the GM is still working it out. */
+  asset: string | null;
+  /** 1 fills the token's footprint. */
+  scale: number;
+  /** Degrees, on top of the token's own rotation. */
+  turn: number;
+}
+
 export interface PlayerToken {
   x: number;
   y: number;
@@ -157,6 +167,8 @@ export interface PlayerToken {
   instance?: number;
   /** The map's ring size setting, which scales the ring and what sits on it; sent only when it is not 1. */
   ringScale?: number;
+  /** The 3D mini standing on the token; sent only for a token that has one. An older player ignores it. */
+  mini?: PlayerMini;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */

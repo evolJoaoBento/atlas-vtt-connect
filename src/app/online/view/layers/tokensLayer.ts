@@ -22,7 +22,11 @@ import { BadgeEntrances } from './badgeEntrances';
 import { DOWNED_MOTION, DownedFades } from './downedFades';
 import { TokenEmphasis } from './tokenEmphasis';
 import { restingTokenUIScale, selectedTokenUIScale } from '@atlas-vtt/shared/draw';
+import type { MiniLayer } from '../minis/miniLayer';
 import { prefersReducedMotion } from '../motion';
+
+/** Without a mini layer (the web page) no mini is drawn, and three.js is never part of the page. */
+const NO_MINIS: MiniLayer = { begin: () => undefined, add: () => undefined, draw: () => undefined, animating: () => false, dispose: () => undefined };
 
 /** The stand-in drawn until a token's art has loaded. */
 export const TOKEN_MARKER_COLOR = '#9aa0a6';
@@ -31,7 +35,7 @@ export const CONTROLLED_RING_COLOR = '#facc15';
 /** The ring around the token whose turn it is in a fight in turn order, for every player. */
 export const TURN_RING_COLOR = '#f8fafc';
 
-export function createTokensLayer(options: { now?: () => number; reducedMotion?: () => boolean } = {}): PlayerLayer {
+export function createTokensLayer(options: { now?: () => number; reducedMotion?: () => boolean; minis?: MiniLayer } = {}): PlayerLayer {
   // Sorted once per change of the tokens, not on every frame; ids kept for the overlay.
   let sorted: { tokens: Readonly<Record<string, PlayerToken>>; list: Array<[string, PlayerToken]> } | null = null;
   const byLayer = (tokens: Readonly<Record<string, PlayerToken>>): Array<[string, PlayerToken]> => {
@@ -50,6 +54,8 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
   const downedFades = new DownedFades(now, reducedMotion);
   // A selected token's UI grows, and its numbers show while it is hovered or selected, as on Atlas's scene.
   const emphasis = new TokenEmphasis(now, reducedMotion);
+  // The 3D minis standing on tokens (the Tabletop extension's), over the art and under the bars and badges.
+  const minis = options.minis ?? NO_MINIS;
   return {
     draw(surface, frame): void {
       const cellSize = frame.scene.map.cellSize;
@@ -62,6 +68,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       entrances.begin(frame.scene.sceneId);
       downedFades.begin(frame.scene.sceneId);
       emphasis.begin(frame.scene.sceneId);
+      minis.begin(frame);
       const turnToken = turnOf(frame.scene, controlled).tokenId;
       // A lit scene's darkness reaches players as a fog operation of its own: there only their tokens glide.
       const lit = Object.hasOwn(frame.scene.fog, DARKNESS_FOG_ID);
@@ -83,6 +90,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         const ringRadius = getTokenRingCenterRadius(size * ringScale, stroke, ringScale);
         const downed = downedFades.progress(id, token.downed === true);
         drawArt(surface, frame, token, size, stroke, ringRadius, downed);
+        if (token.mini) minis.add(id, token, token.x, token.y, size);
         if (controlled.has(id)) {
           surface.circle(token.x, token.y, ringRadius + stroke * 1.5, { stroke: CONTROLLED_RING_COLOR, lineWidth: stroke });
         }
@@ -103,6 +111,7 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
         if (id === selected) raised.push(ui);
         else uis.push(ui);
       }
+      minis.draw(surface, frame);
       for (const ui of [...uis, ...raised]) ui();
       glides.end();
       fills.end();
@@ -110,7 +119,8 @@ export function createTokensLayer(options: { now?: () => number; reducedMotion?:
       downedFades.end();
       emphasis.end();
     },
-    animating: () => glides.animating() || fills.animating() || entrances.animating() || downedFades.animating() || emphasis.animating(),
+    animating: () => glides.animating() || fills.animating() || entrances.animating() || downedFades.animating() || emphasis.animating() || minis.animating(),
+    dispose: () => minis.dispose(),
   };
 }
 

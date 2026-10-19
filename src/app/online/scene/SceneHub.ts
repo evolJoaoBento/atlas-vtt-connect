@@ -81,6 +81,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
       this.options.handout?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
       // The GM changed what players see of a resource on a token or statblock: every scene in use shows it.
       this.options.resourceVisibility?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
+      // A mini was placed on a token, changed or taken off: every scene in use shows it.
+      this.options.minis?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
       // A collection's dice look (or the default's) changed: every scene in use reads its own again.
       this.options.diceLook?.watch(() => { for (const slot of this.slots.values()) slot.readLook(); }) ?? (() => undefined),
       assignments.onChange(() => { this.update(); this.changes.emit({ kind: 'assignments' }); }),

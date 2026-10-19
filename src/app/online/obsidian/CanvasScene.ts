@@ -20,6 +20,7 @@ import type { PlayerScene } from '../scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
 import type { ViewSurface } from '../view/ViewSurface';
 import { createCanvasSurface } from '../view/canvasSurface';
+import { createMiniLayer } from '../view/minis/miniLayer';
 import type { SceneDom } from './canvasSceneDom';
 import type { OnlineJoinService } from './OnlineJoinService';
 import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
@@ -27,7 +28,7 @@ import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -64,7 +65,10 @@ export class CanvasScene implements OnlineSceneSink {
     const surface = options.surface === undefined ? createCanvasSurface(dom.canvas) : options.surface;
     this.map = surface
       ? new MapView({
-        canvas: dom.canvas, surface, images: (id) => service.image(id),
+        canvas: dom.canvas, surface, images: (id) => service.image(id), models: (id) => service.model?.(id) ?? null,
+        // Only Obsidian draws minis, and only with the Tabletop extension, which paints them: on a bare copy of the map's
+        // canvas, made by its own document (a pop-out window's too).
+        minis: createMiniLayer({ painter: () => service.miniPainter?.() ?? null, canvas: () => dom.canvas.cloneNode(false) as HTMLCanvasElement }),
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
         sendLaser: (points, lifted, dt, color) => service.sendLaser(points, lifted, dt, color),

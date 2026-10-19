@@ -7,6 +7,7 @@ import { openSceneTab } from '../app/online/obsidian/sceneTabs';
 import type { ConnectSettingsStore } from './settingsStore';
 import { JOIN_SESSION_LABEL } from '../app/online/ui/onlineCopy';
 import { need } from './capabilities';
+import { tabletopPainter } from './tabletopMinis';
 
 export type JoinSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'onChange'>;
 
@@ -23,6 +24,8 @@ export function startJoining(plugin: Plugin, atlas: AtlasExtension, api: AtlasAp
   const { app } = plugin;
   const service = new OnlineJoinService(app, settings, plugin.manifest.version, {
     openSceneTab: () => openSceneTab(app, api, atlas),
+    // The Tabletop extension draws the 3D minis, when the player has it.
+    minis: tabletopPainter(app),
     ...(playerKeyFor ? { playerKeyFor } : {}),
   });
   plugin.addCommand({ id: JOIN_COMMAND, name: JOIN_SESSION_LABEL, callback: () => openJoinSessionModal(app) });

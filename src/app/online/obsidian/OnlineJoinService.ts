@@ -30,6 +30,7 @@ import { keyPerHost } from './keyPerHost';
 import { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink, type RemoteImages } from './onlineJoinTypes';
 import { decodeToObjectUrls, urlsOf } from './objectUrlImages';
 import { openOnlineSceneTab } from './onlineSceneTab';
+import type { MiniPainter } from '../view/minis/miniLayer';
 
 export type { SessionIdentity };
 
@@ -49,6 +50,8 @@ export interface OnlineJoinDeps {
   deviceKeys?: Pick<DeviceKeys, 'forTable'>;
   /** One key per GM host, kept by the plugin across Atlas reloads; the service makes its own unless given one. */
   playerKeyFor?: (hostId: string) => string;
+  /** The Tabletop extension's painter for the minis, null without it: their GLBs are fetched only while there is one. */
+  minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void };
 }
 
 type JoinSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'onChange'>;
@@ -76,6 +79,8 @@ export class OnlineJoinService {
   private readonly deviceKeys: Pick<DeviceKeys, 'forTable'>;
   private readonly identityListeners = new Set<(identity: SessionIdentity | null) => void>();
   private readonly flow: FlowHost;
+  private readonly minis: () => MiniPainter | null;
+  private readonly stopMinis: () => void;
 
   /** The scene's images by object URL: one URL for the map, another for tokens. */
   readonly images: RemoteImages = {
@@ -88,6 +93,13 @@ export class OnlineJoinService {
 
   constructor(private readonly app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
     this.playerKeyFor = deps.playerKeyFor ?? keyPerHost();
+    this.minis = deps.minis ? () => deps.minis?.current() ?? null : (): null => null;
+    // Tabletop arrived or left while joined: the scene's minis are asked for (or let go) now, not at the GM's next change.
+    this.stopMinis = deps.minis?.subscribe(() => {
+      const joined = this.joined;
+      if (joined?.scene) joined.loader.setScene(joined.scene);
+      this.sink?.images();
+    }) ?? ((): void => undefined);
     this.createClient = deps.createClient ?? createPeerClient;
     this.openStore = deps.openStore ?? openIndexedDbImageStore;
     this.decode = deps.decode ?? decodeToObjectUrls;
@@ -152,6 +164,7 @@ export class OnlineJoinService {
     this.settings.set({ playerName: remember ? cleaned : '', rememberPlayerName: remember });
     const loader = new AssetLoader({
       cache: this.imageCache(), decode: this.decode, ...(this.hash ? { hash: this.hash } : {}),
+      models: () => this.minis() !== null,
       onChange: () => { if (this.joined?.loader === loader) this.sink?.images(); },
     });
     const joined: Joined = {
@@ -210,6 +223,16 @@ export class OnlineJoinService {
     return this.joined?.loader.image(assetId) ?? null;
   }
 
+  /** A mini's GLB bytes, once they are here and checked. */
+  /** The Tabletop extension's painter for the minis; null without it. */
+  miniPainter(): MiniPainter | null {
+    return this.minis();
+  }
+
+  model(assetId: string | null): ArrayBuffer | null {
+    return this.joined?.loader.model(assetId) ?? null;
+  }
+
   sendTokenMove(tokenId: string, x: number, y: number): boolean {
     return this.joined?.session?.sendTokenMove(tokenId, x, y) ?? false;
   }
@@ -247,6 +270,7 @@ export class OnlineJoinService {
     this.leave();
     this.releaseCache();
     this.stopSettings();
+    this.stopMinis();
     // A disposed service must not be found by `forApp` (Atlas was disabled or reloaded).
     if (OnlineJoinService.instances.get(this.app) === this) OnlineJoinService.instances.delete(this.app);
   }
