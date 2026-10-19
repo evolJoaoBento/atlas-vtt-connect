@@ -99,7 +99,7 @@ describe('players\' own sheets', () => {
 
   it("sends Atlas's card beside the text sheet, and rolls only what the card it drew holds", () => {
     const card: SheetCard = {
-      html: '<div class="atlas-statblock"><span data-connect-roll="0">Claws</span></div>', css: '', rootClasses: '', bodyClasses: 'theme-dark',
+      html: '<div class="atlas-statblock"><span data-connect-roll="0">Claws</span></div>', css: '', variables: {},
       rolls: [{ formula: '1d6+2', text: 'Claws', label: 'Attack' }],
     };
     const w = world((token) => (token.name === 'Anna' ? card : undefined));
@@ -115,7 +115,7 @@ describe('players\' own sheets', () => {
   });
 
   it('leaves out a card too large to send, and keeps the text sheet', () => {
-    const big: SheetCard = { html: 'x'.repeat(150_000), css: 'y'.repeat(60_000), rootClasses: '', bodyClasses: '', rolls: [] };
+    const big: SheetCard = { html: 'x'.repeat(150_000), css: 'y'.repeat(60_000), variables: {}, rolls: [] };
     const w = world(() => big);
     w.control.set('hero', 'p1', true);
     w.control.set('ogre', 'p1', true);

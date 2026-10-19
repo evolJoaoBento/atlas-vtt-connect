@@ -53,21 +53,40 @@ function keepValue(tag: string, name: string, value: string): boolean {
 export type CardRollBinder = (link: HTMLElement, index: number, roll: CardRoll) => void;
 
 /**
- * Draws `card` in `host`'s shadow root, within wrappers standing in for the GM's `<html>` and `<body>` so the rules
- * that name them apply, and nothing of the page's styles reaches in or the card's out.
+ * After the card's rules: none of them takes the card out of its box, and the card stands in the drawer without a
+ * frame of its own, as the drawer's content rather than a panel inside it.
+ */
+const GUARD = `
+:host { display: block !important; position: relative !important; contain: layout paint !important; overflow: hidden !important; }
+.atlas-statblock { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; }
+.atlas-statblock-body { padding: 0 !important; background: transparent !important; }`;
+
+/**
+ * Draws `card` in `host`'s shadow root, in the theme of the document it is in: within wrappers standing in for that
+ * document's `<html>` and `<body>` (their classes, so `.theme-dark` rules follow the player's Obsidian), the
+ * variables its Obsidian or page gives inherited as they are, the GM's values only for the ones it does not give.
+ * Nothing of the page's styles reaches in, or the card's out.
  */
 export function renderCard(host: HTMLElement, card: SheetCard, bind: CardRollBinder): void {
   const doc = host.ownerDocument;
   const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
   const style = host.ownerDocument.createElement('style');
-  // The guard after the card's rules, so none of them takes the card out of its box.
-  style.textContent = `${safeCss(card.css)}\n:host { display: block !important; position: relative !important; contain: layout paint !important; overflow: hidden !important; }`;
+  style.textContent = `${safeCss(card.css)}\n${GUARD}`;
   const html = host.ownerDocument.createElement('div');
   html.setAttribute('data-connect-html', '');
-  html.className = card.rootClasses;
+  html.className = doc.documentElement.className;
   const body = host.ownerDocument.createElement('div');
   body.setAttribute('data-connect-body', '');
-  body.className = card.bodyClasses;
+  body.className = doc.body.className;
+  // A page outside Obsidian names no theme: the one it is drawn in.
+  if (!/\btheme-(?:dark|light)\b/.test(`${html.className} ${body.className}`)) {
+    body.classList.add(doc.defaultView?.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'theme-dark' : 'theme-light');
+  }
+  const local = doc.defaultView?.getComputedStyle(doc.body);
+  for (const [name, value] of Object.entries(card.variables)) {
+    if (!/^--[\w-]+$/.test(name) || local?.getPropertyValue(name).trim()) continue;
+    html.style.setProperty(name, safeCss(value));
+  }
   body.append(sanitizeCardHtml(card.html, doc));
   html.append(body);
   shadow.replaceChildren(style, html);

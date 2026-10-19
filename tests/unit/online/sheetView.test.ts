@@ -19,13 +19,13 @@ const sheet = buildSheet({ name: 'Anna', stats: [10, 16, 10, 10, 10, 10], action
 const entry = (tokenId: string, name: string): TokenSheet => ({ tokenId, name, resources: [{ name: 'HP', current: 7, max: 12 }], sheet });
 
 describe('the sheet drawer', () => {
-  it("shows Atlas's card where the GM sent one, its dice links asking the GM to roll, the numbers after it", () => {
+  it("shows Atlas's card where the GM sent one, its dice links asking the GM to roll, without the numbers the token's bars show", () => {
     const t = setup();
     t.view.receive([{
       ...entry('a', 'Anna'),
       card: {
         html: '<div class="atlas-statblock"><h1>Anna</h1><span class="atlas-dice-link" data-connect-roll="0" role="button" tabindex="0">Claws</span></div>',
-        css: '', rootClasses: '', bodyClasses: 'theme-dark', rolls: [{ formula: '+4', text: 'Claws', label: 'Attack' }],
+        css: '', variables: {}, rolls: [{ formula: '+4', text: 'Claws', label: 'Attack' }],
       },
     }]);
     t.toggleButton.click();
@@ -34,7 +34,7 @@ describe('the sheet drawer', () => {
     // The card in place of the text sheet: no second name, no text sheet's rolls.
     expect(t.body.querySelector('.sheet-name')).toBeNull();
     expect(t.body.querySelectorAll('.sheet-roll')).toHaveLength(0);
-    expect(t.body.textContent).toContain('HP7 / 12');
+    expect(t.body.textContent).not.toContain('HP7 / 12');
     const link = host.shadowRoot!.querySelector<HTMLElement>('.atlas-dice-link')!;
     expect(link.getAttribute('aria-label')).toBe('Roll Attack: +4');
     link.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }));

@@ -17,6 +17,8 @@ export const CARD_LIMITS = {
   formula: 200,
   rollText: 200,
   label: 120,
+  variables: 600,
+  variable: 4000,
 } as const;
 
 export interface CardRoll {
@@ -31,11 +33,13 @@ export interface CardRoll {
 export interface SheetCard {
   /** The card's markup, each roll marked `data-connect-roll="<index>"`. */
   html: string;
-  /** The rules that style it, already scoped to the wrappers `renderCard` draws it in. */
+  /** The rules that style it, already scoped to the wrappers it is drawn in (`cardView.mts`). */
   css: string;
-  /** The classes of the GM's `<html>` and `<body>`, which the rules may name (`theme-dark`). */
-  rootClasses: string;
-  bodyClasses: string;
+  /**
+   * The values the GM's window gives the variables those rules read: used only where the player's own Obsidian (or
+   * page) gives none, so the card takes the player's theme.
+   */
+  variables: Record<string, string>;
   rolls: CardRoll[];
 }
 
@@ -45,7 +49,8 @@ const isText = (value: unknown, max: number): value is string => typeof value ==
 
 export function isSheetCard(value: unknown): value is SheetCard {
   return isObject(value) && isText(value.html, CARD_LIMITS.html) && isText(value.css, CARD_LIMITS.css)
-    && isText(value.rootClasses, 1000) && isText(value.bodyClasses, 1000)
+    && isObject(value.variables) && Object.keys(value.variables).length <= CARD_LIMITS.variables
+    && Object.entries(value.variables).every(([name, variable]) => /^--[\w-]{1,120}$/.test(name) && isText(variable, CARD_LIMITS.variable))
     && Array.isArray(value.rolls) && value.rolls.length <= CARD_LIMITS.rolls
     && value.rolls.every((roll) => isObject(roll) && isText(roll.formula, CARD_LIMITS.formula) && isText(roll.text, CARD_LIMITS.rollText)
       && isText(roll.label, CARD_LIMITS.label));

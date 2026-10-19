@@ -7,6 +7,13 @@
 @media (prefers-color-scheme: dark) {
   :root { --bg: #161719; --card: #202124; --text: #e8e8ea; --muted: #a0a4ab; --border: #33363b; --bar: rgba(32, 33, 36, 0.92); }
 }
+/* Obsidian's colours as this page has them, for Atlas's stat block cards (`cardView.mts`): a card takes these over the GM's. */
+:root {
+  --background-primary: var(--card); --background-primary-alt: var(--bg); --background-secondary: var(--bg);
+  --background-modifier-border: var(--border); --background-modifier-hover: color-mix(in oklch, var(--text) 8%, transparent);
+  --text-normal: var(--text); --text-muted: var(--muted); --text-faint: var(--muted); --text-accent: var(--accent); --text-accent-hover: var(--accent);
+  --interactive-accent: var(--accent); --color-accent: var(--accent); --text-on-accent: #fff; --mono-100: var(--text);
+}
 * { box-sizing: border-box; }
 /* The display rules below would otherwise override the hidden attribute. */
 [hidden] { display: none !important; }

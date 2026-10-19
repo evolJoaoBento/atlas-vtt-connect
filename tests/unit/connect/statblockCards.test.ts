@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { scopeSelector, StatblockCards } from '../../../src/connect/statblockCards';
+import { cardKey, cardKeyParts, scopeSelector, StatblockCards } from '../../../src/connect/statblockCards';
 import type { SheetCard } from '../../../src/app/online/tools/sheetCards';
 
-const card = (name: string): SheetCard => ({ html: name, css: '', rootClasses: '', bodyClasses: '', rolls: [] });
+const card = (name: string): SheetCard => ({ html: name, css: '', variables: {}, rolls: [] });
 
 describe("drawing Atlas's cards for players", () => {
   it("names the wrappers that stand in for the GM's html and body", () => {
@@ -46,5 +46,24 @@ describe("drawing Atlas's cards for players", () => {
     await vi.waitFor(() => expect(cards.get('A.md')).toEqual(card('A.md v2')));
     expect(draw).toHaveBeenCalledTimes(2);
   });
-});
 
+  it("keeps a card per note and token art, and forgets a note's cards together", async () => {
+    const red = cardKey('A.md', { imagePath: 'art/a.webp', ringColor: '#ff0000', showRing: true });
+    const plain = cardKey('A.md', null);
+    expect(cardKeyParts(red)).toEqual({ notePath: 'A.md', art: { imagePath: 'art/a.webp', ringColor: '#ff0000', showRing: true } });
+    expect(cardKeyParts(cardKey('A.md', { imagePath: 'b.png', showRing: false }))).toEqual({ notePath: 'A.md', art: { imagePath: 'b.png', showRing: false } });
+    expect(cardKeyParts(plain)).toEqual({ notePath: 'A.md', art: null });
+    const draw = vi.fn(async (key: string) => card(key));
+    const cards = new StatblockCards(draw, () => undefined);
+    cards.get(red);
+    cards.get(plain);
+    cards.get(cardKey('AB.md', null));
+    await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(3));
+    cards.forget('A.md');
+    cards.get(red);
+    cards.get(plain);
+    cards.get(cardKey('AB.md', null));
+    await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(5));
+    expect(draw.mock.calls.slice(3).map(([key]) => cardKeyParts(key).notePath)).toEqual(['A.md', 'A.md']);
+  });
+});

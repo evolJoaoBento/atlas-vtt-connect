@@ -8,9 +8,8 @@ const CARD: SheetCard = {
   html: `<div class="atlas-statblock"><h1 class="atlas-sb-heading">Modelo NPC</h1><img class="token" src="${PIXEL}">`
     + '<span class="atlas-sb-label">Attack</span><span class="atlas-dice-link" data-connect-roll="0" role="button" tabindex="0">Claws</span>'
     + '<span data-connect-roll="7">stale</span></div>',
-  css: ':where([data-connect-body]) { --accent: #7c5cff; } .atlas-sb-heading { color: var(--accent); }',
-  rootClasses: 'theme-dark',
-  bodyClasses: 'theme-dark obsidian-app',
+  css: '.atlas-sb-heading { color: var(--accent); background: var(--text-normal); }',
+  variables: { '--accent': '#7c5cff', '--text-normal': '#dadada' },
   rolls: [{ formula: '1d6+2', text: 'Claws', label: 'Attack' }],
 };
 
@@ -41,14 +40,24 @@ describe("Atlas's card for a player", () => {
       .toBe(` a { background: none; } b { background: url(${PIXEL}); } c { width: invalid(alert(1)); }`);
   });
 
-  it('draws the card in a shadow root within stand-ins for the GM\'s html and body, its rolls bound', () => {
+  it("draws the card in a shadow root in the player's theme, the GM's values only where the player has none, its rolls bound", () => {
+    document.documentElement.className = 'mod-windows';
+    document.body.className = 'theme-light obsidian-app';
+    document.body.style.setProperty('--text-normal', '#222');
     const host = document.createElement('div');
     const bind = vi.fn();
     renderCard(host, CARD, bind);
     const shadow = host.shadowRoot!;
-    expect(shadow.querySelector('style')?.textContent).toContain('.atlas-sb-heading { color: var(--accent); }');
-    expect(shadow.querySelector('[data-connect-html]')?.className).toBe('theme-dark');
-    expect(shadow.querySelector('[data-connect-body]')?.className).toBe('theme-dark obsidian-app');
+    expect(shadow.querySelector('style')?.textContent).toContain('.atlas-sb-heading { color: var(--accent); background: var(--text-normal); }');
+    const wrapper = shadow.querySelector<HTMLElement>('[data-connect-html]')!;
+    expect(wrapper.className).toBe('mod-windows');
+    expect(shadow.querySelector('[data-connect-body]')?.className).toBe('theme-light obsidian-app');
+    expect(wrapper.style.getPropertyValue('--accent')).toBe('#7c5cff');
+    // The player's Obsidian gives this one: theirs is kept.
+    expect(wrapper.style.getPropertyValue('--text-normal')).toBe('');
+    document.body.style.removeProperty('--text-normal');
+    document.body.className = '';
+    document.documentElement.className = '';
     expect(shadow.querySelector('h1')?.textContent).toBe('Modelo NPC');
     expect(bind).toHaveBeenCalledTimes(1);
     expect(bind).toHaveBeenCalledWith(shadow.querySelector('.atlas-dice-link'), 0, CARD.rolls[0]);

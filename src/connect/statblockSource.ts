@@ -14,7 +14,7 @@ import { TFile, type App, type EventRef } from 'obsidian';
 import type { Character } from '@atlas-vtt/api-types';
 import type { StatblockSource } from '../app/online/atlas/toolParts';
 import { templateId, type TemplatedStatblock } from '../app/online/tools/templateSheets';
-import { captureCard, StatblockCards } from './statblockCards';
+import { captureCard, cardKey, cardKeyParts, StatblockCards } from './statblockCards';
 
 interface FantasyStatblocksApi {
   isResolved?(): boolean;
@@ -109,7 +109,10 @@ class TemplateFiles {
 export function obsidianStatblocks(app: App): StatblockSource {
   const listeners = new Set<() => void>();
   const notify = (): void => listeners.forEach((listener) => listener());
-  const cards = new StatblockCards((path) => captureCard(app, path), notify);
+  const cards = new StatblockCards((key) => {
+    const { notePath: path, art } = cardKeyParts(key);
+    return captureCard(app, path, art);
+  }, notify);
   const templates = new TemplateFiles(app, () => {
     cards.forget();
     notify();
@@ -152,7 +155,9 @@ export function obsidianStatblocks(app: App): StatblockSource {
     },
     card(token: Character) {
       const path = typeof token.statblockPath === 'string' ? notePath(token.statblockPath) : '';
-      return path ? cards.get(path) : null;
+      const imagePath = typeof token.imagePath === 'string' ? token.imagePath : '';
+      const art = imagePath ? { imagePath, ringColor: typeof token.ringColor === 'string' ? token.ringColor : undefined, showRing: token.showRing } : null;
+      return path ? cards.get(cardKey(path, art)) : null;
     },
     onChange(listener: () => void): () => void {
       // Once a second at most: a note being typed in changes the cache on every keystroke.

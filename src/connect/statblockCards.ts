@@ -104,26 +104,21 @@ function keyframesFor(css: string, doc: Document): string[] {
   return found;
 }
 
-/** Values of the variables the card reads, as the card's root has them (computed: no `var()` left). */
-function variablesFor(css: string, root: Element): string {
+/**
+ * Values of the variables the card reads, as the card's root has them (computed: no `var()` left): the player's
+ * side uses each only where its own Obsidian (or page) has none, so the card takes the player's theme.
+ */
+async function variablesFor(css: string, root: Element): Promise<Record<string, string>> {
   const names = new Set<string>();
   for (const match of css.matchAll(/var\(\s*(--[\w-]+)/g)) names.add(match[1]!);
   const computed = getComputedStyle(root);
-  const declarations: string[] = [];
+  const values: Record<string, string> = {};
   for (const name of names) {
     const value = computed.getPropertyValue(name).trim();
-    if (value) declarations.push(`${name}: ${value};`);
+    if (!value || value.length > CARD_LIMITS.variable || Object.keys(values).length >= CARD_LIMITS.variables) continue;
+    values[name] = value.includes('url(') ? await embedUrls(value) : value;
   }
-  return declarations.join(' ');
-}
-
-/** What the card inherits from the note around it: its text's colour, font and size. */
-function inheritedFor(container: Element): string {
-  const computed = getComputedStyle(container);
-  const names = ['color', 'font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'text-rendering',
-    '-webkit-font-smoothing', 'font-feature-settings', 'font-variant-numeric'];
-  return names.map((name) => [name, computed.getPropertyValue(name).trim()] as const).filter(([, value]) => value)
-    .map(([name, value]) => `${name}: ${value};`).join(' ');
+  return values;
 }
 
 /** An image as a small embedded WebP; null when it cannot be read. */
@@ -189,8 +184,37 @@ function settled(element: Element): Promise<void> {
   });
 }
 
-/** Atlas's card of the note at `notePath`, ready for a player; null when this Atlas draws none. */
-export async function captureCard(app: App, notePath: string): Promise<SheetCard | null> {
+/** A token's art as the card shows it in place of the note's own picture (`useTokenPortrait` in Atlas). */
+export interface TokenArt {
+  imagePath: string;
+  ringColor?: string | undefined;
+  showRing?: boolean | undefined;
+}
+
+/**
+ * The card's header with the token's art at its right, as Atlas draws a stat block shown for a token
+ * (`StatblockHeader`, `TokenPortrait`): the art the map shows, so the creature never looks different from its token.
+ */
+function putTokenArt(app: App, root: Element, art: TokenArt): void {
+  const file = app.vault.getFileByPath(art.imagePath);
+  const header = root.querySelector('.atlas-sb-header');
+  if (!file || !header) return;
+  const frame = header.querySelector<HTMLElement>(':scope > [data-block-id="header-token"]') ?? header.createDiv();
+  frame.className = 'atlas-sb-item atlas-sb-item--fit';
+  const attributes = { 'data-type': 'image', 'data-block': 'image', 'data-prop': 'image', 'data-block-id': 'header-token', 'data-look': 'token' };
+  for (const [name, value] of Object.entries(attributes)) frame.setAttribute(name, value);
+  const showRing = art.showRing !== false;
+  frame.empty();
+  const portrait = frame.createDiv({ cls: ['atlas-token-portrait', ...(showRing ? [] : ['atlas-token-portrait--unframed']), 'atlas-sb-token-image'] });
+  portrait.createDiv({ cls: 'atlas-token-image-wrapper' }).createEl('img', { attr: { src: app.vault.getResourcePath(file), alt: '', draggable: 'false' } });
+  if (showRing) {
+    const ring = portrait.createDiv({ cls: 'atlas-token-ring' });
+    if (art.ringColor) ring.style.setProperty('--atlas-token-ring-color', art.ringColor);
+  }
+}
+
+/** Atlas's card of the note at `notePath`, with `art` in its header, ready for a player; null when this Atlas draws none. */
+export async function captureCard(app: App, notePath: string, art: TokenArt | null = null): Promise<SheetCard | null> {
   const doc = document;
   // Rendered as a note renders it, without the note's margins around the card.
   const container = createDiv({ cls: 'markdown-rendered' });
@@ -206,6 +230,7 @@ export async function captureCard(app: App, notePath: string): Promise<SheetCard
     if (!card) return null;
     container.querySelectorAll('.atlas-statblock-fence__bar').forEach((bar) => bar.remove());
     const root = container.firstElementChild ?? container;
+    if (art) putTokenArt(app, root, art);
 
     const rolls: CardRoll[] = [];
     for (const link of Array.from(root.querySelectorAll<HTMLElement>('[data-formula]'))) {
@@ -223,8 +248,8 @@ export async function captureCard(app: App, notePath: string): Promise<SheetCard
     const frames = keyframesFor(rules, doc).join('\n');
     // The variables read inline too: Atlas sets some on its elements (`--atlas-sb-max-columns`).
     const inline = Array.from(container.querySelectorAll('[style]')).map((element) => element.getAttribute('style') ?? '').join(';');
-    const variables = variablesFor(`${rules}\n${inline}`, container);
-    const css = await embedUrls(`:where([data-connect-body]) { ${variables} ${inheritedFor(container)} }\n${rules}\n${frames}`);
+    const variables = await variablesFor(`${rules}\n${inline}`, container);
+    const css = await embedUrls(`${rules}\n${frames}`);
 
     for (const image of Array.from(container.querySelectorAll('img'))) {
       const shown = Math.max(image.getBoundingClientRect().width, image.getBoundingClientRect().height);
@@ -239,15 +264,28 @@ export async function captureCard(app: App, notePath: string): Promise<SheetCard
       console.warn(`[Atlas VTT Connect] The stat block of ${notePath} is too large to send as a card (${outer.length} + ${css.length} characters).`);
       return null;
     }
-    return { html: outer, css, rootClasses: doc.documentElement.className, bodyClasses: doc.body.className, rolls };
+    return { html: outer, css, variables, rolls };
   } finally {
     component.unload();
     container.remove();
   }
 }
 
+/** What a card is kept by: its note and the art of the token it is for, which the card's header shows. */
+export function cardKey(notePath: string, art: TokenArt | null): string {
+  return [notePath, art?.imagePath ?? '', art?.ringColor ?? '', art?.showRing === false ? 'unframed' : ''].join(KEY_SEPARATOR);
+}
+
+const KEY_SEPARATOR = '\u0000';
+
+/** The note and art a key stands for. */
+export function cardKeyParts(key: string): { notePath: string; art: TokenArt | null } {
+  const [notePath = '', imagePath = '', ringColor = '', framed = ''] = key.split(KEY_SEPARATOR);
+  return { notePath, art: imagePath ? { imagePath, ...(ringColor ? { ringColor } : {}), showRing: framed !== 'unframed' } : null };
+}
+
 /**
- * Cards by note path, drawn on demand one at a time: `get` answers from what is kept and asks for a drawing when
+ * Cards by note and token art (`cardKey`), drawn on demand one at a time: `get` answers from what is kept and asks for a drawing when
  * there is none or it is out of date, `drawn` is called once one is ready. A card out of date is still given until
  * its new drawing replaces it, so a player never sees it go while a note is edited.
  */
@@ -267,10 +305,12 @@ export class StatblockCards {
     return this.cards.get(notePath);
   }
 
-  /** Marks the card of `notePath`, or every card, out of date: each is drawn again when next asked for. */
+  /** Marks the cards of `notePath`, or every card, out of date: each is drawn again when next asked for. */
   forget(notePath?: string): void {
     this.generation += 1;
-    for (const path of notePath === undefined ? this.cards.keys() : [notePath]) if (this.cards.has(path)) this.stale.add(path);
+    for (const key of this.cards.keys()) {
+      if (notePath === undefined || key === notePath || key.startsWith(`${notePath}${KEY_SEPARATOR}`)) this.stale.add(key);
+    }
   }
 
   private request(notePath: string): void {

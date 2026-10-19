@@ -242,7 +242,8 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker, 
     parts.push(card);
   } else parts.push(el('h3', 'sheet-name', entry.name ?? sheet?.name ?? 'Token'));
   if (sheet?.subtitle && !card) parts.push(el('p', 'sheet-subtitle', sheet.subtitle));
-  if (entry.resources.length > 0) {
+  // A card leaves out the numbers: the token's bars already show them, and Atlas's card has its own.
+  if (entry.resources.length > 0 && !card) {
     const numbers = el('div', 'sheet-numbers');
     for (const resource of entry.resources) {
       const row = el('div', 'sheet-number');
