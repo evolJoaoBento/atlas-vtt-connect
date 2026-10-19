@@ -18,8 +18,10 @@ import type { SceneSession } from '../scene/sceneContracts';
 import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
-import { buildSheet, SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
+import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
 import type { SheetRollExtras } from './DiceHost';
+import { buildPlayerSheet } from './templateSheets';
+import { cardRollFormula, type SheetCard } from './sheetCards';
 
 /** A sheets message stays under this, well inside a control message, with room for the envelope. */
 const SHEETS_BUDGET_BYTES = Math.floor(MAX_CONTROL_MESSAGE_BYTES * 0.75);
@@ -32,8 +34,10 @@ export interface SheetHostOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot' | 'audience' | 'onSlotChange'>;
   /** The resources of the collection holding the map at `mapPath`. */
   resources(mapPath: string | null): readonly ResourceDefinition[];
-  /** The creature a token links (Fantasy Statblocks' shape), or null: none linked, or it cannot be read. */
+  /** The creature a token links (Fantasy Statblocks' shape, or a templated note's `TemplatedStatblock`), or null: none linked, or it cannot be read. */
   readStatblock(token: Character): unknown;
+  /** Atlas's card of the token's stat block (`sheetCards.ts`); null or undefined where there is none (yet). */
+  readCard?(token: Character): SheetCard | null | undefined;
   /** Calls `listener` when stat blocks may read differently (the statblock plugin updated); returns the stop. */
   onStatblocksChanged?(listener: () => void): () => void;
   /** Rolls a formula as the player's roll, named after the ability it was rolled from and with its side; false when refused. Without it sheets offer no rolls. */
@@ -66,10 +70,22 @@ function resourcesOf(token: Character, definitions: readonly ResourceDefinition[
   return found;
 }
 
-/** Keeps a list of sheets inside the budget: the longest stat blocks lose their sections first, then their stat block. */
+/**
+ * Keeps a list of sheets inside the budget: the largest cards go first (their text sheet stays), then the longest
+ * stat blocks lose their sections, then their stat block.
+ */
 function fitSheets(entries: TokenSheet[]): TokenSheet[] {
   const size = (list: TokenSheet[]): number => new TextEncoder().encode(JSON.stringify(list)).length;
   let fitted = entries;
+  while (size(fitted) > SHEETS_BUDGET_BYTES && fitted.some((entry) => entry.card)) {
+    const cardBytes = fitted.map((entry) => (entry.card ? JSON.stringify(entry.card).length : -1));
+    const largest = cardBytes.indexOf(Math.max(...cardBytes));
+    fitted = fitted.map((entry, index) => {
+      if (index !== largest) return entry;
+      const { card: _card, ...rest } = entry;
+      return rest;
+    });
+  }
   while (size(fitted) > SHEETS_BUDGET_BYTES) {
     const largest = fitted.reduce<{ index: number; bytes: number }>((best, entry, index) => {
       const bytes = entry.sheet ? JSON.stringify(entry.sheet).length : 0;
@@ -130,11 +146,20 @@ export class SheetHost implements SessionHandler {
     const scene = this.sceneOf(player.playerId);
     const token = scene?.snapshot.objects.tokens[message.tokenId];
     if (!scene || !isCharacter(token) || !Object.hasOwn(scene.shown, message.tokenId)) return;
+    const { side } = message.roll;
+    if (message.roll.kind === 'card') {
+      // The card the player was sent last, as the GM's Atlas drew it: a roll is its formula, never the player's.
+      const card = this.cardOf(token);
+      const roll = card ? card.rolls[message.roll.index] : undefined;
+      const formula = card ? cardRollFormula(card, message.roll.index, message.roll.text) : null;
+      if (!roll || !formula) return;
+      this.options.rollFor(player, formula, { abilityName: (roll.label || displayName(token) || 'Roll').slice(0, SHEET_LIMITS.name), ...(side ? { advantage: side } : {}) });
+      return;
+    }
     // Read afresh: the roll is what the stat block says now.
-    const sheet = buildSheet(this.read(token), displayName(token));
+    const sheet = buildPlayerSheet(this.read(token), displayName(token));
     const formula = sheet ? sheetRollFormula(sheet, message.roll) : null;
     if (!sheet || !formula) return;
-    const { side } = message.roll;
     this.options.rollFor(player, formula, { abilityName: sheetRollLabel(sheet, message.roll).slice(0, SHEET_LIMITS.name), ...(side ? { advantage: side } : {}) });
   }
 
@@ -180,9 +205,18 @@ export class SheetHost implements SessionHandler {
     if (!key) return null;
     const cached = this.cache.get(key);
     if (cached && this.now() - cached.at < SHEET_CACHE_MS) return cached.sheet;
-    const sheet = buildSheet(this.read(token), displayName(token));
+    const sheet = buildPlayerSheet(this.read(token), displayName(token));
     this.cache.set(key, { at: this.now(), sheet });
     return sheet;
+  }
+
+  private cardOf(token: Character): SheetCard | null {
+    try {
+      return this.options.readCard?.(token) ?? null;
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Could not read a stat block card for a player:', error);
+      return null;
+    }
   }
 
   /** The player's sheets now; null while their scene is not at hand (they keep what they have). */
@@ -196,7 +230,8 @@ export class SheetHost implements SessionHandler {
     for (const tokenId of controlled) {
       const token = scene.snapshot.objects.tokens[tokenId];
       if (!Object.hasOwn(scene.shown, tokenId) || !isCharacter(token)) continue;
-      entries.push({ tokenId, name: displayName(token), resources: resourcesOf(token, definitions), sheet: this.sheetOf(token) });
+      const card = this.cardOf(token);
+      entries.push({ tokenId, name: displayName(token), resources: resourcesOf(token, definitions), sheet: this.sheetOf(token), ...(card ? { card } : {}) });
       if (entries.length >= SHEET_LIMITS.tokens) break;
     }
     return fitSheets(entries);

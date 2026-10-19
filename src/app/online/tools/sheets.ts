@@ -8,6 +8,8 @@
  * there (`sheetRollFormula`), so a player can roll only what their sheet offers.
  */
 
+import { CARD_LIMITS, isSheetCard, type SheetCard } from './sheetCards';
+
 export const SHEET_LIMITS = {
   /** Tokens per player in one message. */
   tokens: 16,
@@ -83,6 +85,8 @@ export interface TokenSheet {
   resources: SheetResource[];
   /** The linked stat block; null when the token links none or it cannot be read. */
   sheet: PlayerSheet | null;
+  /** The stat block as Atlas draws it (`sheetCards.ts`), shown in place of `sheet` where a page can; absent where Atlas draws none. */
+  card?: SheetCard;
 }
 
 /** A roll with advantage or disadvantage: Atlas's dice set rule for that side decides what it does (`diceAdvantage`). */
@@ -99,6 +103,7 @@ export type SheetRollRef = (
   | { kind: 'save'; index: number }
   | { kind: 'skill'; index: number }
   | { kind: 'text'; section: number; item: number; index: number; text?: string }
+  | { kind: 'card'; index: number; text: string }
 ) & { side?: AdvantageSide };
 
 type Rec = Record<string, unknown>;
@@ -106,7 +111,7 @@ const isObject = (value: unknown): value is Rec => typeof value === 'object' && 
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Plain text of at most `max` characters, or null: numbers become text, markup-looking brackets stay text. */
-function text(value: unknown, max: number): string | null {
+export function text(value: unknown, max: number): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value).slice(0, max);
   if (typeof value !== 'string') return null;
   // Control characters out (tabs and line breaks become spaces with the rest of the whitespace), runs to one space.
@@ -286,6 +291,8 @@ export function sheetRollFormula(sheet: PlayerSheet, ref: SheetRollRef): string 
       // older version, which sends no text), finds other text there, and nothing is rolled.
       return part && 'formula' in part && part.text === ref.text ? part.formula : null;
     }
+    // A card's rolls are the card's (`cardRollFormula`).
+    case 'card': return null;
   }
 }
 
@@ -296,6 +303,7 @@ export function sheetRollLabel(sheet: PlayerSheet, ref: SheetRollRef): string {
     case 'save': return `${sheet.saves[ref.index]?.label ?? 'Save'} save`;
     case 'skill': return sheet.skills[ref.index]?.label ?? 'Skill';
     case 'text': return sheet.sections[ref.section]?.items[ref.item]?.name || 'Roll';
+    case 'card': return 'Roll';
   }
 }
 
@@ -315,6 +323,7 @@ export function isSheetRollRef(value: unknown): value is SheetRollRef {
     case 'skill': return isInt(value.index, 0, SHEET_LIMITS.bonuses - 1);
     case 'text': return isInt(value.section, 0, SHEET_LIMITS.sections - 1) && isInt(value.item, 0, SHEET_LIMITS.items - 1) && isInt(value.index, 0, 99)
       && (value.text === undefined || isText(value.text, SHEET_LIMITS.rollText));
+    case 'card': return isInt(value.index, 0, CARD_LIMITS.rolls - 1) && isText(value.text, CARD_LIMITS.rollText);
     default: return false;
   }
 }
@@ -347,7 +356,7 @@ export function isTokenSheets(value: unknown): value is TokenSheet[] {
   return Array.isArray(value) && value.length <= SHEET_LIMITS.tokens && value.every((entry) => isObject(entry)
     && isText(entry.tokenId, 128) && entry.tokenId.length > 0 && isTextOrNull(entry.name, SHEET_LIMITS.name)
     && Array.isArray(entry.resources) && entry.resources.length <= SHEET_LIMITS.resources && entry.resources.every(isSheetResource)
-    && (entry.sheet === null || isPlayerSheet(entry.sheet)));
+    && (entry.sheet === null || isPlayerSheet(entry.sheet)) && (entry.card === undefined || isSheetCard(entry.card)));
 }
 
 /** A resource colour as a sheet may carry it. */
