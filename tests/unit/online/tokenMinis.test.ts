@@ -79,7 +79,7 @@ describe('minis on tokens', () => {
     const id = fingerprintOf(glb);
     const put = vi.fn(async (_image: StoredImage): Promise<void> => undefined);
     const decode = vi.fn(async () => null);
-    const loader = new AssetLoader({ cache: { get: async () => null, put }, decode, hash: nodeHash, onChange: () => undefined, models: true });
+    const loader = new AssetLoader({ cache: { get: async () => null, put }, decode, hash: nodeHash, onChange: () => undefined, models: () => true });
     loader.connected(() => undefined);
     loader.setScene(playerScene({ tokens: { t: playerToken({ image: null, mini: { asset: id, scale: 1, turn: 0 } }) } }));
     await settle();
