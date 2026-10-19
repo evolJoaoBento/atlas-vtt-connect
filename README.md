@@ -11,7 +11,7 @@ Connect is an independent plugin, not made by or affiliated with the Atlas VTT a
 1. Obsidian 1.8.7 or newer, on desktop.
 2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
 
-**Updating to 0.4.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. With an older GM, clicking a readable pin says the note couldn't be opened, and a note sent with Send to… never arrives.
+**Updating to 0.5.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. Players on an older version still get a text sheet, without Atlas's card.
 
 ## Start a session (GM)
 
@@ -86,7 +86,7 @@ Right-click a token → **Controlled by** → tick the player. They can drag it 
 
 ![Controlled by, then the player moves it](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/18-controlled-by.gif)
 
-Players see the stat block of every token they control, with exact numbers, and roll from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster you hand to a player.
+Players see the stat block of every token they control, with exact numbers, and roll from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster you hand to a player. In Obsidian they see Atlas's own card for the token, in their own theme; stat blocks made with Atlas templates show their template's fields, without the hidden ones.
 
 **Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions.
 
