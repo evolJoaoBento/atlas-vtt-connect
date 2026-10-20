@@ -365,10 +365,8 @@ function headerKey(fields: Map<string, Field>, meaning: string, key: string): st
 export function buildTemplateSheet(template: unknown, record: Rec, fallbackName: string | null = null): PlayerSheet | null {
   if (!isObject(template) || !isObject(template.layout)) return null;
   const fields = fieldsOf(template);
-  // The header's parts read their own keys even where the template's fields leave them out.
-  for (const [key, label, type, meaning] of [['level', 'Level', 'rating', 'rating'], ['type', 'Type', 'text', 'creature-type'], ['hp', 'HP', 'number', 'hit-points'], ['description', 'Description', 'markdown', 'description']] as const) {
-    if (!fields.has(key) && ![...fields.values()].some((field) => field.meaning === meaning)) fields.set(key, { key, label, type, meaning, formerKeys: [] });
-  }
+  // A header part whose field the template leaves out shows players nothing: Atlas hides from them every key the
+  // template names nowhere (`playerAccess`), its card's own header parts among them.
   const values = new Values(record, fields, (field) => hiddenFrom(template, field));
   const displayKey = [...fields.values()].find((field) => field.meaning === 'display-name')?.key;
   const name = (displayKey ? text(values.read(displayKey), SHEET_LIMITS.name) : null) ?? text(record.name, SHEET_LIMITS.name) ?? fallbackName;
@@ -385,10 +383,10 @@ export function buildTemplateSheet(template: unknown, record: Rec, fallbackName:
   const subtitle = text([level ? `${level.label} ${level.text}` : '', type?.text ?? ''].filter(Boolean).join(' · '), SHEET_LIMITS.short);
 
   const out = new SheetSections();
-  const hp = headerPart('hp', 'hit-points', 'hp');
-  // The hit dice beside the hit points roll them, as on Atlas's card.
-  // The hit dice keep to what the template lets players see of them, named as a field or not.
-  const hitDice = hiddenFrom(template, values.field('hit_dice') ?? { key: 'hit_dice', label: '', type: 'text', formerKeys: [] }) ? '' : valueText(record.hit_dice);
+  // The hit dice beside the hit points roll them, as on Atlas's card, where the template names them; hidden from
+  // players, they hide the hit points they are shown with, as Atlas's `readsHiddenField` does.
+  const hp = values.hides('hit_dice') ? null : headerPart('hp', 'hit-points', 'hp');
+  const hitDice = values.text('hit_dice');
   if (hp) out.add(hp.label, [hp.text, hitDice ? `(${hitDice})` : ''].filter(Boolean).join(' '));
   const description = headerPart('description', 'description', 'description');
   if (description) out.add('', description.text);

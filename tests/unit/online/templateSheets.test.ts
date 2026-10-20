@@ -159,10 +159,22 @@ describe("a template's players settings (Atlas 0.9's `players`)", () => {
     expect(JSON.stringify(sheet)).not.toContain('100');
   });
 
-  it('leaves out the hit dice beside the hit points where the template hides them', () => {
+  it('shows the hit dice beside the hit points only where the template names them, and neither where it hides them', () => {
     const note = { ...NOTE, hit_dice: '3d8' };
-    expect(items(ADVERSARY, note)).toContain('3d8');
-    expect(items({ ...ADVERSARY, players: { hit_dice: 'hidden' } }, note)).not.toContain('3d8');
+    const named = { ...ADVERSARY, fields: [...ADVERSARY.fields, { key: 'hit_dice', label: 'Hit dice', type: 'dice' }] };
+    expect(items(ADVERSARY, note)).not.toContain('3d8');
+    expect(buildTemplateSheet(named, note)?.sections[0]?.items[0]).toEqual({ name: 'PV', desc: '6 (3d8)' });
+    const hidden = items({ ...named, players: { hit_dice: 'hidden' } }, note);
+    expect(hidden).not.toContain('3d8');
+    expect(hidden).not.toContain('PV');
+  });
+
+  it('shows no header part whose field the template names nowhere, as Atlas hides such keys from players', () => {
+    const fields = ADVERSARY.fields.filter((field) => !['patamar', 'pv', 'description'].includes(field.key));
+    const sheet = buildTemplateSheet({ ...ADVERSARY, fields }, { ...NOTE, level: 3, hp: 9 })!;
+    expect(sheet.subtitle).toBeNull();
+    expect(JSON.stringify(sheet)).not.toContain('A shadow in the mist.');
+    expect(JSON.stringify(sheet.sections)).not.toMatch(/"(?:HP|PV|Level)"/);
   });
 
   it("shows nothing of a block kind it does not know, such as Atlas 0.9's counters, without failing", () => {
