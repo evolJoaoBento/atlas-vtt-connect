@@ -4,7 +4,7 @@
   "version": "0.4.0",
   "minAppVersion": "1.8.7",
   "description": "Online play for Atlas VTT: host sessions, let players join from a web page or a tab, and share notes and maps.",
-  "author": "João Bento",
+  "author": "Bento's Grimoire of Things",
   "authorUrl": "https://github.com/evolJoaoBento",
   "isDesktopOnly": true
 }
