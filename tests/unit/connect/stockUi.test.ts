@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiApi } from '@atlas-vtt/api-types';
 import { FloatingDock, type DockEnv, type DockView, type MenuItemLike, type MenuLike } from '../../../src/connect/stockUi/floatingDock';
 import { createUiRegistry } from '../../../src/connect/stockUi/uiRegistry';
+import { stockDockEnv, type UiStockView } from '../../../src/connect/stockUi/stockUi';
 
 interface FakeEntry { title: string; icon: string | null; checked: boolean | null; disabled: boolean; click: (() => void) | null; submenu: FakeMenu | null }
 
@@ -346,5 +347,29 @@ describe('the stock stand-in\'s ui namespace', () => {
       expect(error).toHaveBeenCalled();
       error.mockRestore();
     });
+  });
+});
+
+describe('the stock dock\'s view of a map', () => {
+  /** A view whose scene holds `tokens`, `selected`, and whose token layer finds `hit` under any point. */
+  function viewOf(tokens: Record<string, { kind?: string; name?: string; offMap?: true }>, selected: string[], hit: string | null): UiStockView {
+    const containerEl = document.createElement('div');
+    containerEl.append(document.createElement('canvas'));
+    return {
+      viewId: 'v1',
+      containerEl,
+      renderer: { getTokenRenderer: () => ({ hitTestTokens: () => hit, viewport: { toWorld: (point) => point } }) },
+      atlasStore: { getState: () => ({ selectedIds: selected, objects: { tokens } }), subscribe: () => () => undefined },
+      tabMetaStore: { getState: () => ({ tabs: [], activeTabId: null }), subscribe: () => () => undefined },
+    };
+  }
+  const envOf = (view: UiStockView) => stockDockEnv({} as never, { views: () => [view], active: () => view, presentedTabId: () => null, onViewsChanged: () => () => undefined });
+
+  it('leaves out tokens kept beside the map (Atlas 0.9\'s `offMap`) from the selection and the token under the pointer', () => {
+    const tokens = { hero: { kind: 'character', name: 'Hero' }, wolf: { kind: 'character', name: 'Wolf', offMap: true as const } };
+    const env = envOf(viewOf(tokens, ['hero', 'wolf'], 'wolf'));
+    expect(env.activeView()?.selectedTokens().map((token) => token.id)).toEqual(['hero']);
+    expect(env.activeView()?.tokenAt?.(1, 1)).toBeNull();
+    expect(envOf(viewOf(tokens, [], 'hero')).activeView()?.tokenAt?.(1, 1)?.id).toBe('hero');
   });
 });

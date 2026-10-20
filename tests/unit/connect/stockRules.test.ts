@@ -46,6 +46,17 @@ describe('the rules of a stock Atlas map', () => {
     expect(rules.initiative).toEqual({ mode: 'sides', roll: '2d6', firstSide: 'opponents' });
   });
 
+  it("reads Atlas 0.9's initiative by cards as the collection says, never as the defaults", () => {
+    const shown = view('atlas-vtt/collections/Main/scenes/a.atlasmap', { assets: assets({ initiative: { mode: 'cards', roll: '1d8', firstSide: 'opponents', deck: 10 } }) });
+    const rules = stockMapRules([shown], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS);
+    expect(rules.initiative).toEqual({ mode: 'cards', roll: '1d8', firstSide: 'opponents' });
+  });
+
+  it("reads a side the collection named as first (Atlas 0.9) as the players'", () => {
+    const shown = view('atlas-vtt/collections/Main/scenes/a.atlasmap', { assets: assets({ initiative: { mode: 'sides', roll: '1d20', firstSide: 'monsters', sides: [{ id: 'monsters', name: 'Monsters' }] } }) });
+    expect(stockMapRules([shown], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS).initiative).toEqual({ mode: 'sides', roll: '1d20', firstSide: 'players' });
+  });
+
   it('keeps the defaults without a map, a view, an index or a collection, and drops what it cannot read', () => {
     expect(stockMapRules([], 'x.atlasmap', DEFAULTS)).toBe(DEFAULTS);
     expect(stockMapRules([view('a')], null, DEFAULTS)).toBe(DEFAULTS);

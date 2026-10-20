@@ -99,6 +99,8 @@ export function projectInitiative(
   if (!rules.showInitiative || !state.initiativeTrackerOpen || !initiative) return null;
   const combat = initiative.isActive === true;
   const sides = projectSides(state, rules, initiativeRules);
+  // Atlas 0.9's fight by cards: a combatant's number is the card it was dealt, as Atlas's players' list shows it.
+  const byCards = combat && isRecord((initiative as { cards?: unknown }).cards);
   const tokens = state.objects?.tokens ?? {};
   const entries = (Array.isArray(initiative.entries) ? initiative.entries : [])
     .filter((entry) => typeof entry === 'object' && entry !== null && isSceneId(entry.id) && visibleTokenIds.has(entry.tokenId))
@@ -107,12 +109,13 @@ export function projectInitiative(
     .map((entry) => ({
       id: entry.id,
       tokenId: entry.tokenId,
-      initiative: sides ? 0 : finiteOr(entry.initiative, 0),
+      initiative: sides ? 0 : finiteOr(byCards ? (entry as { card?: unknown }).card : entry.initiative, 0),
       name: rules.showTokenNameplates ? textOrNull(entry.name) : null,
       // Entries keep no HP since Atlas 0.5: the bar is the token's `hp` resource, as the player window draws it.
       hp: null,
       hpShare: hpShareOf(tokens, entry.tokenId, definitions, resourceShows),
-      isActive: !sides && combat && entry.isActive === true,
+      // One that delayed its turn (Atlas 0.9) waits outside the order and has no turn, as Atlas's list shows it.
+      isActive: !sides && combat && entry.isActive === true && (entry as { delayed?: unknown }).delayed !== true,
       ...(entry.sitsOut === true && { sitsOut: true as const }),
     }));
   return { round: finiteOr(initiative.round, 0), active: combat, entries, ...(sides && { sides }) };

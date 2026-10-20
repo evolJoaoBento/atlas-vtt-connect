@@ -8,7 +8,8 @@
  * found again as any roll in a trait's text is (`SheetRollRef` `text`). Patterns and fallbacks are not worked out: a
  * value shows as the note holds it. A built-in template (`builtin:`) lives in Atlas's code, out of reach: its stat
  * block reads as a 5e one. A template that cannot be found shows every field of the note, as Atlas's own stand-in
- * template does.
+ * template does. A field the template hides from players (Atlas 0.9's `players`) never reaches them, nor a block
+ * that shows one, as Atlas's own online play decides (`playerAccess.ts`).
  */
 import { buildSheet, SHEET_LIMITS, text, type PlayerSheet, type SheetItem, type SheetSection } from './sheets';
 
@@ -81,6 +82,38 @@ function fieldsOf(template: Rec): Map<string, Field> {
   return found;
 }
 
+/** What a player may do with a field (Atlas 0.9's `PlayerAccess`, `StatblockTemplate.players`). */
+type PlayerAccess = 'edit' | 'read' | 'hidden';
+const PLAYER_ACCESS: ReadonlySet<unknown> = new Set(['edit', 'read', 'hidden']);
+
+/**
+ * Whether players may never see `field`, as Atlas's own online play decides (`playerAccess` in `playerAccess.ts`):
+ * the name, the display name and images are always read; else the setting the template stores under the field's
+ * key, then under a key it had before, newest first, a setting this does not know counting as hidden; a spell list
+ * is hidden only where so set; without a setting, nothing is hidden.
+ */
+function hiddenFrom(template: Rec, field: Field): boolean {
+  if (field.key === 'name' || field.type === 'image' || field.meaning === 'display-name') return false;
+  const players = isObject(template.players) ? template.players : null;
+  if (!players) return false;
+  for (const key of [field.key, ...field.formerKeys]) {
+    if (!Object.hasOwn(players, key)) continue;
+    const stored = players[key];
+    const access: PlayerAccess = PLAYER_ACCESS.has(stored) ? stored as PlayerAccess : 'hidden';
+    return access === 'hidden';
+  }
+  return false;
+}
+
+/**
+ * Whether a template hides any field from players (Atlas 0.9's `players`): Atlas's own card shows every field, so a
+ * player gets the text sheet, which leaves them out, in its place.
+ */
+export function templateHidesFields(template: unknown): boolean {
+  if (!isObject(template) || !isObject(template.players)) return false;
+  return Object.values(template.players).some((access) => access !== 'edit' && access !== 'read');
+}
+
 const signed = (value: number): string => (value >= 0 ? `+${value}` : String(value));
 const formatNumber = (value: number): string => (Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100));
 
@@ -136,14 +169,25 @@ class SheetSections {
 
 /** Reads a note's values by the template's fields: a field's key, else the first of its former keys the note has. */
 class Values {
-  constructor(private readonly record: Rec, private readonly fields: Map<string, Field>) {}
+  constructor(private readonly record: Rec, private readonly fields: Map<string, Field>, private readonly hidden: (field: Field) => boolean = () => false) {}
 
   field(key: unknown): Field | null {
     return typeof key === 'string' ? this.fields.get(key) ?? null : null;
   }
 
-  /** A field's value; nothing for a key the template does not name or a field never shown as text. */
+  /** Whether `key` names a field the template hides from players. */
+  hides(key: unknown): boolean {
+    const field = this.field(key);
+    return field !== null && this.hidden(field);
+  }
+
+  /** A field's value; nothing for a key the template does not name, a field never shown as text or one hidden from players. */
   read(key: unknown): unknown {
+    return this.hides(key) ? undefined : this.condition(key);
+  }
+
+  /** A field's value as a block's condition reads it: the GM works it out, also from a field hidden from players. */
+  condition(key: unknown): unknown {
     const field = this.field(key);
     if (!field || UNSHOWN_TYPES.has(field.type)) return undefined;
     for (const candidate of [field.key, ...field.formerKeys]) {
@@ -166,7 +210,7 @@ class Values {
 function shows(block: Rec, values: Values): boolean {
   const condition = block.showWhen;
   if (!isObject(condition)) return true;
-  const value = values.read(condition.field);
+  const value = values.condition(condition.field);
   switch (condition.is) {
     case 'present': return present(value);
     case 'absent': return !present(value);
@@ -208,10 +252,23 @@ function tableText(value: unknown, field: Field): string[] {
   return one ? [one] : [];
 }
 
+/** Blocks a hidden field never hides whole: containers decide block by block, a Metric number by number. */
+const CONTAINERS = new Set(['section', 'tabs', 'row', 'metric']);
+
+/**
+ * Whether a block shows a field hidden from players (Atlas's `readsHiddenField`), which hides it whole: its fields, a
+ * Stat's dice and a list's intro. A Metric's numbers are left out one by one and a Section's heading field alone.
+ */
+function showsHidden(block: Rec, values: Values): boolean {
+  if (typeof block.type === 'string' && CONTAINERS.has(block.type)) return false;
+  const keys = [block.field, ...(Array.isArray(block.fields) ? (block.fields as unknown[]) : []), block.rollFrom, block.introField];
+  return keys.some((key) => values.hides(key));
+}
+
 function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: number): void {
   if (!Array.isArray(blocks) || depth > MAX_DEPTH) return;
   for (const block of blocks) {
-    if (!isObject(block) || !shows(block, values)) continue;
+    if (!isObject(block) || showsHidden(block, values) || !shows(block, values)) continue;
     const field = values.field(block.field);
     const label = (fallback?: string): string => (typeof block.label === 'string' && block.label.trim() ? block.label : field?.label ?? fallback ?? '');
     switch (block.type) {
@@ -312,7 +369,7 @@ export function buildTemplateSheet(template: unknown, record: Rec, fallbackName:
   for (const [key, label, type, meaning] of [['level', 'Level', 'rating', 'rating'], ['type', 'Type', 'text', 'creature-type'], ['hp', 'HP', 'number', 'hit-points'], ['description', 'Description', 'markdown', 'description']] as const) {
     if (!fields.has(key) && ![...fields.values()].some((field) => field.meaning === meaning)) fields.set(key, { key, label, type, meaning, formerKeys: [] });
   }
-  const values = new Values(record, fields);
+  const values = new Values(record, fields, (field) => hiddenFrom(template, field));
   const displayKey = [...fields.values()].find((field) => field.meaning === 'display-name')?.key;
   const name = (displayKey ? text(values.read(displayKey), SHEET_LIMITS.name) : null) ?? text(record.name, SHEET_LIMITS.name) ?? fallbackName;
   if (!name) return null;
@@ -330,7 +387,9 @@ export function buildTemplateSheet(template: unknown, record: Rec, fallbackName:
   const out = new SheetSections();
   const hp = headerPart('hp', 'hit-points', 'hp');
   // The hit dice beside the hit points roll them, as on Atlas's card.
-  if (hp) out.add(hp.label, [hp.text, valueText(record.hit_dice) ? `(${valueText(record.hit_dice)})` : ''].filter(Boolean).join(' '));
+  // The hit dice keep to what the template lets players see of them, named as a field or not.
+  const hitDice = hiddenFrom(template, values.field('hit_dice') ?? { key: 'hit_dice', label: '', type: 'text', formerKeys: [] }) ? '' : valueText(record.hit_dice);
+  if (hp) out.add(hp.label, [hp.text, hitDice ? `(${hitDice})` : ''].filter(Boolean).join(' '));
   const description = headerPart('description', 'description', 'description');
   if (description) out.add('', description.text);
   addBlocks(template.layout.blocks, values, out, 0);

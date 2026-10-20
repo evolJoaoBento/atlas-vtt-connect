@@ -113,6 +113,14 @@ describe('tokens on a stock Atlas', () => {
       expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }], { allowHidden: true }).ok).toBe(true);
     });
 
+    it('refuses a token kept beside the map (Atlas 0.9\'s `offMap`): it is no part of the map', () => {
+      const t = setup();
+      (t.tokens[CLERIC] as { offMap?: true }).offMap = true;
+      expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }])).toEqual({ ok: false, reason: 'unknown-token' });
+      expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }], { allowHidden: true })).toEqual({ ok: false, reason: 'unknown-token' });
+      expect(t.writes).toEqual([]);
+    });
+
     it('refuses a token named like an object\'s own method, a view that is loading, one the GM is dragging in, and a closed view', () => {
       const t = setup();
       expect(t.api.move('v1', [{ tokenId: 'constructor', x: 1, y: 1 }])).toEqual({ ok: false, reason: 'unknown-token' });

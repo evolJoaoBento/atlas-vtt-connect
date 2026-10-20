@@ -101,9 +101,10 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const fogShows = context.coverage.within(context.mapSize);
   const visible: Shows = lighting ? darkCovers(fogShows, lighting) : fogShows;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
-  // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
-  const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
-  const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
+  // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars; nor is
+  // one kept beside the map (Atlas 0.9's `offMap`), which is no part of the map.
+  const seen = projectRecord(onMapTokens(objects?.tokens), (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
+  const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
   const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state, memo);
   const fog = projectFog(objects?.fog, memo);
   return {
@@ -122,6 +123,45 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
     ...(context.handout !== undefined ? { handout: context.handout ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
   };
+}
+
+/** Whether a token is kept beside the map (Atlas 0.9's `offMap`): only `true` counts, as in Atlas's `isOffMap`. */
+export function isOffMap(token: unknown): boolean {
+  return typeof token === 'object' && token !== null && (token as { offMap?: unknown }).offMap === true;
+}
+
+const onMapMemo = new WeakMap<object, Readonly<Record<string, unknown>>>();
+
+/**
+ * The tokens on the map, without those kept beside it, as Atlas's `mapTokens`: the very record while none is beside
+ * it, and the same filtered record for as long as the source record is the same, so a reader comparing records by
+ * reference sees no change where there is none.
+ */
+export function onMapTokens<T>(tokens: Readonly<Record<string, T>> | undefined): Readonly<Record<string, T>> | undefined {
+  if (!tokens) return tokens;
+  const known = onMapMemo.get(tokens) as Readonly<Record<string, T>> | undefined;
+  if (known) return known;
+  let kept: Record<string, T> | null = null;
+  for (const [id, token] of Object.entries(tokens)) {
+    if (!isOffMap(token)) continue;
+    kept ??= { ...tokens };
+    delete kept[id];
+  }
+  const result = kept ?? tokens;
+  onMapMemo.set(tokens, result);
+  return result;
+}
+
+/**
+ * The tokens whose entries the players' initiative list keeps, as Atlas's own share numbers them (`TokenShare`): the
+ * tokens sent, and the combatants beside the map that are not hidden. None beside the map where the scene shows
+ * players nothing (a lit scene failing closed).
+ */
+function listedTokenIds(sent: Readonly<Record<string, unknown>>, tokens: Readonly<Record<string, TokenEntity>> | undefined, closed: boolean): Set<string> {
+  const ids = new Set(Object.keys(sent));
+  if (closed || !tokens) return ids;
+  for (const [id, token] of Object.entries(tokens)) if (isOffMap(token) && !token.isHidden) ids.add(id);
+  return ids;
 }
 
 function hasPins(objects: unknown): boolean {

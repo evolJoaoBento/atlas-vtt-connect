@@ -22,6 +22,8 @@ interface UiToken {
   readonly name?: string | null | undefined;
   readonly statblockName?: string | null | undefined;
   readonly imagePath?: string | undefined;
+  /** Kept beside the map (Atlas 0.9): no part of it, so never under the pointer nor among the selected tokens. */
+  readonly offMap?: unknown;
 }
 interface UiSceneState {
   selectedIds?: readonly string[] | undefined;
@@ -60,11 +62,11 @@ function dockView(view: UiStockView, presentedTabId: () => string | null): DockV
       const at = layer.viewport.toWorld({ x: clientX - rect.left, y: clientY - rect.top });
       const id = layer.hitTestTokens(at.x, at.y);
       const token = id === null ? undefined : view.atlasStore.getState().objects.tokens[id];
-      return id === null || !token ? null : { id, kind: token.kind === 'character' ? 'character' : 'token', label: tokenLabel(token) };
+      return id === null || !token || token.offMap === true ? null : { id, kind: token.kind === 'character' ? 'character' : 'token', label: tokenLabel(token) };
     },
     selectedTokens: (): DockToken[] => {
       const { selectedIds, objects } = view.atlasStore.getState();
-      return (selectedIds ?? []).filter((id) => Object.hasOwn(objects.tokens, id)).map((id) => {
+      return (selectedIds ?? []).filter((id) => Object.hasOwn(objects.tokens, id) && objects.tokens[id]?.offMap !== true).map((id) => {
         const token = objects.tokens[id]!;
         return { id, kind: token.kind === 'character' ? 'character' : 'token', label: tokenLabel(token) };
       });
