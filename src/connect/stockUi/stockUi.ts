@@ -38,6 +38,8 @@ export interface StockUiDeps {
   presentedTabId: () => string | null;
   /** Calls `listener` when views open, close or change tabs. */
   onViewsChanged(listener: () => void): Disposer;
+  /** Tabletop's 3D boards open on the GM's side: their toolbars carry Connect's buttons too. */
+  boards?(): BoardDockSource[];
 }
 
 const MEMORY_PREFIX = 'atlas-vtt-connect:dock:';
@@ -79,6 +81,43 @@ function dockView(view: UiStockView, presentedTabId: () => string | null): DockV
   };
 }
 
+/** A Tabletop 3D board, as Connect puts its buttons in: its key, the map it shows, and its root (with Atlas's toolbar slot). */
+export interface BoardDockSource {
+  key: string;
+  mapPath: string;
+  root: HTMLElement;
+}
+
+/**
+ * A board as a view of the dock: its buttons act on the Atlas view holding its map (else the one the GM works in), its
+ * scenes are that view's, and it has no selection of its own.
+ */
+function boardDockView(board: BoardDockSource, deps: StockUiDeps): DockView {
+  const views = deps.views();
+  const holder = views.find((view) => (view.atlasStore.getState() as { mapPath?: unknown }).mapPath === board.mapPath)
+    ?? views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.filePath === board.mapPath))
+    ?? deps.active();
+  const atlas = holder ? dockView(holder, deps.presentedTabId) : null;
+  return {
+    viewId: board.key,
+    ...(holder ? { contextViewId: holder.viewId } : {}),
+    doc: board.root.ownerDocument,
+    root: board.root,
+    selectedTokens: () => [],
+    tabs: () => atlas?.tabs() ?? [],
+  };
+}
+
+/** The boards, never failing: a Tabletop that throws has none. */
+function boardsOf(deps: StockUiDeps): BoardDockSource[] {
+  try {
+    return deps.boards?.() ?? [];
+  } catch (error) {
+    console.warn('[Atlas VTT Connect] Could not read the Tabletop boards:', error);
+    return [];
+  }
+}
+
 /** The dock's surroundings on Obsidian and on the stand-in's views. */
 export function stockDockEnv(app: App, deps: StockUiDeps): DockEnv {
   const read = (key: string): unknown => {
@@ -102,9 +141,11 @@ export function stockDockEnv(app: App, deps: StockUiDeps): DockEnv {
     },
     view: (viewId) => {
       const view = deps.views().find((candidate) => candidate.viewId === viewId);
-      return view ? dockView(view, deps.presentedTabId) : null;
+      if (view) return dockView(view, deps.presentedTabId);
+      const board = boardsOf(deps).find((candidate) => candidate.key === viewId);
+      return board ? boardDockView(board, deps) : null;
     },
-    views: () => deps.views().map((view) => dockView(view, deps.presentedTabId)),
+    views: () => [...deps.views().map((view) => dockView(view, deps.presentedTabId)), ...boardsOf(deps).map((board) => boardDockView(board, deps))],
     watch: (listener) => {
       let timer: number | null = null;
       // One redraw for a burst of changes (a selection drag, a tab switch).

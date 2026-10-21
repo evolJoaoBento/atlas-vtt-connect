@@ -11,6 +11,7 @@
  * and `ui` (`stockUi/`: a floating dock and panels, in place of the slots stock Atlas does not have). Not provided:
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
+import { tabletopBoardViews } from './tabletopMinis';
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
@@ -646,6 +647,8 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         views: () => mapViews(app),
         active: () => activeMapView(app),
         presentedTabId: () => presented.get()?.tabId ?? null,
+        // Tabletop's 3D boards carry the same buttons, for the Atlas view holding their map.
+        boards: () => tabletopBoardViews(app),
         onViewsChanged: (listener) => {
           const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, listener as never));
           return () => { for (const stop of stops) stop(); };
