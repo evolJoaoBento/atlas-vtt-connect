@@ -104,4 +104,26 @@ describe('tabletopBoard', () => {
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it('hands the GM session to Tabletop, again when Tabletop reloads, and takes it back', () => {
+    const { app, plugins, trigger } = fakeApp();
+    const attached: unknown[] = [];
+    const released: unknown[] = [];
+    const make = () => fakeTabletop({ attachSession: (session: unknown) => { attached.push(session); return () => released.push(session); } });
+    const first = make();
+    plugins['atlas-vtt-tabletop'] = { api: first.api };
+    const board = tabletopBoard(app);
+    const session = { hosting: () => true } as never;
+    const release = board.attachSession(session);
+    expect(attached).toEqual([session]);
+    const second = make();
+    plugins['atlas-vtt-tabletop'] = { api: second.api };
+    trigger('atlas-vtt-tabletop:api-ready', second.api);
+    expect(attached).toEqual([session, session]);
+    expect(released).toEqual([session]);
+    release();
+    expect(released).toEqual([session, session]);
+    trigger('atlas-vtt-tabletop:api-ready', make().api);
+    expect(attached).toHaveLength(2);
+  });
 });

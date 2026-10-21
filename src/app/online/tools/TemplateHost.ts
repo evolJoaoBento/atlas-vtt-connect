@@ -12,7 +12,8 @@ import type { ControlMessage } from '../protocol';
 import { RateLimit } from '../rateLimit';
 import type { SceneSession } from '../scene/sceneSources';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
-import { laserColor } from './laserColors';
+import { GM_LASER_ID, laserColor } from './laserColors';
+import type { BoardSessionSink } from './BoardSessionHub';
 import { TEMPLATE_LIMITS, type MapTemplate } from './templates';
 
 export interface TemplateHostOptions {
@@ -20,6 +21,8 @@ export interface TemplateHostOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSlot' | 'onSlotChange'>;
   /** Shows a scene's templates in the GM's view of it, with `erase` taking one off; without it the GM sees none. */
   show?: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => void;
+  /** Tabletop's 3D board on the GM's side: told whenever a scene's templates change. */
+  board?: Pick<BoardSessionSink, 'templatesChanged'>;
 }
 
 export class TemplateHost implements SessionHandler {
@@ -48,6 +51,29 @@ export class TemplateHost implements SessionHandler {
     const scenes = [...this.byScene.keys()];
     this.byScene.clear();
     for (const sceneId of scenes) this.broadcast(sceneId);
+  }
+
+  /** A scene's templates as its players have them. */
+  listFor(sceneId: string): readonly MapTemplate[] {
+    return this.byScene.get(sceneId) ?? [];
+  }
+
+  /** The GM places a template on a scene (from the 3D board), in the GM's colour; false over the scene's limit. */
+  addGm(sceneId: string, add: Pick<MapTemplate, 'shape' | 'start' | 'end'>): boolean {
+    const list = this.byScene.get(sceneId) ?? [];
+    if (list.length >= TEMPLATE_LIMITS.perScene) return false;
+    const order = this.options.session.getPlayers().map((each) => each.playerId);
+    list.push({ id: `t${this.next++}`, owner: GM_LASER_ID, shape: add.shape, start: { x: add.start.x, y: add.start.y }, end: { x: add.end.x, y: add.end.y }, color: laserColor(GM_LASER_ID, order) });
+    this.byScene.set(sceneId, list);
+    this.broadcast(sceneId);
+    return true;
+  }
+
+  /** The GM takes every template off one scene. */
+  clearScene(sceneId: string): void {
+    if (!this.byScene.has(sceneId)) return;
+    this.byScene.delete(sceneId);
+    this.broadcast(sceneId);
   }
 
   /** The GM takes one template off a scene, whoever placed it. */
@@ -117,6 +143,7 @@ export class TemplateHost implements SessionHandler {
       this.options.session.send(playerId, { v: 1, type: 'map-templates', sceneId, templates });
     }
     this.showGmView();
+    this.options.board?.templatesChanged();
   }
 
   /** Draws the shown scene's templates in its view, and clears a view the GM left. */

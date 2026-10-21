@@ -11,6 +11,7 @@ import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
 import type { BoardLook } from '../app/online/scene/sceneContracts';
+import type { BoardSession } from '../app/online/tools/BoardSessionHub';
 import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
 const PLUGIN_ID = 'atlas-vtt-tabletop';
@@ -151,6 +152,8 @@ export type { BoardPose } from '../app/online/scene/sceneSources';
  * with a Tabletop that offers `boardLook`, `onBoardChange` and `gmCamera`; an older one has no board to share.
  */
 export interface TabletopBoard extends BoardSource {
+  /** Hands the GM's hosted session to Tabletop's board (again whenever Tabletop reloads); returns the release. */
+  attachSession(session: BoardSession): () => void;
   dispose(): void;
 }
 
@@ -176,6 +179,21 @@ export function tabletopBoard(app: App): TabletopBoard {
   const listeners = new Set<() => void>();
   const cameraListeners = new Set<() => void>();
   let api: TabletopBoardApi | null = null;
+  /** The session handed over, and Tabletop's release of it. */
+  let session: BoardSession | null = null;
+  let releaseSession: (() => void) | null = null;
+  const handOver = (): void => {
+    releaseSession?.();
+    releaseSession = null;
+    const attach = (api as { attachSession?: unknown } | null)?.attachSession;
+    if (!session || typeof attach !== 'function') return;
+    try {
+      const release = (attach as (given: BoardSession) => unknown).call(api, session);
+      releaseSession = typeof release === 'function' ? release as () => void : null;
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Tabletop could not take the session:', error);
+    }
+  };
   let stops: Array<() => void> = [];
   const emitTo = (set: Set<() => void>): void => {
     for (const listener of [...set]) {
@@ -200,6 +218,7 @@ export function tabletopBoard(app: App): TabletopBoard {
         api = null;
       }
     }
+    handOver();
     emit();
   };
   const refs: EventRef[] = [
@@ -235,6 +254,15 @@ export function tabletopBoard(app: App): TabletopBoard {
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
+    attachSession: (given) => {
+      session = given;
+      handOver();
+      return () => {
+        if (session !== given) return;
+        session = null;
+        handOver();
+      };
+    },
     subscribeCamera: (listener) => {
       cameraListeners.add(listener);
       return () => { cameraListeners.delete(listener); };
@@ -242,6 +270,8 @@ export function tabletopBoard(app: App): TabletopBoard {
     dispose: () => {
       for (const ref of refs) app.workspace.offref(ref);
       for (const stop of stops.splice(0)) stop();
+      session = null;
+      handOver();
       api = null;
       listeners.clear();
       cameraListeners.clear();

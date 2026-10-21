@@ -27,8 +27,8 @@ export function diceHostPart(dice: DiceApi): NonNullable<OptionalParts['dice']> 
 
 /** Lasers are heard from and shown in the view of the scene the GM's view shows; the GM's own is the colour set in Atlas. */
 export function laserRelayPart(lasers: LasersApi, settings: Pick<SettingsApi, 'get'>): NonNullable<OptionalParts['laser']> {
-  return ({ session, projection }) => new LaserRelay({
-    session, projection,
+  return ({ session, projection, board }) => new LaserRelay({
+    session, projection, ...(board ? { board } : {}),
     laser: { onLocal: (viewId, listener) => lasers.onLocal(viewId, listener), show: (viewId, laser) => { lasers.show(viewId, laser); } },
     gmColor: () => settings.get('laserPointer').color,
   });
@@ -65,8 +65,8 @@ type PingShowing = { showPing?: (viewId: ViewId, ping: { x: number; y: number; c
 export function pingRelayPart(lasers: LasersApi | null): NonNullable<OptionalParts['pings']> {
   // The stand-in's lasers may carry it; an Atlas API's never do.
   const showPing = lasers ? (lasers as unknown as PingShowing).showPing : undefined;
-  return ({ session, projection }) => new PingRelay({
-    session, projection,
+  return ({ session, projection, board }) => new PingRelay({
+    session, projection, ...(board ? { board } : {}),
     ...(typeof showPing === 'function' ? { show: (viewId: ViewId, ping: { x: number; y: number; color: string }) => showPing.call(lasers, viewId, ping) } : {}),
   });
 }
@@ -77,8 +77,8 @@ type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly Ma
 /** Players' lasting templates, kept per scene and drawn in the GM's view where the lasers can draw. */
 export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: string | null) => number): NonNullable<OptionalParts['templates']> {
   const showTemplates = lasers ? (lasers as unknown as TemplateShowing).showTemplates : undefined;
-  return ({ session, projection }) => new TemplateHost({
-    session, projection,
+  return ({ session, projection, board }) => new TemplateHost({
+    session, projection, ...(board ? { board } : {}),
     ...(typeof showTemplates === 'function'
       ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null), erase) }
       : {}),

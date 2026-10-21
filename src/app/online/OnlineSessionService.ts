@@ -1,3 +1,4 @@
+import type { BoardSession } from './tools/BoardSessionHub';
 import { readPinNote } from './atlas/pinNoteReader';
 import { NoteHost } from './tools/NoteHost';
 import type { ResourceVisibilitySource } from './scene/resourceVisibility';
@@ -67,6 +68,8 @@ export interface Deps extends OptionalParts {
   minis?: MiniSource;
   /** Tabletop's 3D board, for players who show it; without it no board is sent. */
   board?: BoardSource;
+  /** Hands the session to Tabletop's 3D board on the GM's side; without it the board knows no session. */
+  attachBoard?(session: BoardSession): () => void;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -136,6 +139,7 @@ export class OnlineSessionService {
         // The vault's notes: a readable pin's note goes to the player who opens it.
         notes: deps.notes ?? (({ session, projection }) => new NoteHost({ session, projection, read: (notePath, mapPath) => readPinNote(this.app, notePath, mapPath) })),
         ...(deps.laser ? { laser: deps.laser } : {}),
+        ...(deps.attachBoard ? { attachBoard: deps.attachBoard } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
         vaultName: this.app.vault.getName(),
