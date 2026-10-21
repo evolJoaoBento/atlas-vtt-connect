@@ -5,7 +5,7 @@
  * the state the page gives it and hands clicks back; the tools themselves live in the map view.
  */
 import {
-  CLEAR_OWN_TEMPLATES_LABEL, hiddenControls, isControlActive, isMoveGroupTool, LASER_COLOR_HINT, laserSwatches, MEASURE_OPTIONS_LABEL,
+  CLEAR_OWN_TEMPLATES_LABEL, hiddenControls, isControlActive, isMoveGroupTool, LASER_COLOR_HINT, LASER_SIZE_MAX, LASER_SIZE_MIN, laserSwatches, MEASURE_OPTIONS_LABEL,
   MEASURE_SHAPE_OPTIONS, measureIcon, MORE_TOOLS_LABEL, MOVE_OPTIONS_LABEL, MOVE_TOOL_OPTIONS, moveIcon, TEMPLATE_OPTIONS_LABEL, TEMPLATE_SHAPE_OPTIONS, templateIcon, TOOLBAR_CONTROLS,
   type ToolbarControlId, type ToolbarState,
 } from '../src/app/online/page/playerToolbar';
@@ -25,6 +25,8 @@ export interface PageToolbarOptions {
   /** Clear my templates, from the same menu. */
   onClearTemplates?(): void;
   onLaserColor(color: string): void;
+  /** The laser's size from the Move menu's slider; without it no slider shows. */
+  onLaserSize?(size: number): void;
   onDice(): void;
   /** Whether this toolbar's surface has the keyboard: inside Obsidian other panes' Escape must not close its menus. The page always does. */
   active?: () => boolean;
@@ -106,6 +108,8 @@ export class PageToolbar {
   private readonly laserChevron: HTMLButtonElement;
   private readonly laserFlyout: HTMLElement;
   private readonly swatchButtons = new Map<string, HTMLButtonElement>();
+  private sizeInput: HTMLInputElement | null = null;
+  private sizeValue: HTMLElement | null = null;
   /** The Move group's tool its button shows: the one in use, else the last one used. */
   private moveTool: 'move' | 'laser' | 'ping' = 'move';
   private readonly more: HTMLElement;
@@ -173,14 +177,22 @@ export class PageToolbar {
     move.classList.add('tool-group');
     this.laserChevron = chevronButton(MOVE_OPTIONS_LABEL, () => this.setMenu(this.state.laserMenuOpen ? null : 'laser'));
     this.laserFlyout = this.laserMenu();
+    // As Atlas's Move menu: its tools, ticked when in use, above the laser's colour and size.
     const tools = document.createElement('div');
     tools.className = 'menu-section';
     for (const option of MOVE_TOOL_OPTIONS) {
-      tools.append(menuEntry(option.label, option.icon, () => {
+      const entry = menuEntry(option.menuLabel, option.icon, () => {
         this.closeMenus();
         this.moveTool = option.tool;
         if (this.state.tool !== option.tool) options.onTool(option.tool);
-      }));
+      });
+      entry.setAttribute('role', 'menuitemradio');
+      entry.dataset.tool = option.tool;
+      const tick = document.createElement('span');
+      tick.className = 'menu-check';
+      tick.append(iconElement(toolIconUrl('check')));
+      entry.prepend(tick);
+      tools.append(entry);
     }
     this.laserFlyout.prepend(tools);
     move.append(this.laserChevron, this.laserFlyout);
@@ -199,7 +211,7 @@ export class PageToolbar {
   }
 
   /** The page's tool, shape or tray changed. */
-  update(state: Partial<Pick<ToolbarState, 'tool' | 'shape' | 'templateShape' | 'ownTemplates' | 'diceOpen' | 'laserColor'>>): void {
+  update(state: Partial<Pick<ToolbarState, 'tool' | 'shape' | 'templateShape' | 'ownTemplates' | 'diceOpen' | 'laserColor' | 'laserSize'>>): void {
     this.state = { ...this.state, ...state };
     this.render();
   }
@@ -240,10 +252,13 @@ export class PageToolbar {
     else this.options.onTool(id);
   }
 
-  /** The laser flyout: a round swatch per color and the hint for colour-blind players. */
+  /** The laser's part of the Move menu, as Atlas's: Laser colour with a swatch per colour and the hint, then Laser size. */
   private laserMenu(): HTMLElement {
     const flyout = menu();
     flyout.classList.add('swatch-menu');
+    const colourLabel = document.createElement('span');
+    colourLabel.className = 'menu-label';
+    colourLabel.textContent = 'Laser colour';
     const grid = document.createElement('div');
     grid.className = 'swatch-grid';
     for (const swatch of laserSwatches('')) {
@@ -253,6 +268,10 @@ export class PageToolbar {
       button.setAttribute('role', 'menuitemradio');
       button.setAttribute('aria-label', swatch.ariaLabel);
       button.style.setProperty('--swatch', swatch.value);
+      const check = document.createElement('span');
+      check.className = 'swatch-check';
+      check.append(iconElement(toolIconUrl('check')));
+      button.append(check);
       button.addEventListener('click', () => {
         this.closeMenus();
         this.options.onLaserColor(swatch.value);
@@ -263,7 +282,34 @@ export class PageToolbar {
     const hint = document.createElement('p');
     hint.className = 'menu-hint';
     hint.textContent = LASER_COLOR_HINT;
-    flyout.append(grid, hint);
+    flyout.append(colourLabel, grid, hint);
+    if (this.options.onLaserSize) {
+      const row = document.createElement('div');
+      row.className = 'menu-slider';
+      const head = document.createElement('div');
+      head.className = 'menu-slider-head';
+      const label = document.createElement('span');
+      label.className = 'menu-label';
+      label.textContent = 'Laser size';
+      const value = document.createElement('span');
+      value.className = 'menu-slider-value';
+      head.append(label, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = String(LASER_SIZE_MIN);
+      input.max = String(LASER_SIZE_MAX);
+      input.step = '1';
+      input.setAttribute('aria-label', 'Laser size');
+      input.addEventListener('input', () => {
+        const size = Math.round(Number(input.value));
+        value.textContent = size + 'px';
+        this.options.onLaserSize?.(size);
+      });
+      row.append(head, input);
+      flyout.append(row);
+      this.sizeInput = input;
+      this.sizeValue = value;
+    }
     return flyout;
   }
 
@@ -301,8 +347,13 @@ export class PageToolbar {
     move.button.dataset.label = moveLabel;
     setIcon(move.entry, moveUrl);
     for (const entry of this.laserFlyout.querySelectorAll<HTMLButtonElement>('.menu-section .menu-entry')) {
-      entry.classList.toggle('is-active', entry.textContent === MOVE_TOOL_OPTIONS.find((option) => option.tool === this.state.tool)?.label);
+      const chosen = entry.dataset.tool === this.state.tool;
+      entry.setAttribute('aria-checked', String(chosen));
+      entry.classList.toggle('is-checked', chosen);
     }
+    const size = Math.round(this.state.laserSize ?? 16);
+    if (this.sizeInput && this.sizeInput.ownerDocument.activeElement !== this.sizeInput) this.sizeInput.value = String(size);
+    if (this.sizeValue) this.sizeValue.textContent = size + 'px';
     const measure = this.controls.get('measure')!;
     const icon = toolIconUrl(measureIcon(this.state.shape));
     setIcon(measure.button, icon);

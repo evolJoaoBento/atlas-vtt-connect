@@ -57,7 +57,7 @@ export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: numb
     if (middle) drawLabel(surface, ruler.label, middle, zoom, dark);
   }
   for (const template of overlay.templates) drawTemplate(surface, template, zoom, overlay.coneOpening, dark);
-  for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.head, laser.color, zoom, pixel);
+  for (const laser of overlay.lasers) drawLaser(surface, laser.trail, laser.head, laser.color, zoom, pixel, laser.size);
   for (const ring of overlay.pings) drawPingRing(surface, ring, zoom);
 }
 
@@ -157,8 +157,8 @@ function drawLabel(surface: ViewSurface, text: string, center: ScenePoint, zoom:
 }
 
 /** `head`: where the laser is held, its hot spot. */
-function drawLaser(surface: ViewSurface, trail: readonly BeamPoint[], head: ScenePoint | null, color: string, zoom: number, pixel: number): void {
-  const { halfWidth, bodyShare } = beamWidth(DEFAULT_LASER_POINTER_SETTINGS.size, zoom);
+function drawLaser(surface: ViewSurface, trail: readonly BeamPoint[], head: ScenePoint | null, color: string, zoom: number, pixel: number, size?: number): void {
+  const { halfWidth, bodyShare } = beamWidth(size ?? DEFAULT_LASER_POINTER_SETTINGS.size, zoom);
   const points = smoothBeam(trail, beamSmoothingSpacing(halfWidth, zoom));
   const raster = rasterBeam(points, null, { color, halfWidth, bodyShare, pointer: head }, pixel > 0 ? 1 / pixel : zoom);
   if (raster) {

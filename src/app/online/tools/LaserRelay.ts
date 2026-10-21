@@ -45,6 +45,8 @@ interface Stroke {
   lifted: boolean;
   dt?: number[];
   picked?: string | null;
+  /** The size the player picked, passed on as it came. */
+  size?: number;
 }
 
 export class LaserRelay implements SessionHandler {
@@ -91,7 +93,7 @@ export class LaserRelay implements SessionHandler {
     // Field by field: a page may add keys to its points.
     const points = allowed ? message.points.map(({ x, y }) => ({ x, y })) : [];
     const dt = allowed && message.dt ? [...message.dt] : undefined;
-    this.relay({ from: playerId, sceneId: slot.sceneId, points, lifted: message.lifted, ...(dt ? { dt } : {}), picked: picked ?? null }, slot.tab.viewId);
+    this.relay({ from: playerId, sceneId: slot.sceneId, points, lifted: message.lifted, ...(dt ? { dt } : {}), picked: picked ?? null, ...(message.size !== undefined ? { size: message.size } : {}) }, slot.tab.viewId);
     if (message.lifted) this.picks.delete(playerId);
   }
 
@@ -172,7 +174,7 @@ export class LaserRelay implements SessionHandler {
     const color = this.colorOf(from, order, stroke.picked ?? null);
     for (const playerId of projection.audience(sceneId)) {
       if (playerId === from) continue;
-      session.send(playerId, { v: 1, type: 'laser', from, sceneId, points, lifted, color, ...(dt ? { dt } : {}) });
+      session.send(playerId, { v: 1, type: 'laser', from, sceneId, points, lifted, color, ...(dt ? { dt } : {}), ...(stroke.size !== undefined ? { size: stroke.size } : {}) });
     }
     if (from !== GM_LASER_ID) {
       const mapPath = projection.slotOf(from)?.mapPath;

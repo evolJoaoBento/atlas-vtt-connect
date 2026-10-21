@@ -297,8 +297,8 @@ export class OnlineJoinService {
     return this.joined?.session?.sendSheetRoll(tokenId, roll) ?? false;
   }
 
-  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string): boolean {
-    return this.joined?.session?.sendLaser(points, lifted, dt, color) ?? false;
+  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string, size?: number): boolean {
+    return this.joined?.session?.sendLaser(points, lifted, dt, color, size) ?? false;
   }
 
   /** The plugin unloads. */

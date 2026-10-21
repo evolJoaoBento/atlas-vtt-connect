@@ -113,7 +113,7 @@ export type ControlMessage =
    * it with `from`, the sender's session id (`gm` for the GM's own). `dt` times the points: the
    * milliseconds from each to the one before it in the stroke, so receivers can play the motion back smoothly.
    */
-  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string }
+  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string; size?: number }
   /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
   | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
   /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
@@ -196,7 +196,9 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier),
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'
-    && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
+    && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from))
+    // Atlas's laser size, 8 to 100; an older page sends none and is drawn at the default.
+    && (m.size === undefined || (isNumber(m.size) && m.size >= 8 && m.size <= 100)),
   'token-sheets': (m) => isTokenSheets(m.entries),
   'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
   'map-template': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1

@@ -28,6 +28,7 @@ export interface SceneViewport {
   clearOwnTemplates(): void;
   selectShape(shape: MeasureChoice): void;
   selectLaserColor(color: string): void;
+  selectLaserSize(size: number): void;
   toolState(): ToolState;
   setPlayers(order: readonly string[], self: string | null): void;
   receiveNote(answer: PinNoteAnswer): void;

@@ -12,7 +12,7 @@ import { parseJoinFragment } from '../src/app/online/joinLink';
 import { keptPlayerKey, pageKey, readKept } from '../src/app/online/page/pageStorage';
 import { createOnlineLog } from '../src/app/online/onlineLog';
 import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
-import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
+import { loadLaserColor, loadLaserSize, saveLaserColor, saveLaserSize } from '../src/app/online/page/laserColorStore';
 import { OwnRollThrows } from '../src/app/online/page/ownRollThrows';
 import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
@@ -66,11 +66,13 @@ const map = surface
     canvas, surface, images: (id) => loader.image(id),
     viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
-    sendLaser: (points, lifted, dt, color) => session?.sendLaser(points, lifted, dt, color) ?? false,
+    sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
     sendTemplate: (change) => session?.sendTemplate(change) ?? false,
     laserColor: loadLaserColor(() => localStorage),
     onLaserColor: (color) => saveLaserColor(color, () => localStorage),
+    laserSize: loadLaserSize(() => localStorage),
+    onLaserSize: (size) => saveLaserSize(size, () => localStorage),
     notice: element('move-notice'),
     hoverCard: element('hover-card'),
     turnNotice: element('turn-notice'),
@@ -123,6 +125,7 @@ const toolbar = new PageToolbar({
   onTemplateShape: (shape) => map?.selectTemplateShape(shape),
   onClearTemplates: () => map?.clearOwnTemplates(),
   onLaserColor: (color) => map?.selectLaserColor(color),
+  onLaserSize: (size) => map?.selectLaserSize(size),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
 let assetsFrame: number | null = null;

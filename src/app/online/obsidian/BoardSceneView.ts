@@ -35,7 +35,7 @@ export interface BoardSceneViewOptions {
   imageUrl(id: string): string | null;
   model(id: string): ArrayBuffer | null;
   sendMove(tokenId: string, x: number, y: number): boolean;
-  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
+  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   sendPing(x: number, y: number): boolean;
   sendTemplate(change: TemplateChange): boolean;
   requestNote?(pinId: string): boolean;
@@ -61,6 +61,7 @@ export class BoardSceneView implements SceneViewport {
   private controlled: readonly string[] = [];
   private sheets = new Map<string, TokenSheet>();
   private awaitedNote: { sceneId: string; pinId: string; timer: number } | null = null;
+  private laserSize = 16;
 
   constructor(private readonly options: BoardSceneViewOptions) {
     const extra = { ...(options.active ? { active: options.active } : {}), ...(options.doc ? { doc: options.doc } : {}) };
@@ -73,7 +74,8 @@ export class BoardSceneView implements SceneViewport {
       image: (id) => options.imageUrl(id),
       model: (id) => options.model(id),
       sendMove: (tokenId, x, y) => options.sendMove(tokenId, x, y),
-      sendLaser: (points, lifted, dt, color) => options.sendLaser(points, lifted, dt, color),
+      // Tabletop's board knows no size: the one picked in the Move menu goes with each stroke.
+      sendLaser: (points, lifted, dt, color) => options.sendLaser(points, lifted, dt, color, this.laserSize),
       sendPing: (x, y) => options.sendPing(x, y),
       sendTemplate: (change) => options.sendTemplate(change),
       openPin: (pinId) => this.openPin(pinId),
@@ -124,6 +126,15 @@ export class BoardSceneView implements SceneViewport {
   clearOwnTemplates(): void { this.board.clearOwnTemplates(); }
   selectShape(shape: MeasureChoice): void { this.board.selectShape(shape); }
   selectLaserColor(color: string): void { this.board.selectLaserColor(color); }
+
+  /** The laser's size: Tabletop's board draws its own lasers at one width, but the size goes to everyone else. */
+  selectLaserSize(size: number): void {
+    if (!Number.isFinite(size)) return;
+    this.laserSize = Math.round(Math.min(100, Math.max(8, size)));
+    // Choosing the tool in use again would return to Move.
+    if (this.board.toolState().tool !== 'laser') this.board.selectTool('laser');
+    this.options.onToolsChange();
+  }
   setPlayers(order: readonly string[], self: string | null): void { this.board.setPlayers(order, self); }
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.board.receiveTemplates(sceneId, templates); }
   receivePing(ping: PlayerPing): void { this.board.receivePing(ping); }
@@ -132,7 +143,7 @@ export class BoardSceneView implements SceneViewport {
 
   toolState(): ToolState {
     const { tool, shape, templateShape, ownTemplates, laserColor } = this.board.toolState();
-    return { tool, shape, templateShape: templateShape as TemplateShape, ownTemplates, laserColor };
+    return { tool, shape, templateShape: templateShape as TemplateShape, ownTemplates, laserColor, laserSize: this.laserSize };
   }
 
   receiveNote(answer: PinNoteAnswer): void {

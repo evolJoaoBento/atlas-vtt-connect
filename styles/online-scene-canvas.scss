@@ -585,4 +585,23 @@
 }
 /* The Move group's tools, above the laser's colours, as in Atlas's Move menu. */
 .atlas-connect-scene .swatch-menu .menu-section { display: flex; flex-direction: column; gap: 2px; margin: -4px -4px 0; padding-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); }
-.atlas-connect-scene .swatch-menu { width: 220px; }
+.atlas-connect-scene 
+/* The Move menu, as Atlas's: ticked tools, Laser colour (a row of squares, the chosen one ticked) and Laser size. */
+.atlas-connect-scene .swatch-menu { width: 248px; padding: 6px; gap: 6px; }
+.atlas-connect-scene .swatch-menu .menu-entry { height: 32px; padding: 0 10px 0 6px; gap: 8px; font-weight: 600; font-size: 13px; }
+.atlas-connect-scene .menu-check { width: 14px; height: 14px; display: inline-flex; visibility: hidden; }
+.atlas-connect-scene .menu-check .tool-icon { width: 14px; height: 14px; }
+.atlas-connect-scene .menu-entry.is-checked .menu-check { visibility: visible; }
+.atlas-connect-scene .menu-label { display: block; padding: 2px 6px 0; font-size: 13px; font-weight: 600; }
+.atlas-connect-scene .swatch-menu .swatch-grid { grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 0 6px; }
+.atlas-connect-scene .swatch-menu .swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--background-modifier-border); position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.atlas-connect-scene .swatch-menu .swatch.is-selected { border-color: transparent; box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--interactive-accent); }
+.atlas-connect-scene .swatch-check { display: none; width: 16px; height: 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); align-items: center; justify-content: center; }
+.atlas-connect-scene .swatch-check .tool-icon { width: 12px; height: 12px; background: #fff; }
+.atlas-connect-scene .swatch.is-selected .swatch-check { display: inline-flex; }
+.atlas-connect-scene .swatch-menu .menu-hint { padding: 0 6px; }
+.atlas-connect-scene .menu-slider { display: flex; flex-direction: column; gap: 6px; padding: 2px 6px 6px; }
+.atlas-connect-scene .menu-slider-head { display: flex; align-items: center; justify-content: space-between; }
+.atlas-connect-scene .menu-slider-head .menu-label { padding: 0; }
+.atlas-connect-scene .menu-slider-value { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.atlas-connect-scene .menu-slider input[type="range"] { width: 100%; accent-color: var(--interactive-accent); margin: 0; }

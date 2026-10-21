@@ -5,7 +5,7 @@
  * or tray hangs from it, never move. Shared with the web page; the DOM is
  * `online-client/toolbar.mts`.
  */
-import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
+import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES, LASER_SIZE_MAX, LASER_SIZE_MIN } from '@atlas-vtt/shared/rules';
 import { overflowingToolbarItems, type ToolbarFitLayout } from '../../packages/components/toolbar/toolbarFit';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool } from '../view/tools/PlayerTools';
@@ -28,7 +28,7 @@ export const LASER_OPTIONS_LABEL = 'Laser color options';
 export const MOVE_OPTIONS_LABEL = 'Move options';
 export const TEMPLATE_OPTIONS_LABEL = 'Template options';
 export const CLEAR_OWN_TEMPLATES_LABEL = 'Clear my templates';
-export { LASER_COLOR_HINT };
+export { LASER_COLOR_HINT, LASER_SIZE_MAX, LASER_SIZE_MIN };
 
 /** Atlas's priorities (`MainToolbar.tsx`). The laser lives in Atlas's Move group, so it ranks between Measure and Dice. */
 export const TOOLBAR_CONTROLS: readonly ToolbarControl[] = [
@@ -39,10 +39,10 @@ export const TOOLBAR_CONTROLS: readonly ToolbarControl[] = [
 ];
 
 /** The tools of the Move group, as Atlas's Move group holds Move/Select and its laser: its menu lists them. */
-export const MOVE_TOOL_OPTIONS: ReadonlyArray<{ tool: 'move' | 'laser' | 'ping'; label: string; icon: ToolIconName }> = [
-  { tool: 'move', label: 'Move', icon: 'hand' },
-  { tool: 'laser', label: 'Laser', icon: 'flashlight' },
-  { tool: 'ping', label: 'Ping', icon: 'radar' },
+export const MOVE_TOOL_OPTIONS: ReadonlyArray<{ tool: 'move' | 'laser' | 'ping'; label: string; menuLabel: string; icon: ToolIconName }> = [
+  { tool: 'move', label: 'Move', menuLabel: 'Move/Select', icon: 'hand' },
+  { tool: 'laser', label: 'Laser', menuLabel: 'Laser Pointer', icon: 'flashlight' },
+  { tool: 'ping', label: 'Ping', menuLabel: 'Ping', icon: 'radar' },
 ];
 
 /** Whether `tool` is one of the Move group's. */
@@ -83,6 +83,8 @@ export interface ToolbarState {
   laserMenuOpen: boolean;
   /** The laser's colour now, marked in the flyout. */
   laserColor: string;
+  /** The laser's size now, in Atlas's pixels (8 to 100). */
+  laserSize?: number;
 }
 
 export interface LaserSwatch {

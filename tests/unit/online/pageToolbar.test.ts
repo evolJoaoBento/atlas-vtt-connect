@@ -13,6 +13,7 @@ function setup(available = 1000) {
     onTemplateShape: (shape) => calls.push(`template ${shape}`),
     onClearTemplates: () => calls.push('clear templates'),
     onLaserColor: (color) => calls.push(`color ${color}`),
+    onLaserSize: (size) => calls.push(`size ${size}`),
     onDice: () => calls.push('dice'),
     measure: (element) => (element.dataset.control === 'measure' || element.dataset.control === 'move' ? 56 : 36),
     layout: () => ({ available, chrome: 19, gap: 8, overflowButtonWidth: 36 }),
@@ -36,7 +37,7 @@ describe('the join page toolbar', () => {
     const { root, toolbar, calls, button } = setup();
     button('Move options').click();
     const items = [...root.querySelectorAll<HTMLButtonElement>('[data-control="move"] .menu-entry')];
-    expect(items.map((entry) => entry.textContent)).toEqual(['Move', 'Laser', 'Ping']);
+    expect(items.map((entry) => entry.textContent)).toEqual(['Move/Select', 'Laser Pointer', 'Ping']);
     expect(root.querySelectorAll('[data-control="move"] .swatch').length).toBeGreaterThan(0);
     items[1]!.click();
     button('Move options').click();
@@ -54,6 +55,28 @@ describe('the join page toolbar', () => {
     expect(face.getAttribute('aria-label')).toBe('Laser');
     face.click();
     expect(calls.at(-1)).toBe('tool laser');
+  });
+
+  it("lays the Move menu out as Atlas's: ticked tools, Laser colour with ticked swatches and its hint, and Laser size", () => {
+    const { root, toolbar, calls, button } = setup();
+    toolbar.update({ tool: 'laser', laserColor: '#00a9ff', laserSize: 24 });
+    button('Move options').click();
+    const menu = root.querySelector<HTMLElement>('[data-control="move"] .toolbar-menu')!;
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('.menu-entry')];
+    expect(items.map((entry) => entry.textContent)).toEqual(['Move/Select', 'Laser Pointer', 'Ping']);
+    expect(items.map((entry) => entry.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
+    expect(menu.querySelector('.menu-label')?.textContent).toBe('Laser colour');
+    const picked = menu.querySelector<HTMLButtonElement>('.swatch.is-selected')!;
+    expect(picked.getAttribute('aria-label')).toBe('Sky blue');
+    expect(picked.querySelector('.swatch-check')).not.toBeNull();
+    expect(menu.querySelector('.menu-hint')?.textContent).toMatch(/colour-blind/);
+    const size = menu.querySelector<HTMLInputElement>('input[type="range"][aria-label="Laser size"]')!;
+    expect([size.min, size.max, size.value]).toEqual(['8', '100', '24']);
+    expect(menu.querySelector('.menu-slider-value')?.textContent).toBe('24px');
+    size.value = '40';
+    size.dispatchEvent(new Event('input'));
+    expect(calls).toEqual(['size 40']);
+    toolbar.closeMenus();
   });
 
   it('hands clicks to the page and shows the state the page gives it', () => {

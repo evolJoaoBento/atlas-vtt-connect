@@ -7,7 +7,7 @@
  */
 export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x'
   | 'minus' | 'plus' | 'chevron-right' | 'maximize' | 'locate-fixed' | 'scroll-text' | 'radar' | 'shapes' | 'image' | 'map-pin'
-  | 'chevrons-up' | 'chevrons-down' | 'square' | 'eraser';
+  | 'chevrons-up' | 'chevrons-down' | 'square' | 'eraser' | 'check';
 
 /** Each Lucide icon's children. */
 export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
@@ -17,6 +17,7 @@ export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
   ruler: '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/>'
     + '<path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
   circle: '<circle cx="12" cy="12" r="10"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   triangle: '<path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>',
   flashlight: '<path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12z"/>'
     + '<line x1="6" x2="18" y1="6" y2="6"/><line x1="12" x2="12" y1="12" y2="12"/>',

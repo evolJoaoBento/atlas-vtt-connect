@@ -338,7 +338,7 @@ describe('CanvasSceneView', () => {
     it('keeps the laser tool on Escape in another pane, and returns to Move on Escape in the tab', async () => {
       const { view, active } = await opened();
       // Laser is in the Move group's menu, as in Atlas.
-      [...view.contentEl.querySelectorAll<HTMLButtonElement>('[data-control="move"] .menu-entry')].find((entry) => entry.textContent === 'Laser')!.click();
+      view.contentEl.querySelector<HTMLButtonElement>('[data-control="move"] .menu-entry[data-tool="laser"]')!.click();
       const canvas = view.contentEl.querySelector('canvas')!;
       expect(canvas.dataset.tool).toBe('laser');
       active(false);
