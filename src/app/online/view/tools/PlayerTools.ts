@@ -13,7 +13,7 @@
  */
 import { laserPointSpacing } from '@atlas-vtt/shared/draw';
 import { RemoteLasers, type RemoteLaserFrame } from '@atlas-vtt/shared/draw';
-import { DEFAULT_LASER_POINTER_SETTINGS } from '@atlas-vtt/shared/rules';
+import { DEFAULT_LASER_POINTER_SETTINGS, LASER_SIZE_MAX, LASER_SIZE_MIN } from '@atlas-vtt/shared/rules';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import { laserColor, swatchLaserColor } from '../../tools/laserColors';
 import type { PlayerLaser } from '../../tools/toolMessages';
@@ -44,8 +44,8 @@ export type ShownTemplate = MapTemplate & { label?: string };
 export interface ToolOverlay {
   measure: MeasureOverlay | null;
   ruler: RulerOverlay | null;
-  /** Everyone's lasers, this player's own included. */
-  lasers: RemoteLaserFrame[];
+  /** Everyone's lasers, this player's own included, each at the size its sender picked (none: Atlas's default). */
+  lasers: Array<RemoteLaserFrame & { size?: number }>;
   /** Everyone's pings, this player's own included. */
   pings: PingRing[];
   /** The scene's lasting templates, and the one this player is placing (last), each with its size. */
@@ -62,15 +62,22 @@ export interface PlayerToolsOptions {
   zoom(): number;
   now(): number;
   /** `color`: this player's pick, absent until they pick one (the GM then colours it by their place). */
-  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
+  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   /** Sends a ping at a world point; false when it could not go. Without it the Ping tool does nothing. */
   sendPing?(x: number, y: number): boolean;
   /** Asks the GM to add a template or remove one of the player's own; false when it could not go. */
   sendTemplate?(change: TemplateChange): boolean;
   /** The colour remembered from an earlier visit, if any. */
   laserColor?: string | null;
+  /** The laser size remembered from an earlier visit, if any. */
+  laserSize?: number | null;
   /** The tool, the shape, or what the tools draw changed. */
   onChange(): void;
+}
+
+/** A laser size within Atlas's bounds. */
+function clampSize(size: number): number {
+  return Math.round(Math.min(LASER_SIZE_MAX, Math.max(LASER_SIZE_MIN, size)));
 }
 
 /** This player's own laser, among the others'. */
@@ -83,6 +90,10 @@ export class PlayerTools implements TokenGrab {
   private templateShapeChoice: TemplateShape = 'circle';
   /** The laser swatch this player picked; null until then, when the colour follows their place in the session. */
   private pickedColor: string | null;
+  /** The laser size this player picked (Atlas's 8 to 100); Atlas's default until then. */
+  private pickedSize: number;
+  /** The size each sender's laser came at, by sender. */
+  private readonly laserSizes = new Map<string, number>();
   private scene: PlayerScene | null = null;
   private grid: ToolGrid | null = null;
   private order: readonly string[] = [];
@@ -102,11 +113,12 @@ export class PlayerTools implements TokenGrab {
 
   constructor(private readonly options: PlayerToolsOptions) {
     this.pickedColor = swatchLaserColor(options.laserColor);
+    this.pickedSize = clampSize(options.laserSize ?? DEFAULT_LASER_POINTER_SETTINGS.size);
     this.ruler = new DragRulerTool(() => options.onChange());
     this.laser = new LaserTool({
       now: () => options.now(),
       send: (points, lifted, dt) => {
-        options.sendLaser(points, lifted, dt, this.pickedColor ?? undefined);
+        options.sendLaser(points, lifted, dt, this.pickedColor ?? undefined, this.pickedSize);
         // A held laser sends empty batches to stay alive: they keep it alive here too.
         if (points.length === 0 && !lifted) this.lasers.receive(SELF, this.selfColor(), [], false, options.now());
       },
@@ -171,6 +183,20 @@ export class PlayerTools implements TokenGrab {
     return true;
   }
 
+  /** The size this player's laser has now. */
+  get laserSize(): number {
+    return this.pickedSize;
+  }
+
+  /** Picks the laser's size (kept within Atlas's 8 to 100) and the laser tool with it; it applies from the next stroke. */
+  selectLaserSize(size: number): void {
+    if (!Number.isFinite(size)) return;
+    this.endGesture();
+    this.pickedSize = clampSize(size);
+    this.current = 'laser';
+    this.options.onChange();
+  }
+
   /** Chooses the measure shape, and the measure tool with it. */
   selectShape(shape: MeasureChoice): void {
     this.endGesture();
@@ -227,6 +253,8 @@ export class PlayerTools implements TokenGrab {
 
   /** Someone else's laser; one for another scene is ignored. */
   receiveLaser(laser: PlayerLaser): void {
+    if (laser.size !== undefined) this.laserSizes.set(laser.from, laser.size);
+    else this.laserSizes.delete(laser.from);
     if (!this.scene || laser.sceneId !== this.scene.sceneId) return;
     this.lasers.receive(laser.from, laser.color ?? laserColor(laser.from, this.order), laser.points, laser.lifted, this.options.now(), laser.dt ? { dt: laser.dt } : {});
     this.options.onChange();
@@ -318,7 +346,10 @@ export class PlayerTools implements TokenGrab {
     return {
       measure: this.grid ? this.measure.overlay(this.shapeChoice, this.grid, this.selfColor(), this.options.now()) : null,
       ruler: this.pressed === 'move' ? this.ruler.overlay() : null,
-      lasers: this.lasers.frame(this.options.now()),
+      lasers: this.lasers.frame(this.options.now()).map((laser) => {
+        const size = laser.from === SELF ? this.pickedSize : this.laserSizes.get(laser.from);
+        return size === undefined ? laser : { ...laser, size };
+      }),
       pings: this.pings.frame(this.options.now()),
       templates: (this.draft && this.pressed === 'template'
         ? [...this.templates, { id: 'draft', owner: this.self ?? SELF, shape: this.templateShapeChoice, start: this.draft.start, end: this.draft.end, color: this.selfColor() }]

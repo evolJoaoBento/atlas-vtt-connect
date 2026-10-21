@@ -25,7 +25,7 @@ export const STOP_HOSTING_FIRST = 'Stop the online session first, then make a ne
 export const NEW_TABLE_KEY_DONE = 'Made a new table key. Approve your players again when they next join.';
 export const NEW_TABLE_KEY_NOT_KEPT = "Couldn't save a new table key on this device, so your table keeps its old key.";
 /** Shown once after a table key moved out of the settings file or came over from the online play preview. */
-export const KEY_MOVED_NOTICE = 'Atlas VTT Connect now keeps your table key on this device only. If a copy of your vault, its sync history or a backup reached someone else, choose New table key in the settings.';
+export const KEY_MOVED_NOTICE = 'Connect for Atlas VTT now keeps your table key on this device only. If a copy of your vault, its sync history or a backup reached someone else, choose New table key in the settings.';
 
 type KeySettings = Pick<ConnectSettingsStore, 'replaceTable'>;
 

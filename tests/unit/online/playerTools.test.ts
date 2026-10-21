@@ -131,6 +131,34 @@ describe('PlayerTools', () => {
     expect(tools.isAnimating()).toBe(false);
   });
 
+  it('sends the laser at the size the player picked, draws its own at it, and others’ at theirs', () => {
+    const sizes: Array<number | undefined> = [];
+    const identity = (point: ScenePoint): ScenePoint => ({ x: point.x, y: point.y });
+    const moves = new TokenMoves({ toWorld: identity, send: () => true, onChange: () => {} });
+    const tools = new PlayerTools({
+      moves, toWorld: identity, zoom: () => 1, now: () => Date.now(),
+      sendLaser: (_points, _lifted, _dt, _color, size) => { sizes.push(size); return true; },
+      onChange: () => {},
+    });
+    const scene = playerScene();
+    tools.setScene(scene);
+    tools.setPlayers(['other', 'me'], 'me');
+    tools.setConnected(true);
+    expect(tools.laserSize).toBe(16);
+    tools.selectLaserSize(40);
+    expect(tools.tool).toBe('laser');
+    tools.grab({ x: 10, y: 10 }, 'mouse');
+    tools.move({ x: 50, y: 10 });
+    expect(sizes).toEqual([40]);
+    expect(tools.overlay().lasers[0]).toMatchObject({ from: 'self', size: 40 });
+    tools.receiveLaser({ from: 'other', sceneId: scene.sceneId, points: [{ x: 1, y: 1 }], lifted: false, size: 70 });
+    // Others' lasers play back a moment later, as they were drawn.
+    vi.advanceTimersByTime(200);
+    expect(tools.overlay().lasers.find((laser) => laser.from === 'other')).toMatchObject({ size: 70 });
+    tools.selectLaserSize(500);
+    expect(tools.laserSize).toBe(100);
+  });
+
   it('keeps a laser held still alive for longer than the stale time', () => {
     const { tools } = setup();
     tools.select('laser');

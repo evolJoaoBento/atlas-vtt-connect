@@ -15,6 +15,13 @@ import { onlineSessionStore } from './onlineSessionStore';
 import { peerServerOptions, type OnlineSettings } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
+import { BoardSender } from './scene/BoardSender';
+import { BoardSessionHub, type BoardSession } from './tools/BoardSessionHub';
+import type { HandoutSource } from './handouts';
+
+/** No handout source: nothing is ever shown. */
+const NO_HANDOUT: HandoutSource = { current: () => null, subscribe: () => () => undefined };
+import { TemplateHost } from './tools/TemplateHost';
 import { CameraSender } from './scene/CameraSender';
 import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
@@ -31,7 +38,7 @@ import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
 import type { SheetRollExtras } from './tools/DiceHost';
 
-const BAD_PAGE_URL = "The player page address in Atlas VTT Connect's settings isn't a valid web address.";
+const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
 
 /** Sharing joins a hosted session that has a table; `started` returns what stops it. */
@@ -44,6 +51,8 @@ export interface HostedContext {
   session: SceneSession;
   presented: SceneProjectionOptions['presented'];
   projection: SceneHub;
+  /** Tabletop's 3D board on the GM's side: what the relays accept reaches it too. */
+  board?: BoardSessionHub;
 }
 
 export interface HostedPart {
@@ -91,6 +100,8 @@ export interface HostEnvironment extends OptionalParts {
   };
   /** Whether this start is still the current one; a later stop or start makes it stale. */
   isCurrent(): boolean;
+  /** Hands the session to Tabletop's 3D board on the GM's side; returns the release. Without it the board knows no session. */
+  attachBoard?(session: BoardSession): () => void;
 }
 
 /** A running session; `stop` releases everything it holds, the store is left to the caller. */
@@ -181,9 +192,17 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const tabs = tabScenes?.() ?? null;
   const hub: SceneHub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
   hubRef = hub;
-  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
+  // Tabletop's board on the GM's side hears what players do, as Connect's own view does.
+  const boardHub = env.attachBoard ? new BoardSessionHub({
+    projection: hub,
+    handouts: env.scene.handout ?? NO_HANDOUT,
+    coneAngle: (mapPath) => env.scene.coneAngle?.(mapPath) ?? 90,
+  }) : null;
+  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}) };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
+  // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
+  const boardSender = new BoardSender({ session: scenes, projection: hub, board: env.scene.board ?? null });
   // Serves the images of the scene players have, over each player's assets channel.
   const assetServer = new AssetServer({ session, projection: hub, files: registry });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
@@ -192,6 +211,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
+  boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
@@ -199,7 +219,11 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   let stopSharing: (() => void) | null = null;
   let stopLog: (() => void) | null = null;
   let stopSplit: (() => void) | null = null;
+  let stopBoard: (() => void) | null = null;
   const stop = (): void => {
+    stopBoard?.();
+    stopBoard = null;
+    boardHub?.stop();
     stopSplit?.();
     stopSplit = null;
     stopSharing?.();
@@ -207,6 +231,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopErrors();
     assetServer.stop();
     for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    boardSender.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -223,12 +248,17 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     // The GM's panel, eye menu and badges read who is assigned where from the store.
     stopSplit = syncSplitState(hub);
     cameraSender.start();
+    boardSender.start();
     assetServer.start();
     for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
       part.start();
       parts.push(part);
     }
     if (table && sharing) stopSharing = sharing.started({ session, table });
+    if (boardHub && env.attachBoard) {
+      boardHub.start();
+      stopBoard = env.attachBoard(boardHub);
+    }
   } catch (error) {
     // No session may keep running without its scene hub; `start` reports the error.
     stop();

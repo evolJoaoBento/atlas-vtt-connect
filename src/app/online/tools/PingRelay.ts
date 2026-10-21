@@ -12,12 +12,15 @@ import type { SceneSession } from '../scene/sceneSources';
 import type { SlotProjection } from '../scene/slotViews';
 import { laserColor } from './laserColors';
 import { isPingPoint, PING_LIMITS } from './pings';
+import type { BoardSessionSink } from './BoardSessionHub';
 
 export interface PingRelayOptions {
   session: SceneSession;
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSnapshot'>;
   /** Shows a ping in the GM's view of a scene; without it the GM sees none (an Atlas whose map Connect cannot draw on). */
   show?(viewId: ViewId, ping: { x: number; y: number; color: string }): void;
+  /** Tabletop's 3D board on the GM's side, wherever it shows the map. */
+  board?: Pick<BoardSessionSink, 'ping'>;
 }
 
 export class PingRelay implements SessionHandler {
@@ -45,6 +48,7 @@ export class PingRelay implements SessionHandler {
     for (const playerId of this.options.projection.audience(slot.sceneId)) {
       if (playerId !== player.playerId) this.options.session.send(playerId, ping);
     }
+    this.options.board?.ping(slot.mapPath, message.x, message.y, color);
     if (this.options.projection.shownSnapshot(slot.sceneId) !== null) {
       try {
         this.options.show?.(slot.tab.viewId, { x: message.x, y: message.y, color });

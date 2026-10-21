@@ -1,3 +1,4 @@
+import type { BoardSession } from './tools/BoardSessionHub';
 import { readPinNote } from './atlas/pinNoteReader';
 import { NoteHost } from './tools/NoteHost';
 import type { ResourceVisibilitySource } from './scene/resourceVisibility';
@@ -13,7 +14,7 @@ import type { PresentedSceneSource } from './atlas/presentedSource';
 import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
-import type { DiceLookSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
+import type { DiceLookSource, BoardSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
@@ -65,6 +66,10 @@ export interface Deps extends OptionalParts {
   resourceVisibility?: ResourceVisibilitySource;
   /** The 3D minis on tokens, from the Tabletop extension; without it no token carries one. */
   minis?: MiniSource;
+  /** Tabletop's 3D board, for players who show it; without it no board is sent. */
+  board?: BoardSource;
+  /** Hands the session to Tabletop's 3D board on the GM's side; without it the board knows no session. */
+  attachBoard?: (session: BoardSession) => () => void;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -134,6 +139,7 @@ export class OnlineSessionService {
         // The vault's notes: a readable pin's note goes to the player who opens it.
         notes: deps.notes ?? (({ session, projection }) => new NoteHost({ session, projection, read: (notePath, mapPath) => readPinNote(this.app, notePath, mapPath) })),
         ...(deps.laser ? { laser: deps.laser } : {}),
+        ...(deps.attachBoard ? { attachBoard: deps.attachBoard } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
         vaultName: this.app.vault.getName(),
@@ -156,6 +162,7 @@ export class OnlineSessionService {
           ...(deps.handout ? { handout: deps.handout } : {}),
           ...(deps.resourceVisibility ? { resourceVisibility: deps.resourceVisibility } : {}),
           ...(deps.minis ? { minis: deps.minis } : {}),
+          ...(deps.board ? { board: deps.board } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,

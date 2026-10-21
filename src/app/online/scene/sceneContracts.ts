@@ -41,3 +41,19 @@ export interface SceneSession {
   send(playerId: string, message: ControlMessage): void;
   getPlayers(): SessionPlayer[];
 }
+
+/**
+ * What the GM gave a map on Tabletop's 3D board (Tabletop's `api.boardLook`): heights in grid squares, materials by id
+ * with their texture maps, door props and props by vault path. Paths never leave the GM's machine: only asset ids do.
+ */
+export interface BoardLook {
+  wallHeight(id: string): number | null;
+  wallMaterial(id: string): string | null;
+  doorProp(id: string): string | null;
+  lightHeight(id: string): number | null;
+  readonly fogHeight: number | null;
+  readonly wallThickness: number | null;
+  readonly ambient: number | null;
+  readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
+  readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string> }>;
+}

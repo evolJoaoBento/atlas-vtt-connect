@@ -8,12 +8,18 @@
  */
 import type { App, EventRef } from 'obsidian';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
-import type { MiniSource } from '../app/online/scene/sceneSources';
+import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
+import type { BoardLook } from '../app/online/scene/sceneContracts';
+import type { BoardSession } from '../app/online/tools/BoardSessionHub';
+import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
-const PLUGIN_ID = 'atlas-vtt-tabletop';
-const READY = 'atlas-vtt-tabletop:api-ready';
-const UNLOAD = 'atlas-vtt-tabletop:api-unload';
+/** Tabletop's plugin id, and the one it had before ("Tabletop for Atlas VTT" took a new one). */
+const PLUGIN_IDS = ['tabletop-for-atlas', 'atlas-vtt-tabletop'];
+const READY = 'tabletop-for-atlas:api-ready';
+const UNLOAD = 'tabletop-for-atlas:api-unload';
+const OLD_READY = 'atlas-vtt-tabletop:api-ready';
+const OLD_UNLOAD = 'atlas-vtt-tabletop:api-unload';
 const NONE: Readonly<Record<string, MiniPlacement>> = Object.freeze({});
 
 interface TabletopApi {
@@ -30,8 +36,11 @@ function isTabletopApi(value: unknown): value is TabletopApi {
 
 function tabletopApi(app: App): TabletopApi | null {
   const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { api?: unknown } | undefined> } }).plugins?.plugins;
-  const api = plugins?.[PLUGIN_ID]?.api;
-  return isTabletopApi(api) ? api : null;
+  for (const id of PLUGIN_IDS) {
+    const api = plugins?.[id]?.api;
+    if (isTabletopApi(api)) return api;
+  }
+  return null;
 }
 
 export interface TabletopPainter {
@@ -42,6 +51,8 @@ export interface TabletopPainter {
   current(): MiniPainter | null;
   /** Calls `listener` when Tabletop arrives or leaves. */
   subscribe(listener: () => void): () => void;
+  /** Tabletop's 3D player board, read fresh on every call; null without one this Connect understands. */
+  board(): PlayerBoardFactory | null;
 }
 
 export function tabletopPainter(app: App): TabletopPainter {
@@ -50,11 +61,12 @@ export function tabletopPainter(app: App): TabletopPainter {
       const painter = (tabletopApi(app) as { playerMinis?: unknown } | null)?.playerMinis as Partial<MiniPainter> | undefined;
       return painter && painter.version === 1 && typeof painter.create === 'function' ? painter as MiniPainter : null;
     },
+    board: () => asPlayerBoardFactory((tabletopApi(app) as { playerBoard?: unknown } | null)?.playerBoard),
     subscribe: (listener) => {
       const refs: EventRef[] = [
-        app.workspace.on(READY as never, (() => listener()) as never),
+        ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => listener()) as never)),
         // Unload is announced before the API goes: it is read again on the next tick.
-        app.workspace.on(UNLOAD as never, (() => { window.setTimeout(listener, 0); }) as never),
+        ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(listener, 0); }) as never)),
       ];
       return () => { for (const ref of refs) app.workspace.offref(ref); };
     },
@@ -110,9 +122,9 @@ export function tabletopMinis(app: App): TabletopMinis {
     emit();
   };
   const refs: EventRef[] = [
-    app.workspace.on(READY as never, (() => bind()) as never),
+    ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => bind()) as never)),
     // Unload is announced before the API goes: it is read again on the next tick.
-    app.workspace.on(UNLOAD as never, (() => { window.setTimeout(bind, 0); }) as never),
+    ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(bind, 0); }) as never)),
   ];
   bind();
   return {
@@ -137,4 +149,159 @@ export function tabletopMinis(app: App): TabletopMinis {
       listeners.clear();
     },
   };
+}
+
+export type { BoardPose } from '../app/online/scene/sceneSources';
+
+/**
+ * What the GM gave a map on Tabletop's 3D board, and the GM's 3D view of it, for players on the 3D board. Available only
+ * with a Tabletop that offers `boardLook`, `onBoardChange` and `gmCamera`; an older one has no board to share.
+ */
+export interface TabletopBoard extends BoardSource {
+  /** Hands the GM's hosted session to Tabletop's board (again whenever Tabletop reloads); returns the release. */
+  attachSession(session: BoardSession): () => void;
+  dispose(): void;
+}
+
+interface TabletopBoardApi {
+  boardLook(mapPath: string): unknown;
+  onBoardChange(listener: (mapPath: string | null) => void): () => void;
+  gmCamera: { camera(mapPath: string): unknown; onChange(listener: () => void): () => void };
+}
+
+function boardApi(app: App): TabletopBoardApi | null {
+  const api = tabletopApi(app) as Partial<TabletopBoardApi> | null;
+  const camera = api?.gmCamera as Partial<TabletopBoardApi['gmCamera']> | undefined;
+  return api && typeof api.boardLook === 'function' && typeof api.onBoardChange === 'function'
+    && camera && typeof camera.camera === 'function' && typeof camera.onChange === 'function' ? api as TabletopBoardApi : null;
+}
+
+const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } => {
+  const point = value as Record<string, unknown> | null;
+  return typeof point === 'object' && point !== null && [point.x, point.y, point.z].every((n) => typeof n === 'number' && Number.isFinite(n));
+};
+
+export function tabletopBoard(app: App): TabletopBoard {
+  const listeners = new Set<() => void>();
+  const cameraListeners = new Set<() => void>();
+  let api: TabletopBoardApi | null = null;
+  /** The session handed over, and Tabletop's release of it. */
+  let session: BoardSession | null = null;
+  let releaseSession: (() => void) | null = null;
+  const handOver = (): void => {
+    releaseSession?.();
+    releaseSession = null;
+    const attach = (api as { attachSession?: unknown } | null)?.attachSession;
+    if (!session || typeof attach !== 'function') return;
+    try {
+      const release = (attach as (given: BoardSession) => unknown).call(api, session);
+      releaseSession = typeof release === 'function' ? release as () => void : null;
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Tabletop could not take the session:', error);
+    }
+  };
+  let stops: Array<() => void> = [];
+  const emitTo = (set: Set<() => void>): void => {
+    for (const listener of [...set]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error('[Atlas VTT Connect] A board listener failed:', error);
+      }
+    }
+  };
+  const emit = (): void => emitTo(listeners);
+  const bind = (): void => {
+    const next = boardApi(app);
+    if (next === api) return;
+    for (const stop of stops.splice(0)) stop();
+    api = next;
+    if (api) {
+      try {
+        stops = [api.onBoardChange(() => emit()), api.gmCamera.onChange(() => emitTo(cameraListeners))];
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not follow the Tabletop board:', error);
+        api = null;
+      }
+    }
+    handOver();
+    emit();
+  };
+  const refs: EventRef[] = [
+    ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => bind()) as never)),
+    ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(bind, 0); }) as never)),
+  ];
+  bind();
+  return {
+    available: () => api !== null,
+    lookFor: (mapPath) => {
+      if (!api) return null;
+      try {
+        const look = api.boardLook(mapPath) as BoardLook | null;
+        return look && typeof look.wallHeight === 'function' ? look : null;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop board:', error);
+        return null;
+      }
+    },
+    camera: (mapPath) => {
+      if (!api) return null;
+      try {
+        const pose = api.gmCamera.camera(mapPath) as Partial<BoardPose> | null;
+        if (pose && isPoint3(pose.eye) && isPoint3(pose.target)) return { eye: { ...pose.eye }, target: { ...pose.target } };
+        if (pose) console.warn('[Atlas VTT Connect] Tabletop gave a camera that is no camera:', pose);
+        return null;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop camera:', error);
+        return null;
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    attachSession: (given) => {
+      session = given;
+      handOver();
+      return () => {
+        if (session !== given) return;
+        session = null;
+        handOver();
+      };
+    },
+    subscribeCamera: (listener) => {
+      cameraListeners.add(listener);
+      return () => { cameraListeners.delete(listener); };
+    },
+    dispose: () => {
+      for (const ref of refs) app.workspace.offref(ref);
+      for (const stop of stops.splice(0)) stop();
+      session = null;
+      handOver();
+      api = null;
+      listeners.clear();
+      cameraListeners.clear();
+    },
+  };
+}
+
+/**
+ * Tabletop's 3D boards open on the GM's side (`api.boardViews`), for Connect's buttons in their toolbars; none without
+ * a Tabletop that lists them. Never throws.
+ */
+export function tabletopBoardViews(app: App): Array<{ key: string; mapPath: string; root: HTMLElement }> {
+  const list = (tabletopApi(app) as { boardViews?: unknown } | null)?.boardViews;
+  if (typeof list !== 'function') return [];
+  try {
+    const boards = (list as () => unknown).call(tabletopApi(app));
+    return Array.isArray(boards)
+      ? boards.filter((entry: unknown): entry is { key: string; mapPath: string; root: HTMLElement } => {
+        const board = entry as { key?: unknown; mapPath?: unknown; root?: { querySelector?: unknown } } | null;
+        return typeof board?.key === 'string' && typeof board.mapPath === 'string' && typeof board.root?.querySelector === 'function';
+      })
+      : [];
+  } catch (error) {
+    console.warn('[Atlas VTT Connect] Could not list the Tabletop boards:', error);
+    return [];
+  }
 }

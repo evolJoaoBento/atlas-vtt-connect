@@ -1,11 +1,11 @@
 /**
- * The join page's toolbar, like Atlas's main toolbar: Move, Measure (with the Line, Circle/Sphere
- * and Cone flyout), Laser and Dice. Controls that do not fit move into More tools by priority,
+ * The join page's toolbar, like Atlas's main toolbar: Move (with Laser and Ping in its group, as Atlas's Move group
+ * holds its laser), Measure (with the Line, Circle/Sphere and Cone flyout), Template and Dice. Controls that do not fit move into More tools by priority,
  * through Atlas's own fit (`overflowingToolbarItems`). The active tool, and a control whose menu
  * or tray hangs from it, never move. Shared with the web page; the DOM is
  * `online-client/toolbar.mts`.
  */
-import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
+import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES, LASER_SIZE_MAX, LASER_SIZE_MIN } from '@atlas-vtt/shared/rules';
 import { overflowingToolbarItems, type ToolbarFitLayout } from '../../packages/components/toolbar/toolbarFit';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool } from '../view/tools/PlayerTools';
@@ -25,19 +25,35 @@ export interface ToolbarControl {
 export const MORE_TOOLS_LABEL = 'More tools';
 export const MEASURE_OPTIONS_LABEL = 'Measure options';
 export const LASER_OPTIONS_LABEL = 'Laser color options';
+export const MOVE_OPTIONS_LABEL = 'Move options';
 export const TEMPLATE_OPTIONS_LABEL = 'Template options';
 export const CLEAR_OWN_TEMPLATES_LABEL = 'Clear my templates';
-export { LASER_COLOR_HINT };
+export { LASER_COLOR_HINT, LASER_SIZE_MAX, LASER_SIZE_MIN };
 
 /** Atlas's priorities (`MainToolbar.tsx`). The laser lives in Atlas's Move group, so it ranks between Measure and Dice. */
 export const TOOLBAR_CONTROLS: readonly ToolbarControl[] = [
   { id: 'move', label: 'Move', icon: 'hand', priority: 100 },
   { id: 'measure', label: 'Measure', icon: 'ruler', priority: 90 },
   { id: 'template', label: 'Template', icon: 'shapes', priority: 85 },
-  { id: 'laser', label: 'Laser', icon: 'flashlight', priority: 80 },
-  { id: 'ping', label: 'Ping', icon: 'radar', priority: 78 },
   { id: 'dice', label: 'Dice', icon: 'dices', priority: 75 },
 ];
+
+/** The tools of the Move group, as Atlas's Move group holds Move/Select and its laser: its menu lists them. */
+export const MOVE_TOOL_OPTIONS: ReadonlyArray<{ tool: 'move' | 'laser' | 'ping'; label: string; menuLabel: string; icon: ToolIconName }> = [
+  { tool: 'move', label: 'Move', menuLabel: 'Move/Select', icon: 'hand' },
+  { tool: 'laser', label: 'Laser', menuLabel: 'Laser Pointer', icon: 'flashlight' },
+  { tool: 'ping', label: 'Ping', menuLabel: 'Ping', icon: 'radar' },
+];
+
+/** Whether `tool` is one of the Move group's. */
+export function isMoveGroupTool(tool: PlayerTool): tool is 'move' | 'laser' | 'ping' {
+  return tool === 'move' || tool === 'laser' || tool === 'ping';
+}
+
+/** The Move group's button shows its tool in use, as Atlas's does. */
+export function moveIcon(tool: PlayerTool): ToolIconName {
+  return MOVE_TOOL_OPTIONS.find((option) => option.tool === tool)?.icon ?? 'hand';
+}
 
 /** Atlas's measure flyout. */
 export const MEASURE_SHAPE_OPTIONS: ReadonlyArray<{ shape: MeasureChoice; label: string; icon: ToolIconName }> = [
@@ -67,6 +83,8 @@ export interface ToolbarState {
   laserMenuOpen: boolean;
   /** The laser's colour now, marked in the flyout. */
   laserColor: string;
+  /** The laser's size now, in Atlas's pixels (8 to 100). */
+  laserSize?: number;
 }
 
 export interface LaserSwatch {
@@ -94,13 +112,15 @@ export function templateIcon(shape: TemplateShape): ToolIconName {
 }
 
 export function isControlActive(id: ToolbarControlId, state: ToolbarState): boolean {
-  return id === 'dice' ? state.diceOpen : state.tool === id;
+  if (id === 'dice') return state.diceOpen;
+  if (id === 'move') return isMoveGroupTool(state.tool);
+  return state.tool === id;
 }
 
 /** The tool in use, and a control whose menu or tray hangs from it, stay in the bar. */
 export function isControlPinned(id: ToolbarControlId, state: ToolbarState): boolean {
   return isControlActive(id, state) || (id === 'measure' && state.measureMenuOpen)
-    || (id === 'template' && state.templateMenuOpen) || (id === 'laser' && state.laserMenuOpen);
+    || (id === 'template' && state.templateMenuOpen) || (id === 'move' && state.laserMenuOpen);
 }
 
 /** The controls that go into More tools; `widths` holds each control's last measured width. */

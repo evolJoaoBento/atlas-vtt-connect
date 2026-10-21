@@ -86,6 +86,8 @@ export interface PlayerLaser {
   dt?: number[];
   /** The laser's colour, `#rrggbb`: the sender's pick, or the one the GM gave it. */
   color?: string;
+  /** The laser's size as the sender picked it (Atlas's 8 to 100); without it, Atlas's default. */
+  size?: number;
 }
 
 type Fields = Record<string, unknown>;

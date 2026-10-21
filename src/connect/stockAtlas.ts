@@ -11,6 +11,7 @@
  * and `ui` (`stockUi/`: a floating dock and panels, in place of the slots stock Atlas does not have). Not provided:
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
+import { tabletopBoardViews } from './tabletopMinis';
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
@@ -204,7 +205,9 @@ function camera(view: StockView): ViewCamera | null {
 function snapshotSlice(view: StockView): readonly unknown[] {
   const s = view.atlasStore.getState();
   return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
-    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings];
+    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
+    // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
+    (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights];
 }
 
 function guard(what: string, call: () => void): void {
@@ -413,6 +416,9 @@ function presentationApi(app: App, atlas: StockPlugin, presented: StockPresented
   });
 }
 
+/** The name Connect's data is kept under: Atlas's extension folder and the map files' extensions key. */
+export const CONNECT_STORAGE_ID = 'atlas-vtt-connect';
+
 function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
   const add = (dispose: Disposer): Disposer => {
     disposers.add(dispose);
@@ -593,7 +599,8 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       askIndex();
       disposers.add(events.on('map-loaded', askIndex));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
-      const extensionId = plugin.manifest.id;
+      // Connect's data keeps the name it has always had (its folder, and its key in map files), whatever the plugin id.
+      const extensionId = CONNECT_STORAGE_ID;
       // Asked for by Connect and by the player character links at once: made once.
       let made: Promise<string> | null = null;
       const folder = (): Promise<string> => {
@@ -640,6 +647,8 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         views: () => mapViews(app),
         active: () => activeMapView(app),
         presentedTabId: () => presented.get()?.tabId ?? null,
+        // Tabletop's 3D boards carry the same buttons, for the Atlas view holding their map.
+        boards: () => tabletopBoardViews(app),
         onViewsChanged: (listener) => {
           const stops = (['map-loaded', 'map-closed', 'tabs-changed'] as const).map((event) => events.on(event, listener as never));
           return () => { for (const stop of stops) stop(); };

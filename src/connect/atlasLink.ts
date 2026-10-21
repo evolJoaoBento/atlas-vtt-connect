@@ -14,14 +14,19 @@ export const ATLAS_GRACE_MS = 10_000;
 
 /** How long a stock Atlas (one that never publishes an API) gets before Connect stands in for the API. */
 export const STOCK_GRACE_MS = 3_000;
+/**
+ * How often Connect looks whether a stock Atlas was reloaded (updated, disabled, enabled): a stock Atlas announces
+ * nothing, and the reloaded one has views, settings and a presented scene of its own.
+ */
+export const STOCK_WATCH_MS = 1_000;
 /** How long after load the wait for Atlas starts even if Obsidian never calls the layout-ready callback. */
 export const LAYOUT_READY_FALLBACK_MS = 5_000;
 
 /** Every notice about a missing or wrong Atlas ends here: the README names the Atlas build to install. */
 const SEE_README = "See Connect's README for the Atlas build to install.";
-export const MISSING_ATLAS_NOTICE = `Atlas VTT Connect: Install or enable Atlas VTT. ${SEE_README}`;
-export const NO_API_NOTICE = `Atlas VTT Connect: this Atlas VTT has no extension API yet. ${SEE_README}`;
-export const oldApiNotice = (found: string): string => `Atlas VTT Connect needs extension API ${SUPPORTED_MAJOR}.x (found ${found}). ${SEE_README}`;
+export const MISSING_ATLAS_NOTICE = `Connect for Atlas VTT: Install or enable Atlas VTT. ${SEE_README}`;
+export const NO_API_NOTICE = `Connect for Atlas VTT: this Atlas VTT has no extension API yet. ${SEE_README}`;
+export const oldApiNotice = (found: string): string => `Connect for Atlas VTT needs extension API ${SUPPORTED_MAJOR}.x (found ${found}). ${SEE_README}`;
 
 function isAtlasApi(value: unknown): value is AtlasApi {
   const api = value as Partial<AtlasApi> | null;
@@ -43,6 +48,8 @@ export class AtlasLink {
   private fallbackTimer: number | null = null;
   /** Disposes what Atlas registered for the current connection (it would otherwise wait for Connect to unload). */
   private release: (() => void) | null = null;
+  /** The stock Atlas plugin object stood in for, while it is the connection. */
+  private stockAtlas: unknown = null;
 
   constructor(
     private readonly plugin: Plugin,
@@ -56,7 +63,7 @@ export class AtlasLink {
 
   start(): void {
     const { workspace } = this.plugin.app;
-    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => this.attach(api)));
+    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => { this.stockAtlas = null; this.attach(api); }));
     this.plugin.registerEvent(workspace.on('atlas-vtt:api-unload', () => this.detach()));
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
@@ -70,8 +77,15 @@ export class AtlasLink {
       begun = true;
       this.graceTimer = window.setTimeout(() => this.warnMissing(), ATLAS_GRACE_MS);
       // A stock Atlas never publishes an API: no reason to wait the whole grace for it.
-      const stockTimer = window.setTimeout(() => { this.useStockAtlas(); }, STOCK_GRACE_MS);
-      this.plugin.register(() => window.clearTimeout(stockTimer));
+      let watch: number | null = null;
+      const stockTimer = window.setTimeout(() => {
+        this.useStockAtlas();
+        watch = window.setInterval(() => this.followStockAtlas(), STOCK_WATCH_MS);
+      }, STOCK_GRACE_MS);
+      this.plugin.register(() => {
+        window.clearTimeout(stockTimer);
+        if (watch !== null) window.clearInterval(watch);
+      });
     };
     workspace.onLayoutReady(begin);
     if (!begun && !this.atlasSeen) this.fallbackTimer = window.setTimeout(begin, LAYOUT_READY_FALLBACK_MS);
@@ -83,9 +97,34 @@ export class AtlasLink {
     if (this.extension || this.atlasSeen) return false;
     const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
     if (!atlas || !canShimStockAtlas(atlas)) return false;
-    console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in.');
-    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    console.warn('Connect for Atlas VTT: this Atlas has no extension API; using the stock Atlas stand-in.');
+    this.attachStock(atlas);
     return true;
+  }
+
+  private attachStock(atlas: unknown): void {
+    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    this.stockAtlas = atlas;
+  }
+
+  /**
+   * A stock Atlas reloaded (updated in place, disabled, enabled) leaves the stand-in holding the old plugin's stores:
+   * presenting would then open the new Atlas's player window, which knows nothing of Connect showing players the scene.
+   */
+  private followStockAtlas(): void {
+    const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
+    if (atlas === this.stockAtlas) return;
+    // An Atlas with an API is followed through its own events.
+    if (isAtlasApi((atlas as { api?: unknown } | undefined)?.api)) return;
+    if (this.stockAtlas === null && this.extension) return;
+    if (this.stockAtlas !== null) {
+      this.stockAtlas = null;
+      this.detach();
+    }
+    if (atlas && canShimStockAtlas(atlas)) {
+      console.warn('Connect for Atlas VTT: Atlas was reloaded; standing in for it again.');
+      this.attachStock(atlas);
+    }
   }
 
   private stopGrace(): void {
@@ -130,8 +169,8 @@ export class AtlasLink {
       this.stop = null;
       // `connect` may have succeeded before `startWith` threw: take its registrations off Atlas again.
       release.run();
-      console.error('Atlas VTT Connect could not start on this Atlas:', error);
-      this.notify(`Atlas VTT Connect could not start: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Connect for Atlas VTT could not start on this Atlas:', error);
+      this.notify(`Connect for Atlas VTT could not start: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -145,7 +184,7 @@ export class AtlasLink {
           try {
             cleanup();
           } catch (error) {
-            console.error('Atlas VTT Connect could not release a connection to Atlas:', error);
+            console.error('Connect for Atlas VTT could not release a connection to Atlas:', error);
           }
         }
       },
@@ -161,7 +200,7 @@ export class AtlasLink {
     try {
       stop?.();
     } catch (error) {
-      console.error('Atlas VTT Connect failed to stop cleanly:', error);
+      console.error('Connect for Atlas VTT failed to stop cleanly:', error);
     }
     release?.();
   }

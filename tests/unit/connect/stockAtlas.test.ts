@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Plugin } from 'obsidian';
-import { AtlasLink, LAYOUT_READY_FALLBACK_MS, STOCK_GRACE_MS } from '../../../src/connect/atlasLink';
+import { AtlasLink, LAYOUT_READY_FALLBACK_MS, STOCK_GRACE_MS, STOCK_WATCH_MS } from '../../../src/connect/atlasLink';
 import { canShimStockAtlas, stockAtlasApi } from '../../../src/connect/stockAtlas';
 import { fakeConnectPlugin } from '../../fake/fakeWorkspace';
 import { setupStockAtlas as setup } from '../../fake/fakeStockAtlas';
@@ -105,6 +105,39 @@ describe('stock Atlas stand-in', () => {
     vi.advanceTimersByTime(STOCK_GRACE_MS);
     expect(started).toEqual(['atlas-vtt-connect:1.0.0']);
     expect(notices).toEqual([]);
+  });
+  it('follows a stock Atlas that reloads (updated, disabled, enabled): players are shown elsewhere on the new one', () => {
+    const { app, plugins, atlas } = setup();
+    const events: string[] = [];
+    const target = { id: 'online', label: 'Online', isActive: () => true };
+    const link = new AtlasLink(fakeConnectPlugin(app as Plugin['app']), (extension) => {
+      events.push('start');
+      const stop = extension.presentation.addTarget(target);
+      return () => { events.push('stop'); stop(); };
+    }, () => undefined);
+    link.start();
+    vi.advanceTimersByTime(STOCK_GRACE_MS);
+    expect(events).toEqual(['start']);
+    expect(atlas.presentedScene.elsewhere()).toBe(1);
+    // Atlas updated in place: a new plugin object with a presented scene of its own, which would open its player window.
+    const updated = setup().atlas;
+    plugins['atlas-vtt'] = updated as never;
+    vi.advanceTimersByTime(STOCK_WATCH_MS);
+    expect(events).toEqual(['start', 'stop', 'start']);
+    expect(atlas.presentedScene.elsewhere()).toBe(0);
+    expect(updated.presentedScene.elsewhere()).toBe(1);
+    vi.advanceTimersByTime(STOCK_WATCH_MS * 3);
+    expect(events).toEqual(['start', 'stop', 'start']);
+    // Disabled, then enabled again.
+    plugins['atlas-vtt'] = undefined;
+    vi.advanceTimersByTime(STOCK_WATCH_MS);
+    expect(events).toEqual(['start', 'stop', 'start', 'stop']);
+    expect(link.connected).toBeNull();
+    const enabled = setup().atlas;
+    plugins['atlas-vtt'] = enabled as never;
+    vi.advanceTimersByTime(STOCK_WATCH_MS);
+    expect(events).toEqual(['start', 'stop', 'start', 'stop', 'start']);
+    expect(enabled.presentedScene.elsewhere()).toBe(1);
   });
   it("stands in even when Obsidian never calls the layout-ready callback (another plugin's threw before it)", () => {
     const { app } = setup();

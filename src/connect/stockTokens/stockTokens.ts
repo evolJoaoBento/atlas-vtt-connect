@@ -195,6 +195,8 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi {
   });
 }
 
+/** A token of the map by id; null for none, and for one kept beside the map (Atlas 0.9's `offMap`), which is no part of it. */
 function tokenOf(state: TokenScene, id: string): { x: number; y: number; size?: number | undefined; isHidden?: boolean | undefined } | null {
-  return Object.hasOwn(state.objects.tokens, id) ? (state.objects.tokens[id] ?? null) : null;
+  const token = Object.hasOwn(state.objects.tokens, id) ? (state.objects.tokens[id] ?? null) : null;
+  return token && (token as { offMap?: unknown }).offMap !== true ? token : null;
 }

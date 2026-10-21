@@ -1,4 +1,5 @@
 /** What the scene tab takes from a joined session, what it asks of it, and why a join may not start. */
+import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
@@ -34,6 +35,12 @@ export interface OnlineSceneSink {
   ping?(ping: PlayerPing): void;
   /** The GM's answer to a pin this player opened; a view that opens none leaves it out. */
   pinNote?(answer: PinNoteAnswer): void;
+  /** Whether the GM can send the scene for Tabletop's 3D board; a view without the board leaves it out. */
+  boardOffer?(available: boolean): void;
+  /** The scene's board extras (walls, doors, lights, props, materials), or null; a view without the board leaves it out. */
+  boardExtras?(extras: BoardExtras | null): void;
+  /** The GM's 3D camera of the scene, or null; a view without the board leaves it out. */
+  boardCamera?(camera: BoardCamera | null): void;
   /** Images arrived, failed or went. */
   images(): void;
   /** The session was left from elsewhere (a new join, the plugin unloading): close the tab. */

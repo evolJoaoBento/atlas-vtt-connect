@@ -5,7 +5,8 @@
  * creature of the token's statblock name. What comes back is the creature as is; the player's sheet whitelists it
  * (`tools/sheets.ts`, `tools/templateSheets.ts`).
  *
- * Each note's card, as Atlas draws it, is kept too (`statblockCards.ts`): what players see where their page can show it.
+ * Each note's card, as Atlas draws it, is kept too (`statblockCards.ts`): what players see where their page can show it,
+ * unless its template hides fields from players.
  *
  * Atlas keeps its templates as `.atlastemplate` files (JSON) anywhere in the vault, the lowest path winning where two
  * share an id (`TemplateLibrary`). They are read once, and again when one changes.
@@ -13,7 +14,7 @@
 import { TFile, type App, type EventRef } from 'obsidian';
 import type { Character } from '@atlas-vtt/api-types';
 import type { StatblockSource } from '../app/online/atlas/toolParts';
-import { templateId, type TemplatedStatblock } from '../app/online/tools/templateSheets';
+import { templateHidesFields, templateId, type TemplatedStatblock } from '../app/online/tools/templateSheets';
 import { captureCard, cardKey, cardKeyParts, StatblockCards } from './statblockCards';
 
 interface FantasyStatblocksApi {
@@ -157,7 +158,12 @@ export function obsidianStatblocks(app: App): StatblockSource {
       const path = typeof token.statblockPath === 'string' ? notePath(token.statblockPath) : '';
       const imagePath = typeof token.imagePath === 'string' ? token.imagePath : '';
       const art = imagePath ? { imagePath, ringColor: typeof token.ringColor === 'string' ? token.ringColor : undefined, showRing: token.showRing } : null;
-      return path ? cards.get(cardKey(path, art)) : null;
+      if (!path) return null;
+      // Atlas's card shows every field: none where the template hides some from players (Atlas 0.9's `players`), nor
+      // while its template is not read; the player gets the text sheet, which leaves them out.
+      const templated = byTemplate(path);
+      if (templated && (templated.template === undefined || templateHidesFields(templated.template))) return null;
+      return cards.get(cardKey(path, art));
     },
     onChange(listener: () => void): () => void {
       // Once a second at most: a note being typed in changes the cache on every keystroke.

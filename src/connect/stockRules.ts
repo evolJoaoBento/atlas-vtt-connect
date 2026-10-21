@@ -72,10 +72,15 @@ function readList<T>(value: unknown, read: (item: unknown) => T | null, max: num
   return Object.freeze(value.slice(0, max).map(read).filter((item): item is T => item !== null));
 }
 
+/**
+ * A collection's initiative rules. Atlas 0.9's `cards` is read as it is (a list in turn order for players, never by
+ * sides), not as the defaults; a side the collection named as first reads as the players', as older Atlas reads it.
+ */
 function readInitiative(value: unknown): InitiativeRules | null {
-  if (!isObject(value) || (value.mode !== 'turn-order' && value.mode !== 'sides')) return null;
+  if (!isObject(value) || (value.mode !== 'turn-order' && value.mode !== 'sides' && value.mode !== 'cards')) return null;
   return Object.freeze({
-    mode: value.mode,
+    // The API's type predates `cards`; what reads the mode only asks whether it is `sides`.
+    mode: value.mode as InitiativeRules['mode'],
     roll: typeof value.roll === 'string' && value.roll !== '' ? value.roll : '1d20',
     firstSide: value.firstSide === 'opponents' ? 'opponents' : 'players',
   });

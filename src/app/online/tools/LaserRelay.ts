@@ -7,6 +7,7 @@
  * of a laser being held still goes on, without points), and nothing is stored. A player who leaves or is removed
  * mid-stroke is let go for their scene. A `GmSession` handler.
  */
+import type { BoardSessionSink } from './BoardSessionHub';
 import type { Disposer, LasersApi, ViewId } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
@@ -24,6 +25,8 @@ export interface LaserRelayOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSlot' | 'shownSnapshot' | 'onSlotChange'>;
   /** The GM's laser in a view, and other people's lasers shown in it (`lasers.onLocal`, `lasers.show`). */
   laser: Pick<LasersApi, 'onLocal' | 'show'>;
+  /** Tabletop's 3D board on the GM's side, wherever it shows the map. */
+  board?: Pick<BoardSessionSink, 'laser'>;
   /** The GM's laser colour in Atlas, read for every message so a change applies from the next one. */
   gmColor?: () => string;
 }
@@ -42,6 +45,8 @@ interface Stroke {
   lifted: boolean;
   dt?: number[];
   picked?: string | null;
+  /** The size the player picked, passed on as it came. */
+  size?: number;
 }
 
 export class LaserRelay implements SessionHandler {
@@ -88,7 +93,7 @@ export class LaserRelay implements SessionHandler {
     // Field by field: a page may add keys to its points.
     const points = allowed ? message.points.map(({ x, y }) => ({ x, y })) : [];
     const dt = allowed && message.dt ? [...message.dt] : undefined;
-    this.relay({ from: playerId, sceneId: slot.sceneId, points, lifted: message.lifted, ...(dt ? { dt } : {}), picked: picked ?? null }, slot.tab.viewId);
+    this.relay({ from: playerId, sceneId: slot.sceneId, points, lifted: message.lifted, ...(dt ? { dt } : {}), picked: picked ?? null, ...(message.size !== undefined ? { size: message.size } : {}) }, slot.tab.viewId);
     if (message.lifted) this.picks.delete(playerId);
   }
 
@@ -169,7 +174,11 @@ export class LaserRelay implements SessionHandler {
     const color = this.colorOf(from, order, stroke.picked ?? null);
     for (const playerId of projection.audience(sceneId)) {
       if (playerId === from) continue;
-      session.send(playerId, { v: 1, type: 'laser', from, sceneId, points, lifted, color, ...(dt ? { dt } : {}) });
+      session.send(playerId, { v: 1, type: 'laser', from, sceneId, points, lifted, color, ...(dt ? { dt } : {}), ...(stroke.size !== undefined ? { size: stroke.size } : {}) });
+    }
+    if (from !== GM_LASER_ID) {
+      const mapPath = projection.slotOf(from)?.mapPath;
+      if (mapPath) this.options.board?.laser(mapPath, from, points, lifted, color);
     }
     if (from === GM_LASER_ID || viewId === null || projection.shownSnapshot(sceneId) === null) return;
     this.options.laser.show(viewId, { from, color, points, lifted, ...(dt ? { dt } : {}) });

@@ -9,7 +9,8 @@ import { projectInitiative, projectSides } from '../../../src/app/online/scene/p
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { PLAYER_SIDES } from '../../../src/app/online/scene/sceneTypes';
 import type { Character, InitiativeEntry, InitiativeRules, InitiativeState, SceneSnapshot } from '@atlas-vtt/api-types';
-import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
+import { isPlayerSceneBody } from '../../../src/app/online/scene/sceneValidation';
+import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, sceneBody, snapshotOf } from './sceneFixtures';
 
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 const TURN_ORDER: InitiativeRules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
@@ -165,5 +166,31 @@ describe("the join page's list", () => {
   it('hides a side whose combatants are all hidden', () => {
     const entries = [entry('spy', 4, 0), entry('orc', 3, 1)];
     expect(rowsOf(state({ entries }), SIDES).map((row) => row.text)).toEqual(['Opponents', 'orc']);
+  });
+});
+
+describe("Atlas 0.9's fights", () => {
+  it('keep a fight by sides the collection named within the two sides players know, and the scene valid', () => {
+    const tokens = { ...TOKENS, orc: token('orc', { side: 'monsters' as never }) };
+    const fight = { first: 'opponents', active: 'monsters', order: [{ id: 'players' }, { id: 'monsters', name: 'Monsters' }, { id: 'opponents' }] };
+    const sent = project(state({ isActive: true, sides: fight as never }, tokens), SIDES);
+    // A side players do not know is no side's turn there, as an older Atlas's window shows it.
+    expect(sent.initiative?.sides).toEqual({ first: 'opponents' });
+    expect(sent.tokens.orc?.side).toBe('opponents');
+    expect(isPlayerSceneBody(sceneBody(sent))).toBe(true);
+  });
+
+  it('give no turn to a combatant that delayed its turn', () => {
+    const entries = [entry('orc', 21, 0, { isActive: true, delayed: true } as Partial<InitiativeEntry>), entry('hero', 17, 1)];
+    expect(project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries.map((e) => e.isActive)).toEqual([false, false]);
+  });
+
+  it('show the card each combatant was dealt in a fight by cards, where a fight in turn order shows the number', () => {
+    const entries = [entry('orc', 21, 0, { isActive: true, card: 2 } as Partial<InitiativeEntry>), entry('hero', 17, 1, { card: 5 } as Partial<InitiativeEntry>), entry('ally', 3, 2)];
+    const cards = { mode: 'cards', roll: '1d20', firstSide: 'players' } as unknown as InitiativeRules;
+    const sent = project(state({ isActive: true, entries, cards: { deck: 10 } } as Partial<InitiativeState>), cards);
+    expect(sent.initiative?.entries.map((e) => [e.tokenId, e.initiative, e.isActive])).toEqual([['orc', 2, true], ['hero', 5, false], ['ally', 0, false]]);
+    expect(sent.initiative).not.toHaveProperty('sides');
+    expect(project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries.map((e) => e.initiative)).toEqual([21, 17, 3]);
   });
 });

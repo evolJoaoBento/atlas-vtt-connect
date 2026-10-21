@@ -6,6 +6,7 @@
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneInbox } from './playerSessionScene';
+import type { BoardCamera, BoardExtras } from './scene/boardTypes';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
@@ -82,6 +83,12 @@ export interface PlayerSessionOptions {
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
   /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
   onPinNote?(answer: PinNoteAnswer): void;
+  /** Whether the GM can send the scene for Tabletop's 3D board (`board-offer`). */
+  onBoardOffer?(available: boolean): void;
+  /** The scene's board extras, whole once every part of one `seq` is here; null for none. */
+  onBoardExtras?(extras: BoardExtras | null): void;
+  /** The GM's 3D camera of the scene, or null. */
+  onBoardCamera?(camera: BoardCamera | null): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -185,10 +192,12 @@ export class PlayerSession {
   }
 
   /** Sends new points of this player's laser for the scene they have; false when it cannot go. */
-  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string): boolean {
+  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string, size?: number): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'laser', sceneId: scene.sceneId, points: [...points], lifted, ...(dt ? { dt: [...dt] } : {}), ...(color ? { color } : {}) }));
+    this.link.send('control', encodeControl({
+      v: 1, type: 'laser', sceneId: scene.sceneId, points: [...points], lifted, ...(dt ? { dt: [...dt] } : {}), ...(color ? { color } : {}), ...(size !== undefined ? { size } : {}),
+    }));
     return true;
   }
 
@@ -300,15 +309,52 @@ export class PlayerSession {
           this.options.onPing?.({ from: message.from, sceneId: message.sceneId, x: message.x, y: message.y, color: message.color });
         }
         break;
+      case 'board-offer':
+        // Offered on every admission: a GM hosting anew counts its board from 1 again.
+        this.board = null;
+        this.options.onBoardOffer?.(message.available);
+        break;
+      case 'board-extras':
+        this.boardPart(message.seq, message.part, message.parts, message.extras);
+        break;
+      case 'board-camera':
+        this.options.onBoardCamera?.(message.camera);
+        break;
       case 'laser':
         // Only the GM's relays carry `from`.
         if (message.from !== undefined) {
-          this.options.onLaser?.({ from: message.from, sceneId: message.sceneId, points: message.points, lifted: message.lifted, ...(message.dt ? { dt: message.dt } : {}), ...(message.color ? { color: message.color } : {}) });
+          this.options.onLaser?.({
+            from: message.from, sceneId: message.sceneId, points: message.points, lifted: message.lifted,
+            ...(message.dt ? { dt: message.dt } : {}), ...(message.color ? { color: message.color } : {}), ...(message.size !== undefined ? { size: message.size } : {}),
+          });
         }
         break;
       default:
         break;
     }
+  }
+
+  /** Asks the GM to send (or stop sending) the board extras of this player's scene; false while not admitted. */
+  sendBoardRequest(on: boolean): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'board-request', on }));
+    return true;
+  }
+
+  /** The parts of the newest board seen; an older seq's parts are dropped. */
+  private board: { seq: number; parts: Array<BoardExtras | null | undefined> } | null = null;
+
+  private boardPart(seq: number, part: number, parts: number, extras: BoardExtras | null): void {
+    if (this.board && seq < this.board.seq) return;
+    if (!this.board || seq > this.board.seq) this.board = { seq, parts: new Array<BoardExtras | null | undefined>(parts).fill(undefined) };
+    if (this.board.parts.length !== parts || part >= parts) return;
+    this.board.parts[part] = extras;
+    if (this.board.parts.some((entry) => entry === undefined)) return;
+    const [first, ...rest] = this.board.parts as Array<BoardExtras | null>;
+    const whole = first ? rest.reduce<BoardExtras>((sum, next) => (next ? {
+      ...sum, walls: [...sum.walls, ...next.walls], lights: [...sum.lights, ...next.lights], props: [...sum.props, ...next.props],
+    } : sum), first) : null;
+    this.options.onBoardExtras?.(whole);
   }
 
   /** The link closed or could not be made: retry if we were in, else stop. */
