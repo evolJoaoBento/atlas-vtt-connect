@@ -2,6 +2,7 @@
  * What the scene hub tells the rest of the session about its scenes (B6–B9 read it): which scene each player has, the
  * live one, and every change. Also the shape the GM's panel reads (`SceneUse`).
  */
+import type { BoardExtras } from './boardTypes';
 import type { SceneSnapshot } from '@atlas-vtt/api-types';
 import type { TabKey } from '../split/tabKey';
 import type { SceneSlot, SlotState } from './SceneSlot';
@@ -13,6 +14,8 @@ export interface SlotView {
   sceneId: string;
   state: SlotState;
   lastSent: PlayerScene | null;
+  /** Tabletop's board extras of what was last sent; null without Tabletop or a scene. */
+  board?: BoardExtras | null;
   mapPath: string;
   name: string;
 }
@@ -64,7 +67,7 @@ export interface SceneUse {
 }
 
 export function viewOf(slot: SceneSlot): SlotView {
-  return { tab: { ...slot.tab }, sceneId: slot.sceneId, state: slot.state, lastSent: slot.lastSent, mapPath: slot.mapPath, name: slot.name };
+  return { tab: { ...slot.tab }, sceneId: slot.sceneId, state: slot.state, lastSent: slot.lastSent, board: slot.board, mapPath: slot.mapPath, name: slot.name };
 }
 
 /** Listeners of slot changes (or of `T`), each guarded: one that throws does not stop the others. */

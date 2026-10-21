@@ -73,6 +73,8 @@ describe('tabletopBoard', () => {
     const board = tabletopBoard(app);
     const heard = vi.fn();
     board.subscribe(heard);
+    const moved = vi.fn();
+    board.subscribeCamera(moved);
     const tabletop = fakeTabletop();
     plugins['atlas-vtt-tabletop'] = { api: tabletop.api };
     trigger('atlas-vtt-tabletop:api-ready', tabletop.api);
@@ -83,7 +85,8 @@ describe('tabletopBoard', () => {
     tabletop.boardChanged('m.atlasmap');
     expect(heard).toHaveBeenCalledTimes(2);
     tabletop.cameraMoved({ eye: { x: 9, y: 9, z: 9 }, target: { x: 1, y: 0, z: 1 } });
-    expect(heard).toHaveBeenCalledTimes(3);
+    expect(heard).toHaveBeenCalledTimes(2);
+    expect(moved).toHaveBeenCalledTimes(1);
     expect(board.camera('m.atlasmap')?.eye.x).toBe(9);
     board.dispose();
     expect(tabletop.board.size + tabletop.camera.size).toBe(0);

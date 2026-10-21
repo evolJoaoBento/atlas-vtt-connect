@@ -17,7 +17,7 @@ import { connectStorage } from './connectStorage';
 import type { MigrationSettings } from './migrateFromFork';
 import { migrationGate, startMigration, type MigrationStart } from './startMigration';
 import { startJoining, type JoinSettings } from './startJoining';
-import { tabletopMinis } from './tabletopMinis';
+import { tabletopBoard, tabletopMinis } from './tabletopMinis';
 
 export interface ConnectOptions {
   /** Connect's own settings (`ConnectSettingsStore`). */
@@ -61,9 +61,11 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   void resourceVisibility?.load();
   // The Tabletop extension's 3D minis, when it is installed: players see them on the tokens they are sent.
   const minis = tabletopMinis(plugin.app);
+  // And its 3D board, for players who show it.
+  const board = tabletopBoard(plugin.app);
   const deps: Deps = {
     ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) }),
-    people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, ...options.hosting,
+    people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, board, ...options.hosting,
   };
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
@@ -80,6 +82,7 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
       gmUi?.();
       stopOnline();
       minis.dispose();
+      board.dispose();
     },
   };
 }

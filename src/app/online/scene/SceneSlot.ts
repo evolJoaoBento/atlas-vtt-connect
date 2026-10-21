@@ -9,7 +9,10 @@ import type { Disposer, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { TabKey } from '../split/tabKey';
 import { SightWait } from './goLive';
 import type { LightingFrame } from './lightingFrame';
-import { projectForPlayers } from './projectForPlayers';
+import { projectForPlayers, visibleShows } from './projectForPlayers';
+import { projectBoard } from './projectBoard';
+import type { BoardExtras } from './boardTypes';
+import type { FogCoverage } from './FogCoverage';
 import { createProjectionMemo } from './projectRecords';
 import { diffScenes } from './sceneDiff';
 import type { PresentationLighting } from './sceneLighting';
@@ -36,6 +39,10 @@ export class SceneSlot {
   state: SlotState = 'waiting';
   /** What its players have: the last projection sent; null before the first, or after a clear. */
   lastSent: PlayerScene | null = null;
+  /** Tabletop's board extras of the scene last projected; null without Tabletop or a scene. */
+  board: BoardExtras | null = null;
+  /** `board` as text, to tell a change. */
+  private boardText = 'null';
   /** The tab's name and map, as its tab shows them; the hub follows renames. */
   name = '';
   mapPath = '';
@@ -247,7 +254,11 @@ export class SceneSlot {
     }
     const next = this.project(prepared);
     const patch = diffScenes(previous, next);
-    if (!patch) return;
+    if (!patch) {
+      // Only the board changed (a door opened): players on the 3D board hear it; the scene stays as it was.
+      if (this.boardChanged) this.host.projected(this);
+      return;
+    }
     this.setSent(next);
     const message = patchMessage(patch);
     for (const playerId of this.host.audience(this)) {
@@ -312,7 +323,7 @@ export class SceneSlot {
     if (this.state === 'live' && fog.coverage.hasFog && !(snapshot.mapSize.width > 0 && snapshot.mapSize.height > 0)) {
       this.sizeWait.watch(() => this.source.snapshot()?.mapSize);
     }
-    return projectForPlayers(snapshot, {
+    const scene = projectForPlayers(snapshot, {
       sceneId: this.sceneId,
       rules: this.host.rules(),
       coverage: fog.coverage,
@@ -320,9 +331,30 @@ export class SceneSlot {
       assets: this.host.options.assets,
       ...sceneContext(snapshot, this.host.options),
     }, this.memo);
+    this.projectBoard(snapshot, lighting, fog.coverage, scene);
+    return scene;
+  }
+
+  /** Whether the last projection changed the board extras; read once. */
+  private boardChanged = false;
+
+  /** Tabletop's board extras, by the same rules as the scene just projected (`visibleShows`). */
+  private projectBoard(snapshot: SceneSnapshot, lighting: LightingFrame | null, coverage: FogCoverage, scene: PlayerScene): void {
+    const board = this.host.options.board;
+    const next = board?.available()
+      ? projectBoard(snapshot, this.sceneId, visibleShows(snapshot, { lighting, coverage, mapSize: snapshot.mapSize }), scene.tokens, board.lookFor(this.mapPath), this.host.options.assets)
+      : null;
+    const text = JSON.stringify(next);
+    this.boardChanged = text !== this.boardText;
+    this.boardText = text;
+    this.board = next;
   }
 
   private setSent(scene: PlayerScene | null): void {
+    if (!scene && this.board) {
+      this.board = null;
+      this.boardText = 'null';
+    }
     this.lastSent = scene;
     this.host.projected(this);
   }

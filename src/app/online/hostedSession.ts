@@ -15,6 +15,7 @@ import { onlineSessionStore } from './onlineSessionStore';
 import { peerServerOptions, type OnlineSettings } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
+import { BoardSender } from './scene/BoardSender';
 import { CameraSender } from './scene/CameraSender';
 import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
@@ -184,6 +185,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
+  // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
+  const boardSender = new BoardSender({ session: scenes, projection: hub, board: env.scene.board ?? null });
   // Serves the images of the scene players have, over each player's assets channel.
   const assetServer = new AssetServer({ session, projection: hub, files: registry });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
@@ -207,6 +210,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopErrors();
     assetServer.stop();
     for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    boardSender.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -223,6 +227,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     // The GM's panel, eye menu and badges read who is assigned where from the store.
     stopSplit = syncSplitState(hub);
     cameraSender.start();
+    boardSender.start();
     assetServer.start();
     for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
       part.start();

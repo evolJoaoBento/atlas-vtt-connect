@@ -2,6 +2,7 @@
  * Image fingerprints and the limits of image transfers. Shared with the web
  * player page, so this file imports only the id helpers and the scene wire types.
  */
+import type { BoardExtras } from '../scene/boardTypes';
 import { base64Url } from '../ids';
 import type { PlayerScene } from '../scene/sceneTypes';
 
@@ -100,6 +101,16 @@ export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: bool
   }
   // The GM's handout reaches the players of every scene in use.
   if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);
+  return [...ids];
+}
+
+/** The files Tabletop's 3D board shows of a scene: its materials' maps, its door props and its props, each once. */
+export function boardAssetIds(board: BoardExtras | null): string[] {
+  if (!board) return [];
+  const ids = new Set<string>();
+  for (const material of board.materials) for (const id of Object.values(material.maps)) if (isAssetId(id)) ids.add(id);
+  for (const wall of board.walls) if (isAssetId(wall.door?.prop)) ids.add(wall.door.prop);
+  for (const prop of board.props) if (isAssetId(prop.asset)) ids.add(prop.asset);
   return [...ids];
 }
 

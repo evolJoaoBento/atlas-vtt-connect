@@ -204,7 +204,9 @@ function camera(view: StockView): ViewCamera | null {
 function snapshotSlice(view: StockView): readonly unknown[] {
   const s = view.atlasStore.getState();
   return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
-    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings];
+    s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
+    // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
+    (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights];
 }
 
 function guard(what: string, call: () => void): void {

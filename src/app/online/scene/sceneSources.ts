@@ -1,4 +1,5 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
+import type { BoardLook } from './sceneContracts';
 import type { HandoutSource } from '../handouts';
 import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
@@ -54,6 +55,24 @@ export interface SceneProjectionOptions {
   resourceVisibility?: ResourceVisibilitySource;
   /** The 3D minis on tokens (the Tabletop extension's); without it no token carries one. */
   minis?: MiniSource;
+  /** Tabletop's 3D board: what the GM gave each map, for players on the board; without it no board extras are made. */
+  board?: BoardSource;
+}
+
+/** A 3D pose in the board's world: x and z are the map's x and y in pixels, y is up. */
+export interface BoardPose { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }
+
+/** The Tabletop extension's board, as `connect/tabletopMinis.ts` reads it. */
+export interface BoardSource {
+  /** Whether a Tabletop that shares its board is there. */
+  available(): boolean;
+  lookFor(mapPath: string): BoardLook | null;
+  /** The GM's 3D view of the map (its players' window, else its board); null when none shows it. */
+  camera(mapPath: string): BoardPose | null;
+  /** Calls `listener` when Tabletop arrives or leaves, or a map's look changes; returns the stop. */
+  subscribe(listener: () => void): () => void;
+  /** Calls `listener` (often) while the GM's 3D camera moves; returns the stop. */
+  subscribeCamera(listener: () => void): () => void;
 }
 
 /** The minis standing on each map's tokens, as the Tabletop extension keeps them (`connect/tabletopMinis.ts`). */
@@ -84,6 +103,8 @@ export function sliceOf(snapshot: SceneSnapshot): Slice {
     snapshot.background, snapshot.grid, snapshot.objects.tokens, snapshot.objects.texts, snapshot.objects.drawings,
     snapshot.objects.fog, snapshot.widgets.settings, snapshot.widgets.values, snapshot.initiative,
     snapshot.initiativeTrackerOpen, snapshot.lighting,
+    // Walls and lights: what players on Tabletop's 3D board see of them (`projectBoard`).
+    (snapshot.objects as { walls?: unknown }).walls, (snapshot.objects as { lights?: unknown }).lights,
     // A stock Atlas's snapshot carries its note pins (an Atlas API's has none): the readable ones go to players.
     (snapshot.objects as { pins?: unknown }).pins,
     // And its token settings: the instance badges and ring size players see follow them.

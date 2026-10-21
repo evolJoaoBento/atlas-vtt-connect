@@ -8,7 +8,7 @@
  */
 import type { App, EventRef } from 'obsidian';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
-import type { MiniSource } from '../app/online/scene/sceneSources';
+import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
 import type { BoardLook } from '../app/online/scene/sceneContracts';
 
@@ -140,19 +140,13 @@ export function tabletopMinis(app: App): TabletopMinis {
   };
 }
 
-/** A 3D pose in the board's world, as Tabletop's `gmCamera` reports it. */
-export interface BoardPose { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }
+export type { BoardPose } from '../app/online/scene/sceneSources';
 
 /**
  * What the GM gave a map on Tabletop's 3D board, and the GM's 3D view of it, for players on the 3D board. Available only
  * with a Tabletop that offers `boardLook`, `onBoardChange` and `gmCamera`; an older one has no board to share.
  */
-export interface TabletopBoard {
-  available(): boolean;
-  lookFor(mapPath: string): BoardLook | null;
-  camera(mapPath: string): BoardPose | null;
-  /** Calls `listener` when Tabletop arrives or leaves, a map's look changes, or the GM's camera moves. */
-  subscribe(listener: () => void): () => void;
+export interface TabletopBoard extends BoardSource {
   dispose(): void;
 }
 
@@ -176,10 +170,11 @@ const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } 
 
 export function tabletopBoard(app: App): TabletopBoard {
   const listeners = new Set<() => void>();
+  const cameraListeners = new Set<() => void>();
   let api: TabletopBoardApi | null = null;
   let stops: Array<() => void> = [];
-  const emit = (): void => {
-    for (const listener of [...listeners]) {
+  const emitTo = (set: Set<() => void>): void => {
+    for (const listener of [...set]) {
       try {
         listener();
       } catch (error) {
@@ -187,6 +182,7 @@ export function tabletopBoard(app: App): TabletopBoard {
       }
     }
   };
+  const emit = (): void => emitTo(listeners);
   const bind = (): void => {
     const next = boardApi(app);
     if (next === api) return;
@@ -194,7 +190,7 @@ export function tabletopBoard(app: App): TabletopBoard {
     api = next;
     if (api) {
       try {
-        stops = [api.onBoardChange(() => emit()), api.gmCamera.onChange(() => emit())];
+        stops = [api.onBoardChange(() => emit()), api.gmCamera.onChange(() => emitTo(cameraListeners))];
       } catch (error) {
         console.warn('[Atlas VTT Connect] Could not follow the Tabletop board:', error);
         api = null;
@@ -235,11 +231,16 @@ export function tabletopBoard(app: App): TabletopBoard {
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
+    subscribeCamera: (listener) => {
+      cameraListeners.add(listener);
+      return () => { cameraListeners.delete(listener); };
+    },
     dispose: () => {
       for (const ref of refs) app.workspace.offref(ref);
       for (const stop of stops.splice(0)) stop();
       api = null;
       listeners.clear();
+      cameraListeners.clear();
     },
   };
 }
