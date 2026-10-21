@@ -1,15 +1,17 @@
-# Atlas VTT Extension - Connect
+# Connect for Atlas VTT
+
+Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
 Play [Atlas VTT](https://github.com/ByteMirror/atlas-vtt) maps online with your group. You host from Obsidian; players join from a web page or from their own Obsidian. No accounts, no server to run.
 
 ![A player joins and the GM's map opens for them](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/04-allow-player.gif)
 
-Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It changes nothing in Atlas.
+It changes nothing in Atlas, and it is not Atlas Online: players connect through the servers listed under [Servers and privacy](#servers-and-privacy).
 
 ## Install
 
 1. Obsidian 1.8.7 or newer, on desktop.
-2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
+2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Connect for Atlas VTT**.
 
 **Updating to 0.4.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. With an older GM, clicking a readable pin says the note couldn't be opened, and a note sent with Send to… never arrives.
 
@@ -150,7 +152,7 @@ During a session, right-click a note → **Send to…** and pick anyone who play
 
 ## Settings
 
-Settings → Atlas VTT Extension - Connect:
+Settings → Connect for Atlas VTT:
 
 - **Signaling server / My own server:** how players find your session. The default works.
 - **Relay (TURN) servers:** add one if players can't connect from strict networks (some offices, schools, mobile data).
@@ -167,9 +169,9 @@ On Atlas from Community plugins, Connect reads what Atlas leaves reachable, so a
 - Templates show their size to players only; the GM sees them without the label.
 - **Sharing maps** and per-collection rules need an Atlas build with the extension API, which no released Atlas has yet. Notes are shared on any Atlas (Send to…, Share with…, Shared with me…).
 
-## Privacy
+## Servers and privacy
 
-Connect talks to:
+Connect uses these servers:
 
 - PeerJS cloud signalling (`0.peerjs.com`) to connect players, unless you set your own server;
 - the STUN server `stun.l.google.com:19302`, to find a direct route;

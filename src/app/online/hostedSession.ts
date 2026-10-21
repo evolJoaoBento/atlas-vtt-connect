@@ -38,7 +38,7 @@ import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
 import type { SheetRollExtras } from './tools/DiceHost';
 
-const BAD_PAGE_URL = "The player page address in Atlas VTT Connect's settings isn't a valid web address.";
+const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
 
 /** Sharing joins a hosted session that has a table; `started` returns what stops it. */

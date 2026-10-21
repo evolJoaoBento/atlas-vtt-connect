@@ -242,7 +242,7 @@ export class FloatingDock implements PanelHost {
     const grip = make('div', 'atlas-connect-dock__grip');
     const gripIcon = make('span', 'atlas-connect-dock__icon');
     this.env.setIcon(gripIcon, 'grip-vertical');
-    grip.append(gripIcon, make('span', 'atlas-connect-dock__title', 'Atlas VTT Connect'));
+    grip.append(gripIcon, make('span', 'atlas-connect-dock__title', 'Connect for Atlas VTT'));
     const collapse = make('button', 'atlas-connect-dock__collapse');
     collapse.setAttribute('aria-label', 'Collapse or expand the Connect panel');
     this.env.setIcon(collapse, 'chevrons-up-down');

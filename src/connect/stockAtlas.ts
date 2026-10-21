@@ -415,6 +415,9 @@ function presentationApi(app: App, atlas: StockPlugin, presented: StockPresented
   });
 }
 
+/** The name Connect's data is kept under: Atlas's extension folder and the map files' extensions key. */
+export const CONNECT_STORAGE_ID = 'atlas-vtt-connect';
+
 function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
   const add = (dispose: Disposer): Disposer => {
     disposers.add(dispose);
@@ -595,7 +598,8 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       askIndex();
       disposers.add(events.on('map-loaded', askIndex));
       plugin.register(() => { for (const dispose of [...disposers]) guard('teardown', dispose); disposers.clear(); });
-      const extensionId = plugin.manifest.id;
+      // Connect's data keeps the name it has always had (its folder, and its key in map files), whatever the plugin id.
+      const extensionId = CONNECT_STORAGE_ID;
       // Asked for by Connect and by the player character links at once: made once.
       let made: Promise<string> | null = null;
       const folder = (): Promise<string> => {

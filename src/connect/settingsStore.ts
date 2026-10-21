@@ -10,7 +10,7 @@ import { readTableMarks, retired, storedTableMarks, type TableMarks } from './ta
  */
 export const TABLE_KEY_STORAGE = 'atlas-vtt-connect:table-key';
 /** Shown once per session when local storage refuses a table key that was never in `data.json`: it is then kept in memory only. */
-export const TABLE_KEY_NOT_KEPT_NOTICE = "Atlas VTT Connect couldn't save your table key on this device. It works until Obsidian closes; next time your table may have a new key.";
+export const TABLE_KEY_NOT_KEPT_NOTICE = "Connect for Atlas VTT couldn't save your table key on this device. It works until Obsidian closes; next time your table may have a new key.";
 
 /**
  * The vault's steps of the migration from the fork (`migrateFromFork`), each marked once it is done; together they

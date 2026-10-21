@@ -126,4 +126,16 @@ describe('tabletopBoard', () => {
     trigger('atlas-vtt-tabletop:api-ready', make().api);
     expect(attached).toHaveLength(2);
   });
+
+  it('finds Tabletop under its new id and hears its new event, as under the old', () => {
+    const { app, plugins, trigger } = fakeApp();
+    const board = tabletopBoard(app);
+    const heard = vi.fn();
+    board.subscribe(heard);
+    const tabletop = fakeTabletop();
+    plugins['tabletop-for-atlas'] = { api: tabletop.api };
+    trigger('tabletop-for-atlas:api-ready', tabletop.api);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(board.available()).toBe(true);
+  });
 });

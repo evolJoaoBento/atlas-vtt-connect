@@ -169,7 +169,7 @@ describe('migrateFromFork', () => {
     expect([...second.files.keys()].some((path) => path.endsWith('.migrating'))).toBe(false);
     expect(snapshot(second.files, FORK)).toEqual(forkSharing);
     expect(merged.notices).toEqual([KEPT_FORK_COPY_NOTICE, MIGRATED_NOTICE]);
-    expect(KEPT_FORK_COPY_NOTICE).toBe("Atlas VTT Connect kept its sharing data and left the preview's copy in atlas-vtt/.atlas-data/sharing. Delete it once you've checked your people and shares.");
+    expect(KEPT_FORK_COPY_NOTICE).toBe("Connect for Atlas VTT kept its sharing data and left the preview's copy in atlas-vtt/.atlas-data/sharing. Delete it once you've checked your people and shares.");
   });
 
   it('copies unreadable data files byte for byte: Connect keeps its own broken copy when it first reads them', async () => {

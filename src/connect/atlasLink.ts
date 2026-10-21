@@ -24,9 +24,9 @@ export const LAYOUT_READY_FALLBACK_MS = 5_000;
 
 /** Every notice about a missing or wrong Atlas ends here: the README names the Atlas build to install. */
 const SEE_README = "See Connect's README for the Atlas build to install.";
-export const MISSING_ATLAS_NOTICE = `Atlas VTT Connect: Install or enable Atlas VTT. ${SEE_README}`;
-export const NO_API_NOTICE = `Atlas VTT Connect: this Atlas VTT has no extension API yet. ${SEE_README}`;
-export const oldApiNotice = (found: string): string => `Atlas VTT Connect needs extension API ${SUPPORTED_MAJOR}.x (found ${found}). ${SEE_README}`;
+export const MISSING_ATLAS_NOTICE = `Connect for Atlas VTT: Install or enable Atlas VTT. ${SEE_README}`;
+export const NO_API_NOTICE = `Connect for Atlas VTT: this Atlas VTT has no extension API yet. ${SEE_README}`;
+export const oldApiNotice = (found: string): string => `Connect for Atlas VTT needs extension API ${SUPPORTED_MAJOR}.x (found ${found}). ${SEE_README}`;
 
 function isAtlasApi(value: unknown): value is AtlasApi {
   const api = value as Partial<AtlasApi> | null;
@@ -97,7 +97,7 @@ export class AtlasLink {
     if (this.extension || this.atlasSeen) return false;
     const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
     if (!atlas || !canShimStockAtlas(atlas)) return false;
-    console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in.');
+    console.warn('Connect for Atlas VTT: this Atlas has no extension API; using the stock Atlas stand-in.');
     this.attachStock(atlas);
     return true;
   }
@@ -122,7 +122,7 @@ export class AtlasLink {
       this.detach();
     }
     if (atlas && canShimStockAtlas(atlas)) {
-      console.warn('Atlas VTT Connect: Atlas was reloaded; standing in for it again.');
+      console.warn('Connect for Atlas VTT: Atlas was reloaded; standing in for it again.');
       this.attachStock(atlas);
     }
   }
@@ -169,8 +169,8 @@ export class AtlasLink {
       this.stop = null;
       // `connect` may have succeeded before `startWith` threw: take its registrations off Atlas again.
       release.run();
-      console.error('Atlas VTT Connect could not start on this Atlas:', error);
-      this.notify(`Atlas VTT Connect could not start: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Connect for Atlas VTT could not start on this Atlas:', error);
+      this.notify(`Connect for Atlas VTT could not start: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -184,7 +184,7 @@ export class AtlasLink {
           try {
             cleanup();
           } catch (error) {
-            console.error('Atlas VTT Connect could not release a connection to Atlas:', error);
+            console.error('Connect for Atlas VTT could not release a connection to Atlas:', error);
           }
         }
       },
@@ -200,7 +200,7 @@ export class AtlasLink {
     try {
       stop?.();
     } catch (error) {
-      console.error('Atlas VTT Connect failed to stop cleanly:', error);
+      console.error('Connect for Atlas VTT failed to stop cleanly:', error);
     }
     release?.();
   }

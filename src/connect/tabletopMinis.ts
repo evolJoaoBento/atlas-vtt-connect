@@ -14,9 +14,12 @@ import type { BoardLook } from '../app/online/scene/sceneContracts';
 import type { BoardSession } from '../app/online/tools/BoardSessionHub';
 import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
-const PLUGIN_ID = 'atlas-vtt-tabletop';
-const READY = 'atlas-vtt-tabletop:api-ready';
-const UNLOAD = 'atlas-vtt-tabletop:api-unload';
+/** Tabletop's plugin id, and the one it had before ("Tabletop for Atlas VTT" took a new one). */
+const PLUGIN_IDS = ['tabletop-for-atlas', 'atlas-vtt-tabletop'];
+const READY = 'tabletop-for-atlas:api-ready';
+const UNLOAD = 'tabletop-for-atlas:api-unload';
+const OLD_READY = 'atlas-vtt-tabletop:api-ready';
+const OLD_UNLOAD = 'atlas-vtt-tabletop:api-unload';
 const NONE: Readonly<Record<string, MiniPlacement>> = Object.freeze({});
 
 interface TabletopApi {
@@ -33,8 +36,11 @@ function isTabletopApi(value: unknown): value is TabletopApi {
 
 function tabletopApi(app: App): TabletopApi | null {
   const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { api?: unknown } | undefined> } }).plugins?.plugins;
-  const api = plugins?.[PLUGIN_ID]?.api;
-  return isTabletopApi(api) ? api : null;
+  for (const id of PLUGIN_IDS) {
+    const api = plugins?.[id]?.api;
+    if (isTabletopApi(api)) return api;
+  }
+  return null;
 }
 
 export interface TabletopPainter {
@@ -58,9 +64,9 @@ export function tabletopPainter(app: App): TabletopPainter {
     board: () => asPlayerBoardFactory((tabletopApi(app) as { playerBoard?: unknown } | null)?.playerBoard),
     subscribe: (listener) => {
       const refs: EventRef[] = [
-        app.workspace.on(READY as never, (() => listener()) as never),
+        ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => listener()) as never)),
         // Unload is announced before the API goes: it is read again on the next tick.
-        app.workspace.on(UNLOAD as never, (() => { window.setTimeout(listener, 0); }) as never),
+        ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(listener, 0); }) as never)),
       ];
       return () => { for (const ref of refs) app.workspace.offref(ref); };
     },
@@ -116,9 +122,9 @@ export function tabletopMinis(app: App): TabletopMinis {
     emit();
   };
   const refs: EventRef[] = [
-    app.workspace.on(READY as never, (() => bind()) as never),
+    ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => bind()) as never)),
     // Unload is announced before the API goes: it is read again on the next tick.
-    app.workspace.on(UNLOAD as never, (() => { window.setTimeout(bind, 0); }) as never),
+    ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(bind, 0); }) as never)),
   ];
   bind();
   return {
@@ -222,8 +228,8 @@ export function tabletopBoard(app: App): TabletopBoard {
     emit();
   };
   const refs: EventRef[] = [
-    app.workspace.on(READY as never, (() => bind()) as never),
-    app.workspace.on(UNLOAD as never, (() => { window.setTimeout(bind, 0); }) as never),
+    ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => bind()) as never)),
+    ...[UNLOAD, OLD_UNLOAD].map((name) => app.workspace.on(name as never, (() => { window.setTimeout(bind, 0); }) as never)),
   ];
   bind();
   return {
