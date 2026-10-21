@@ -295,7 +295,10 @@ export function tabletopBoardViews(app: App): Array<{ key: string; mapPath: stri
   try {
     const boards = (list as () => unknown).call(tabletopApi(app));
     return Array.isArray(boards)
-      ? boards.filter((board): board is { key: string; mapPath: string; root: HTMLElement } => typeof board?.key === 'string' && typeof board?.mapPath === 'string' && typeof (board?.root as { querySelector?: unknown } | undefined)?.querySelector === 'function')
+      ? boards.filter((entry: unknown): entry is { key: string; mapPath: string; root: HTMLElement } => {
+        const board = entry as { key?: unknown; mapPath?: unknown; root?: { querySelector?: unknown } } | null;
+        return typeof board?.key === 'string' && typeof board.mapPath === 'string' && typeof board.root?.querySelector === 'function';
+      })
       : [];
   } catch (error) {
     console.warn('[Atlas VTT Connect] Could not list the Tabletop boards:', error);

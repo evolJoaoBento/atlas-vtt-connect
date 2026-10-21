@@ -69,7 +69,7 @@ export interface Deps extends OptionalParts {
   /** Tabletop's 3D board, for players who show it; without it no board is sent. */
   board?: BoardSource;
   /** Hands the session to Tabletop's 3D board on the GM's side; without it the board knows no session. */
-  attachBoard?(session: BoardSession): () => void;
+  attachBoard?: (session: BoardSession) => () => void;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */

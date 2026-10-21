@@ -85,8 +85,7 @@ export class CanvasScene implements OnlineSceneSink {
     const { dom, service } = options;
     // The keys of the window this tab is in, which may be a popout.
     const doc = dom.root.ownerDocument;
-    this.boardEl = doc.createElement('div');
-    this.boardEl.className = 'atlas-connect-scene__board';
+    this.boardEl = dom.root.createDiv({ cls: 'atlas-connect-scene__board' });
     this.boardEl.hidden = true;
     dom.canvas.after(this.boardEl);
     this.view = this.makeMap();
@@ -122,8 +121,7 @@ export class CanvasScene implements OnlineSceneSink {
     });
     // The toolbar has drawn its controls: Follow GM and Fit map join them, shown only while the view is off the GM's.
     // With Tabletop, and a GM who can send its board: the 3D board, or the 2D map at the player's choice.
-    this.dimensionButton = doc.createElement('button');
-    this.dimensionButton.className = 'clickable-icon atlas-connect-scene__dimension';
+    this.dimensionButton = dom.toolbar.createEl('button', { cls: 'clickable-icon atlas-connect-scene__dimension' });
     this.dimensionButton.hidden = true;
     dom.toolbar.append(this.dimensionButton);
     dom.toolbar.append(dom.viewButtons);
@@ -356,7 +354,6 @@ export class CanvasScene implements OnlineSceneSink {
     this.dimensionButton.hidden = !possible;
     const label = board ? 'Show 2D map' : 'Show 3D board';
     this.dimensionButton.setAttribute('aria-label', label);
-    this.dimensionButton.title = label;
     this.dimensionButton.textContent = board ? '2D' : '3D';
     if (board === this.view instanceof BoardSceneView) return;
     this.view?.dispose();
