@@ -8,6 +8,8 @@ import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, Scene
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
+import type { BoardCamera, BoardExtras } from './scene/boardTypes';
+import { isBoardCamera, isBoardExtras, isBoardPart } from './scene/boardValidation';
 import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
 import { isPinNote, type PinNote } from './tools/pinNotes';
@@ -125,11 +127,19 @@ export type ControlMessage =
   /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
-  | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null };
+  | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null }
+  /** GM to a player, on admission and when it changes: whether the GM can send the scene for Tabletop's 3D board. */
+  | { v: 1; type: 'board-offer'; available: boolean }
+  /** Player to GM: start (or stop) sending this player the board extras of its scene; only a player showing 3D asks. */
+  | { v: 1; type: 'board-request'; on: boolean }
+  /** GM to a player who asked: one part of its scene's board extras (`parts` of one `seq` make the whole), or none. */
+  | { v: 1; type: 'board-extras'; seq: number; part: number; parts: number; extras: BoardExtras | null }
+  /** GM to a player who asked: the GM's 3D view of its scene, for the "GM view" button; null when there is none. */
+  | { v: 1; type: 'board-camera'; camera: BoardCamera | null };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request',
+  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
 ]);
 
 export type Decoded =
@@ -196,6 +206,10 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
   'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),
+  'board-offer': (m) => typeof m.available === 'boolean',
+  'board-request': (m) => typeof m.on === 'boolean',
+  'board-extras': (m) => isBoardPart(m) && (m.extras === null || isBoardExtras(m.extras)),
+  'board-camera': (m) => m.camera === null || isBoardCamera(m.camera),
 };
 
 export function encodeControl(message: ControlMessage): string {
