@@ -11,6 +11,7 @@ import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
 import type { BoardLook } from '../app/online/scene/sceneContracts';
+import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
 const PLUGIN_ID = 'atlas-vtt-tabletop';
 const READY = 'atlas-vtt-tabletop:api-ready';
@@ -43,6 +44,8 @@ export interface TabletopPainter {
   current(): MiniPainter | null;
   /** Calls `listener` when Tabletop arrives or leaves. */
   subscribe(listener: () => void): () => void;
+  /** Tabletop's 3D player board, read fresh on every call; null without one this Connect understands. */
+  board(): PlayerBoardFactory | null;
 }
 
 export function tabletopPainter(app: App): TabletopPainter {
@@ -51,6 +54,7 @@ export function tabletopPainter(app: App): TabletopPainter {
       const painter = (tabletopApi(app) as { playerMinis?: unknown } | null)?.playerMinis as Partial<MiniPainter> | undefined;
       return painter && painter.version === 1 && typeof painter.create === 'function' ? painter as MiniPainter : null;
     },
+    board: () => asPlayerBoardFactory((tabletopApi(app) as { playerBoard?: unknown } | null)?.playerBoard),
     subscribe: (listener) => {
       const refs: EventRef[] = [
         app.workspace.on(READY as never, (() => listener()) as never),

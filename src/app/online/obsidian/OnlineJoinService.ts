@@ -31,6 +31,7 @@ import { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink, type RemoteI
 import { decodeToObjectUrls, urlsOf } from './objectUrlImages';
 import { openOnlineSceneTab } from './onlineSceneTab';
 import type { MiniPainter } from '../view/minis/miniLayer';
+import type { PlayerBoardFactory } from './playerBoardContract';
 
 export type { SessionIdentity };
 
@@ -51,7 +52,7 @@ export interface OnlineJoinDeps {
   /** One key per GM host, kept by the plugin across Atlas reloads; the service makes its own unless given one. */
   playerKeyFor?: (hostId: string) => string;
   /** The Tabletop extension's painter for the minis, null without it: their GLBs are fetched only while there is one. */
-  minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void };
+  minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void; board?(): PlayerBoardFactory | null };
 }
 
 type JoinSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'onChange'>;
@@ -94,6 +95,7 @@ export class OnlineJoinService {
   constructor(private readonly app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
     this.playerKeyFor = deps.playerKeyFor ?? keyPerHost();
     this.minis = deps.minis ? () => deps.minis?.current() ?? null : (): null => null;
+    this.boardOf = (): PlayerBoardFactory | null => deps.minis?.board?.() ?? null;
     // Tabletop arrived or left while joined: the scene's minis are asked for (or let go) now, not at the GM's next change.
     this.stopMinis = deps.minis?.subscribe(() => {
       const joined = this.joined;
@@ -225,6 +227,13 @@ export class OnlineJoinService {
   }
 
   /** A mini's GLB bytes, once they are here and checked. */
+  /** Tabletop's 3D player board; null without Tabletop, or one that offers none. */
+  boardPainter(): PlayerBoardFactory | null {
+    return this.boardOf();
+  }
+
+  private readonly boardOf: () => PlayerBoardFactory | null = () => null;
+
   /** The Tabletop extension's painter for the minis; null without it. */
   miniPainter(): MiniPainter | null {
     return this.minis();
