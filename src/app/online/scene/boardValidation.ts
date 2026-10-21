@@ -54,7 +54,7 @@ export function isBoardExtras(value: unknown): value is BoardExtras {
   const lighting = value.lighting;
   return isList(value.walls, BOARD_PART_LIMITS.walls, isWall) && isList(value.lights, BOARD_PART_LIMITS.lights, isLight)
     && isList(value.props, BOARD_PART_LIMITS.props, isProp) && isList(value.materials, BOARD_PART_LIMITS.materials, isMaterial)
-    && isNullable(isNumber)(value.ambient) && isNullable(isNumber)(value.fogHeight)
+    && isNullable(isNumber)(value.ambient) && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
     && isFields(lighting) && typeof lighting.enabled === 'boolean' && isNumber(lighting.ambient) && isNullable(isText)(lighting.ambientColor);
 }
 

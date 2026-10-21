@@ -14,6 +14,7 @@ const extras = (overrides: Partial<BoardExtras> = {}): BoardExtras => ({
   ambient: null,
   lighting: { enabled: true, ambient: 0.2, ambientColor: null },
   fogHeight: 2,
+  wallThickness: null,
   ...overrides,
 });
 

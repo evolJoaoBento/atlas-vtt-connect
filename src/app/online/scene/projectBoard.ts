@@ -37,6 +37,7 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     ambient: look?.ambient ?? null,
     lighting: { enabled: lighting.enabled === true, ambient: Math.min(1, Math.max(0, num(lighting.ambient, 0.1))), ambientColor: str(lighting.ambientColor) },
     fogHeight: look?.fogHeight ?? null,
+    wallThickness: look?.wallThickness ?? null,
   };
   if (!visible) return extras;
   const objects = state.objects ?? {};

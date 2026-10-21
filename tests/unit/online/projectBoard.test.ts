@@ -14,6 +14,7 @@ const look: BoardLook = {
   doorProp: (id) => (id === 'd1' ? 'minis/door.glb' : null),
   lightHeight: (id) => (id === 'l1' ? 1.5 : null),
   fogHeight: 2,
+  wallThickness: 0.3,
   ambient: 0.4,
   props: [{ id: 'p1', path: 'minis/barrel.glb', x: 100, y: 100, scale: 1, turn: 90 }, { id: 'p2', path: 'minis/crate.glb', x: 900, y: 100, scale: 1, turn: 0 }],
   materials: [{ id: 'mat/brick', scale: 2, maps: { color: 'mat/brick/c.jpg' } }, { id: 'mat/wood', scale: 1, maps: { color: 'mat/wood/c.jpg' } }],
@@ -32,7 +33,7 @@ describe('projectBoard', () => {
   it('a wall whose middle is under fog is not sent; one in view is, with its look', () => {
     const extras = projectBoard(state([wall('w1', 'solid', 0), wall('w2', 'solid', 600)]), 's1', leftHalf, {}, look, assets);
     expect(extras.walls).toEqual([{ id: 'w1', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: 3, material: 'id:mat/brick/c.jpg' }]);
-    expect(extras).toMatchObject({ sceneId: 's1', ambient: 0.4, fogHeight: 2, lighting: { enabled: true, ambient: 0.2, ambientColor: '#223344' } });
+    expect(extras).toMatchObject({ sceneId: 's1', ambient: 0.4, fogHeight: 2, wallThickness: 0.3, lighting: { enabled: true, ambient: 0.2, ambientColor: '#223344' } });
   });
 
   it('a closed secret door is plain wall; opened it is a door; closed again plain wall', () => {

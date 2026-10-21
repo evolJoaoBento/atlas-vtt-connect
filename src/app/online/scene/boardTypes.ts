@@ -68,6 +68,8 @@ export interface BoardExtras {
   ambient: number | null;
   lighting: BoardLighting;
   fogHeight: number | null;
+  /** How thick walls stand, as a share of a grid square; null is the board's default. */
+  wallThickness: number | null;
 }
 
 export interface BoardCamera {

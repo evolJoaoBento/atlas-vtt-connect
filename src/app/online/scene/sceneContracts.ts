@@ -52,6 +52,7 @@ export interface BoardLook {
   doorProp(id: string): string | null;
   lightHeight(id: string): number | null;
   readonly fogHeight: number | null;
+  readonly wallThickness: number | null;
   readonly ambient: number | null;
   readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
   readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string> }>;
