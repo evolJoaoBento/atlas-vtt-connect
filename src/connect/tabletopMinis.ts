@@ -10,6 +10,7 @@ import type { App, EventRef } from 'obsidian';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
+import type { BoardLook } from '../app/online/scene/sceneContracts';
 
 const PLUGIN_ID = 'atlas-vtt-tabletop';
 const READY = 'atlas-vtt-tabletop:api-ready';
@@ -133,6 +134,110 @@ export function tabletopMinis(app: App): TabletopMinis {
       for (const ref of refs) app.workspace.offref(ref);
       stopApi?.();
       stopApi = null;
+      api = null;
+      listeners.clear();
+    },
+  };
+}
+
+/** A 3D pose in the board's world, as Tabletop's `gmCamera` reports it. */
+export interface BoardPose { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }
+
+/**
+ * What the GM gave a map on Tabletop's 3D board, and the GM's 3D view of it, for players on the 3D board. Available only
+ * with a Tabletop that offers `boardLook`, `onBoardChange` and `gmCamera`; an older one has no board to share.
+ */
+export interface TabletopBoard {
+  available(): boolean;
+  lookFor(mapPath: string): BoardLook | null;
+  camera(mapPath: string): BoardPose | null;
+  /** Calls `listener` when Tabletop arrives or leaves, a map's look changes, or the GM's camera moves. */
+  subscribe(listener: () => void): () => void;
+  dispose(): void;
+}
+
+interface TabletopBoardApi {
+  boardLook(mapPath: string): unknown;
+  onBoardChange(listener: (mapPath: string | null) => void): () => void;
+  gmCamera: { camera(mapPath: string): unknown; onChange(listener: () => void): () => void };
+}
+
+function boardApi(app: App): TabletopBoardApi | null {
+  const api = tabletopApi(app) as Partial<TabletopBoardApi> | null;
+  const camera = api?.gmCamera as Partial<TabletopBoardApi['gmCamera']> | undefined;
+  return api && typeof api.boardLook === 'function' && typeof api.onBoardChange === 'function'
+    && camera && typeof camera.camera === 'function' && typeof camera.onChange === 'function' ? api as TabletopBoardApi : null;
+}
+
+const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } => {
+  const point = value as Record<string, unknown> | null;
+  return typeof point === 'object' && point !== null && [point.x, point.y, point.z].every((n) => typeof n === 'number' && Number.isFinite(n));
+};
+
+export function tabletopBoard(app: App): TabletopBoard {
+  const listeners = new Set<() => void>();
+  let api: TabletopBoardApi | null = null;
+  let stops: Array<() => void> = [];
+  const emit = (): void => {
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error('[Atlas VTT Connect] A board listener failed:', error);
+      }
+    }
+  };
+  const bind = (): void => {
+    const next = boardApi(app);
+    if (next === api) return;
+    for (const stop of stops.splice(0)) stop();
+    api = next;
+    if (api) {
+      try {
+        stops = [api.onBoardChange(() => emit()), api.gmCamera.onChange(() => emit())];
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not follow the Tabletop board:', error);
+        api = null;
+      }
+    }
+    emit();
+  };
+  const refs: EventRef[] = [
+    app.workspace.on(READY as never, (() => bind()) as never),
+    app.workspace.on(UNLOAD as never, (() => { window.setTimeout(bind, 0); }) as never),
+  ];
+  bind();
+  return {
+    available: () => api !== null,
+    lookFor: (mapPath) => {
+      if (!api) return null;
+      try {
+        const look = api.boardLook(mapPath) as BoardLook | null;
+        return look && typeof look.wallHeight === 'function' ? look : null;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop board:', error);
+        return null;
+      }
+    },
+    camera: (mapPath) => {
+      if (!api) return null;
+      try {
+        const pose = api.gmCamera.camera(mapPath) as Partial<BoardPose> | null;
+        if (pose && isPoint3(pose.eye) && isPoint3(pose.target)) return { eye: { ...pose.eye }, target: { ...pose.target } };
+        if (pose) console.warn('[Atlas VTT Connect] Tabletop gave a camera that is no camera:', pose);
+        return null;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop camera:', error);
+        return null;
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    dispose: () => {
+      for (const ref of refs) app.workspace.offref(ref);
+      for (const stop of stops.splice(0)) stop();
       api = null;
       listeners.clear();
     },
