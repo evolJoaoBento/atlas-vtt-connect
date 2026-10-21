@@ -24,13 +24,17 @@ function isDoor(value: unknown): boolean {
 function isWall(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.id) || (value.type !== 'solid' && value.type !== 'door')) return false;
   if (!isPoint(value.p1) || !isPoint(value.p2) || !isNullable(isNumber)(value.height) || !isNullable(isSceneId)(value.material)) return false;
+  if (value.direction !== undefined && value.direction !== 'left' && value.direction !== 'right') return false;
+  if (value.blocks !== undefined && value.blocks !== 'sight' && value.blocks !== 'light') return false;
+  if (value.limited !== undefined && typeof value.limited !== 'boolean') return false;
   return value.type === 'door' ? isDoor(value.door) : value.door === undefined;
 }
 
 function isLight(value: unknown): boolean {
   return isFields(value) && isSceneId(value.id) && isNumber(value.x) && isNumber(value.y) && isNullable(isNumber)(value.height)
     && isText(value.color) && isNumber(value.bright) && isNumber(value.dim) && isNumber(value.intensity)
-    && isNullable(isText)(value.animation) && isNullable(isNumber)(value.angle) && isNumber(value.rotation);
+    && isNullable(isText)(value.animation) && isNullable(isNumber)(value.angle) && isNumber(value.rotation)
+    && typeof value.darkness === 'boolean' && isNullable(isNumber)(value.activeBelowAmbient);
 }
 
 function isProp(value: unknown): boolean {

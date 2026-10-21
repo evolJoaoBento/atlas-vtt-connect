@@ -8,7 +8,7 @@ const extras = (overrides: Partial<BoardExtras> = {}): BoardExtras => ({
     { id: 'w1', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: null, material: 'stone' },
     { id: 'd1', type: 'door', p1: { x: 70, y: 0 }, p2: { x: 140, y: 0 }, height: 2, material: null, door: { open: true, swing: 'left', prop: null } },
   ],
-  lights: [{ id: 'l1', x: 35, y: 35, height: 1.5, color: '#ffaa00', bright: 20, dim: 40, intensity: 1, animation: 'torch', angle: null, rotation: 0 }],
+  lights: [{ id: 'l1', x: 35, y: 35, height: 1.5, color: '#ffaa00', bright: 20, dim: 40, intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null }],
   props: [{ id: 'p1', asset: 'a'.repeat(64), x: 10, y: 10, scale: 1, turn: 0 }],
   materials: [{ id: 'stone', scale: 1, maps: { color: 'b'.repeat(64) } }],
   ambient: null,

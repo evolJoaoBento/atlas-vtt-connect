@@ -89,6 +89,19 @@ const DEFAULT_RING = '#ffffff';
 const NO_RESOURCES: readonly ResourceDefinition[] = [];
 const DEFAULT_GRID_OPACITY = 0.7;
 
+/**
+ * What players may see of the scene, as `projectForPlayers` decides it for texts and drawings: the GM's fog and, on a
+ * lit scene, the lighting's darkness. Null when the lighting cannot be read (a closed frame): players then see nothing
+ * but the dark map. Tabletop's board extras (`projectBoard`) are checked against the same.
+ */
+export function visibleShows(state: Pick<ProjectionInput, 'lighting'>, context: Pick<ProjectionContext, 'lighting' | 'coverage' | 'mapSize'>): Shows | null {
+  const lit = state.lighting?.enabled === true;
+  if (context.lighting?.closed === true || (lit && !context.lighting)) return null;
+  const fogShows = context.coverage.within(context.mapSize);
+  const lighting = context.lighting?.open === true ? null : context.lighting ?? null;
+  return lighting ? darkCovers(fogShows, lighting) : fogShows;
+}
+
 export function projectForPlayers(state: ProjectionInput, context: ProjectionContext, memo: ProjectionMemo): PlayerScene {
   const objects = state.objects;
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
