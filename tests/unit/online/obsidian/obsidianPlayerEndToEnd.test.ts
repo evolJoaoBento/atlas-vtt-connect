@@ -157,7 +157,8 @@ describe('an Obsidian player end to end', () => {
 
   it("points the laser at the GM and sees the GM's", async () => {
     const { w, service, view, playerId, seen, screenOf, surface, frames } = await joinFromObsidian();
-    const laser = [...view().contentEl.querySelectorAll<HTMLButtonElement>('.tool-button')].find((button) => button.getAttribute('aria-label') === 'Laser')!;
+    // Laser is in the Move group's menu, as in Atlas.
+    const laser = [...view().contentEl.querySelectorAll<HTMLButtonElement>('[data-control="move"] .menu-entry')].find((entry) => entry.textContent === 'Laser')!;
     laser.click();
     const canvas = view().contentEl.querySelector('canvas')!;
     const at = screenOf(40, 50);

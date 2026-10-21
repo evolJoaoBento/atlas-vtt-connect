@@ -14,7 +14,7 @@ function setup(available = 1000) {
     onClearTemplates: () => calls.push('clear templates'),
     onLaserColor: (color) => calls.push(`color ${color}`),
     onDice: () => calls.push('dice'),
-    measure: (element) => (element.dataset.control === 'measure' ? 56 : 36),
+    measure: (element) => (element.dataset.control === 'measure' || element.dataset.control === 'move' ? 56 : 36),
     layout: () => ({ available, chrome: 19, gap: 8, overflowButtonWidth: 36 }),
   });
   const button = (label: string): HTMLButtonElement => root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
@@ -23,23 +23,45 @@ function setup(available = 1000) {
 }
 
 describe('the join page toolbar', () => {
-  it('shows Move, Measure, Laser and Dice with tooltips and icons, Move pressed, and no native tooltip', () => {
+  it('shows Move, Measure and Dice with tooltips and icons, Move pressed, and no native tooltip', () => {
     const { root, button } = setup();
-    for (const label of ['Move', 'Measure', 'Laser', 'Dice']) expect(button(label).dataset.label).toBe(label);
+    for (const label of ['Move', 'Measure', 'Dice']) expect(button(label).dataset.label).toBe(label);
     expect(button('Move').getAttribute('aria-pressed')).toBe('true');
-    expect(button('Laser').getAttribute('aria-pressed')).toBe('false');
+    expect(root.querySelector('[data-control="laser"], [data-control="ping"]')).toBeNull();
     expect(button('Move').querySelector<HTMLElement>('.tool-icon')?.style.getPropertyValue('--icon')).toBe(toolIconUrl('hand'));
     expect(root.querySelector('[title]')).toBeNull();
   });
 
+  it('keeps Laser and Ping in the Move group, as Atlas does: its menu, its colours, and its face showing the tool in use', () => {
+    const { root, toolbar, calls, button } = setup();
+    button('Move options').click();
+    const items = [...root.querySelectorAll<HTMLButtonElement>('[data-control="move"] .menu-entry')];
+    expect(items.map((entry) => entry.textContent)).toEqual(['Move', 'Laser', 'Ping']);
+    expect(root.querySelectorAll('[data-control="move"] .swatch').length).toBeGreaterThan(0);
+    items[1]!.click();
+    button('Move options').click();
+    root.querySelector<HTMLButtonElement>('[data-control="move"] .swatch')!.click();
+    expect(calls).toEqual(['tool laser', 'color #ff0059']);
+    toolbar.update({ tool: 'laser' });
+    const face = root.querySelector<HTMLButtonElement>('[data-control="move"] .tool-button')!;
+    expect(face.getAttribute('aria-label')).toBe('Laser');
+    expect(face.getAttribute('aria-pressed')).toBe('true');
+    expect(face.querySelector<HTMLElement>('.tool-icon')?.style.getPropertyValue('--icon')).toBe(toolIconUrl('flashlight'));
+    // As in Atlas, the face keeps the tool in use; from another tool it goes back to the group's last.
+    face.click();
+    expect(calls).toEqual(['tool laser', 'color #ff0059']);
+    toolbar.update({ tool: 'measure' });
+    expect(face.getAttribute('aria-label')).toBe('Laser');
+    face.click();
+    expect(calls.at(-1)).toBe('tool laser');
+  });
+
   it('hands clicks to the page and shows the state the page gives it', () => {
     const { toolbar, calls, button } = setup();
-    button('Laser').click();
     button('Dice').click();
-    expect(calls).toEqual(['tool laser', 'dice']);
-    toolbar.update({ tool: 'laser', diceOpen: true });
-    expect(button('Laser').getAttribute('aria-pressed')).toBe('true');
-    expect(button('Move').getAttribute('aria-pressed')).toBe('false');
+    expect(calls).toEqual(['dice']);
+    toolbar.update({ tool: 'ping', diceOpen: true });
+    expect(button('Ping').getAttribute('aria-pressed')).toBe('true');
     expect(button('Dice').classList.contains('is-active')).toBe(true);
   });
 
@@ -72,18 +94,18 @@ describe('the join page toolbar', () => {
   });
 
   it('moves what does not fit into More tools, and keeps the tool in use in the bar', () => {
-    const { root, toolbar, calls, button, entries } = setup(170);
+    const { root, toolbar, calls, button, entries } = setup(190);
     toolbar.fit();
     const shown = (control: string): boolean => !root.querySelector<HTMLElement>(`[data-control="${control}"]`)!.hidden;
-    expect(['move', 'measure', 'laser', 'dice'].map(shown)).toEqual([true, true, false, false]);
+    expect(['move', 'measure', 'template', 'dice'].map(shown)).toEqual([true, true, false, false]);
     expect(button('More tools').closest<HTMLElement>('.toolbar-more')!.hidden).toBe(false);
     const more = entries('.toolbar-more').filter((entry) => !entry.hidden);
-    expect(more.map((entry) => entry.textContent)).toEqual(['Template', 'Laser', 'Ping', 'Dice']);
+    expect(more.map((entry) => entry.textContent)).toEqual(['Template', 'Dice']);
     button('More tools').click();
-    more[3]!.click();
+    more[1]!.click();
     expect(calls).toEqual(['dice']);
-    toolbar.update({ tool: 'laser' });
-    expect(shown('laser')).toBe(true);
+    toolbar.update({ tool: 'template' });
+    expect(shown('template')).toBe(true);
   });
 
   it('does not fit while the table is hidden, and fits once it has a width', () => {
@@ -92,14 +114,14 @@ describe('the join page toolbar', () => {
     const root = document.getElementById('toolbar')!;
     const toolbar = new PageToolbar({
       root, onTool: () => {}, onShape: () => {}, onLaserColor: () => {}, onDice: () => {},
-      measure: (element) => (element.dataset.control === 'measure' ? 56 : 36),
+      measure: (element) => (element.dataset.control === 'measure' || element.dataset.control === 'move' ? 56 : 36),
       layout: () => ({ available, chrome: 19, gap: 8, overflowButtonWidth: 36 }),
     });
     toolbar.fit();
     expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(0);
-    available = 170;
+    available = 190;
     toolbar.fit();
-    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(4);
+    expect(root.querySelectorAll('.toolbar-item[hidden]:not(.toolbar-more)').length).toBe(2);
   });
 
   it('closes an open menu on Escape before the rest of the page hears it', () => {

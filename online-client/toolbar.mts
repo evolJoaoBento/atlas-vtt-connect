@@ -5,8 +5,8 @@
  * the state the page gives it and hands clicks back; the tools themselves live in the map view.
  */
 import {
-  CLEAR_OWN_TEMPLATES_LABEL, hiddenControls, isControlActive, LASER_COLOR_HINT, LASER_OPTIONS_LABEL, laserSwatches, MEASURE_OPTIONS_LABEL,
-  MEASURE_SHAPE_OPTIONS, measureIcon, MORE_TOOLS_LABEL, TEMPLATE_OPTIONS_LABEL, TEMPLATE_SHAPE_OPTIONS, templateIcon, TOOLBAR_CONTROLS,
+  CLEAR_OWN_TEMPLATES_LABEL, hiddenControls, isControlActive, isMoveGroupTool, LASER_COLOR_HINT, laserSwatches, MEASURE_OPTIONS_LABEL,
+  MEASURE_SHAPE_OPTIONS, measureIcon, MORE_TOOLS_LABEL, MOVE_OPTIONS_LABEL, MOVE_TOOL_OPTIONS, moveIcon, TEMPLATE_OPTIONS_LABEL, TEMPLATE_SHAPE_OPTIONS, templateIcon, TOOLBAR_CONTROLS,
   type ToolbarControlId, type ToolbarState,
 } from '../src/app/online/page/playerToolbar';
 import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
@@ -106,6 +106,8 @@ export class PageToolbar {
   private readonly laserChevron: HTMLButtonElement;
   private readonly laserFlyout: HTMLElement;
   private readonly swatchButtons = new Map<string, HTMLButtonElement>();
+  /** The Move group's tool its button shows: the one in use, else the last one used. */
+  private moveTool: 'move' | 'laser' | 'ping' = 'move';
   private readonly more: HTMLElement;
   private readonly moreButton: HTMLButtonElement;
   private readonly moreMenu: HTMLElement;
@@ -123,12 +125,13 @@ export class PageToolbar {
       item.dataset.control = control.id;
       const button = toolButton(control.label, control.icon);
       button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => this.activate(control.id));
+      button.addEventListener('click', () => (control.id === 'move' ? this.activateMove() : this.activate(control.id)));
       item.append(button);
       root.append(item);
       const entry = menuEntry(control.label, control.icon, () => {
         this.closeMenus();
-        this.activate(control.id);
+        if (control.id === 'move') this.activateMove();
+        else this.activate(control.id);
       });
       this.moreMenu.append(entry);
       this.controls.set(control.id, { item, button, entry });
@@ -165,12 +168,22 @@ export class PageToolbar {
       this.templateFlyout.append(this.clearTemplatesEntry);
       template.append(this.templateChevron, this.templateFlyout);
     }
-    // Laser is one too: its flyout lists the colors.
-    const laser = this.controls.get('laser')!.item;
-    laser.classList.add('tool-group');
-    this.laserChevron = chevronButton(LASER_OPTIONS_LABEL, () => this.setMenu(this.state.laserMenuOpen ? null : 'laser'));
+    // Move is Atlas's Move group: the tool in use on its button, and a chevron to Move, Laser and Ping and the laser's colours.
+    const move = this.controls.get('move')!.item;
+    move.classList.add('tool-group');
+    this.laserChevron = chevronButton(MOVE_OPTIONS_LABEL, () => this.setMenu(this.state.laserMenuOpen ? null : 'laser'));
     this.laserFlyout = this.laserMenu();
-    laser.append(this.laserChevron, this.laserFlyout);
+    const tools = document.createElement('div');
+    tools.className = 'menu-section';
+    for (const option of MOVE_TOOL_OPTIONS) {
+      tools.append(menuEntry(option.label, option.icon, () => {
+        this.closeMenus();
+        this.moveTool = option.tool;
+        if (this.state.tool !== option.tool) options.onTool(option.tool);
+      }));
+    }
+    this.laserFlyout.prepend(tools);
+    move.append(this.laserChevron, this.laserFlyout);
     // More tools comes last and shows only while something is in it.
     this.more = document.createElement('div');
     this.more.className = 'toolbar-item toolbar-more';
@@ -215,6 +228,11 @@ export class PageToolbar {
   dispose(): void {
     this.listeners.abort();
     this.resizeObserver?.disconnect();
+  }
+
+  /** The Move group's button: as in Atlas it keeps its tool in use, and from another tool goes back to the group's. */
+  private activateMove(): void {
+    if (this.state.tool !== this.moveTool) this.options.onTool(this.moveTool);
   }
 
   private activate(id: ToolbarControlId): void {
@@ -273,6 +291,17 @@ export class PageToolbar {
       control.button.setAttribute('aria-pressed', String(active));
       control.button.classList.toggle('is-active', active);
       control.entry.classList.toggle('is-active', active);
+    }
+    if (isMoveGroupTool(this.state.tool)) this.moveTool = this.state.tool;
+    const move = this.controls.get('move')!;
+    const moveLabel = MOVE_TOOL_OPTIONS.find((option) => option.tool === this.moveTool)?.label ?? 'Move';
+    const moveUrl = toolIconUrl(moveIcon(this.moveTool));
+    setIcon(move.button, moveUrl);
+    move.button.setAttribute('aria-label', moveLabel);
+    move.button.dataset.label = moveLabel;
+    setIcon(move.entry, moveUrl);
+    for (const entry of this.laserFlyout.querySelectorAll<HTMLButtonElement>('.menu-section .menu-entry')) {
+      entry.classList.toggle('is-active', entry.textContent === MOVE_TOOL_OPTIONS.find((option) => option.tool === this.state.tool)?.label);
     }
     const measure = this.controls.get('measure')!;
     const icon = toolIconUrl(measureIcon(this.state.shape));

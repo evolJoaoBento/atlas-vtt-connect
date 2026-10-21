@@ -139,7 +139,8 @@ describe('the 3D board in the player tab', () => {
     sink.session(admitted);
     sink.boardOffer?.(true);
     sink.scene(playerScene({ tokens: { t1: playerToken({ name: 'Orc', conditions: [{ id: 'f', value: 2, name: 'Frightened', color: '#e93147', icon: 'terror' }] as never }) } }));
-    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Laser pointer"], [aria-label="Laser"]')?.click();
+    // Laser is in the Move group's menu, as in Atlas.
+    [...view.contentEl.querySelectorAll<HTMLButtonElement>('[data-control="move"] .menu-entry')].find((entry) => entry.textContent === 'Laser')!.click();
     expect(w.board.calls.some((call) => call.startsWith('selectTool'))).toBe(true);
     const host = w.board.host();
     expect(host.sendMove('t1', 10, 20)).toBe(true);

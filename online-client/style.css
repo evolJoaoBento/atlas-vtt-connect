@@ -625,3 +625,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .note-body table { border-collapse: collapse; }
 .note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
 .note-body .note-status { color: var(--muted); font-style: italic; }
+/* The Move group's tools, above the laser's colours, as in Atlas's Move menu. */
+.swatch-menu .menu-section { display: flex; flex-direction: column; gap: 2px; margin: -4px -4px 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.swatch-menu { width: 220px; }

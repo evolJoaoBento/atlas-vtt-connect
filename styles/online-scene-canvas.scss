@@ -583,3 +583,6 @@
   .note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--background-modifier-border); text-align: left; }
   .note-body .note-status { color: var(--text-muted); font-style: italic; }
 }
+/* The Move group's tools, above the laser's colours, as in Atlas's Move menu. */
+.atlas-connect-scene .swatch-menu .menu-section { display: flex; flex-direction: column; gap: 2px; margin: -4px -4px 0; padding-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); }
+.atlas-connect-scene .swatch-menu { width: 220px; }
