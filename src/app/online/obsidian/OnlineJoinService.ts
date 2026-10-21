@@ -118,6 +118,7 @@ export class OnlineJoinService {
       createClient: (server) => this.createClient(server),
       clientVersion,
       shareHandler: () => this.shareHandler,
+      boardOffered: (joined) => this.askBoard(joined),
     };
     // Switching keeping off deletes the stored images at once, joined or not.
     this.keepImages = settings.get().keepImages;
@@ -227,6 +228,32 @@ export class OnlineJoinService {
   /** The Tabletop extension's painter for the minis; null without it. */
   miniPainter(): MiniPainter | null {
     return this.minis();
+  }
+
+  /** Whether the GM of the joined session can send Tabletop's 3D board. */
+  boardOffered(): boolean {
+    return this.joined?.boardOffer === true;
+  }
+
+  /** Whether the tab shows Tabletop's 3D board: the GM is asked for the board, once per admission, while it is offered. */
+  wantBoard(on: boolean): void {
+    this.boardWanted = on;
+    const joined = this.joined;
+    if (!joined) return;
+    if (on) this.askBoard(joined);
+    else if (joined.boardAsked) {
+      joined.boardAsked = false;
+      joined.session?.sendBoardRequest(false);
+      joined.board = null;
+      joined.loader.setBoard(null);
+    }
+  }
+
+  private boardWanted = false;
+
+  private askBoard(joined: Joined): void {
+    if (!this.boardWanted || joined.boardOffer !== true || joined.boardAsked) return;
+    joined.boardAsked = joined.session?.sendBoardRequest(true) === true;
   }
 
   model(assetId: string | null): ArrayBuffer | null {

@@ -6,10 +6,11 @@
  * fingerprint before it is decoded and shown; images the scene stops using
  * are cancelled and released. A mini's GLB is checked the same way, then kept as bytes (`model`) for the view to read.
  */
+import type { BoardExtras } from '../scene/boardTypes';
 import type { PlayerAssetHandler } from '../PlayerSession';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { AssetCache } from './AssetCache';
-import { ASSET_LIMITS, isModelMime, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
+import { ASSET_LIMITS, isModelMime, boardAssetIds, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
 import { decodeAsset, encodeAsset, type AssetChunk, type AssetMessage } from './assetProtocol';
 import { ProgressTally, type AssetProgress, type PendingImage } from './ProgressTally';
 import { TransferAssembler } from './TransferAssembler';
@@ -85,9 +86,25 @@ export class AssetLoader implements PlayerAssetHandler {
     return this.tally.progress(pending);
   }
 
+  private scene: PlayerScene | null = null;
+  private board: BoardExtras | null = null;
+
   setScene(scene: PlayerScene | null): void {
+    this.scene = scene;
+    this.want();
+  }
+
+  /** The files of Tabletop's 3D board of the scene (its materials' maps, door props and props); null for none. */
+  setBoard(board: BoardExtras | null): void {
+    this.board = board;
+    this.want();
+  }
+
+  /** Asks for what the scene and its board show and lets go of the rest. */
+  private want(): void {
     if (this.disposed) return;
-    const ids = sceneAssetIds(scene, { minis: this.options.models?.() === true });
+    // The board's files are wanted only by a player showing the board, which draws them (and the minis) in 3D.
+    const ids = [...new Set([...sceneAssetIds(this.scene, { minis: this.options.models?.() === true }), ...boardAssetIds(this.board)])];
     const keep = new Set(ids);
     const cancelled: string[] = [];
     for (const [id, wanted] of [...this.wanted]) {

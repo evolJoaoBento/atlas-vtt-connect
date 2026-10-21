@@ -2,6 +2,7 @@
  * What happens inside one join: the state it keeps, the player session it runs against the GM, and
  * what a scene tab gets when it attaches. `OnlineJoinService` owns the join and calls these.
  */
+import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate } from '../tools/templates';
 import type { AssetLoader } from '../assets/AssetLoader';
@@ -36,6 +37,12 @@ export interface Joined {
   sheets: readonly TokenSheet[];
   /** The scene's lasting templates, as the GM last sent them; null before any. */
   templates: { sceneId: string; list: readonly MapTemplate[] } | null;
+  /** Whether the GM can send Tabletop's 3D board, its board of the scene, and its 3D camera. */
+  boardOffer?: boolean;
+  board?: BoardExtras | null;
+  boardCamera?: BoardCamera | null;
+  /** This admission asked the GM for the board (`board-request`): asked once, again after a new admission. */
+  boardAsked?: boolean;
   ids: JoinIdentity;
 }
 
@@ -48,6 +55,8 @@ export interface FlowHost {
   createClient(server: JoinTarget['server']): ClientTransport;
   clientVersion: string;
   shareHandler(): PlayerShareHandler | null;
+  /** The GM offered the board (or took it away): a tab that wants it asks now. */
+  boardOffered?(joined: Joined): void;
 }
 
 /** Starts the player session of `joined`; what it hears goes to the tab through `host.sink()`. */
@@ -113,6 +122,25 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       host.sink()?.sheets?.(entries);
     },
     onPinNote: (answer) => { if (current()) host.sink()?.pinNote?.(answer); },
+    onBoardOffer: (available) => {
+      if (!current()) return;
+      joined.boardOffer = available;
+      // Offered anew (a new admission, Tabletop back on the GM's side): the GM holds no request of ours.
+      joined.boardAsked = false;
+      host.sink()?.boardOffer?.(available);
+      host.boardOffered?.(joined);
+    },
+    onBoardExtras: (extras) => {
+      if (!current()) return;
+      joined.board = extras;
+      joined.loader.setBoard(extras);
+      host.sink()?.boardExtras?.(extras);
+    },
+    onBoardCamera: (camera) => {
+      if (!current()) return;
+      joined.boardCamera = camera;
+      host.sink()?.boardCamera?.(camera);
+    },
   });
   return session;
 }
@@ -133,6 +161,9 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.sheets?.(joined.sheets),
     () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
     () => { if (joined.camera) sink.camera(joined.camera); },
+    () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer); },
+    () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },
+    () => { if (joined.boardCamera !== undefined) sink.boardCamera?.(joined.boardCamera); },
     () => sink.images(),
   ];
   for (const step of steps) {
