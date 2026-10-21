@@ -1,9 +1,8 @@
 /**
  * The board extras of a scene (`boardTypes.ts`): what a player on Tabletop's 3D board gets besides the scene. Only what
  * players may see goes, by the rules of the scene's own projection (`visible`: the GM's fog and the lighting's
- * darkness), as the GM's player window shows it: a wall or door by its middle, a prop by where it stands. A closed
- * secret door is plain wall. A light placed on the map goes unless hidden (its glow can reach ground players see); one a
- * token carries goes only with that token. Vault paths never leave: materials, door props and props go as asset ids,
+ * darkness), as the GM's player window shows it: a wall or door by its middle, a prop or a light by where it stands. A
+ * closed secret door is plain wall. A light a token carries goes only with that token. Vault paths never leave: materials, door props and props go as asset ids,
  * and one whose file is not hashed yet is left out until it is (the registry asks for another projection).
  */
 import type { Shows } from './FogCoverage';
@@ -54,7 +53,9 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
   }
   extras.materials = [...new Map([...materialIds.values()].filter((entry): entry is BoardMaterialRecord => entry !== null).map((entry) => [entry.id, entry])).values()];
   for (const raw of items(objects.lights)) {
-    if (raw.hidden === true) continue;
+    // Only a light players could find: switched on, and standing where they see.
+    const where = point(raw);
+    if (raw.hidden === true || !where || !visible.shows(at(where.x, where.y))) continue;
     const light = projectLight(raw, raw.emission, point(raw), look);
     if (light) extras.lights.push(light);
   }
@@ -98,9 +99,11 @@ function projectWall(raw: Raw, visible: Shows, look: BoardLook | null, assets: P
     const prop = look?.doorProp(id) ?? null;
     wall.door = { open, swing: raw.direction === 'right' ? 'right' : 'left', prop: prop ? assets.idFor(prop) : null, ...(chain ? { chainId: chain } : {}) };
   }
-  if (raw.direction === 'left' || raw.direction === 'right') wall.direction = raw.direction;
+  // A closed secret door keeps nothing that would set it apart from the wall around it.
+  const secret = raw.type === 'secret-door' && !door;
+  if (!secret && (raw.direction === 'left' || raw.direction === 'right')) wall.direction = raw.direction;
   if (raw.blocks === 'sight' || raw.blocks === 'light') wall.blocks = raw.blocks;
-  if (raw.limited === true) wall.limited = true;
+  if (!secret && raw.limited === true) wall.limited = true;
   return wall;
 }
 

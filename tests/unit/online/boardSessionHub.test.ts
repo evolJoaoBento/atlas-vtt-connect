@@ -96,4 +96,13 @@ describe('BoardSessionHub', () => {
     expect(changed).toHaveBeenCalled();
     expect(w.hub.overlay('maps/a.atlasmap').handout).toEqual({ path: 'handouts/map.png', title: 'Old map' });
   });
+
+  it('a projection that changes nothing the board shows tells it nothing', () => {
+    const w = world();
+    const changed = vi.fn();
+    w.hub.onChange(changed);
+    for (const listener of [...w.listeners]) listener({ kind: 'projected', slot: w.slot });
+    for (const listener of [...w.listeners]) listener({ kind: 'projected', slot: w.slot });
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
 });

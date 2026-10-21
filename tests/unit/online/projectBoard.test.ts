@@ -37,7 +37,7 @@ describe('projectBoard', () => {
   });
 
   it('a closed secret door is plain wall; opened it is a door; closed again plain wall', () => {
-    const closed = projectBoard(state([wall('d1', 'secret-door', 0, { closed: true })]), 's1', all, {}, look, assets);
+    const closed = projectBoard(state([wall('d1', 'secret-door', 0, { closed: true, direction: 'left', limited: true })]), 's1', all, {}, look, assets);
     expect(closed.walls).toEqual([{ id: 'd1', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: null, material: null }]);
     const open = projectBoard(state([wall('d1', 'secret-door', 0, { closed: false, direction: 'right' })]), 's1', all, {}, look, assets);
     expect(open.walls[0]).toMatchObject({ type: 'door', door: { open: true, swing: 'right', prop: 'id:minis/door.glb' } });
@@ -52,17 +52,18 @@ describe('projectBoard', () => {
     expect(extras.walls[1]).toMatchObject({ type: 'solid', blocks: 'light', limited: true, direction: 'left' });
   });
 
-  it('a token light goes when its token is not sent; a hidden fixed light is never sent, a fogged one is', () => {
+  it('a token light goes when its token is not sent; a hidden fixed light is never sent, nor one under fog', () => {
     const lights = [
       { id: 'l1', x: 900, y: 10, emission: { bright: 10, dim: 20, color: '#ff0000', intensity: 1, animation: 'torch' } },
       { id: 'l2', x: 10, y: 10, hidden: true, emission: { bright: 10, dim: 20 } },
     ];
     const tokens = { t1: { id: 't1', x: 50, y: 50, light: { bright: 5, dim: 10 } }, t2: { id: 't2', x: 60, y: 60, light: { bright: 5, dim: 10 } } };
     const extras = projectBoard(state([], lights, tokens), 's1', leftHalf, { t1: {} }, look, assets);
-    expect(extras.lights.map((light) => light.id)).toEqual(['l1', 't1']);
-    expect(extras.lights[0]).toEqual({ id: 'l1', x: 900, y: 10, height: 1.5, color: '#ff0000', bright: 10, dim: 20, intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null });
+    expect(extras.lights.map((light) => light.id)).toEqual(['t1']);
+    const shown = projectBoard(state([], lights, tokens), 's1', all, {}, look, assets);
+    expect(shown.lights[0]).toEqual({ id: 'l1', x: 900, y: 10, height: 1.5, color: '#ff0000', bright: 10, dim: 20, intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null });
     const hidden = projectBoard(state([], lights, tokens), 's1', leftHalf, {}, look, assets);
-    expect(hidden.lights.map((light) => light.id)).toEqual(['l1']);
+    expect(hidden.lights.map((light) => light.id)).toEqual([]);
   });
 
   it('in the dark (the frame shows nothing there) walls and props are not sent; a closed frame sends nothing', () => {

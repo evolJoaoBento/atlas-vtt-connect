@@ -140,6 +140,7 @@ export class CanvasScene implements OnlineSceneSink {
     }, { signal });
     // The 2D map follows the GM by its own buttons; the 3D board's GM view is the same button.
     dom.followButton.addEventListener('click', () => { if (this.view instanceof BoardSceneView) this.view.followGm(); }, { signal });
+    dom.fitButton.addEventListener('click', () => { if (this.view instanceof BoardSceneView) this.view.fitMap(); }, { signal });
     // An open tray takes Escape first, before the map returns to Move.
     doc.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !this.tray.isOpen || options.active?.() === false) return;
@@ -171,6 +172,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.shown = scene;
     this.map?.setScene(scene);
     this.showStatus();
+    if (this.view instanceof BoardSceneView) this.syncToolbar();
   }
 
   camera(camera: SceneCamera): void {
@@ -357,6 +359,11 @@ export class CanvasScene implements OnlineSceneSink {
     this.dimensionButton.textContent = board ? '2D' : '3D';
     if (board === this.view instanceof BoardSceneView) return;
     this.view?.dispose();
+    // The board's news belong to the board shown: a board shown again waits for the GM's again.
+    if (!board) {
+      this.board = null;
+      this.gmBoardCamera = null;
+    }
     const { dom } = this.options;
     this.view = board && factory ? this.makeBoard(factory) : this.makeMap();
     dom.canvas.hidden = board;
@@ -394,6 +401,8 @@ export class CanvasScene implements OnlineSceneSink {
   }
 
   private syncToolbar(): void {
+    // On the 3D board the GM view and Fit map are always at hand while there is a scene (the 2D map shows them only off the GM's view).
+    if (this.view instanceof BoardSceneView) this.options.dom.viewButtons.hidden = this.shown === null;
     this.toolbar.update({ ...(this.map?.toolState() ?? {}), diceOpen: this.tray.isOpen });
   }
 

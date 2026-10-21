@@ -100,6 +100,17 @@ describe('the player side of the 3D board', () => {
     expect(tab.cameras).toEqual([{ sceneId: 's1', eye: { x: 1, y: 2, z: 3 }, target: { x: 0, y: 0, z: 0 } }]);
   });
 
+  it('a GM that hosts again counts its board from 1: the new offer starts the count over', async () => {
+    const w = world();
+    const id = await w.join();
+    const tab = sink();
+    w.service.attach(tab.value);
+    await w.send(id, { v: 1, type: 'board-extras', seq: 9, part: 0, parts: 1, extras: board(1) });
+    await w.send(id, { v: 1, type: 'board-offer', available: true });
+    await w.send(id, { v: 1, type: 'board-extras', seq: 1, part: 0, parts: 1, extras: board(2) });
+    expect(tab.boards.map((extras) => extras?.walls.length)).toEqual([1, 2]);
+  });
+
   it('asks the GM for the board once per admission, only when the GM offered it', async () => {
     const w = world();
     const id = await w.join();

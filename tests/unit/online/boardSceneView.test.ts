@@ -36,6 +36,7 @@ function fakeFactory() {
     get: (_target, name: string) => {
       if (name === 'toolState') return () => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '#fff', gmView: true });
       if (name === 'dispose') return () => { disposed++; calls.push('dispose'); };
+      if (name === 'setExtras') return (extras: unknown) => { calls.push(`setExtras:${extras === null ? 'null' : 'data'}`); };
       return (...args: unknown[]) => { calls.push(`${name}${args.length && typeof args[0] === 'string' ? `:${args[0]}` : ''}`); };
     },
   });
@@ -89,7 +90,7 @@ describe('the 3D board in the player tab', () => {
     sink.scene(playerScene());
     expect(w.board.calls).toContain('setScene');
     sink.boardExtras?.(null);
-    expect(w.board.calls).toContain('setExtras');
+    expect(w.board.calls).toContain('setExtras:null');
   });
 
   it('without the GM\'s offer, or without Tabletop, the tab stays 2D', async () => {
@@ -147,5 +148,31 @@ describe('the 3D board in the player tab', () => {
     expect(w.notes).toEqual(['pin-1']);
     host.hover('t1', { x: 50, y: 60 }, false);
     expect(view.contentEl.textContent).toContain('Frightened');
+  });
+
+  it('in 3D the GM view and Fit map buttons show and reach the board', async () => {
+    const w = world();
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true);
+    sink.scene(playerScene());
+    const buttons = view.contentEl.querySelector<HTMLElement>('.view-buttons')!;
+    expect(buttons.hidden).toBe(false);
+    buttons.querySelector<HTMLButtonElement>('[aria-label="Fit map"]')!.click();
+    buttons.querySelector<HTMLButtonElement>('[aria-label="Follow GM"]')!.click();
+    expect(w.board.calls).toContain('fitMap');
+    expect(w.board.calls.filter((call) => call === 'followGm')).toHaveLength(1);
+  });
+
+  it('a board switched off and on again starts without the old scene walls', async () => {
+    const w = world();
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true);
+    sink.boardExtras?.({ sceneId: 's1' } as never);
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Show 2D map"]')!.click();
+    w.board.calls.length = 0;
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Show 3D board"]')!.click();
+    expect(w.board.calls.filter((call) => call.startsWith('setExtras'))).toEqual(['setExtras:null']);
   });
 });

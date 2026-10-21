@@ -20,19 +20,34 @@ export interface BoardSenderOptions {
   board: BoardSource | null;
 }
 
-/** `extras` cut into parts no larger than one message may carry; at least one part. */
+/** What one part may weigh as JSON, well under the control message's cap with its envelope and non-ASCII text. */
+export const BOARD_PART_BYTES = 180 * 1024;
+
+/**
+ * `extras` cut into parts no larger than one message may carry, by size as much as by count; at least one part. The
+ * first part carries the materials and the scene's light; walls, then lights, then props fill the parts in order.
+ */
 export function boardParts(extras: BoardExtras): BoardExtras[] {
-  const count = Math.max(1,
-    Math.ceil(extras.walls.length / BOARD_PART_LIMITS.walls),
-    Math.ceil(extras.lights.length / BOARD_PART_LIMITS.lights),
-    Math.ceil(extras.props.length / BOARD_PART_LIMITS.props));
-  return Array.from({ length: Math.min(count, BOARD_PART_LIMITS.parts) }, (_, part) => ({
-    ...extras,
-    walls: extras.walls.slice(part * BOARD_PART_LIMITS.walls, (part + 1) * BOARD_PART_LIMITS.walls),
-    lights: extras.lights.slice(part * BOARD_PART_LIMITS.lights, (part + 1) * BOARD_PART_LIMITS.lights),
-    props: extras.props.slice(part * BOARD_PART_LIMITS.props, (part + 1) * BOARD_PART_LIMITS.props),
-    materials: part === 0 ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [],
-  }));
+  const empty = (first: boolean): BoardExtras => ({ ...extras, walls: [], lights: [], props: [], materials: first ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [] });
+  const size = (value: unknown): number => JSON.stringify(value).length + 1;
+  const parts: BoardExtras[] = [empty(true)];
+  let current = parts[0]!;
+  let used = size(current);
+  const place = <K extends 'walls' | 'lights' | 'props'>(key: K, item: BoardExtras[K][number], cap: number): void => {
+    const weight = size(item);
+    if (used + weight > BOARD_PART_BYTES || (current[key] as unknown[]).length >= cap) {
+      if (parts.length >= BOARD_PART_LIMITS.parts) return;
+      current = empty(false);
+      parts.push(current);
+      used = size(current);
+    }
+    (current[key] as unknown[]).push(item);
+    used += weight;
+  };
+  for (const wall of extras.walls) place('walls', wall, BOARD_PART_LIMITS.walls);
+  for (const light of extras.lights) place('lights', light, BOARD_PART_LIMITS.lights);
+  for (const prop of extras.props) place('props', prop, BOARD_PART_LIMITS.props);
+  return parts;
 }
 
 export class BoardSender implements SessionHandler {

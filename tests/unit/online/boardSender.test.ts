@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
-import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
+import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import { boardAssetIds } from '../../../src/app/online/assets/assetIds';
-import { BOARD_CAMERA_INTERVAL_MS, BoardSender } from '../../../src/app/online/scene/BoardSender';
+import { BOARD_CAMERA_INTERVAL_MS, BoardSender, boardParts } from '../../../src/app/online/scene/BoardSender';
 import { SceneHub } from '../../../src/app/online/scene/SceneHub';
 import type { BoardSource, BoardPose } from '../../../src/app/online/scene/sceneSources';
 import type { BoardLook } from '../../../src/app/online/scene/sceneContracts';
@@ -209,5 +209,24 @@ describe('board assets', () => {
     expect(server.allowedFor('anna').has(ID.glb2)).toBe(false);
     slot = { ...slot, board };
     expect(server.allowedFor('anna').has(ID.glb2)).toBe(true);
+  });
+});
+
+describe('board parts by size', () => {
+  it('a large painted board goes in parts that each fit one message, and come back whole', () => {
+    const many = Array.from({ length: 3000 }, (_, i) => ({
+      id: `wall-${i.toString(36)}-${'x'.repeat(30)}`, type: 'solid' as const,
+      p1: { x: 1234.5678901234 + i, y: 987.6543210987 }, p2: { x: 1304.5678901234 + i, y: 987.6543210987 }, height: 2.5, material: 'M'.repeat(43),
+    }));
+    const lights = Array.from({ length: 800 }, (_, i) => ({ id: `light-${i}-${'y'.repeat(30)}`, x: 1234.5678901234, y: 987.6543210987, height: 1.5, color: '#ffaa00', bright: 20, dim: 40, intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null }));
+    const extras = { sceneId: 's1', walls: many, lights, props: [], materials: [], ambient: null, fogHeight: null, wallThickness: null, lighting: { enabled: true, ambient: 0.2, ambientColor: null } };
+    const parts = boardParts(extras);
+    for (const [index, part] of parts.entries()) {
+      const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: index, parts: parts.length, extras: part });
+      expect(new TextEncoder().encode(text).length).toBeLessThan(MAX_CONTROL_MESSAGE_BYTES);
+      expect(decodeControl(text).kind).toBe('message');
+    }
+    expect(parts.reduce((sum, part) => sum + part.walls.length, 0)).toBe(3000);
+    expect(parts.reduce((sum, part) => sum + part.lights.length, 0)).toBe(800);
   });
 });

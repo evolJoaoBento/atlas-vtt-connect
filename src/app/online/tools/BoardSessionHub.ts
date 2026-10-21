@@ -145,6 +145,8 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   }
 
   private slotChanged(change: SlotChange): void {
+    // Most projections (a token moved) change nothing the board shows: it hears only of a new scene or presented map.
+    const before = `${this.presentedMap()}|${JSON.stringify([...this.scenes])}`;
     if (change.kind === 'freed') {
       if (this.scenes.get(change.slot.mapPath) === change.slot.sceneId) this.scenes.delete(change.slot.mapPath);
     } else if (change.kind === 'projected' || change.kind === 'state') {
@@ -152,7 +154,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     } else if (change.kind === 'moved' && change.to) {
       this.scenes.set(change.to.mapPath, change.to.sceneId);
     }
-    this.emit();
+    if (`${this.presentedMap()}|${JSON.stringify([...this.scenes])}` !== before) this.emit();
   }
 
   private mark(mark: BoardMark): void {

@@ -308,6 +308,8 @@ export class PlayerSession {
         }
         break;
       case 'board-offer':
+        // Offered on every admission: a GM hosting anew counts its board from 1 again.
+        this.board = null;
         this.options.onBoardOffer?.(message.available);
         break;
       case 'board-extras':
