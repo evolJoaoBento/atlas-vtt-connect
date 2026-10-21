@@ -14,6 +14,11 @@ export const ATLAS_GRACE_MS = 10_000;
 
 /** How long a stock Atlas (one that never publishes an API) gets before Connect stands in for the API. */
 export const STOCK_GRACE_MS = 3_000;
+/**
+ * How often Connect looks whether a stock Atlas was reloaded (updated, disabled, enabled): a stock Atlas announces
+ * nothing, and the reloaded one has views, settings and a presented scene of its own.
+ */
+export const STOCK_WATCH_MS = 1_000;
 /** How long after load the wait for Atlas starts even if Obsidian never calls the layout-ready callback. */
 export const LAYOUT_READY_FALLBACK_MS = 5_000;
 
@@ -43,6 +48,8 @@ export class AtlasLink {
   private fallbackTimer: number | null = null;
   /** Disposes what Atlas registered for the current connection (it would otherwise wait for Connect to unload). */
   private release: (() => void) | null = null;
+  /** The stock Atlas plugin object stood in for, while it is the connection. */
+  private stockAtlas: unknown = null;
 
   constructor(
     private readonly plugin: Plugin,
@@ -56,7 +63,7 @@ export class AtlasLink {
 
   start(): void {
     const { workspace } = this.plugin.app;
-    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => this.attach(api)));
+    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => { this.stockAtlas = null; this.attach(api); }));
     this.plugin.registerEvent(workspace.on('atlas-vtt:api-unload', () => this.detach()));
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
@@ -70,8 +77,15 @@ export class AtlasLink {
       begun = true;
       this.graceTimer = window.setTimeout(() => this.warnMissing(), ATLAS_GRACE_MS);
       // A stock Atlas never publishes an API: no reason to wait the whole grace for it.
-      const stockTimer = window.setTimeout(() => { this.useStockAtlas(); }, STOCK_GRACE_MS);
-      this.plugin.register(() => window.clearTimeout(stockTimer));
+      let watch: number | null = null;
+      const stockTimer = window.setTimeout(() => {
+        this.useStockAtlas();
+        watch = window.setInterval(() => this.followStockAtlas(), STOCK_WATCH_MS);
+      }, STOCK_GRACE_MS);
+      this.plugin.register(() => {
+        window.clearTimeout(stockTimer);
+        if (watch !== null) window.clearInterval(watch);
+      });
     };
     workspace.onLayoutReady(begin);
     if (!begun && !this.atlasSeen) this.fallbackTimer = window.setTimeout(begin, LAYOUT_READY_FALLBACK_MS);
@@ -84,8 +98,33 @@ export class AtlasLink {
     const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
     if (!atlas || !canShimStockAtlas(atlas)) return false;
     console.warn('Atlas VTT Connect: this Atlas has no extension API; using the stock Atlas stand-in.');
-    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    this.attachStock(atlas);
     return true;
+  }
+
+  private attachStock(atlas: unknown): void {
+    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    this.stockAtlas = atlas;
+  }
+
+  /**
+   * A stock Atlas reloaded (updated in place, disabled, enabled) leaves the stand-in holding the old plugin's stores:
+   * presenting would then open the new Atlas's player window, which knows nothing of Connect showing players the scene.
+   */
+  private followStockAtlas(): void {
+    const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
+    if (atlas === this.stockAtlas) return;
+    // An Atlas with an API is followed through its own events.
+    if (isAtlasApi((atlas as { api?: unknown } | undefined)?.api)) return;
+    if (this.stockAtlas === null && this.extension) return;
+    if (this.stockAtlas !== null) {
+      this.stockAtlas = null;
+      this.detach();
+    }
+    if (atlas && canShimStockAtlas(atlas)) {
+      console.warn('Atlas VTT Connect: Atlas was reloaded; standing in for it again.');
+      this.attachStock(atlas);
+    }
   }
 
   private stopGrace(): void {
