@@ -211,8 +211,8 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
   'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),
-  'board-offer': (m) => typeof m.available === 'boolean' && (m.diceResults === undefined || m.diceResults === true)
-    && (m.diceRules === undefined || isOfferedDiceRules(m.diceRules)),
+  // The dice fields are optional extras: bad ones are dropped on decode (`decodeControl`), never the offer.
+  'board-offer': (m) => typeof m.available === 'boolean',
   'board-request': (m) => typeof m.on === 'boolean',
   'board-extras': (m) => isBoardPart(m) && (m.extras === null || isBoardExtras(m.extras)),
   'board-camera': (m) => m.camera === null || isBoardCamera(m.camera),
@@ -248,6 +248,10 @@ export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decode
   if (!validate(parsed)) return { kind: 'invalid', reason: `bad-${type}` };
   const message = parsed as unknown as ControlMessage;
   if (message.type === 'dice-log') cleanLoggedEntries(message.entries);
+  if (message.type === 'board-offer') {
+    if (message.diceResults !== true) delete message.diceResults;
+    if (message.diceRules !== undefined && !isOfferedDiceRules(message.diceRules)) delete message.diceRules;
+  }
   return { kind: 'message', message };
 }
 

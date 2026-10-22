@@ -155,9 +155,15 @@ describe('online protocol', () => {
       expect(offer({})).toBe('message');
       expect(offer({ diceResults: true, diceRules: { defaultRoll: '1d20', crit: 'natural' } })).toBe('message');
       expect(offer({ diceRules: { defaultRoll: '2d6', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 1, lowFaces: 0 } } })).toBe('message');
-      expect(offer({ diceResults: false })).toBe('invalid');
-      expect(offer({ diceRules: { defaultRoll: '1d20', crit: 'sometimes' } })).toBe('invalid');
-      expect(offer({ diceRules: 'x' })).toBe('invalid');
+    });
+
+    it('drops bad dice fields from a board-offer and keeps the offer', () => {
+      const read = (extra: object) => decodeControl(JSON.stringify({ v: 1, type: 'board-offer', available: true, ...extra }));
+      const rules = { defaultRoll: '1d20', crit: 'natural' };
+      expect(read({ diceResults: false, diceRules: { defaultRoll: '1d20', crit: 'sometimes' } })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true } });
+      expect(read({ diceRules: 'x', diceResults: true })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true, diceResults: true } });
+      expect(read({ diceResults: 1, diceRules: rules })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true, diceRules: rules } });
+      expect(read({ available: 'yes' }).kind).toBe('invalid');
     });
   });
 });
