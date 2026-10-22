@@ -1,7 +1,8 @@
 /**
  * An Obsidian player against the real GM side over `MemoryTransport`: the join service and the Canvas 2D scene tab
  * (`CanvasSceneView`), with the GM's session, scene broadcaster, token control, dice host and laser relay
- * (`toolsWorld`).
+ * (`toolsWorld`); for physical dice also Tabletop's 3D board as the GM offers it (`BoardSender`), and a fake player
+ * board that lands scripted values and hands them back as Tabletop's `RollSession.result()` does.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App, WorkspaceLeaf } from 'obsidian';
@@ -10,10 +11,15 @@ import { CanvasSceneView } from '../../../../src/app/online/obsidian/CanvasScene
 import { joinedSessionStore } from '../../../../src/app/online/obsidian/joinedSessionStore';
 import { OnlineJoinService, type OnlineSceneSink } from '../../../../src/app/online/obsidian/OnlineJoinService';
 import { ONLINE_SCENE_VIEW_TYPE } from '../../../../src/app/online/obsidian/onlineSceneTab';
+import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost, PlayerDiceRequest } from '../../../../src/app/online/obsidian/playerBoardContract';
+import { offeredRulesOf } from '../../../../src/app/online/atlas/toolParts';
+import { BoardSender } from '../../../../src/app/online/scene/BoardSender';
+import type { BoardSource } from '../../../../src/app/online/scene/sceneSources';
 import type { PlayerScene } from '../../../../src/app/online/scene/sceneTypes';
-import type { PlayerLaser } from '../../../../src/app/online/tools/toolMessages';
+import type { DiceLogEntry, OfferedDiceRules, PhysicalDie, PlayerLaser } from '../../../../src/app/online/tools/toolMessages';
 import { memorySettings } from '../../connect/memorySettings';
 import { nodeHash } from '../assetFixtures';
+import { TAVERN_MAP } from '../presentedFixtures';
 import { fakeFrames, RecordingSurface } from '../recordingSurface';
 import { toolsWorld } from '../toolsFixtures';
 
@@ -25,10 +31,71 @@ function pointer(target: EventTarget, type: string, x: number, y: number): void 
   target.dispatchEvent(event);
 }
 
+/** Tabletop on the GM's side, sharing its board; nothing of the board itself is needed here. */
+const SHARED_BOARD: BoardSource = {
+  available: () => true, lookFor: () => null, camera: () => null, subscribe: () => () => {}, subscribeCamera: () => () => {},
+};
+
+const SIDES: Record<PhysicalDie['die'], number> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+
+/**
+ * Tabletop's player board, its dice only: a throw lands the next scripted values, one per die, half a second later. A
+ * die that explodes by the rules the GM offered (`host.diceRules()`) asks for another die of its kind, which lands the
+ * next value and is marked `exploded`. The finished roll goes back through `host.sendDiceResult` in the shape
+ * Tabletop's `RollSession.result()` gives and its `PlayerDice` sends: each die with its `max`, the modifier, no total.
+ */
+function fakeDiceBoard(landing: number[]) {
+  const throws: PlayerDiceRequest[] = [];
+  const sent: boolean[] = [];
+  let host: PlayerBoardHost | null = null;
+  const settle = (request: PlayerDiceRequest): void => {
+    const rule = host!.diceRules?.()?.explode;
+    const rolls: Array<PhysicalDie & { max: number }> = [];
+    for (const [die, count] of Object.entries(request.dice) as Array<[PhysicalDie['die'], number]>) {
+      for (let i = 0; i < count; i++) {
+        for (let exploded = false; ; exploded = true) {
+          const value = landing.shift()!;
+          rolls.push({ die, value, max: SIDES[die], ...(exploded ? { exploded: true as const } : {}) });
+          if (!rule || value <= SIDES[die] - rule.highFaces || (exploded && !rule.repeats)) break;
+        }
+      }
+    }
+    sent.push(host!.sendDiceResult!({ rolls, modifier: request.modifier }));
+  };
+  const handle = new Proxy({} as PlayerBoardHandle, {
+    get: (_target, name: string) => {
+      if (name === 'diceAvailable') return host?.sendDiceResult ? true : undefined;
+      if (name === 'throwDice') {
+        return (request: PlayerDiceRequest): boolean => {
+          throws.push(request);
+          setTimeout(() => settle(request), 500);
+          return true;
+        };
+      }
+      if (name === 'toolState') return () => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '#fff', gmView: false });
+      return () => undefined;
+    },
+  });
+  const factory: PlayerBoardFactory = { version: 1, create: (_parent, given) => { host = given; return handle; } };
+  return { factory, throws, sent };
+}
+
+interface JoinOptions {
+  /** Tabletop on both sides: the GM shares its board, the player shows this one. */
+  board?: PlayerBoardFactory;
+  /** The dice rules of the collection holding the tavern; with them the GM takes players' physical rolls, without them it is an older GM. */
+  diceRules?: OfferedDiceRules;
+}
+
 /** The GM presents the tavern; Anna joins from Obsidian, is let in, and her scene tab opens and attaches. */
-async function joinFromObsidian() {
+async function joinFromObsidian(options: JoinOptions = {}) {
   const w = toolsWorld();
   w.present();
+  if (options.diceRules) w.atlas.rules.saveCollection('c1', { maps: [TAVERN_MAP], dice: options.diceRules });
+  const boardSender = options.board ? new BoardSender({
+    session: w.gm, projection: w.broadcaster, board: SHARED_BOARD, ...(options.diceRules ? { diceRules: offeredRulesOf(w.extension) } : {}),
+  }) : null;
+  boardSender?.start();
   const leaves: FakeLeaf[] = [];
   const vault = { create: vi.fn(), modify: vi.fn(), process: vi.fn(), read: vi.fn(), delete: vi.fn(), adapter: { write: vi.fn(), read: vi.fn() } };
   const workspace = {
@@ -39,11 +106,12 @@ async function joinFromObsidian() {
   const app = { workspace, vault } as unknown as App;
   const surface = new RecordingSurface();
   const frames = fakeFrames();
-  const seen = { scenes: [] as Array<PlayerScene | null>, lasers: [] as PlayerLaser[] };
+  const seen = { scenes: [] as Array<PlayerScene | null>, lasers: [] as PlayerLaser[], logs: [] as Array<readonly DiceLogEntry[]> };
   const decode: ImageDecoder = async () => null;
   const opened: { view: CanvasSceneView | null; leaf: FakeLeaf | null } = { view: null, leaf: null };
   const service: OnlineJoinService = new OnlineJoinService(app, memorySettings(), '0.1.0', {
     createClient: () => w.network.client(), openStore: async () => null, decode, hash: nodeHash, isHosting: () => false,
+    ...(options.board ? { minis: { current: () => null, subscribe: () => () => {}, board: () => options.board! } } : {}),
     openSceneTab: async () => {
       const leaf: FakeLeaf = { app, view: null, detach: vi.fn() };
       const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, { surface, frames, isHidden: () => false });
@@ -62,9 +130,12 @@ async function joinFromObsidian() {
     camera: (camera) => sink.camera(camera),
     control: (tokenIds) => sink.control(tokenIds),
     moveRefused: (tokenId) => sink.moveRefused(tokenId),
-    diceLog: (entries) => sink.diceLog(entries),
+    diceLog: (entries) => { seen.logs.push(entries); sink.diceLog(entries); },
     ownRoll: (entry) => sink.ownRoll(entry),
     laser: (laser) => { seen.lasers.push(laser); sink.laser(laser); },
+    boardOffer: (available, dice) => sink.boardOffer?.(available, dice),
+    boardExtras: (extras) => sink.boardExtras?.(extras),
+    boardCamera: (camera) => sink.boardCamera?.(camera),
     images: () => sink.images(),
     close: () => sink.close(),
   }));
@@ -86,7 +157,12 @@ async function joinFromObsidian() {
     if (camera?.op !== 'camera') throw new Error('The tab drew nothing');
     return { x: x * camera.scale + camera.offsetX, y: y * camera.scale + camera.offsetY };
   };
-  return { w, service, view, leaf: (): FakeLeaf => opened.leaf!, vault, seen, surface, frames, screenOf, playerId: (): string => service.state?.playerId ?? '' };
+  const finish = (): void => {
+    service.dispose();
+    boardSender?.stop();
+    w.finish();
+  };
+  return { w, service, view, finish, leaf: (): FakeLeaf => opened.leaf!, vault, seen, surface, frames, screenOf, playerId: (): string => service.state?.playerId ?? '' };
 }
 
 beforeEach(() => {
@@ -153,6 +229,49 @@ describe('an Obsidian player end to end', () => {
     expect(card.textContent).toContain('13');
     service.dispose();
     w.finish();
+  });
+
+  it("a player's physical roll reaches the GM's log", async () => {
+    const board = fakeDiceBoard([10, 4]);
+    // The collection holding the tavern rolls d10s, and a 10 explodes once.
+    const diceRules: OfferedDiceRules = { defaultRoll: '1d10', crit: 'natural', explode: { dice: 'default', repeats: false, highFaces: 1, lowFaces: 0 } };
+    const { w, view, seen, finish } = await joinFromObsidian({ board: board.factory, diceRules });
+    expect(view().contentEl.querySelector('[aria-label="Show 2D map"]')).not.toBeNull();
+    expect(view().onlineControls()!.rollDice({ d10: 1 }, 3)).toBeNull();
+    expect(board.throws).toEqual([{ dice: { d10: 1 }, modifier: 3 }]);
+    // Nothing reaches the GM while the dice tumble: the 10 lands, the board asks for another d10, and it lands a 4.
+    expect(w.logged).toEqual([]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(board.sent).toEqual([true]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.logged).toHaveLength(1);
+    expect(w.logged[0]).toMatchObject({
+      formula: 'd10+3', rolledBy: 'Anna', modifiers: 3, total: 17, crit: 'high',
+      rolls: [{ die: 'd10', value: 10, max: 10, min: 1 }, { die: 'd10', value: 4, max: 10, min: 1, exploded: true }],
+    });
+    expect(w.logged[0]!.rolls[0]!.exploded).toBeUndefined();
+    // The player's log shows the GM's reading of the dice, as the player's own roll.
+    const mine = seen.logs.flat().find((entry) => entry.total === 17);
+    expect(mine).toMatchObject({ name: 'Anna', mine: true, crit: 'high', modifier: 3 });
+    expect(mine!.dice).toEqual([expect.objectContaining({ die: 'd10', value: 10 }), expect.objectContaining({ die: 'd10', value: 4, exploded: true })]);
+    const entries = [...view().contentEl.querySelectorAll('.dice-log-list .dice-entry')];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.textContent).toContain('17');
+    finish();
+  });
+
+  it('old GM gets dice-roll: a GM that takes no physical rolls rolls the dice itself, though the player has a board that throws', async () => {
+    const board = fakeDiceBoard([10, 4]);
+    const { w, view, seen, finish } = await joinFromObsidian({ board: board.factory });
+    expect(view().contentEl.querySelector('[aria-label="Show 2D map"]')).not.toBeNull();
+    expect(view().onlineControls()!.rollDice({ d20: 1 }, 2)).toBeNull();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(board.throws).toEqual([]);
+    expect(board.sent).toEqual([]);
+    expect(w.logged).toHaveLength(1);
+    expect(w.logged[0]).toMatchObject({ formula: 'd20+2', rolledBy: 'Anna', total: 13 });
+    expect(seen.logs.flat().find((entry) => entry.total === 13)).toMatchObject({ name: 'Anna', mine: true });
+    finish();
   });
 
   it("points the laser at the GM and sees the GM's", async () => {
