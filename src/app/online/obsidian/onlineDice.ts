@@ -9,7 +9,7 @@ import { isDieType, parseFormula, type DiceRollResult, type DiceSelection } from
 import { entryRolls, rollerLabel } from '../page/diceLogModel';
 import { cardRollFormula } from '../tools/sheetCards';
 import { sheetRollFormula, sheetRollLabel, type SheetRollRef, type TokenSheet } from '../tools/sheets';
-import { DICE_LIMITS, type DiceLogEntry, type OfferedDiceRules } from '../tools/toolMessages';
+import { DICE_LIMITS, PHYSICAL_MODIFIER, type DiceLogEntry, type OfferedDiceRules } from '../tools/toolMessages';
 import type { PlayerDiceRequest } from './playerBoardContract';
 
 export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult[] {
@@ -43,13 +43,11 @@ export function traySelection(selection: Readonly<Record<string, number>>): Dice
   return total >= 1 && total <= DICE_LIMITS.dicePerRoll ? dice : null;
 }
 
-/** A physical roll's modifier lies within ±999, as the GM takes it (`isPhysicalRoll`). */
-const THROWN_MODIFIER = 999;
-
 /**
  * A roll of the player's sheet as Tabletop's board throws it: the formula's dice and its bonus, a bare bonus on the
  * default roll of the map's rules (Atlas's 1d20 without them), as the GM would roll it. Null where the board cannot
- * throw it: no such roll, a die the board has not, a die that subtracts or explodes, or more than 20 dice.
+ * throw it: no such roll, a die the board has not, a die that subtracts or explodes, or more than 20 dice (19 with a
+ * side, as the board throws one die more for it).
  */
 export function sheetThrow(entry: TokenSheet, ref: SheetRollRef, rules: OfferedDiceRules | null): Omit<PlayerDiceRequest, 'sheet'> | null {
   const formula = ref.kind === 'card'
@@ -63,7 +61,8 @@ export function sheetThrow(entry: TokenSheet, ref: SheetRollRef, rules: OfferedD
   const dice = base ? base.dice : own.dice;
   const count = base ? base.count : own.count;
   const modifier = own.modifier + (base?.modifier ?? 0);
-  if (count < 1 || count > DICE_LIMITS.dicePerRoll || Math.abs(modifier) > THROWN_MODIFIER) return null;
+  const most = DICE_LIMITS.dicePerRoll - (ref.side ? 1 : 0);
+  if (count < 1 || count > most || Math.abs(modifier) > PHYSICAL_MODIFIER) return null;
   const label = ref.kind === 'card' ? entry.card?.rolls[ref.index]?.label : entry.sheet ? sheetRollLabel(entry.sheet, ref) : undefined;
   return { dice, modifier, ...(label ? { label } : {}), ...(ref.side ? { advantage: ref.side } : {}) };
 }

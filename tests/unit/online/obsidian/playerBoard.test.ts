@@ -98,6 +98,18 @@ describe('the player side of the 3D board', () => {
     expect(w.fromPlayer.filter((message) => message.type === 'dice-result')).toEqual([{ v: 1, type: 'dice-result', ...roll }]);
   });
 
+  it('a dropped link forgets the dice offer: a tab that attaches while reconnecting gets the board offer without dice', async () => {
+    const w = world();
+    const id = await w.join();
+    await w.send(id, { v: 1, type: 'board-offer', available: true, diceResults: true });
+    const gmLinks = (w.gm as unknown as { links: Map<unknown, unknown> }).links;
+    ([...gmLinks.keys()][0] as { close(): void }).close();
+    expect(w.service.state?.status).toBe('connecting');
+    const offers: unknown[] = [];
+    w.service.attach({ ...sink().value, boardOffer: (...args) => { offers.push(args); } });
+    expect(offers).toEqual([[true, undefined]]);
+  });
+
   it('a board in parts reaches the tab once, whole; an older seq\'s late part is dropped', async () => {
     const w = world();
     const id = await w.join();

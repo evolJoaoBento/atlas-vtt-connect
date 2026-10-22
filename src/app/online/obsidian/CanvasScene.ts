@@ -165,6 +165,8 @@ export class CanvasScene implements OnlineSceneSink {
 
   session(state: PlayerSessionState): void {
     this.state = state;
+    // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
+    if (state.status !== 'admitted') this.diceOffer = null;
     this.chooseView();
     // Only an admitted player drags tokens and uses the tools: reconnecting or ended cancels a gesture.
     this.map?.setConnected(state.status === 'admitted');
@@ -405,9 +407,13 @@ export class CanvasScene implements OnlineSceneSink {
     this.syncToolbar();
   }
 
-  /** The board that throws the player's dice: the 3D board with dice, while the GM takes thrown dice; null otherwise. */
+  /**
+   * The board that throws the player's dice: the 3D board with dice, while the player is in and the GM takes thrown
+   * dice; null otherwise, so a roll pressed while reconnecting is refused as the tray refuses it, not thrown and lost.
+   */
   private diceBoard(): BoardSceneView | null {
-    return this.view instanceof BoardSceneView && this.diceOffer && this.view.throwsDice ? this.view : null;
+    const admitted = this.state?.status === 'admitted';
+    return admitted && this.view instanceof BoardSceneView && this.diceOffer && this.view.throwsDice ? this.view : null;
   }
 
   /** A roll from the tray: thrown on the board where it can be, else rolled by the GM; false when it did not go. */

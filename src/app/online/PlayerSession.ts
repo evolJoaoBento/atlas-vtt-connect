@@ -278,6 +278,8 @@ export class PlayerSession {
       case 'admitted':
         this.wasAdmitted = true;
         this.attempt = 0;
+        // A new admission takes no thrown dice until the GM offers them again (it does right after).
+        this.takesDiceResults = false;
         this.tableProof = message.table ?? null;
         this.update({ status: 'admitted', playerId: message.playerId, title: message.session.title, reason: null });
         if (this.assetLink !== link) {

@@ -5,6 +5,7 @@ import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessi
 import { OnlineJoinService, type OnlineSceneSink } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { ONLINE_SCENE_VIEW_TYPE } from '../../../src/app/online/obsidian/onlineSceneTab';
 import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost, PlayerDiceRequest } from '../../../src/app/online/obsidian/playerBoardContract';
+import { sheetThrow } from '../../../src/app/online/obsidian/onlineDice';
 import type { TokenSheet } from '../../../src/app/online/tools/sheets';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
@@ -328,5 +329,62 @@ describe("the player's dice on the 3D board", () => {
     expect(view.contentEl.querySelector('.dice-log-list')?.children.length).toBe(1);
     expect(view.contentEl.querySelector('.dice-toasts')?.textContent).toContain('9');
     expect(w.board.throws).toHaveLength(1);
+  });
+});
+
+describe("the player's dice while the session is not in, or the offer changed", () => {
+  it('a roll pressed while not admitted is not thrown: the tray says it did not go, as today', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.scene(playerScene());
+    vi.spyOn(w.service, 'sendDiceRoll').mockReturnValue(false);
+    sink.session({ ...admitted, status: 'connecting' });
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([]);
+    expect(view.contentEl.querySelector('.dice-tray .dice-note')?.textContent).toContain("Couldn't send the roll");
+  });
+
+  it('an offer without dice after one with dice goes back to dice-roll', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.boardOffer?.(true);
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([]);
+    expect(w.rolls).toEqual([[{ d20: 1 }, 2]]);
+  });
+
+  it('a reconnect forgets the dice offer until the GM offers again', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.session({ ...admitted, status: 'connecting' });
+    sink.session(admitted);
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([]);
+    expect(w.rolls).toEqual([[{ d20: 1 }, 2]]);
+    sink.boardOffer?.(true, { rules: null });
+    w.tick(1000);
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toHaveLength(1);
+  });
+});
+
+describe('a sheet roll as the board throws it', () => {
+  const textSheet = (desc: string): TokenSheet => {
+    const entry = sheetOf([10, 10, 10, 10, 10, 10]);
+    entry.sheet!.sections = [{ title: 'Actions', items: [{ name: 'Volley', desc }] }];
+    return entry;
+  };
+  const ref = (text: string, side?: 'advantage' | 'disadvantage') => ({ kind: 'text' as const, section: 0, item: 0, index: 0, text, ...(side ? { side } : {}) });
+
+  it('throws up to 20 dice, and up to 19 with a side, so the extra die stays within 20', () => {
+    expect(sheetThrow(textSheet('Hit: 20d6 fire.'), ref('20d6'), null)).toMatchObject({ dice: { d6: 20 }, modifier: 0 });
+    expect(sheetThrow(textSheet('Hit: 20d6 fire.'), ref('20d6', 'advantage'), null)).toBeNull();
+    expect(sheetThrow(textSheet('Hit: 19d6 fire.'), ref('19d6', 'disadvantage'), null)).toMatchObject({ dice: { d6: 19 }, advantage: 'disadvantage' });
   });
 });

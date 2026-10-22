@@ -207,6 +207,9 @@ describe('PlayerSession', () => {
       expect(player.sendDiceResult(thrown)).toBe(true);
       expect(links[0]!.sent.at(-1)).toEqual({ v: 1, type: 'dice-result', ...thrown });
       expect(offers).toEqual([[true, undefined], [true, { rules }]]);
+      // A new admission (a reconnect, a GM hosting anew) takes none until the GM offers again.
+      admit(links[0]!);
+      expect(player.sendDiceResult(thrown)).toBe(false);
     });
 
     it('start() twice connects once', async () => {

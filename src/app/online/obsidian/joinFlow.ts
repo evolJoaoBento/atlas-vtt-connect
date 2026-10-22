@@ -75,7 +75,12 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
     ...(share ? { share } : {}),
     ...(joined.ids.device ? { device: joined.ids.device } : {}),
     transport: host.createClient(joined.target.server),
-    onChange: (state) => { if (current()) host.changed(joined, state); },
+    onChange: (state) => {
+      if (!current()) return;
+      // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
+      if (state.status !== 'admitted') delete joined.boardDice;
+      host.changed(joined, state);
+    },
     onScene: (scene) => {
       if (!current()) return;
       joined.scene = scene;

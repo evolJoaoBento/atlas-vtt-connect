@@ -155,7 +155,8 @@ export interface OfferedDiceRules {
   explode?: { dice: 'default' | 'all'; repeats: boolean; highFaces: number; lowFaces: number };
 }
 
-const PHYSICAL_MODIFIER = 999;
+/** A physical roll's modifier lies within ±999. */
+export const PHYSICAL_MODIFIER = 999;
 const PHYSICAL_LABEL = 120;
 const CRIT_RULES: readonly unknown[] = ['natural', 'roll-under', 'doubles', 'high-total', 'none'];
 
