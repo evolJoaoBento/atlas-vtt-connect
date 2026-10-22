@@ -7,6 +7,7 @@ import { SCENE_RANGES } from '../scene/sceneLimits';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { isSceneId } from '../scene/sceneValidation';
 import { dieTagOf } from './diceTags';
+import { isSheetRollRef, type SheetRollRef } from './sheets';
 
 export const DICE_LIMITS = {
   /** Dice in one player roll. */
@@ -122,6 +123,67 @@ export function isDiceModifier(value: unknown): value is number {
 export function playerRollFormula(dice: DiceSelection, modifier: number): string | null {
   const formula = diceFormula(dice, modifier);
   return parseFormula(formula).ok ? formula : null;
+}
+
+/** The sides of each die a player may throw physically; a d100 reads as one combined value, 1 to 100 (00 and 0 make 100). */
+const PHYSICAL_SIDES: Readonly<Record<string, number>> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+
+/** One die of a roll the player threw on Tabletop's board, as Atlas's `RolledDie` without `max`. */
+export interface PhysicalDie {
+  die: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
+  /** 1 up to the die's sides; never 0. */
+  value: number;
+  exploded?: true;
+  negative?: true;
+  dropped?: true;
+  color?: string;
+  colorName?: string;
+}
+
+/** A finished physical throw, as the player sends it (`dice-result`) and Tabletop's board hands it over. */
+export interface PhysicalRoll {
+  rolls: PhysicalDie[];
+  modifier: number;
+  label?: string;
+  sheet?: { tokenId: string; roll: SheetRollRef };
+}
+
+/** How a collection rolls dice, as the GM offers it with `board-offer` (Atlas's `DiceRules`). */
+export interface OfferedDiceRules {
+  defaultRoll: string;
+  crit: 'natural' | 'roll-under' | 'doubles' | 'high-total' | 'none';
+  explode?: { dice: 'default' | 'all'; repeats: boolean; highFaces: number; lowFaces: number };
+}
+
+const PHYSICAL_MODIFIER = 999;
+const PHYSICAL_LABEL = 120;
+const CRIT_RULES: readonly unknown[] = ['natural', 'roll-under', 'doubles', 'high-total', 'none'];
+
+function isPhysicalDie(value: unknown): value is PhysicalDie {
+  if (!isFields(value) || typeof value.die !== 'string' || !Object.hasOwn(PHYSICAL_SIDES, value.die)) return false;
+  return Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= (PHYSICAL_SIDES[value.die] ?? 0)
+    && isFlag(value.exploded) && isFlag(value.negative) && isFlag(value.dropped)
+    && (value.color === undefined || isLaserColor(value.color))
+    && (value.colorName === undefined || isText(value.colorName, 0, DICE_LIMITS.nameLength));
+}
+
+/** 1 to 20 dice, each read (1 up to its sides), a modifier within ±999, a label of at most 120 characters, and a sheet roll if any. */
+export function isPhysicalRoll(value: unknown): value is PhysicalRoll {
+  return isFields(value) && Array.isArray(value.rolls) && value.rolls.length >= 1 && value.rolls.length <= DICE_LIMITS.dicePerRoll
+    && value.rolls.every((die) => isPhysicalDie(die))
+    && Number.isSafeInteger(value.modifier) && Math.abs(value.modifier as number) <= PHYSICAL_MODIFIER
+    && (value.label === undefined || isText(value.label, 0, PHYSICAL_LABEL))
+    && (value.sheet === undefined || (isFields(value.sheet) && isSceneId(value.sheet.tokenId) && isSheetRollRef(value.sheet.roll)));
+}
+
+const isWhole = (value: unknown, max: number): boolean => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+
+export function isOfferedDiceRules(value: unknown): value is OfferedDiceRules {
+  if (!isFields(value) || !isText(value.defaultRoll, 1, 32) || !CRIT_RULES.includes(value.crit)) return false;
+  const rule = value.explode;
+  if (rule === undefined) return true;
+  return isFields(rule) && (rule.dice === 'default' || rule.dice === 'all') && typeof rule.repeats === 'boolean'
+    && isWhole(rule.highFaces, 100) && isWhole(rule.lowFaces, 100);
 }
 
 /** Absent, or exactly `true`. */

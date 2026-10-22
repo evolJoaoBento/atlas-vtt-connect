@@ -110,6 +110,54 @@ describe('online protocol', () => {
   });
 
   it('names what players may send: a resync, a token move, a dice roll, a laser, a roll from their sheet, a ping, a template, a pin they open and the 3D board', () => {
-    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['board-request', 'dice-roll', 'laser', 'map-ping', 'map-template', 'note-request', 'scene-resync', 'sheet-roll', 'token-move']);
+    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['board-request', 'dice-result', 'dice-roll', 'laser', 'map-ping', 'map-template', 'note-request', 'scene-resync', 'sheet-roll', 'token-move']);
+  });
+
+  describe('dice-result and the dice offer', () => {
+    const decode = (message: unknown) => decodeControl(JSON.stringify({ v: 1, type: 'dice-result', ...(message as object) }));
+    const ok = { rolls: [{ die: 'd6', value: 3 }, { die: 'd6', value: 6 }], modifier: 2 };
+
+    it('accepts a roll of 2d6, a d100 as one value, tags, a label and a sheet roll', () => {
+      expect(decode(ok).kind).toBe('message');
+      expect(decode({ rolls: [{ die: 'd100', value: 100 }, { die: 'd10', value: 10, exploded: true, dropped: true, color: '#aabbcc', colorName: 'Red' }], modifier: -999, label: 'x'.repeat(120) }).kind).toBe('message');
+      expect(decode({ ...ok, sheet: { tokenId: 't1', roll: { kind: 'check', index: 1 } } }).kind).toBe('message');
+      expect(PLAYER_MESSAGE_TYPES.has('dice-result')).toBe(true);
+    });
+
+    it('refuses what is not a read roll', () => {
+      const bad: unknown[] = [
+        { ...ok, rolls: [] },
+        { ...ok, rolls: Array.from({ length: 21 }, () => ({ die: 'd6', value: 1 })) },
+        { ...ok, rolls: [{ die: 'd6', value: 0 }] },
+        { ...ok, rolls: [{ die: 'd6', value: 7 }] },
+        { ...ok, rolls: [{ die: 'd100', value: 101 }] },
+        { ...ok, rolls: [{ die: 'd100', value: 0 }] },
+        { ...ok, rolls: [{ die: 'd6', value: Number.NaN }] },
+        { ...ok, rolls: [{ die: 'd6', value: 2.5 }] },
+        { ...ok, rolls: [{ die: 'd3', value: 1 }] },
+        { ...ok, modifier: 1000 },
+        { ...ok, modifier: -1000 },
+        { ...ok, modifier: 1.5 },
+        { ...ok, label: 'x'.repeat(121) },
+        { ...ok, rolls: [{ die: 'd6', value: 1, color: 'red' }] },
+        { ...ok, sheet: { tokenId: 't1', roll: { kind: 'nope' } } },
+      ];
+      for (const message of bad) expect(decode(message).kind, JSON.stringify(message)).toBe('invalid');
+    });
+
+    it('an older page ignores dice-result', () => {
+      const older = new Set(['ping']);
+      expect(decodeControl(JSON.stringify({ v: 1, type: 'dice-result', ...ok }), older).kind).toBe('ignored');
+    });
+
+    it('reads board-offer with and without the dice fields', () => {
+      const offer = (extra: object) => decodeControl(JSON.stringify({ v: 1, type: 'board-offer', available: true, ...extra })).kind;
+      expect(offer({})).toBe('message');
+      expect(offer({ diceResults: true, diceRules: { defaultRoll: '1d20', crit: 'natural' } })).toBe('message');
+      expect(offer({ diceRules: { defaultRoll: '2d6', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 1, lowFaces: 0 } } })).toBe('message');
+      expect(offer({ diceResults: false })).toBe('invalid');
+      expect(offer({ diceRules: { defaultRoll: '1d20', crit: 'sometimes' } })).toBe('invalid');
+      expect(offer({ diceRules: 'x' })).toBe('invalid');
+    });
   });
 });
