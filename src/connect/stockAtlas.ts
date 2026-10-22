@@ -218,7 +218,7 @@ function guard(what: string, call: () => void): void {
   }
 }
 
-/** Atlas's defaults: a stock Atlas gives no read of a collection's rules, so every map gets these. */
+/** Atlas's defaults: what a map gets of every rule its collection does not say (`stockMapRules`), its dice rules included. */
 function defaultRules(): MapRules {
   return Object.freeze({
     collectionId: null,

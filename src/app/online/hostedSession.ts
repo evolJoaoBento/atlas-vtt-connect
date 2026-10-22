@@ -36,7 +36,8 @@ import type { PeopleBook } from './sharing/people/PeopleBook';
 import type { PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
-import type { SheetRollExtras } from './tools/DiceHost';
+import type { SheetRollExtras, SheetRollLabels } from './tools/DiceHost';
+import type { OfferedDiceRules } from './tools/toolMessages';
 
 const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
@@ -67,12 +68,18 @@ export interface OptionalParts {
   /** Players move the tokens the GM assigns them, through Atlas's `tokens.move`. Without it nobody controls a token. */
   tokenControl?: (context: HostedContext) => HostedPart & { readonly control: TokenControl };
   /** Players' dice, rolled and logged through Atlas's dice (B7). Without it players cannot roll. */
-  dice?: (context: HostedContext) => HostedPart & { rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean };
+  dice?: (context: HostedContext) => HostedPart & {
+    rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean;
+    /** Names players' physical sheet rolls from the sheets part. */
+    useSheets?: (sheets: SheetRollLabels | null) => void;
+  };
+  /** The dice rules players' physical rolls are judged by; with `dice`, the board offer tells players the GM takes them. */
+  diceRules?: (mapPath: string | null) => OfferedDiceRules;
   /**
    * Players' own sheets: the tokens they control with their exact numbers and stat blocks, and rolls from them through
    * the dice part. Needs token control; without it no sheet is sent.
    */
-  sheets?: (context: HostedContext & { control: TokenControl; rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean }) => HostedPart;
+  sheets?: (context: HostedContext & { control: TokenControl; rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean }) => HostedPart & Partial<SheetRollLabels>;
   /** Players' lasers and the GM's (B7). Without it no laser is relayed. */
   laser?: (context: HostedContext) => HostedPart;
   /** Players' pings, relayed to their scene and shown in the GM's view where Connect can draw on it. */
@@ -202,7 +209,10 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
   // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
-  const boardSender = new BoardSender({ session: scenes, projection: hub, board: env.scene.board ?? null });
+  const boardSender = new BoardSender({
+    session: scenes, projection: hub, board: env.scene.board ?? null,
+    ...(env.dice && env.diceRules ? { diceRules: env.diceRules } : {}),
+  });
   // Serves the images of the scene players have, over each player's assets channel.
   const assetServer = new AssetServer({ session, projection: hub, files: registry });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
@@ -215,6 +225,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
+  // Players' physical sheet rolls are named from the GM's own copy of their sheets.
+  dice?.useSheets?.(sheets && typeof sheets.rollLabel === 'function' ? { rollLabel: sheets.rollLabel.bind(sheets) } : null);
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
   let stopSharing: (() => void) | null = null;
   let stopLog: (() => void) | null = null;

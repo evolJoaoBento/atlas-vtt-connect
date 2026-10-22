@@ -6,7 +6,7 @@ import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, laserRelayPart, offeredRulesOf, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -23,7 +23,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'templates' | 'handout'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'diceRules' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'templates' | 'handout'
   | 'tabScenes'
 >;
 
@@ -75,7 +75,8 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(diceLooks ? { diceLook: diceLooks } : {}),
     ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
-    ...(dice ? { dice: diceHostPart(dice) } : {}),
+    // Players' physical rolls are judged by the rules the board offer tells them.
+    ...(dice ? { dice: diceHostPart(dice, offeredRulesOf(atlas)), diceRules: offeredRulesOf(atlas) } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
     templates: templateHostPart(lasers, (mapPath) => atlas.rules.forMap(mapPath).measurement.coneAngle),

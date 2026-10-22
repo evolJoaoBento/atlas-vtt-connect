@@ -7,7 +7,8 @@
  * the sheets its players have.
  *
  * Rolls from a sheet (`sheet-roll`) are found again on the GM's own copy of the stat block (`sheetRollFormula`) and
- * rolled through the dice host as the player's roll, so a player rolls only what their sheet offers.
+ * rolled through the dice host as the player's roll, so a player rolls only what their sheet offers. A roll of a sheet
+ * the player threw on Tabletop's board is named the same way (`rollLabel`).
  */
 import type { Character, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
 import type { TokenControl } from '../control/TokenControl';
@@ -18,7 +19,7 @@ import type { SceneSession } from '../scene/sceneContracts';
 import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
-import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type TokenSheet } from './sheets';
+import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type SheetRollRef, type TokenSheet } from './sheets';
 import type { SheetRollExtras } from './DiceHost';
 import { buildPlayerSheet } from './templateSheets';
 import { cardRollFormula, type SheetCard } from './sheetCards';
@@ -143,24 +144,39 @@ export class SheetHost implements SessionHandler {
   onMessage(player: SessionPlayer, message: ControlMessage): void {
     if (message.type !== 'sheet-roll' || !this.options.rollFor) return;
     if (!this.options.control.controls(player.playerId, message.tokenId) || !this.limit.allow(player.playerId, this.now())) return;
-    const scene = this.sceneOf(player.playerId);
-    const token = scene?.snapshot.objects.tokens[message.tokenId];
-    if (!scene || !isCharacter(token) || !Object.hasOwn(scene.shown, message.tokenId)) return;
+    const found = this.sheetRoll(player, message.tokenId, message.roll);
+    if (!found) return;
     const { side } = message.roll;
-    if (message.roll.kind === 'card') {
+    this.options.rollFor(player, found.formula, { abilityName: found.label, ...(side ? { advantage: side } : {}) });
+  }
+
+  /** The ability a roll of `player`'s sheet is named after, from the GM's own copy of it; null when they have no such roll. */
+  rollLabel(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null {
+    return this.sheetRoll(player, tokenId, roll)?.label ?? null;
+  }
+
+  /**
+   * A roll of the sheet of a token `player` controls and their scene shows, found again on the GM's own copy: its
+   * formula and the ability it is named after. Null when the player has no such roll.
+   */
+  private sheetRoll(player: SessionPlayer, tokenId: string, ref: SheetRollRef): { formula: string; label: string } | null {
+    if (!this.options.control.controls(player.playerId, tokenId)) return null;
+    const scene = this.sceneOf(player.playerId);
+    const token = scene?.snapshot.objects.tokens[tokenId];
+    if (!scene || !isCharacter(token) || !Object.hasOwn(scene.shown, tokenId)) return null;
+    if (ref.kind === 'card') {
       // The card the player was sent last, as the GM's Atlas drew it: a roll is its formula, never the player's.
       const card = this.cardOf(token);
-      const roll = card ? card.rolls[message.roll.index] : undefined;
-      const formula = card ? cardRollFormula(card, message.roll.index, message.roll.text) : null;
-      if (!roll || !formula) return;
-      this.options.rollFor(player, formula, { abilityName: (roll.label || displayName(token) || 'Roll').slice(0, SHEET_LIMITS.name), ...(side ? { advantage: side } : {}) });
-      return;
+      const roll = card ? card.rolls[ref.index] : undefined;
+      const formula = card ? cardRollFormula(card, ref.index, ref.text) : null;
+      if (!roll || !formula) return null;
+      return { formula, label: (roll.label || displayName(token) || 'Roll').slice(0, SHEET_LIMITS.name) };
     }
     // Read afresh: the roll is what the stat block says now.
     const sheet = buildPlayerSheet(this.read(token), displayName(token));
-    const formula = sheet ? sheetRollFormula(sheet, message.roll) : null;
-    if (!sheet || !formula) return;
-    this.options.rollFor(player, formula, { abilityName: sheetRollLabel(sheet, message.roll).slice(0, SHEET_LIMITS.name), ...(side ? { advantage: side } : {}) });
+    const formula = sheet ? sheetRollFormula(sheet, ref) : null;
+    if (!sheet || !formula) return null;
+    return { formula, label: sheetRollLabel(sheet, ref).slice(0, SHEET_LIMITS.name) };
   }
 
   playersChanged(players: readonly SessionPlayer[]): void {

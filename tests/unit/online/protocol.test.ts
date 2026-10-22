@@ -3,6 +3,7 @@ import {
   decodeControl, encodeControl, normalizePlayerName, MAX_CONTROL_MESSAGE_BYTES, MAX_CONTROLLED_TOKENS, PLAYER_MESSAGE_TYPES, type ControlMessage,
 } from '../../../src/app/online/protocol';
 import { randomId } from '../../../src/app/online/ids';
+import { isPhysicalRoll } from '../../../src/app/online/tools/toolMessages';
 
 describe('online protocol', () => {
   it('round-trips every message type', () => {
@@ -143,6 +144,27 @@ describe('online protocol', () => {
         { ...ok, sheet: { tokenId: 't1', roll: { kind: 'nope' } } },
       ];
       for (const message of bad) expect(decode(message).kind, JSON.stringify(message)).toBe('invalid');
+    });
+
+    it('refuses rolls that are not a list of dice, dice that are not objects, unknown dice kinds and false flags', () => {
+      const bad: unknown[] = [
+        { ...ok, rolls: { 0: { die: 'd6', value: 3 }, length: 1 } },
+        { ...ok, rolls: 'd6' },
+        { ...ok, rolls: [3] },
+        { ...ok, rolls: [null] },
+        { ...ok, rolls: [[{ die: 'd6', value: 3 }]] },
+        { ...ok, rolls: [{ die: '__proto__', value: 1 }] },
+        { ...ok, rolls: [{ die: 'toString', value: 1 }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, exploded: false }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, dropped: false }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, negative: 'yes' }] },
+      ];
+      for (const message of bad) expect(decode(message).kind, JSON.stringify(message)).toBe('invalid');
+      // JSON carries no Infinity: the check itself refuses it.
+      expect(isPhysicalRoll({ ...ok, modifier: Number.POSITIVE_INFINITY })).toBe(false);
+      expect(isPhysicalRoll({ ...ok, rolls: [{ die: 'd6', value: Number.POSITIVE_INFINITY }] })).toBe(false);
+      expect(isPhysicalRoll({ ...ok, rolls: [{ die: 'd6', value: Number.NEGATIVE_INFINITY }] })).toBe(false);
+      expect(isPhysicalRoll(ok)).toBe(true);
     });
 
     it('an older page ignores dice-result', () => {
