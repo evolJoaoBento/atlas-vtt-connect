@@ -4,7 +4,8 @@ import { CanvasSceneView } from '../../../src/app/online/obsidian/CanvasSceneVie
 import { joinedSessionStore } from '../../../src/app/online/obsidian/joinedSessionStore';
 import { OnlineJoinService, type OnlineSceneSink } from '../../../src/app/online/obsidian/OnlineJoinService';
 import { ONLINE_SCENE_VIEW_TYPE } from '../../../src/app/online/obsidian/onlineSceneTab';
-import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost } from '../../../src/app/online/obsidian/playerBoardContract';
+import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost, PlayerDiceRequest } from '../../../src/app/online/obsidian/playerBoardContract';
+import type { TokenSheet } from '../../../src/app/online/tools/sheets';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 import { memorySettings } from '../connect/memorySettings';
@@ -27,13 +28,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** A board factory that records what the tab asks of the handle and keeps the host it was given. */
-function fakeFactory() {
+/**
+ * A board factory that records what the tab asks of the handle and keeps the host it was given; with `dice`, the board
+ * throws dice (`throwDice` answering `dice.throws`) and records each throw.
+ */
+function fakeFactory(dice?: { throws: boolean }) {
   const calls: string[] = [];
+  const throws: PlayerDiceRequest[] = [];
   let host: PlayerBoardHost | null = null;
   let disposed = 0;
   const handle = new Proxy({} as PlayerBoardHandle, {
     get: (_target, name: string) => {
+      if (name === 'diceAvailable') return dice ? true : undefined;
+      if (name === 'throwDice') return dice ? (request: PlayerDiceRequest) => { throws.push(request); return dice.throws; } : undefined;
       if (name === 'toolState') return () => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '#fff', gmView: true });
       if (name === 'dispose') return () => { disposed++; calls.push('dispose'); };
       if (name === 'setExtras') return (extras: unknown) => { calls.push(`setExtras:${extras === null ? 'null' : 'data'}`); };
@@ -44,10 +51,10 @@ function fakeFactory() {
     version: 1,
     create: (parent, given) => { host = given; calls.push(`create:${parent.className}`); return handle; },
   };
-  return { factory, calls, host: () => host!, disposed: () => disposed };
+  return { factory, calls, throws, host: () => host!, disposed: () => disposed };
 }
 
-function world() {
+function world(dice?: { throws: boolean }) {
   const ws = {
     leaves: [] as unknown[], getActiveViewOfType: (): unknown => null, revealLeaf: vi.fn(),
     getLeavesOfType: (type: string): unknown[] => (type === ONLINE_SCENE_VIEW_TYPE ? ws.leaves : []),
@@ -59,23 +66,32 @@ function world() {
   vi.spyOn(service, 'attach').mockImplementation((sink) => { sinks.push(sink); return () => undefined; });
   const wanted: boolean[] = [];
   vi.spyOn(service, 'wantBoard').mockImplementation((on) => { wanted.push(on); });
-  const board = fakeFactory();
+  const board = fakeFactory(dice);
   let painter: PlayerBoardFactory | null = board.factory;
   vi.spyOn(service, 'boardPainter').mockImplementation(() => painter);
   const moves: Array<[string, number, number]> = [];
   vi.spyOn(service, 'sendTokenMove').mockImplementation((id, x, y) => { moves.push([id, x, y]); return true; });
   const notes: string[] = [];
   vi.spyOn(service, 'sendNoteRequest').mockImplementation((pinId) => { notes.push(pinId); return true; });
+  const rolls: Array<[unknown, number]> = [];
+  vi.spyOn(service, 'sendDiceRoll').mockImplementation((picked, modifier) => { rolls.push([picked, modifier]); return true; });
+  const results: unknown[] = [];
+  vi.spyOn(service, 'sendDiceResult').mockImplementation((result) => { results.push(result); return true; });
+  const sheetRolls: unknown[] = [];
+  vi.spyOn(service, 'sendSheetRoll').mockImplementation((tokenId, ref) => { sheetRolls.push([tokenId, ref]); return true; });
   const surface = new RecordingSurface();
+  let now = 1000;
   const open = async () => {
     const leaf = { app, view: null as unknown, detach: vi.fn() };
-    const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, { surface, frames: fakeFrames(), isHidden: () => false });
+    const view = new CanvasSceneView(leaf as unknown as WorkspaceLeaf, { surface, frames: fakeFrames(), isHidden: () => false, now: () => now });
     leaf.view = view;
     ws.leaves.push(leaf);
     await view.onOpen();
     return { view, sink: sinks.at(-1)! };
   };
-  return { service, open, board, wanted, moves, notes, setPainter: (next: PlayerBoardFactory | null) => { painter = next; } };
+  return {
+    service, open, board, wanted, moves, notes, rolls, results, sheetRolls, tick: (ms: number) => { now += ms; },
+    setPainter: (next: PlayerBoardFactory | null) => { painter = next; } };
 }
 
 describe('the 3D board in the player tab', () => {
@@ -175,5 +191,142 @@ describe('the 3D board in the player tab', () => {
     w.board.calls.length = 0;
     view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Show 3D board"]')!.click();
     expect(w.board.calls.filter((call) => call.startsWith('setExtras'))).toEqual(['setExtras:null']);
+  });
+});
+
+/** Picks a d20 and a modifier of +2 in the tray, then presses Roll. */
+function rollD20Plus2(root: HTMLElement): void {
+  if (root.querySelector<HTMLElement>('.dice-tray')?.hidden) root.querySelector<HTMLButtonElement>('.toolbar button[aria-label="Dice"]')!.click();
+  root.querySelector<HTMLButtonElement>('.tray-face[data-die="d20"]')!.click();
+  root.querySelector<HTMLButtonElement>('[aria-label="Increase modifier"]')!.click();
+  root.querySelector<HTMLButtonElement>('[aria-label="Increase modifier"]')!.click();
+  root.querySelector<HTMLButtonElement>('.tray-roll')!.click();
+}
+
+const sheetOf = (stats: number[]): TokenSheet => ({
+  tokenId: 't1', name: 'Anna', resources: [],
+  sheet: { name: 'Anna', subtitle: null, ac: null, hp: null, speed: null, stats, saves: [], skills: [], lines: [], sections: [] },
+});
+
+describe("the player's dice on the 3D board", () => {
+  it('3D tray roll throws on the board', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.scene(playerScene());
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([{ dice: { d20: 1 }, modifier: 2 }]);
+    expect(w.rolls).toEqual([]);
+    // The board hands the landed dice back: they go to the GM as one dice-result.
+    expect(w.board.host().sendDiceResult?.({ rolls: [{ die: 'd20', value: 7 }], modifier: 2 })).toBe(true);
+    expect(w.results).toEqual([{ rolls: [{ die: 'd20', value: 7 }], modifier: 2 }]);
+  });
+
+  it("the board reads the rules of the player's map from the GM's offer", async () => {
+    const w = world({ throws: true });
+    const { sink } = await w.open();
+    sink.session(admitted);
+    const rules = { defaultRoll: '2d6', crit: 'doubles' as const };
+    sink.boardOffer?.(true, { rules });
+    expect(w.board.host().diceRules?.()).toEqual(rules);
+  });
+
+  it('old GM gets dice-roll', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true);
+    sink.scene(playerScene());
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([]);
+    expect(w.rolls).toEqual([[{ d20: 1 }, 2]]);
+  });
+
+  it('2D view keeps dice-roll', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Show 2D map"]')!.click();
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toEqual([]);
+    expect(w.rolls).toEqual([[{ d20: 1 }, 2]]);
+  });
+
+  it('a board without dice, or one that cannot throw now, leaves the roll to the GM', async () => {
+    const plain = world();
+    const first = await plain.open();
+    first.sink.session(admitted);
+    first.sink.boardOffer?.(true, { rules: null });
+    rollD20Plus2(first.view.contentEl);
+    expect(plain.rolls).toEqual([[{ d20: 1 }, 2]]);
+    const refusing = world({ throws: false });
+    const second = await refusing.open();
+    second.sink.session(admitted);
+    second.sink.boardOffer?.(true, { rules: null });
+    rollD20Plus2(second.view.contentEl);
+    expect(refusing.board.throws).toHaveLength(1);
+    expect(refusing.rolls).toEqual([[{ d20: 1 }, 2]]);
+  });
+
+  it('throws at most two rolls a second, refusing the next as the tray refuses a roll that did not go', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    rollD20Plus2(view.contentEl);
+    rollD20Plus2(view.contentEl);
+    rollD20Plus2(view.contentEl);
+    expect(w.board.throws).toHaveLength(2);
+    expect(w.rolls).toEqual([]);
+    expect(view.contentEl.querySelector('.dice-tray .dice-note')?.textContent).not.toBe('');
+    w.tick(1000);
+    view.contentEl.querySelector<HTMLButtonElement>('.tray-roll')!.click();
+    expect(w.board.throws).toHaveLength(3);
+  });
+
+  it("sheet roll in 3D throws the sheet's dice", async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.sheets?.([sheetOf([10, 14, 10, 10, 10, 10])]);
+    // DEX 14: a bare +2, thrown with the rules' default roll (Atlas's 1d20 without rules).
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Roll DEX check"]')!.click();
+    expect(w.board.throws).toEqual([{ dice: { d20: 1 }, modifier: 2, label: 'DEX check', sheet: { tokenId: 't1', roll: { kind: 'check', index: 1 } } }]);
+    expect(w.sheetRolls).toEqual([]);
+  });
+
+  it("a sheet roll thrown by the map's rules, and one the board cannot throw left to the GM", async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: { defaultRoll: '2d6', crit: 'none' } });
+    const entry = sheetOf([10, 8, 10, 10, 10, 10]);
+    entry.sheet!.sections = [{ title: 'Actions', items: [{ name: 'Curse', desc: 'Hit: 2d6 - 1d4 necrotic.' }] }];
+    sink.sheets?.([entry]);
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Roll DEX check"]')!.click();
+    expect(w.board.throws.at(-1)).toMatchObject({ dice: { d6: 2 }, modifier: -1 });
+    // A die that subtracts is no physical die: the GM rolls it.
+    w.tick(1000);
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label^="Roll Curse"]')!.click();
+    expect(w.board.throws).toHaveLength(1);
+    expect(w.sheetRolls).toHaveLength(1);
+  });
+
+  it('own physical roll is logged but not re-thrown', async () => {
+    const w = world({ throws: true });
+    const { view, sink } = await w.open();
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.scene(playerScene());
+    rollD20Plus2(view.contentEl);
+    const mine: DiceLogEntry = { ...roll, id: 'p1', formula: '1d20+2', dice: [{ die: 'd20', value: 7 }], modifier: 2, total: 9 };
+    sink.diceLog([mine]);
+    sink.ownRoll(mine);
+    expect(view.contentEl.querySelector('.dice-log-list')?.children.length).toBe(1);
+    expect(view.contentEl.querySelector('.dice-toasts')?.textContent).toContain('9');
+    expect(w.board.throws).toHaveLength(1);
   });
 });

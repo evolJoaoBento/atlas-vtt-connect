@@ -6,6 +6,7 @@
  * Reconnect still has them. Nothing here reads or writes the vault.
  */
 import type { SheetRollRef } from '../tools/sheets';
+import type { PhysicalRoll } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 import { Notice, type App } from 'obsidian';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
@@ -275,6 +276,11 @@ export class OnlineJoinService {
 
   sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
     return this.joined?.session?.sendDiceRoll(dice, modifier) ?? false;
+  }
+
+  /** Sends dice the player threw on Tabletop's board; false when the GM takes none or it cannot go. */
+  sendDiceResult(result: PhysicalRoll): boolean {
+    return this.joined?.session?.sendDiceResult(result) ?? false;
   }
 
   /** Asks the GM to add a template or remove one of the player's own. */

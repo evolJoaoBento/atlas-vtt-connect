@@ -9,7 +9,7 @@ import { PlayerSceneInbox } from './playerSessionScene';
 import type { BoardCamera, BoardExtras } from './scene/boardTypes';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
-import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
+import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
 import type { SheetRollRef, TokenSheet } from './tools/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
@@ -83,8 +83,8 @@ export interface PlayerSessionOptions {
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
   /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
   onPinNote?(answer: PinNoteAnswer): void;
-  /** Whether the GM can send the scene for Tabletop's 3D board (`board-offer`). */
-  onBoardOffer?(available: boolean): void;
+  /** Whether the GM can send the scene for Tabletop's 3D board (`board-offer`); `dice` when it also takes thrown dice (`diceResults`), with its rules (null for the default). */
+  onBoardOffer?(available: boolean, dice?: BoardDiceOffer): void;
   /** The scene's board extras, whole once every part of one `seq` is here; null for none. */
   onBoardExtras?(extras: BoardExtras | null): void;
   /** The GM's 3D camera of the scene, or null. */
@@ -95,6 +95,11 @@ export interface PlayerSessionOptions {
   assets?: PlayerAssetHandler;
   /** Sharing's end of the assets channel (Obsidian clients only). */
   share?: PlayerShareHandler;
+}
+
+/** The GM takes dice thrown on Tabletop's board (`dice-result`), judged by these rules; null for Atlas's defaults. */
+export interface BoardDiceOffer {
+  rules: OfferedDiceRules | null;
 }
 
 export class PlayerSession {
@@ -109,6 +114,8 @@ export class PlayerSession {
   private assetLink: PeerLink | null = null;
   private controlled: readonly string[] = [];
   private tableProof: TableProof | null = null;
+  /** The latest board offer took `dice-result`. */
+  private takesDiceResults = false;
 
   private readonly inbox: PlayerSceneInbox;
 
@@ -157,6 +164,16 @@ export class PlayerSession {
   sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
     if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier }));
+    return true;
+  }
+
+  /** Sends dice thrown on Tabletop's board; false when it cannot go (not admitted, no link, or a GM that takes none). */
+  sendDiceResult(result: PhysicalRoll): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !this.takesDiceResults) return false;
+    const { rolls, modifier, label, sheet } = result;
+    this.link.send('control', encodeControl({
+      v: 1, type: 'dice-result', rolls, modifier, ...(label !== undefined ? { label } : {}), ...(sheet ? { sheet } : {}),
+    }));
     return true;
   }
 
@@ -312,7 +329,8 @@ export class PlayerSession {
       case 'board-offer':
         // Offered on every admission: a GM hosting anew counts its board from 1 again.
         this.board = null;
-        this.options.onBoardOffer?.(message.available);
+        this.takesDiceResults = message.diceResults === true;
+        this.options.onBoardOffer?.(message.available, message.diceResults === true ? { rules: message.diceRules ?? null } : undefined);
         break;
       case 'board-extras':
         this.boardPart(message.seq, message.part, message.parts, message.extras);

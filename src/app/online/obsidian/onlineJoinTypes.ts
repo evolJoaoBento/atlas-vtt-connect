@@ -5,7 +5,7 @@ import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
-import type { PlayerSessionState } from '../PlayerSession';
+import type { BoardDiceOffer, PlayerSessionState } from '../PlayerSession';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT } from '../page/pageScreen';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
@@ -35,8 +35,8 @@ export interface OnlineSceneSink {
   ping?(ping: PlayerPing): void;
   /** The GM's answer to a pin this player opened; a view that opens none leaves it out. */
   pinNote?(answer: PinNoteAnswer): void;
-  /** Whether the GM can send the scene for Tabletop's 3D board; a view without the board leaves it out. */
-  boardOffer?(available: boolean): void;
+  /** Whether the GM can send the scene for Tabletop's 3D board, and `dice` when it takes dice thrown on it; a view without the board leaves it out. */
+  boardOffer?(available: boolean, dice?: BoardDiceOffer): void;
   /** The scene's board extras (walls, doors, lights, props, materials), or null; a view without the board leaves it out. */
   boardExtras?(extras: BoardExtras | null): void;
   /** The GM's 3D camera of the scene, or null; a view without the board leaves it out. */
