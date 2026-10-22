@@ -14,7 +14,7 @@ import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } fro
 import { isPingPoint } from './tools/pings';
 import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
-import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
+import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
 export const MAX_PLAYER_NAME_LENGTH = 40;
@@ -106,6 +106,8 @@ export type ControlMessage =
   | { v: 1; type: 'token-move-refused'; tokenId: string }
   /** Player to GM: a roll from the dice tray, rolled on the GM's side. */
   | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number }
+  /** Player to GM: dice thrown on Tabletop's board, every die as it landed; sent only when the GM offered `diceResults`. */
+  | { v: 1; type: 'dice-result'; rolls: PhysicalDie[]; modifier: number; label?: string; sheet?: { tokenId: string; roll: SheetRollRef } }
   /** GM to players: dice log entries, newest first; `replay` replaces a player's log (sent on every admission). */
   | { v: 1; type: 'dice-log'; entries: DiceLogEntry[]; replay: boolean }
   /**
@@ -128,8 +130,8 @@ export type ControlMessage =
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
   | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null }
-  /** GM to a player, on admission and when it changes: whether the GM can send the scene for Tabletop's 3D board. */
-  | { v: 1; type: 'board-offer'; available: boolean }
+  /** GM to a player, on admission and when it changes: whether the GM can send the scene for Tabletop's 3D board; `diceResults` when it also takes `dice-result`, with the rules of that player's map. */
+  | { v: 1; type: 'board-offer'; available: boolean; diceResults?: true; diceRules?: OfferedDiceRules }
   /** Player to GM: start (or stop) sending this player the board extras of its scene; only a player showing 3D asks. */
   | { v: 1; type: 'board-request'; on: boolean }
   /** GM to a player who asked: one part of its scene's board extras (`parts` of one `seq` make the whole), or none. */
@@ -139,7 +141,7 @@ export type ControlMessage =
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
+  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
 ]);
 
 export type Decoded =
@@ -194,6 +196,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
   'token-move-refused': (m) => isSceneId(m.tokenId),
   'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier),
+  'dice-result': (m) => isPhysicalRoll(m),
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'
     && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from))
@@ -208,6 +211,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
   'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),
+  // The dice fields are optional extras: bad ones are dropped on decode (`decodeControl`), never the offer.
   'board-offer': (m) => typeof m.available === 'boolean',
   'board-request': (m) => typeof m.on === 'boolean',
   'board-extras': (m) => isBoardPart(m) && (m.extras === null || isBoardExtras(m.extras)),
@@ -244,6 +248,10 @@ export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decode
   if (!validate(parsed)) return { kind: 'invalid', reason: `bad-${type}` };
   const message = parsed as unknown as ControlMessage;
   if (message.type === 'dice-log') cleanLoggedEntries(message.entries);
+  if (message.type === 'board-offer') {
+    if (message.diceResults !== true) delete message.diceResults;
+    if (message.diceRules !== undefined && !isOfferedDiceRules(message.diceRules)) delete message.diceRules;
+  }
   return { kind: 'message', message };
 }
 

@@ -8,7 +8,7 @@ import type { MapTemplate } from '../tools/templates';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { JoinTarget } from '../joinLink';
 import { mergeDiceLog, ownRolls } from '../page/diceLogModel';
-import type { PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
+import type { BoardDiceOffer, PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
@@ -39,6 +39,8 @@ export interface Joined {
   templates: { sceneId: string; list: readonly MapTemplate[] } | null;
   /** Whether the GM can send Tabletop's 3D board, its board of the scene, and its 3D camera. */
   boardOffer?: boolean;
+  /** The latest offer took thrown dice (`diceResults`), with the rules of the player's map; absent when it did not. */
+  boardDice?: BoardDiceOffer;
   board?: BoardExtras | null;
   boardCamera?: BoardCamera | null;
   /** This admission asked the GM for the board (`board-request`): asked once, again after a new admission. */
@@ -73,7 +75,12 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
     ...(share ? { share } : {}),
     ...(joined.ids.device ? { device: joined.ids.device } : {}),
     transport: host.createClient(joined.target.server),
-    onChange: (state) => { if (current()) host.changed(joined, state); },
+    onChange: (state) => {
+      if (!current()) return;
+      // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
+      if (state.status !== 'admitted') delete joined.boardDice;
+      host.changed(joined, state);
+    },
     onScene: (scene) => {
       if (!current()) return;
       joined.scene = scene;
@@ -122,12 +129,14 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       host.sink()?.sheets?.(entries);
     },
     onPinNote: (answer) => { if (current()) host.sink()?.pinNote?.(answer); },
-    onBoardOffer: (available) => {
+    onBoardOffer: (available, dice) => {
       if (!current()) return;
       joined.boardOffer = available;
+      if (dice) joined.boardDice = dice;
+      else delete joined.boardDice;
       // Offered anew (a new admission, Tabletop back on the GM's side): the GM holds no request of ours.
       joined.boardAsked = false;
-      host.sink()?.boardOffer?.(available);
+      host.sink()?.boardOffer?.(available, dice);
       host.boardOffered?.(joined);
     },
     onBoardExtras: (extras) => {
@@ -161,7 +170,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.sheets?.(joined.sheets),
     () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
     () => { if (joined.camera) sink.camera(joined.camera); },
-    () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer); },
+    () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer, joined.boardDice); },
     () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },
     () => { if (joined.boardCamera !== undefined) sink.boardCamera?.(joined.boardCamera); },
     () => sink.images(),

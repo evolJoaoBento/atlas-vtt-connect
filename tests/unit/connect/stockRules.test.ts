@@ -67,3 +67,44 @@ describe('the rules of a stock Atlas map', () => {
     expect(rules.conditions.map((condition) => condition.id)).toEqual(['c1']);
   });
 });
+
+describe("a stock Atlas map's dice rules", () => {
+  const MAP = 'atlas-vtt/collections/Main/scenes/a.atlasmap';
+  const EXPLODE = { dice: 'all', repeats: true, highFaces: 1, lowFaces: 0 };
+  const withTool = (diceRules: unknown, settings: Record<string, unknown> | null = null): RulesView => ({
+    mapPath: () => MAP,
+    serviceManager: {
+      getToolController: () => ({ getDiceTool: () => ({ getDiceRules: () => diceRules }) }),
+      getAssetService: () => assets(settings),
+    },
+  });
+
+  it("reads the dice tool of the view showing the map first, the collection's explode included", () => {
+    const rules = stockMapRules([withTool({ defaultRoll: '1d6', crit: 'none', explode: EXPLODE })], MAP, DEFAULTS);
+    expect(rules.dice).toEqual({ defaultRoll: '1d6', crit: 'none', explode: EXPLODE });
+  });
+
+  it("reads a dice set's groups as its default roll", () => {
+    const rules = stockMapRules([withTool({ dice: [{ count: 2, sides: 12 }], crit: 'doubles' })], MAP, DEFAULTS);
+    expect(rules.dice).toEqual({ defaultRoll: '2d12', crit: 'doubles' });
+  });
+
+  it("reads the collection's stored dice where no view shows the map, and the defaults without either", () => {
+    const shown = view(MAP, { assets: assets({ dice: { defaultRoll: '2d10', crit: 'high-total', explode: EXPLODE } }) });
+    expect(stockMapRules([shown], 'atlas-vtt/collections/Main/scenes/b.atlasmap', DEFAULTS).dice).toEqual({ defaultRoll: '2d10', crit: 'high-total', explode: EXPLODE });
+    expect(stockMapRules([view(MAP, { assets: assets({}) })], MAP, DEFAULTS).dice).toBe(DEFAULTS.dice);
+    // A dice tool that throws, or answers nothing, leaves the collection's stored dice.
+    const throwing: RulesView = { mapPath: () => MAP, serviceManager: { getToolController: () => { throw new Error('no'); }, getAssetService: () => assets({ dice: { defaultRoll: '1d8', crit: 'none' } }) } };
+    expect(stockMapRules([throwing], MAP, DEFAULTS).dice).toEqual({ defaultRoll: '1d8', crit: 'none' });
+  });
+
+  it("takes a mixed dice set's default die from the collection's stored dice, not the defaults", () => {
+    const rules = stockMapRules([withTool({ dice: [{ count: 2, sides: 6 }, { count: 1, sides: 8 }], crit: 'doubles' }, { dice: { defaultRoll: '2d6', crit: 'none' } })], MAP, DEFAULTS);
+    expect(rules.dice).toEqual({ defaultRoll: '2d6', crit: 'doubles' });
+  });
+
+  it('reads each field it cannot as the default, and drops an explode rule it cannot read', () => {
+    const rules = stockMapRules([withTool({ defaultRoll: 'lots', crit: 'sometimes', explode: { dice: 'all', repeats: 'yes', highFaces: 1, lowFaces: 0 } })], MAP, DEFAULTS);
+    expect(rules.dice).toEqual({ defaultRoll: '1d20', crit: 'natural' });
+  });
+});

@@ -85,9 +85,14 @@ const isPolygon = (value: unknown): value is Polygon => Array.isArray(value) && 
 const SEEING = new Set(['none', 'normal', 'as-bright', 'as-dim']);
 const isSeeing = (value: unknown): boolean => typeof value === 'string' && SEEING.has(value);
 
-/** The view's lighting controller, or null while Atlas has none (dynamic lighting off, or not built yet) or it cannot be read. */
+/**
+ * The view's lighting controller, or null while Atlas has none (dynamic lighting off, or not built yet) or it cannot be
+ * read. Atlas 0.9.1 made dynamic lighting standard: the controller is the renderer's own `lighting`; before, the
+ * experiment's feature held it (`lightingFeature.controller`).
+ */
 function controllerOf(view: LightingView): Controller | null {
-  const controller = field(field(view.renderer, 'lightingFeature'), 'controller');
+  const own = field(view.renderer, 'lighting');
+  const controller = isObject(own) && typeof own.playerSight === 'function' ? own : field(field(view.renderer, 'lightingFeature'), 'controller');
   const lighting = field(controller, 'renderer');
   const names = ['isEnabled', 'sightIsCurrent', 'currentSight', 'ambientLight', 'lightReaches'] as const;
   if (!isObject(controller) || typeof controller.playerSight !== 'function' || !isObject(lighting) || names.some((name) => typeof lighting[name] !== 'function')) return null;

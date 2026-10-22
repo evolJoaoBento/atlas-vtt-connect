@@ -5,7 +5,7 @@
  */
 import type { DiceRollResult, ViewId } from '@atlas-vtt/api-types';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { diceHostPart, laserRelayPart } from '../../../src/app/online/atlas/toolParts';
+import { diceHostPart, laserRelayPart, offeredRulesOf } from '../../../src/app/online/atlas/toolParts';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import type { HostedContext } from '../../../src/app/online/hostedSession';
 import { controlWorld, type ControlPlayer } from './controlFixtures';
@@ -25,7 +25,7 @@ export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
   const logged: DiceRollResult[] = [];
   extension.dice.onRolled((result) => logged.push(result));
   const context: HostedContext = { session: world.gm, presented: scene.presented, projection: scene.broadcaster };
-  const dice = diceHostPart(extension.dice)(context);
+  const dice = diceHostPart(extension.dice, offeredRulesOf(extension))(context);
   const lasers = laserRelayPart(extension.lasers, extension.settings)(context);
   dice.start();
   lasers.start();

@@ -3,10 +3,14 @@
  * (`board-offer`: Tabletop is there and shares its board) and told again when that changes. A player showing the board
  * asks for it (`board-request`); from then on it gets its scene's board extras whenever they change (`board-extras`,
  * in parts when large, all of one `seq`) and the GM's 3D camera of that scene, at most every 100 ms with the last move
- * always included (`board-camera`). A player who stops asking, or leaves, gets nothing more. A `GmSession` handler.
+ * always included (`board-camera`). A player who stops asking, or leaves, gets nothing more. Where the GM takes
+ * players' physical rolls, the offer says so (`diceResults`) with the dice rules of the player's map (`diceRules`), as
+ * the GM judges their rolls by. A `GmSession` handler.
  */
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
+import { offeredDiceRules } from '../tools/physicalRolls';
+import type { OfferedDiceRules } from '../tools/toolMessages';
 import { BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
 import type { BoardSource, SceneSession } from './sceneSources';
 import type { SlotChange, SlotProjection, SlotView } from './slotViews';
@@ -18,6 +22,8 @@ export interface BoardSenderOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'onSlotChange'>;
   /** Tabletop's board; without it every player is told no. */
   board: BoardSource | null;
+  /** The dice rules of the collection holding `mapPath`; given when the GM takes players' physical rolls (`dice-result`). */
+  diceRules?: (mapPath: string | null) => OfferedDiceRules;
 }
 
 /** What one part may weigh as JSON, well under the control message's cap with its envelope and non-ASCII text. */
@@ -76,7 +82,7 @@ export class BoardSender implements SessionHandler {
   }
 
   onAdmitted(player: SessionPlayer): void {
-    this.options.session.send(player.playerId, { v: 1, type: 'board-offer', available: this.available() });
+    this.offer(player.playerId, this.available());
   }
 
   onMessage(player: SessionPlayer, message: ControlMessage): void {
@@ -104,11 +110,30 @@ export class BoardSender implements SessionHandler {
     return this.options.board?.available() ?? false;
   }
 
+  /**
+   * The offer for `playerId`, with the dice rules of their scene's map where the GM takes physical rolls; rules that
+   * cannot be read are left out (the player throws by the defaults), never the offer.
+   */
+  private offer(playerId: string, available: boolean): void {
+    this.options.session.send(playerId, { v: 1, type: 'board-offer', available, ...this.diceOffer(playerId) });
+  }
+
+  private diceOffer(playerId: string): { diceResults?: true; diceRules?: OfferedDiceRules } {
+    const { diceRules } = this.options;
+    if (!diceRules) return {};
+    try {
+      return { diceResults: true, diceRules: offeredDiceRules(diceRules(this.options.projection.slotOf(playerId)?.mapPath || null)) };
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Could not read the dice rules for a board offer; offering without them:', error);
+      return { diceResults: true };
+    }
+  }
+
   private availabilityChanged(): void {
     const available = this.available();
     if (available === this.offered) return;
     this.offered = available;
-    for (const player of this.options.session.getPlayers()) this.options.session.send(player.playerId, { v: 1, type: 'board-offer', available });
+    for (const player of this.options.session.getPlayers()) this.offer(player.playerId, available);
     if (!available) this.asking.clear();
   }
 

@@ -8,6 +8,7 @@
  * - A roll for a player is named after them in the log through the roll's source (`tokenName`), not through `rolledBy`;
  *   the roll `onRolled` hears carries `rolledBy`, so Connect's players' log attributes it.
  * - `publish` announces on the views' buses, which throw the roll in 3D; `throw: false` cannot ask for a card instead.
+ *   A die's tag also goes under the names stock Atlas reads (`colour`, `name`), beside the API's.
  * - `throw`, `registerLook` and the look choices do not exist: only `roll`, `onRolled` and `publish` do.
  *
  * More than the API: a roll from a player's sheet names its ability in Atlas's toast and log (the source's
@@ -16,6 +17,7 @@
  */
 import type { DiceApi, DicePublishOptions, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
 import { SHEET_AWARE_DICE, type PlayerRollRequest } from '../../app/online/tools/DiceHost';
+import { dieTagOf } from '../../app/online/tools/diceTags';
 import { ADVANTAGE_SIDES, type AdvantageSide } from '../../app/online/tools/sheets';
 
 /** Most dice a roll may list, as the API's `publish` holds it to. */
@@ -88,6 +90,15 @@ function plainCopy(value: unknown): unknown {
   } catch {
     return null;
   }
+}
+
+/** The roll with each die's well-formed tag also under stock Atlas's names (`colour`, `name`); the API's names stay for Connect's log. */
+function withStockTags(roll: DiceRollResult): DiceRollResult {
+  const rolls = roll.rolls.map((die) => {
+    const { color, colorName } = dieTagOf(die);
+    return { ...die, ...(color !== undefined ? { colour: color } : {}), ...(colorName !== undefined ? { name: colorName } : {}) };
+  });
+  return { ...roll, rolls };
 }
 
 function isRoll(value: unknown): value is DiceRollResult {
@@ -206,13 +217,14 @@ export function stockDiceApi(deps: StockDiceDeps): DiceApi {
       const copy = plainCopy(result);
       if (copy === null) throw new Error('[Atlas VTT Connect] dice.publish: the roll must be plain data.');
       if (!isRoll(copy)) throw new Error('[Atlas VTT Connect] dice.publish: the roll must be { id, timestamp, formula, rolls, modifiers, total }.');
+      const tagged = withStockTags(copy);
       follow();
       // Every open map view announces it, so each one's log, toasts and 3D dice show it; listeners hear it once (by its id).
       for (const view of deps.views()) {
         const found = diceOf(view);
         if (!found) continue;
         try {
-          found.bus.emit('dice-rolled', structuredClone(copy));
+          found.bus.emit('dice-rolled', structuredClone(tagged));
         } catch (error) {
           console.error('[Atlas VTT Connect] A map view could not show a roll:', error);
         }

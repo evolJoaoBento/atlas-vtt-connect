@@ -50,6 +50,13 @@ describe('lighting on a stock Atlas', () => {
     expect(showing).toBeLessThan(cols * rows);
   });
 
+  it("reads Atlas 0.9.1's lighting, whose controller is the renderer's own `lighting`, as it read the experiment's", () => {
+    const answer = visibility(litView({ standard: true }));
+    expect(answer.status).toBe('ready');
+    expect((answer as Ready).tokens).toEqual(REAL.perception);
+    expect((answer as Ready).darkness).toEqual((visibility(litView()) as Ready).darkness);
+  });
+
   it('shows a cell only where the light there lets the sense perceive it', () => {
     const lit = litView();
     const dark = structuredClone(REAL.sight);
@@ -203,7 +210,7 @@ describe('lighting on a stock Atlas', () => {
       const heard: string[] = [];
       api.watch('view-a', () => heard.push('x'));
       const next = new FakeController({ enabled: true, current: true, sight: REAL.sight, ambient: REAL.ambient, reaches: REAL.reaches });
-      (lit.view.renderer.lightingFeature as { controller: unknown }).controller = next;
+      ((lit.view.renderer as { lightingFeature: { controller: unknown } }).lightingFeature).controller = next;
       lit.tick(300);
       expect(heard).toEqual(['x']);
       next.onSightChange();

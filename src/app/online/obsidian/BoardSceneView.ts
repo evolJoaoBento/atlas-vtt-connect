@@ -18,12 +18,12 @@ import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate, TemplateShape } from '../tools/templates';
-import type { PlayerLaser } from '../tools/toolMessages';
+import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool, TemplateChange } from '../view/tools/PlayerTools';
 import { nextTurnOf, turnNotice, turnOf } from '../view/turns';
-import type { PlayerBoardFactory, PlayerBoardHandle } from './playerBoardContract';
+import type { PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 
 export interface BoardSceneViewOptions {
@@ -39,6 +39,10 @@ export interface BoardSceneViewOptions {
   sendPing(x: number, y: number): boolean;
   sendTemplate(change: TemplateChange): boolean;
   requestNote?(pinId: string): boolean;
+  /** Sends dice thrown on the board to the GM; without it the board has no dice. */
+  sendDiceResult?(result: PhysicalRoll): boolean;
+  /** The dice rules of the player's map, as the GM offered them; null for the default. */
+  diceRules?(): OfferedDiceRules | null;
   onToolsChange(): void;
   hoverCard: HTMLElement;
   statblockPreview: HTMLElement;
@@ -81,6 +85,10 @@ export class BoardSceneView implements SceneViewport {
       openPin: (pinId) => this.openPin(pinId),
       hover: (tokenId, client, modifier) => this.hover(tokenId, client, modifier),
       toolsChanged: () => options.onToolsChange(),
+      ...(options.sendDiceResult ? {
+        sendDiceResult: (result: PhysicalRoll) => options.sendDiceResult?.(result) ?? false,
+        diceRules: () => options.diceRules?.() ?? null,
+      } : {}),
     });
   }
 
@@ -144,6 +152,16 @@ export class BoardSceneView implements SceneViewport {
   toolState(): ToolState {
     const { tool, shape, templateShape, ownTemplates, laserColor } = this.board.toolState();
     return { tool, shape, templateShape: templateShape as TemplateShape, ownTemplates, laserColor, laserSize: this.laserSize };
+  }
+
+  /** Whether the board throws dice (an older Tabletop's has none). */
+  get throwsDice(): boolean {
+    return this.board.diceAvailable === true && typeof this.board.throwDice === 'function';
+  }
+
+  /** Throws the roll on the board; false when it cannot now (no dice, no scene). */
+  throwDice(request: PlayerDiceRequest): boolean {
+    return this.throwsDice && this.board.throwDice?.(request) === true;
   }
 
   receiveNote(answer: PinNoteAnswer): void {

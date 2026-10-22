@@ -9,7 +9,8 @@ import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
-import type { PlayerLaser } from '../tools/toolMessages';
+import type { SheetRollRef } from '../tools/sheets';
+import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 
 export interface PlayerBoardHost {
@@ -27,6 +28,10 @@ export interface PlayerBoardHost {
   hover(tokenId: string | null, client: BoardPoint | null, modifier: boolean): void;
   /** The tool, shape or colour changed on the board (Escape too): the toolbar follows. */
   toolsChanged(): void;
+  /** Sends a finished throw to the GM; false when it could not. Without it the board has no dice. */
+  sendDiceResult?(result: PhysicalRoll): boolean;
+  /** The rules of the player's map as the GM offered them; null for the default rules. */
+  diceRules?(): OfferedDiceRules | null;
 }
 
 export type PlayerBoardTool = 'move' | 'measure' | 'template' | 'laser' | 'ping';
@@ -68,6 +73,20 @@ export interface PlayerBoardHandle {
   refresh(): void;
   measure(): void;
   dispose(): void;
+  /** This board throws dice (`throwDice`): set when Connect can send a roll (`sendDiceResult`). */
+  readonly diceAvailable?: true;
+  /** Throws the roll on the board (one still settling is dropped, unsent); false when there are no dice or no scene. */
+  throwDice?(request: PlayerDiceRequest): boolean;
+}
+
+/** What the board throws: dice by kind, the modifier, and the sheet roll it is for, handed back with the result unchanged. */
+export interface PlayerDiceRequest {
+  dice: Partial<Record<'d4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100', number>>;
+  modifier: number;
+  advantage?: 'advantage' | 'disadvantage';
+  label?: string;
+  colors?: Partial<Record<'d4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100', string>>;
+  sheet?: { tokenId: string; roll: SheetRollRef };
 }
 
 export interface PlayerBoardFactory {

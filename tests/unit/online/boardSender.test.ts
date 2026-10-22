@@ -16,6 +16,7 @@ import type { ClientTransport, PeerLink } from '../../../src/app/online/transpor
 import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { emptySceneState, TAVERN_MAP, viewWithViewport, FakeViewport } from './presentedFixtures';
 import { pathPresenter, pathTabs } from './hubPath';
+import type { OfferedDiceRules } from '../../../src/app/online/tools/toolMessages';
 
 const LOOK: BoardLook = {
   wallHeight: () => null, wallMaterial: () => null, doorProp: () => null, lightHeight: () => null,
@@ -43,7 +44,7 @@ function fakeBoard(available = true) {
 
 const wall = (id: string, closed: boolean) => ({ id, type: 'door', p1: { x: 100, y: 100 }, p2: { x: 170, y: 100 }, closed });
 
-function world(board: ReturnType<typeof fakeBoard> | null) {
+function world(board: ReturnType<typeof fakeBoard> | null, diceRules?: (mapPath: string | null) => OfferedDiceRules) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   const gm = new GmSession(network.host('gm'), { title: 'Vault', onJoinRequest: (p) => requests.push(p), onRequestClosed: () => {}, onPlayersChanged: () => {} });
@@ -54,7 +55,7 @@ function world(board: ReturnType<typeof fakeBoard> | null) {
   const tabs = pathTabs(presented);
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: () => {}, hash: nodeHash });
   const hub = new SceneHub({ tabs, assignments: new SceneAssignments(), session: gm, presented, settings, assets, notify: () => {}, ...(board ? { board: board.source } : {}) });
-  const sender = new BoardSender({ session: gm, projection: hub, board: board?.source ?? null });
+  const sender = new BoardSender({ session: gm, projection: hub, board: board?.source ?? null, ...(diceRules ? { diceRules } : {}) });
   hub.start();
   sender.start();
   const state = emptySceneState();
@@ -113,6 +114,38 @@ describe('BoardSender', () => {
     board.setAvailable(false);
     await vi.advanceTimersByTimeAsync(0);
     expect(w.of('ben', 'board-offer').at(-1)).toMatchObject({ available: false });
+  });
+
+  it("offers dice results with the rules of the player's map when the GM takes them, and again when the board comes and goes", async () => {
+    const savage: OfferedDiceRules = { defaultRoll: '1d6', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 1, lowFaces: 0 } };
+    const diceRules = vi.fn((_mapPath: string | null) => savage);
+    const board = fakeBoard();
+    const w = world(board, diceRules);
+    w.presented.present(w.view, w.tavern);
+    await vi.advanceTimersByTimeAsync(0);
+    await w.join('anna');
+    expect(w.of('anna', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true, diceRules: savage }]);
+    expect(diceRules).toHaveBeenLastCalledWith(TAVERN_MAP);
+    board.setAvailable(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.of('anna', 'board-offer').at(-1)).toEqual({ v: 1, type: 'board-offer', available: false, diceResults: true, diceRules: savage });
+  });
+
+  it('offers dice results without rules when they cannot be read, and keeps offering to later players', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const w = world(fakeBoard(), () => { throw new Error('no rules'); });
+    await w.join('anna');
+    await w.join('ben');
+    expect(w.of('anna', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true }]);
+    expect(w.of('ben', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true }]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('offers rules it can vouch for only: rules that would not pass the check go as the defaults', async () => {
+    const w = world(fakeBoard(), () => ({ defaultRoll: '', crit: 'natural' }));
+    await w.join('anna');
+    expect(w.of('anna', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true, diceRules: { defaultRoll: '1d20', crit: 'natural' } }]);
   });
 
   it('only a player who asked gets the board extras of its scene, and stops getting them when it stops asking', async () => {

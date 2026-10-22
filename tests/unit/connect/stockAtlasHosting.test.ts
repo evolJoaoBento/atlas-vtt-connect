@@ -89,13 +89,15 @@ describe('hosting on a stock Atlas through the stand-in', () => {
   });
 
   /** A lit scene as a stock Atlas 0.8.0 lights it (real sight, light and perception), with `perception` deciding which tokens the players' frame shows. */
-  async function litHosting(perception: Record<string, string>) {
+  async function litHosting(perception: Record<string, string>, atlas091 = false) {
     const hosting = stockHosting();
     const { connect, join, a, presented, atlas } = hosting;
-    (atlas.settingsService as unknown as { isExperimentalOn: (id: string) => boolean }).isExperimentalOn = (id) => id === 'dynamicLighting';
+    // Atlas 0.9.1 has no lighting experiment: asked about it, it says off whatever the scene. Before, it was switched on.
+    (atlas.settingsService as unknown as { isExperimentalOn: (id: string) => boolean }).isExperimentalOn = (id) => !atlas091 && id === 'dynamicLighting';
+    if (atlas091) Object.assign(atlas, { manifest: { version: '0.9.1' } });
     const controller = new FakeController({ enabled: true, current: true, sight: structuredClone(REAL.sight), ambient: structuredClone(REAL.ambient), reaches: structuredClone(REAL.reaches) });
     Object.assign(a.view.renderer, {
-      lightingFeature: { controller },
+      ...(atlas091 ? { lighting: controller } : { lightingFeature: { controller } }),
       getTokenRenderer: () => ({ playerFramePerception: () => (id: string) => perception[id] }),
     });
     await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
@@ -111,6 +113,14 @@ describe('hosting on a stock Atlas through the stand-in', () => {
   it("sends the tokens the players' frame shows of a lit scene, and the darkness Atlas's lighting gives", async () => {
     const ids = Object.keys(realScene.objects.tokens);
     const { received } = await litHosting({ [ids[0]!]: 'seen', [ids[1]!]: 'unseen' });
+    const snapshot = received.find((message) => message.type === 'scene-snapshot');
+    expect(snapshot).toBeDefined();
+    expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toHaveLength(1);
+  });
+
+  it("on Atlas 0.9.1 (lighting standard, no experiment) still sends only the tokens the players' frame shows of a lit scene", async () => {
+    const ids = Object.keys(realScene.objects.tokens);
+    const { received } = await litHosting({ [ids[0]!]: 'seen', [ids[1]!]: 'unseen' }, true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot');
     expect(snapshot).toBeDefined();
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toHaveLength(1);

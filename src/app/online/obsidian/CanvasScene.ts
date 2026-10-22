@@ -6,7 +6,7 @@
  * remote view; it needs nothing of Atlas's map.
  */
 import { SheetView } from '../../../../online-client/sheetView.mts';
-import type { TokenSheet } from '../tools/sheets';
+import type { SheetRollRef, TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { PinNoteAnswer } from '../tools/pinNotes';
@@ -15,24 +15,27 @@ import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import { BoardSceneView } from './BoardSceneView';
-import type { PlayerBoardFactory } from './playerBoardContract';
+import type { PlayerBoardFactory, PlayerDiceRequest } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 import { PageToolbar } from '../../../../online-client/toolbar.mts';
-import type { PlayerSessionState } from '../PlayerSession';
+import type { BoardDiceOffer, PlayerSessionState } from '../PlayerSession';
+import { RateLimit } from '../rateLimit';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
-import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
+import type { DiceSelection } from '@atlas-vtt/shared/rules';
+import { DICE_LIMITS, type DiceLogEntry, type PhysicalRoll, type PlayerLaser } from '../tools/toolMessages';
 import type { ViewSurface } from '../view/ViewSurface';
 import { createCanvasSurface } from '../view/canvasSurface';
 import { createMiniLayer } from '../view/minis/miniLayer';
 import type { SceneDom } from './canvasSceneDom';
 import type { OnlineJoinService } from './OnlineJoinService';
 import type { OnlineSceneControls, OnlineSceneSink } from './onlineJoinTypes';
+import { sheetThrow } from './onlineDice';
 import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -63,6 +66,10 @@ export class CanvasScene implements OnlineSceneSink {
   /** The player wants the board when it can be shown (the 2D/3D button). */
   private wantsBoard = true;
   private offered = false;
+  /** The GM takes dice thrown on the board (`diceResults`), with the rules of the player's map; null when it does not. */
+  private diceOffer: BoardDiceOffer | null = null;
+  /** Throws on the board, at most as many a second as the GM takes rolls. */
+  private readonly throwLimit = new RateLimit(DICE_LIMITS.rollsPerSecond);
   private board: BoardExtras | null = null;
   private gmBoardCamera: BoardCamera | null = null;
   private sheetEntries: readonly TokenSheet[] = [];
@@ -91,7 +98,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.view = this.makeMap();
     this.tray = new DiceTrayView({
       root: dom.diceTray,
-      roll: (dice, modifier) => service.sendDiceRoll(dice, modifier),
+      roll: (dice, modifier) => this.rollDice(dice, modifier),
       onClose: () => this.setDiceOpen(false),
     });
 
@@ -103,7 +110,7 @@ export class CanvasScene implements OnlineSceneSink {
     });
     this.sheetView = new SheetView({
       panel: dom.sheetPanel, body: dom.sheetBody, tabs: dom.sheetTabs, closeButton: dom.sheetClose, toggleButton: dom.sheetButton,
-      onRoll: (tokenId, roll) => service.sendSheetRoll(tokenId, roll),
+      onRoll: (tokenId, roll) => this.rollSheet(tokenId, roll),
       ...(options.active ? { active: options.active } : {}),
       doc,
     });
@@ -129,7 +136,7 @@ export class CanvasScene implements OnlineSceneSink {
       followGm: () => this.map?.followGm(),
       fitMap: () => this.map?.fitMap(),
       reconnect: () => { service.reconnect(); },
-      rollDice: (dice, modifier) => (service.sendDiceRoll(dice, modifier) ? null : rollRefusal(this.state)),
+      rollDice: (dice, modifier) => (this.rollDice(dice, modifier) ? null : rollRefusal(this.state)),
     };
     const { signal } = this.listeners;
     dom.reconnect.addEventListener('click', () => this.controls.reconnect(), { signal });
@@ -158,6 +165,8 @@ export class CanvasScene implements OnlineSceneSink {
 
   session(state: PlayerSessionState): void {
     this.state = state;
+    // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
+    if (state.status !== 'admitted') this.diceOffer = null;
     this.chooseView();
     // Only an admitted player drags tokens and uses the tools: reconnecting or ended cancels a gesture.
     this.map?.setConnected(state.status === 'admitted');
@@ -239,9 +248,10 @@ export class CanvasScene implements OnlineSceneSink {
     this.map?.setSheets(entries);
   }
 
-  /** Whether the GM can send Tabletop's board of the scene. */
-  boardOffer(available: boolean): void {
+  /** Whether the GM can send Tabletop's board of the scene, and whether it takes dice thrown on it. */
+  boardOffer(available: boolean, dice?: BoardDiceOffer): void {
     this.offered = available;
+    this.diceOffer = dice ?? null;
     this.chooseView();
   }
 
@@ -330,6 +340,10 @@ export class CanvasScene implements OnlineSceneSink {
       sendPing: (x, y) => service.sendPing(x, y),
       sendTemplate: (change) => service.sendTemplate(change),
       ...(service.sendNoteRequest ? { requestNote: (pinId: string) => service.sendNoteRequest?.(pinId) ?? false } : {}),
+      ...(service.sendDiceResult ? {
+        sendDiceResult: (result: PhysicalRoll) => service.sendDiceResult?.(result) ?? false,
+        diceRules: () => this.diceOffer?.rules ?? null,
+      } : {}),
       onToolsChange: () => this.syncToolbar(),
       hoverCard: dom.hoverCard,
       statblockPreview: dom.statblockPreview,
@@ -391,6 +405,39 @@ export class CanvasScene implements OnlineSceneSink {
     }
     view.measure();
     this.syncToolbar();
+  }
+
+  /**
+   * The board that throws the player's dice: the 3D board with dice, while the player is in and the GM takes thrown
+   * dice; null otherwise, so a roll pressed while reconnecting is refused as the tray refuses it, not thrown and lost.
+   */
+  private diceBoard(): BoardSceneView | null {
+    const admitted = this.state?.status === 'admitted';
+    return admitted && this.view instanceof BoardSceneView && this.diceOffer && this.view.throwsDice ? this.view : null;
+  }
+
+  /** A roll from the tray: thrown on the board where it can be, else rolled by the GM; false when it did not go. */
+  private rollDice(dice: DiceSelection, modifier: number): boolean {
+    return this.throwOr({ dice, modifier }, () => this.options.service.sendDiceRoll(dice, modifier));
+  }
+
+  /** A roll from the player's sheet: its dice thrown on the board where it can be, else rolled by the GM. */
+  private rollSheet(tokenId: string, roll: SheetRollRef): boolean {
+    const send = (): boolean => this.options.service.sendSheetRoll(tokenId, roll);
+    const entry = this.diceBoard() ? this.sheetEntries.find((candidate) => candidate.tokenId === tokenId) : undefined;
+    const thrown = entry ? sheetThrow(entry, roll, this.diceOffer?.rules ?? null) : null;
+    return thrown ? this.throwOr({ ...thrown, sheet: { tokenId, roll } }, send) : send();
+  }
+
+  /**
+   * Throws `request` on the board, refused (false) beyond the rolls a second the GM takes; the GM rolls it instead
+   * (`fallback`) where there is no board to throw on, or the board cannot throw now, so no roll is lost.
+   */
+  private throwOr(request: PlayerDiceRequest, fallback: () => boolean): boolean {
+    const board = this.diceBoard();
+    if (!board) return fallback();
+    if (!this.throwLimit.allow('', (this.options.now ?? Date.now)())) return false;
+    return board.throwDice(request) || fallback();
   }
 
   private setDiceOpen(open: boolean): void {

@@ -238,6 +238,23 @@ describe('CanvasSceneView', () => {
     expect(view.onlineControls()!.rollDice({ d20: 1 }, 0)).toBe("The GM hasn't let you in yet.");
   });
 
+  it('without the 3D board a GM that takes thrown dice still rolls the tray and the sheet', async () => {
+    const w = world();
+    const { view } = w.open();
+    await view.onOpen();
+    const sheetRolls = vi.spyOn(w.service, 'sendSheetRoll').mockReturnValue(true);
+    const results = vi.spyOn(w.service, 'sendDiceResult');
+    const sink = w.sinks[0]!;
+    sink.session(admitted);
+    sink.boardOffer?.(true, { rules: null });
+    sink.sheets?.([{ tokenId: 't1', name: 'Anna', resources: [], sheet: { name: 'Anna', subtitle: null, ac: null, hp: null, speed: null, stats: [10, 14, 10, 10, 10, 10], saves: [], skills: [], lines: [], sections: [] } }]);
+    expect(view.onlineControls()!.rollDice({ d20: 1 }, 2)).toBeNull();
+    expect(w.sent.rolls).toEqual([[{ d20: 1 }, 2]]);
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Roll DEX check"]')!.click();
+    expect(sheetRolls).toHaveBeenCalledWith('t1', { kind: 'check', index: 1 });
+    expect(results).not.toHaveBeenCalled();
+  });
+
   it('lists the dice log and shows the own roll as a result card', async () => {
     const w = world();
     const { view } = w.open();

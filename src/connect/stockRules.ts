@@ -8,9 +8,13 @@
  *   stored settings. Resources a collection never stored read as Atlas's HP, which players do not see by default.
  * - Neither (no view, an index not loaded yet, an Atlas that keeps them elsewhere): Atlas's defaults.
  *
+ * Dice rules read first from the dice tool of a view showing the map (`getToolController().getDiceTool().getDiceRules()`:
+ * the dice set Atlas's own toolbar rolls there), else the collection's stored `dice`, else the defaults.
+ *
  * Everything read is checked and copied: a stock Atlas's objects are its own, never handed on.
  */
-import type { ConditionDefinition, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
+import type { ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
+import { isDieType } from '@atlas-vtt/shared/rules';
 
 /** A map view as the rules read it. */
 export interface RulesView {
@@ -86,6 +90,52 @@ function readInitiative(value: unknown): InitiativeRules | null {
   });
 }
 
+const CRITS: readonly unknown[] = ['natural', 'roll-under', 'doubles', 'high-total', 'none'];
+const isFaceCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
+
+/** One dice group, `NdS`, of a die Atlas rolls. */
+const isDiceGroup = (value: unknown): value is string => {
+  const match = typeof value === 'string' ? /^(\d*)d(\d+)$/.exec(value) : null;
+  return match !== null && (match[1] === '' || Number(match[1]) >= 1) && isDieType(`d${Number(match[2])}`);
+};
+
+/** `NdS` of a dice set's groups (`[{count, sides}]`); null for mixed dice, which have no one default die. */
+function groupsRoll(groups: unknown[]): string | null {
+  let count = 0;
+  let sides: unknown = null;
+  for (const group of groups) {
+    if (!isObject(group) || !isFaceCount(group.count) || group.count < 1) return null;
+    if (sides !== null && group.sides !== sides) return null;
+    sides = group.sides;
+    count += group.count;
+  }
+  return count > 0 && typeof sides === 'number' ? `${count}d${sides}` : null;
+}
+
+/**
+ * Dice rules as Atlas stores them, a collection's `dice` (`defaultRoll`) or a dice set's (`dice: [{count, sides}]`),
+ * each field it cannot read as the default's; an explode rule it cannot read is dropped.
+ */
+function readDice(value: unknown, defaults: DiceRules): DiceRules | null {
+  if (!isObject(value)) return null;
+  const written = Array.isArray(value.dice) ? groupsRoll(value.dice) : value.defaultRoll;
+  const rules: { -readonly [K in keyof DiceRules]: DiceRules[K] } = {
+    defaultRoll: isDiceGroup(written) ? written : defaults.defaultRoll,
+    crit: CRITS.includes(value.crit) ? value.crit as DiceRules['crit'] : defaults.crit,
+  };
+  const { explode } = value;
+  if (isObject(explode) && (explode.dice === 'default' || explode.dice === 'all') && typeof explode.repeats === 'boolean'
+    && isFaceCount(explode.highFaces) && isFaceCount(explode.lowFaces)) {
+    rules.explode = Object.freeze({ dice: explode.dice, repeats: explode.repeats, highFaces: explode.highFaces, lowFaces: explode.lowFaces });
+  }
+  return Object.freeze(rules);
+}
+
+/** The dice set a view's dice tool rolls for the map it shows. */
+function toolDice(view: RulesView): unknown {
+  return call(call(call(view.serviceManager, 'getToolController'), 'getDiceTool'), 'getDiceRules');
+}
+
 /** The collection sync of a view's token renderer: Atlas's own resources and conditions for the map it shows. */
 function collectionSyncOf(view: RulesView): Rec | null {
   const renderer = call(call(view.serviceManager, 'getRendererService'), 'getRenderer');
@@ -117,12 +167,16 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
   const conditions = (sync ? readList(call(sync, 'conditions'), readCondition, MAX_CONDITIONS) : null)
     ?? (stored ? readList(stored.settings.conditions, readCondition, MAX_CONDITIONS) : null);
   const initiative = stored ? readInitiative(stored.settings.initiative) : null;
-  if (!stored && !resources && !conditions) return defaults;
+  // A dice set the tool cannot give a default roll for (mixed dice) takes the collection's stored one before the defaults.
+  const storedDice = stored ? readDice(stored.settings.dice, defaults.dice) : null;
+  const dice = (showing ? readDice(toolDice(showing), storedDice ?? defaults.dice) : null) ?? storedDice;
+  if (!stored && !resources && !conditions && !dice) return defaults;
   return Object.freeze({
     ...defaults,
     collectionId: stored?.collectionId ?? null,
     resources: resources ?? defaults.resources,
     conditions: conditions ?? defaults.conditions,
     initiative: initiative ?? defaults.initiative,
+    dice: dice ?? defaults.dice,
   });
 }

@@ -82,6 +82,34 @@ describe('the player side of the 3D board', () => {
     expect(w.service.boardOffered()).toBe(true);
   });
 
+  it("a GM that takes thrown dice: its offer and rules reach a tab that attaches later, and the player's throw reaches the GM", async () => {
+    const w = world();
+    const id = await w.join();
+    const roll = { rolls: [{ die: 'd20' as const, value: 7 }], modifier: 2 };
+    await w.send(id, { v: 1, type: 'board-offer', available: true });
+    expect(w.service.sendDiceResult(roll)).toBe(false);
+    const rules = { defaultRoll: '2d6', crit: 'doubles' as const };
+    await w.send(id, { v: 1, type: 'board-offer', available: true, diceResults: true, diceRules: rules });
+    const offers: unknown[] = [];
+    w.service.attach({ ...sink().value, boardOffer: (...args) => { offers.push(args); } });
+    expect(offers).toEqual([[true, { rules }]]);
+    expect(w.service.sendDiceResult(roll)).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.fromPlayer.filter((message) => message.type === 'dice-result')).toEqual([{ v: 1, type: 'dice-result', ...roll }]);
+  });
+
+  it('a dropped link forgets the dice offer: a tab that attaches while reconnecting gets the board offer without dice', async () => {
+    const w = world();
+    const id = await w.join();
+    await w.send(id, { v: 1, type: 'board-offer', available: true, diceResults: true });
+    const gmLinks = (w.gm as unknown as { links: Map<unknown, unknown> }).links;
+    ([...gmLinks.keys()][0] as { close(): void }).close();
+    expect(w.service.state?.status).toBe('connecting');
+    const offers: unknown[] = [];
+    w.service.attach({ ...sink().value, boardOffer: (...args) => { offers.push(args); } });
+    expect(offers).toEqual([[true, undefined]]);
+  });
+
   it('a board in parts reaches the tab once, whole; an older seq\'s late part is dropped', async () => {
     const w = world();
     const id = await w.join();

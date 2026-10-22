@@ -97,6 +97,17 @@ describe('players\' own sheets', () => {
     expect(w.rollFor).not.toHaveBeenCalled();
   });
 
+  it("names a roll of the player's sheet from the GM's own copy, and nothing for a token they do not control or a roll not there", () => {
+    const w = world();
+    w.control.set('hero', 'p1', true);
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'text', section: 0, item: 0, index: 1, text: '1d8 + 3' })).toBe('Sword');
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'check', index: 1 })).toBe('DEX check');
+    expect(w.host.rollLabel(BEN, 'hero', { kind: 'check', index: 1 })).toBeNull();
+    expect(w.host.rollLabel(ANA, 'ogre', { kind: 'check', index: 1 })).toBeNull();
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'save', index: 0 })).toBeNull();
+    expect(w.rollFor).not.toHaveBeenCalled();
+  });
+
   it("sends Atlas's card beside the text sheet, and rolls only what the card it drew holds", () => {
     const card: SheetCard = {
       html: '<div class="atlas-statblock"><span data-connect-roll="0">Claws</span></div>', css: '', variables: {},

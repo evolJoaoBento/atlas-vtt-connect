@@ -3,6 +3,8 @@ import type { AtlasExtension, Character, DiceApi, LasersApi, SettingsApi, Tokens
 import type { OptionalParts } from '../hostedSession';
 import { TokenControlHost } from '../control/TokenControlHost';
 import { DiceHost, foldedRequest, SHEET_AWARE_DICE } from '../tools/DiceHost';
+import { DEFAULT_DICE_RULES, offeredDiceRules } from '../tools/physicalRolls';
+import type { OfferedDiceRules } from '../tools/toolMessages';
 import { LaserRelay } from '../tools/LaserRelay';
 import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
@@ -15,10 +17,25 @@ export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['
   return ({ session, projection }) => new TokenControlHost({ session, projection, tokens });
 }
 
-/** Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log. */
-export function diceHostPart(dice: DiceApi): NonNullable<OptionalParts['dice']> {
+/** The dice rules of the collection holding a map, as the GM offers them and judges players' physical rolls by; Atlas's defaults when they cannot be read. */
+export function offeredRulesOf(atlas: Pick<AtlasExtension, 'rules'>): (mapPath: string | null) => OfferedDiceRules {
+  return (mapPath) => {
+    try {
+      return offeredDiceRules(atlas.rules.forMap(mapPath).dice);
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Could not read the dice rules of a map; using the defaults:', error);
+      return DEFAULT_DICE_RULES;
+    }
+  };
+}
+
+/**
+ * Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log.
+ * With `rules`, players' physical rolls are judged by them and published into that log.
+ */
+export function diceHostPart(dice: DiceApi, rules?: (mapPath: string | null) => OfferedDiceRules): NonNullable<OptionalParts['dice']> {
   return ({ session, projection }) => new DiceHost({
-    session, projection,
+    session, projection, ...(rules ? { rules } : {}),
     // Connect's stock stand-in hands the ability and the side to Atlas's dice tool; an Atlas API takes neither.
     roll: (request) => dice.roll(SHEET_AWARE_DICE.has(dice) ? request : foldedRequest(request)),
     feed: { subscribe: (listener) => dice.onRolled(listener), publish: (result) => { dice.publish(result); } },
