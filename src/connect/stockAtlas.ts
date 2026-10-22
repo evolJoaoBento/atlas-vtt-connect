@@ -99,6 +99,8 @@ interface StockSettings {
 interface StockPlugin {
   settingsService?: StockSettings;
   presentedScene?: StockPresentedScene;
+  /** Obsidian's copy of the plugin's manifest: its version. */
+  manifest?: { version?: unknown };
 }
 
 const isObj = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -554,8 +556,23 @@ function watchTokens(app: App, events: Events, listener: () => void): Disposer {
   };
 }
 
-/** Whether Atlas's dynamic lighting experiment is on; null when its settings cannot be read. */
-function dynamicLighting(service: StockSettings): boolean | null {
+/**
+ * Whether this Atlas lights scenes as standard: 0.9.1 made dynamic lighting no longer an experiment (a pre-release of
+ * 0.9.1 counts too: calling lighting on when Atlas has none built leaves a lit scene dark, never shown).
+ */
+export function lightingIsStandard(version: unknown): boolean {
+  const parts = typeof version === 'string' ? /^(\d+)\.(\d+)\.(\d+)/.exec(version) : null;
+  if (!parts) return false;
+  const [major, minor, patch] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+  return major > 0 || minor > 9 || (minor === 9 && patch >= 1);
+}
+
+/**
+ * Whether Atlas's dynamic lighting is on: always from 0.9.1, where asking for the experiment says off; before, the
+ * experiment's switch. Null when its settings cannot be read.
+ */
+function dynamicLighting(service: StockSettings, plugin: StockPlugin): boolean | null {
+  if (lightingIsStandard(plugin.manifest?.version)) return true;
   const on = typeof service.isExperimentalOn === 'function' ? service.isExperimentalOn('dynamicLighting') : undefined;
   return typeof on === 'boolean' ? on : null;
 }
@@ -698,12 +715,12 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         tokens: stockTokensApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
-          dynamicLighting: () => dynamicLighting(service),
+          dynamicLighting: () => dynamicLighting(service, atlasPlugin),
         }),
         lighting: stockLightingApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
-          dynamicLighting: () => dynamicLighting(service),
+          dynamicLighting: () => dynamicLighting(service, atlasPlugin),
           add: (dispose) => {
             disposers.add(dispose);
             return () => { disposers.delete(dispose); dispose(); };
