@@ -259,7 +259,7 @@ export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decode
 export function normalizePlayerName(name: unknown): string | null {
   if (typeof name !== 'string') return null;
   const cleaned = name
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '') // delete non-whitespace control chars
+    .replace(/[^\P{Cc}\t\n\r]/gu, '') // delete non-whitespace control chars
     .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '') // delete zero-width and bidi controls, so "G\u200BM" is "GM"
     .replace(/[\t\n\r]/g, ' ') // replace whitespace control chars with space
     .replace(/\s+/g, ' ') // collapse whitespace
