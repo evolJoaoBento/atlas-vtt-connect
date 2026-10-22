@@ -167,7 +167,9 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
   const conditions = (sync ? readList(call(sync, 'conditions'), readCondition, MAX_CONDITIONS) : null)
     ?? (stored ? readList(stored.settings.conditions, readCondition, MAX_CONDITIONS) : null);
   const initiative = stored ? readInitiative(stored.settings.initiative) : null;
-  const dice = (showing ? readDice(toolDice(showing), defaults.dice) : null) ?? (stored ? readDice(stored.settings.dice, defaults.dice) : null);
+  // A dice set the tool cannot give a default roll for (mixed dice) takes the collection's stored one before the defaults.
+  const storedDice = stored ? readDice(stored.settings.dice, defaults.dice) : null;
+  const dice = (showing ? readDice(toolDice(showing), storedDice ?? defaults.dice) : null) ?? storedDice;
   if (!stored && !resources && !conditions && !dice) return defaults;
   return Object.freeze({
     ...defaults,

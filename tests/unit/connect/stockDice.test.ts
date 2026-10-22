@@ -177,6 +177,23 @@ describe('dice on a stock Atlas', () => {
       expect(heard).toEqual([roll.id]);
     });
 
+    it("names a die's tag as stock Atlas reads it (colour, name) beside the API's names, and only a well-formed one", () => {
+      const a = fakeView('a', 'm');
+      const { api } = setup(a);
+      const emitted: DiceRollResult[] = [];
+      a.listeners.add((result) => emitted.push(result));
+      api.publish(rollOf('2d6', { rolls: [
+        { die: 'd6', value: 3, max: 6, color: '#ff0000', colorName: 'Fire' },
+        { die: 'd6', value: 4, max: 6, color: 'red', colorName: 'Bad‮name' },
+        { die: 'd6', value: 5, max: 6 },
+      ] as never }));
+      expect(emitted[0]?.rolls).toEqual([
+        { die: 'd6', value: 3, max: 6, color: '#ff0000', colorName: 'Fire', colour: '#ff0000', name: 'Fire' },
+        { die: 'd6', value: 4, max: 6, color: 'red', colorName: 'Bad‮name' },
+        { die: 'd6', value: 5, max: 6 },
+      ]);
+    });
+
     it('refuses what is not a roll of plain data, and options that are not { throw?: boolean }', () => {
       const { api } = setup(fakeView('a', 'm'));
       expect(() => api.publish({ id: 'x' } as never)).toThrow(/roll must be/);

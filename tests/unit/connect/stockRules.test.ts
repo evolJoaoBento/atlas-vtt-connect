@@ -98,6 +98,11 @@ describe("a stock Atlas map's dice rules", () => {
     expect(stockMapRules([throwing], MAP, DEFAULTS).dice).toEqual({ defaultRoll: '1d8', crit: 'none' });
   });
 
+  it("takes a mixed dice set's default die from the collection's stored dice, not the defaults", () => {
+    const rules = stockMapRules([withTool({ dice: [{ count: 2, sides: 6 }, { count: 1, sides: 8 }], crit: 'doubles' }, { dice: { defaultRoll: '2d6', crit: 'none' } })], MAP, DEFAULTS);
+    expect(rules.dice).toEqual({ defaultRoll: '2d6', crit: 'doubles' });
+  });
+
   it('reads each field it cannot as the default, and drops an explode rule it cannot read', () => {
     const rules = stockMapRules([withTool({ defaultRoll: 'lots', crit: 'sometimes', explode: { dice: 'all', repeats: 'yes', highFaces: 1, lowFaces: 0 } })], MAP, DEFAULTS);
     expect(rules.dice).toEqual({ defaultRoll: '1d20', crit: 'natural' });

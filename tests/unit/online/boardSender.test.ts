@@ -131,6 +131,17 @@ describe('BoardSender', () => {
     expect(w.of('anna', 'board-offer').at(-1)).toEqual({ v: 1, type: 'board-offer', available: false, diceResults: true, diceRules: savage });
   });
 
+  it('offers dice results without rules when they cannot be read, and keeps offering to later players', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const w = world(fakeBoard(), () => { throw new Error('no rules'); });
+    await w.join('anna');
+    await w.join('ben');
+    expect(w.of('anna', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true }]);
+    expect(w.of('ben', 'board-offer')).toEqual([{ v: 1, type: 'board-offer', available: true, diceResults: true }]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('offers rules it can vouch for only: rules that would not pass the check go as the defaults', async () => {
     const w = world(fakeBoard(), () => ({ defaultRoll: '', crit: 'natural' }));
     await w.join('anna');

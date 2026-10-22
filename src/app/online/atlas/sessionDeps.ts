@@ -59,6 +59,7 @@ export function diceLookSource(atlas: Pick<AtlasExtension, 'rules' | 'on'>, dice
  */
 export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs, statblocks }: OptionalNamespaces): AtlasSessionDeps {
   const diceLooks = diceLookSource(atlas, dice);
+  const diceRules = offeredRulesOf(atlas);
   return {
     presented: presentedSource(atlas),
     views: atlas.views,
@@ -76,7 +77,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
     // Players' physical rolls are judged by the rules the board offer tells them.
-    ...(dice ? { dice: diceHostPart(dice, offeredRulesOf(atlas)), diceRules: offeredRulesOf(atlas) } : {}),
+    ...(dice ? { dice: diceHostPart(dice, diceRules), diceRules } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
     templates: templateHostPart(lasers, (mapPath) => atlas.rules.forMap(mapPath).measurement.coneAngle),

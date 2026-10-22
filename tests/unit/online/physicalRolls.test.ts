@@ -108,6 +108,11 @@ describe('physicalRollResult', () => {
       expect(() => physicalRollResult(roll([die('d6', 4), die('d6', 5, { negative: true })]), D20, 'Anna')).toThrow();
     });
 
+    it('a die dropped by advantage earns no explosion, and a dropped die marked exploded is refused', () => {
+      expect(() => physicalRollResult(roll([die('d6', 6, { dropped: true }), die('d6', 4), die('d6', 2, { exploded: true })]), SAVAGE, 'Anna')).toThrow();
+      expect(() => physicalRollResult(roll([die('d6', 6), die('d6', 2, { exploded: true, dropped: true }), die('d6', 3)]), SAVAGE, 'Anna')).toThrow();
+    });
+
     it('does not ask for an explosion the throw never added (a roll stops adding dice at 20)', () => {
       expect(physicalRollResult(roll([die('d6', 6)]), SAVAGE, 'Anna').total).toBe(6);
     });

@@ -110,11 +110,23 @@ export class BoardSender implements SessionHandler {
     return this.options.board?.available() ?? false;
   }
 
-  /** The offer for `playerId`, with the dice rules of their scene's map where the GM takes physical rolls. */
+  /**
+   * The offer for `playerId`, with the dice rules of their scene's map where the GM takes physical rolls; rules that
+   * cannot be read are left out (the player throws by the defaults), never the offer.
+   */
   private offer(playerId: string, available: boolean): void {
+    this.options.session.send(playerId, { v: 1, type: 'board-offer', available, ...this.diceOffer(playerId) });
+  }
+
+  private diceOffer(playerId: string): { diceResults?: true; diceRules?: OfferedDiceRules } {
     const { diceRules } = this.options;
-    const dice = diceRules ? { diceResults: true as const, diceRules: offeredDiceRules(diceRules(this.options.projection.slotOf(playerId)?.mapPath || null)) } : {};
-    this.options.session.send(playerId, { v: 1, type: 'board-offer', available, ...dice });
+    if (!diceRules) return {};
+    try {
+      return { diceResults: true, diceRules: offeredDiceRules(diceRules(this.options.projection.slotOf(playerId)?.mapPath || null)) };
+    } catch (error) {
+      console.warn('[Atlas VTT Connect] Could not read the dice rules for a board offer; offering without them:', error);
+      return { diceResults: true };
+    }
   }
 
   private availabilityChanged(): void {

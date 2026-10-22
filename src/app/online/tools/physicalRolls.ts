@@ -76,7 +76,8 @@ export function totalOf(rolls: readonly CountedDie[], modifier: number): number 
  * Throws unless every `exploded` die was earned: an earlier die of its kind exploded under the rules, in the direction
  * its sign shows (down subtracts; up keeps the sign of the die it came from), and no die earned two. A die thrown for
  * an explosion may come anywhere after its die (Tabletop adds them as they land). An explosion earned but never thrown
- * is no reason to refuse: a roll stops adding dice at 20. A negative die no explosion threw is refused too.
+ * is no reason to refuse: a roll stops adding dice at 20. A negative die no explosion threw is refused too, and so is
+ * a dropped die marked exploded: a die set aside (advantage) earns no explosion.
  */
 function checkExplosions(rules: OfferedDiceRules, rolls: readonly PhysicalDie[]): void {
   const kind = defaultDieOf(rules);
@@ -85,6 +86,7 @@ function checkExplosions(rules: OfferedDiceRules, rolls: readonly PhysicalDie[])
   for (const die of rolls) {
     const earned = owed.get(die.die) ?? { adds: 0, subtracts: 0 };
     owed.set(die.die, earned);
+    if (die.exploded && die.dropped) throw new Error(`a dropped ${die.die} marked exploded`);
     if (die.exploded) {
       const side = die.negative ? 'subtracts' : 'adds';
       if (earned[side] === 0) throw new Error(`a ${die.die} marked exploded that no die of the roll exploded into`);
@@ -92,6 +94,7 @@ function checkExplosions(rules: OfferedDiceRules, rolls: readonly PhysicalDie[])
     } else if (die.negative) {
       throw new Error(`a ${die.die} that subtracts without an explosion`);
     }
+    if (die.dropped) continue;
     const direction = explosion(rules, die, die.die === kind);
     if (direction === 'down' || (direction === 'up' && die.negative)) earned.subtracts += 1;
     else if (direction === 'up') earned.adds += 1;
