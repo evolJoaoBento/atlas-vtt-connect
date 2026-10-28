@@ -71,6 +71,19 @@ describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it("keeps an unseen token's roll to its ability and result, as Atlas does: no name, no picture (Atlas 0.7.0)", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    const source = { type: 'statblock', tokenId: 'orc', tokenName: 'Orc', abilityName: 'Axe', tokenImagePath: 'atlas-vtt/assets/secret-orc.png' };
+    w.publish({ ...rollFormula('d20'), source } as never);
+    const sent = JSON.stringify(a.received);
+    for (const leaked of ['Orc', 'secret-orc', 'tokenImagePath', 'tokenName']) expect(sent).not.toContain(leaked);
+    // Atlas's own player window (`PlayerDiceToasts`) keeps the ability of a roll for a hidden token, and so does the log.
+    expect(w.logs(a).at(-1)?.entries[0]).toMatchObject({ name: 'GM', ability: 'Axe' });
+    w.finish();
+  });
+
   it('names a roll only from what players see: a fogged token or nameplates off make it "GM"', async () => {
     const w = toolsWorld();
     w.present();

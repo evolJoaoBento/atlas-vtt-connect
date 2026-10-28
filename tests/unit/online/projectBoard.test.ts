@@ -36,6 +36,16 @@ describe('projectBoard', () => {
     expect(extras).toMatchObject({ sceneId: 's1', ambient: 0.4, fogHeight: 2, wallThickness: 0.3, lighting: { enabled: true, ambient: 0.2, ambientColor: '#223344' } });
   });
 
+  it('a door under fog is not sent with its prop, and the same door in view is (Atlas 0.7.0: door icons under fog are hidden)', () => {
+    const asked: string[] = [];
+    const recording = { idFor: (path: string | null | undefined) => { if (path) asked.push(path); return path ? `id:${path}` : null; } };
+    const fogged = projectBoard(state([wall('d1', 'door', 600, { closed: true })]), 's1', leftHalf, {}, look, recording);
+    expect(fogged.walls).toEqual([]);
+    expect(asked).not.toContain('minis/door.glb');
+    const seen = projectBoard(state([wall('d1', 'door', 0, { closed: true })]), 's1', leftHalf, {}, look, recording);
+    expect(seen.walls[0]).toMatchObject({ type: 'door', door: { prop: 'id:minis/door.glb' } });
+  });
+
   it('a closed secret door is plain wall; opened it is a door; closed again plain wall', () => {
     const closed = projectBoard(state([wall('d1', 'secret-door', 0, { closed: true, direction: 'left', limited: true })]), 's1', all, {}, look, assets);
     expect(closed.walls).toEqual([{ id: 'd1', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: null, material: null }]);

@@ -9,7 +9,6 @@ import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
 import { resolvePinIcon } from '../view/pinIcons';
-import { badgeNumberInView, NO_INSTANCE_NUMBERS, numberTokensInView, type TokenInView } from './instanceNumbers';
 import type { AssetIds } from './sceneContracts';
 import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
@@ -118,7 +117,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // one kept beside the map (Atlas 0.9's `offMap`), which is no part of the map.
   const seen = projectRecord(onMapTokens(objects?.tokens), (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
   const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
-  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state, memo);
+  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state);
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
@@ -370,30 +369,40 @@ function projectMini(placement: MiniPlacement | undefined, context: ProjectionCo
   };
 }
 
+/** The art a token's look-alikes share: its image path, `''` for a token with none (Atlas groups by the value as it is). */
+const artOf = (token: { imagePath?: unknown }): string => (typeof token.imagePath === 'string' ? token.imagePath : '');
+
+/** How many tokens of the scene share each art, the hidden, fogged and kept-beside-the-map ones too. */
+function tokensByArt(tokens: Readonly<Record<string, TokenEntity>> | undefined): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const token of Object.values(tokens ?? {})) counts.set(artOf(token), (counts.get(artOf(token)) ?? 0) + 1);
+  return counts;
+}
+
+/** The number a token holds (`instanceNumber`, 1 where it has none), as a whole number the wire accepts. */
+function storedNumber(value: unknown): number {
+  return finiteOr(Math.trunc(finiteOr(value, 1)), 1, SCENE_RANGES.instance);
+}
+
 /**
- * The instance badges and ring size of the tokens players see, as Atlas's players' picture shows them
- * (`PlayerInstanceBadges`): look-alikes numbered among the tokens sent, each keeping its number while it stays in view.
+ * The instance badges and ring size of the tokens players see, by Atlas VTT 0.10.2's rule for its players' picture
+ * (`K2e`, AGPL-3.0-only): a token whose art
+ * two or more tokens of the scene share, counting those players cannot see, shows its own stored number. Nothing is
+ * numbered again for what players see, so players read the numbers the GM does.
  */
-function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput, memo: ProjectionMemo): Record<string, PlayerToken> {
+function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput): Record<string, PlayerToken> {
   const settings = state.tokenSettings;
   const ring = finiteOr(settings?.tokenRingSize, 1, SCENE_RANGES.ringScale);
-  const previous = memo.instances?.map === state.mapPath ? memo.instances.numbers : NO_INSTANCE_NUMBERS;
-  const inView: TokenInView[] = [];
-  for (const id of Object.keys(tokens)) {
-    const token = state.objects?.tokens?.[id];
-    if (token) inView.push({ id, art: typeof token.imagePath === 'string' ? token.imagePath : '', rank: finiteOr(token.instanceNumber, 1) });
-  }
-  const numbers = numberTokensInView(previous, inView);
-  memo.instances = { map: state.mapPath, numbers };
-  const badgesOn = settings?.showInstanceBadges ?? true;
+  const counts = (settings?.showInstanceBadges ?? true) ? tokensByArt(state.objects?.tokens) : null;
   let changed: Record<string, PlayerToken> | null = null;
   for (const [id, token] of Object.entries(tokens)) {
-    const number = badgeNumberInView(numbers, id, badgesOn);
+    const raw = state.objects?.tokens?.[id];
+    const number = counts && raw && (counts.get(artOf(raw)) ?? 0) >= 2 ? storedNumber(raw.instanceNumber) : null;
     if (number === null && ring === 1) continue;
     changed ??= { ...tokens };
     changed[id] = {
       ...token,
-      ...(number !== null ? { instance: finiteOr(number, 1, SCENE_RANGES.instance) } : {}),
+      ...(number !== null ? { instance: number } : {}),
       ...(ring !== 1 ? { ringScale: ring } : {}),
     };
   }

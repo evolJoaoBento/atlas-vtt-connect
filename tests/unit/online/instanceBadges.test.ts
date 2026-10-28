@@ -26,18 +26,50 @@ const instances = (scene: ReturnType<typeof projectForPlayers>): Record<string, 
   Object.fromEntries(Object.entries(scene.tokens).map(([id, token]) => [id, token.instance]));
 
 describe("Atlas's instance badges for players", () => {
-  it('numbers look-alikes players see by their rank, and leaves a lone token unnumbered', () => {
-    const memo = createProjectionMemo();
-    const scene = projectForPlayers(state([goblin('a', 140, 2), goblin('b', 280, 1), { ...goblin('c', 420), imagePath: 'atlas-vtt/assets/orc.png' }]), context, memo);
+  it("shows each look-alike's own stored number, and leaves a lone token unnumbered", () => {
+    const scene = projectForPlayers(state([goblin('a', 140, 2), goblin('b', 280, 1), { ...goblin('c', 420), imagePath: 'atlas-vtt/assets/orc.png' }]), context, createProjectionMemo());
     expect(instances(scene)).toEqual({ a: 2, b: 1, c: undefined });
     expect(isPlayerSceneBody(scene)).toBe(true);
   });
 
-  it('keeps a number while its token stays in view, as Atlas does, and drops badges with one look-alike left', () => {
+  it('shows the number the GM sees: stored numbers are never made up again for what players see', () => {
+    // 3 and 5 are the GM's numbers (others were removed); players read them as they are.
+    expect(instances(projectForPlayers(state([goblin('a', 140, 3), goblin('b', 280, 5)]), context, createProjectionMemo()))).toEqual({ a: 3, b: 5 });
+    // A token with no stored number shows 1, as Atlas draws it.
+    expect(instances(projectForPlayers(state([goblin('a', 140), goblin('b', 280, 2)]), context, createProjectionMemo()))).toEqual({ a: 1, b: 2 });
+    // Twice, with a token gone in between: nothing is kept or renumbered.
     const memo = createProjectionMemo();
-    projectForPlayers(state([goblin('a', 140), goblin('b', 280), goblin('c', 420)]), context, memo);
-    expect(instances(projectForPlayers(state([goblin('a', 140), goblin('c', 420)]), context, memo))).toEqual({ a: 1, c: 3 });
-    expect(instances(projectForPlayers(state([goblin('c', 420)]), context, memo))).toEqual({ c: undefined });
+    projectForPlayers(state([goblin('a', 140, 1), goblin('b', 280, 2), goblin('c', 420, 3)]), context, memo);
+    expect(instances(projectForPlayers(state([goblin('a', 140, 1), goblin('c', 420, 3)]), context, memo))).toEqual({ a: 1, c: 3 });
+  });
+
+  it('counts the look-alikes players cannot see, so a lone visible one still shows its number (Atlas 0.10.2)', () => {
+    const hiddenTwin = { ...goblin('h', 560, 2), isHidden: true } as Character;
+    const scene = projectForPlayers(state([goblin('a', 140, 1), hiddenTwin]), context, createProjectionMemo());
+    expect(Object.keys(scene.tokens)).toEqual(['a']);
+    expect(instances(scene)).toEqual({ a: 1 });
+    // The same for one kept beside the map.
+    const offMap = { ...goblin('o', 700, 2), offMap: true } as Character;
+    expect(instances(projectForPlayers(state([goblin('a', 140, 1), offMap]), context, createProjectionMemo()))).toEqual({ a: 1 });
+    // And one under fog: sent to no one, counted all the same.
+    const fogged = { ...goblin('f', 5000, 2) } as Character;
+    const scene2 = projectForPlayers(state([goblin('a', 140, 1), fogged]), { ...context, coverage: { revealsSome: (box: { x: number }) => box.x < 1000, within: () => ({ shows: () => true }) } as unknown as FogCoverage }, createProjectionMemo());
+    expect(Object.keys(scene2.tokens)).toEqual(['a']);
+    expect(instances(scene2)).toEqual({ a: 1 });
+  });
+
+  it('counts only the look-alikes of the same art', () => {
+    const orc = { ...goblin('o', 420, 1), imagePath: 'atlas-vtt/assets/orc.png', isHidden: true } as Character;
+    expect(instances(projectForPlayers(state([goblin('a', 140, 1), orc]), context, createProjectionMemo()))).toEqual({ a: undefined });
+  });
+
+  it('sends a whole number the player page accepts, whatever a note holds', () => {
+    const odd = (value: unknown): Character => ({ ...goblin('x', 140), instanceNumber: value } as unknown as Character);
+    for (const [stored, shown] of [[0, 1], [-4, 1], [2.9, 2], ['7', 7], ['many', 1], [123456, 9999], [null, 1], [Number.NaN, 1]] as Array<[unknown, number]>) {
+      const scene = projectForPlayers(state([odd(stored), goblin('b', 280, 1)]), context, createProjectionMemo());
+      expect(scene.tokens.x?.instance).toBe(shown);
+      expect(isPlayerSceneBody(scene)).toBe(true);
+    }
   });
 
   it("shows none when the map's badges are off", () => {

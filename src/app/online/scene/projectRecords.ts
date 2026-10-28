@@ -13,7 +13,6 @@ import {
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { isSceneId } from './sceneValidation';
 import { finitePoints, wirePoints } from './simplifyPoints';
-import type { InstanceNumbers } from './instanceNumbers';
 
 /**
  * Projections by GM record. Immer keeps unchanged records, so their projections
@@ -22,8 +21,6 @@ import type { InstanceNumbers } from './instanceNumbers';
 export interface ProjectionMemo {
   fog: WeakMap<FogOperation, PlayerFogOp | null>;
   drawings: WeakMap<DrawingStroke, PlayerDrawing | null>;
-  /** The look-alikes' numbers as the last projection gave them, and the map they belong to: a token keeps its number. */
-  instances?: { map: string | null; numbers: InstanceNumbers };
 }
 
 export function createProjectionMemo(): ProjectionMemo {
