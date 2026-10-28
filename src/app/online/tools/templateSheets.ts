@@ -152,8 +152,9 @@ class SheetSections {
     this.sections.push(this.current);
   }
 
-  add(name: string, desc: string): void {
+  add(name: string, desc: string, rollable = false): void {
     const item: SheetItem = { name: text(name, SHEET_LIMITS.name) ?? '', desc: text(desc, SHEET_LIMITS.desc) ?? '' };
+    if (rollable) item.rollable = true;
     if (!item.name && !item.desc) return;
     if (!this.current) {
       if (this.sections.length > 0) return;
@@ -299,7 +300,7 @@ function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: n
         // The dice it is rolled from where the value shows none ("45" rolled from "7d10 + 7").
         const dice = values.text(block.rollFrom);
         if (shown && dice && !/\d*d\d+/i.test(shown)) shown = `${shown} (${dice})`;
-        if (shown) out.add(label(), shown);
+        if (shown) out.add(label(), shown, block.rollable === true);
         break;
       }
       case 'metric': {
@@ -307,7 +308,7 @@ function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: n
           .map((key) => [values.field(key)?.label ?? '', values.text(key)] as const)
           .filter(([, shown]) => shown)
           .map(([name, shown]) => [name, shown].filter(Boolean).join(' '));
-        if (numbers.length > 0) out.add(typeof block.heading === 'string' ? block.heading : '', numbers.join(' | '));
+        if (numbers.length > 0) out.add(typeof block.heading === 'string' ? block.heading : '', numbers.join(' | '), block.rollable === true);
         break;
       }
       case 'tags':
@@ -316,7 +317,7 @@ function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: n
         const shown = block.type === 'pairs' && block.display === 'signed' && isObject(value)
           ? Object.entries(value).map(([key, bonus]) => `${key} ${typeof bonus === 'number' ? signed(bonus) : valueText(bonus)}`).join(', ')
           : values.text(block.field);
-        if (shown) out.add(label(), shown);
+        if (shown) out.add(label(), shown, block.type === 'pairs' && block.rollable === true);
         break;
       }
       case 'text': {
@@ -325,7 +326,7 @@ function addBlocks(blocks: unknown, values: Values, out: SheetSections, depth: n
         break;
       }
       case 'scores':
-        if (field) for (const line of tableText(values.read(block.field), field)) out.add(field.label, line);
+        if (field) for (const line of tableText(values.read(block.field), field)) out.add(field.label, line, block.rollable === true);
         break;
       case 'entries':
       case 'spells': {

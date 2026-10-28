@@ -6,7 +6,7 @@
  * disadvantage, both at once cancel, and a right-click offers the three. Its button shows only while the player has
  * sheets. Text only, never markup: everything comes from the GM. Shared with the Obsidian scene tab.
  */
-import { ABILITY_NAMES, modifierOf, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
+import { ABILITY_NAMES, modifierOf, rollableName, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
 import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
 import { iconElement } from './icons.mts';
 import { renderCard } from './cardView.mts';
@@ -299,10 +299,10 @@ export function sheetContent(entry: TokenSheet, doc: Document, roll: RollMaker, 
     section.items.forEach((item, itemIndex) => {
       const paragraph = el('p', 'sheet-item');
       if (item.name) paragraph.append(el('strong', '', `${item.name}. `));
-      for (const part of textParts(item.desc)) {
+      for (const part of textParts(item.desc, item.rollable)) {
         if ('roll' in part) {
           const ref: SheetRollRef = { kind: 'text', section: sectionIndex, item: itemIndex, index: part.roll, text: part.text };
-          paragraph.append(roll(ref, part.text, `${item.name || section.title}: ${part.formula}`, mayHaveAdvantage(part.formula)));
+          paragraph.append(roll(ref, part.text, `${rollableName(item, part.roll) || section.title}: ${part.formula}`, mayHaveAdvantage(part.formula)));
         } else paragraph.append(doc.createTextNode(part.text));
       }
       parts.push(paragraph);

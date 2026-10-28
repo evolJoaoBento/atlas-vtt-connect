@@ -50,6 +50,8 @@ export interface SheetBonus {
 export interface SheetItem {
   name: string;
   desc: string;
+  /** Set by a template block with `rollable`: its plain numbers roll, as Atlas rolls them (`rollableBonus`, below). */
+  rollable?: true;
 }
 
 export interface SheetSection {
@@ -251,17 +253,32 @@ export function toRollFormula(text: string): string {
   return text.replace(/\s+/g, '').replace(/^(?:ATK|Attack):/i, '').replace(/[−–]/g, '-').replace(/\+-/g, '-');
 }
 
-/** A trait's text cut into plain pieces and the rolls in it, in order; the same on the GM's side and the player's. */
-export function textParts(desc: string): TextPart[] {
+/** A number on its own, signed or not; a template block with `rollable` rolls it. */
+const PLAIN_NUMBER = new RegExp(String.raw`(?<![\w.+\-−–])[+\-−–]?\d{1,4}(?![\w.]|\s*d\d)`, 'g');
+/** Atlas's rule for a rollable number: `14` and `+14` add 14 to the dice set's default roll, `-2` and `−2` take 2 off, and `0` is `+0`. */
+function rollableBonus(shown: string): string {
+  const number = Number(shown.replace(/^[+\-−–]/, ''));
+  return /^[−–-]/.test(shown) && number !== 0 ? `-${number}` : `+${number}`;
+}
+
+/**
+ * A trait's text cut into plain pieces and the rolls in it, in order; the same on the GM's side and the player's. In a
+ * `rollable` item (a template block's `rollable` setting) a number on its own is a roll too, but only where the text
+ * holds no dice or bonus of its own, as Atlas's `rollable` stat leaves a cell that already has one alone.
+ */
+export function textParts(desc: string, rollable = false): TextPart[] {
   const parts: TextPart[] = [];
   let last = 0;
   let index = 0;
-  for (const match of desc.matchAll(DICE_PATTERN)) {
-    const at = match.index ?? 0;
-    if (at > last) parts.push({ text: desc.slice(last, at) });
-    parts.push({ text: match[0], roll: index, formula: toRollFormula(match[0]) });
+  const own = [...desc.matchAll(DICE_PATTERN)];
+  const matches = own.length > 0 || !rollable
+    ? own.map((match) => ({ at: match.index ?? 0, text: match[0], formula: toRollFormula(match[0]) }))
+    : [...desc.matchAll(PLAIN_NUMBER)].map((match) => ({ at: match.index ?? 0, text: match[0], formula: rollableBonus(match[0]) }));
+  for (const match of matches) {
+    if (match.at > last) parts.push({ text: desc.slice(last, match.at) });
+    parts.push({ text: match.text, roll: index, formula: match.formula });
     index += 1;
-    last = at + match[0].length;
+    last = match.at + match.text.length;
   }
   if (last < desc.length) parts.push({ text: desc.slice(last) });
   return parts;
@@ -286,7 +303,7 @@ export function sheetRollFormula(sheet: PlayerSheet, ref: SheetRollRef): string 
     case 'text': {
       const item = sheet.sections[ref.section]?.items[ref.item];
       if (!item) return null;
-      const part = textParts(item.desc).find((candidate) => 'roll' in candidate && candidate.roll === ref.index);
+      const part = textParts(item.desc, item.rollable).find((candidate) => 'roll' in candidate && candidate.roll === ref.index);
       // Never a roll other than the one clicked: a sheet that changed, or a page that cuts the text another way (an
       // older version, which sends no text), finds other text there, and nothing is rolled.
       return part && 'formula' in part && part.text === ref.text ? part.formula : null;
@@ -296,13 +313,32 @@ export function sheetRollFormula(sheet: PlayerSheet, ref: SheetRollRef): string 
   }
 }
 
+/**
+ * What the number a rollable item rolls is called, as Atlas names a rolled cell: the label before it in the same value
+ * ("Severe" in "Major 7 | Severe 14"); the item's own name where none stands there.
+ */
+export function rollableName(item: SheetItem, roll: number): string {
+  if (!item.rollable) return item.name;
+  // The parts together are the text, so what stands before the roll is every part ahead of it.
+  let before = '';
+  for (const part of textParts(item.desc, true)) {
+    if ('roll' in part && part.roll === roll) break;
+    before += part.text;
+  }
+  const label = before.split(/[|,;]/).pop()?.replace(/[:\s]+$/, '').trim() ?? '';
+  return label || item.name;
+}
+
 /** What a roll is called in the log: "Anna: Dagger", "Anna: DEX save". */
 export function sheetRollLabel(sheet: PlayerSheet, ref: SheetRollRef): string {
   switch (ref.kind) {
     case 'check': return `${ABILITY_NAMES[ref.index] ?? 'Check'} check`;
     case 'save': return `${sheet.saves[ref.index]?.label ?? 'Save'} save`;
     case 'skill': return sheet.skills[ref.index]?.label ?? 'Skill';
-    case 'text': return sheet.sections[ref.section]?.items[ref.item]?.name || 'Roll';
+    case 'text': {
+      const item = sheet.sections[ref.section]?.items[ref.item];
+      return (item && rollableName(item, ref.index)) || 'Roll';
+    }
     case 'card': return 'Roll';
   }
 }
@@ -344,7 +380,7 @@ function isPlayerSheet(value: unknown): value is PlayerSheet {
     && Array.isArray(value.sections) && value.sections.length <= SHEET_LIMITS.sections
     && value.sections.every((section) => isObject(section) && isText(section.title, 40) && Array.isArray(section.items)
       && section.items.length <= SHEET_LIMITS.items
-      && section.items.every((item) => isObject(item) && isText(item.name, SHEET_LIMITS.name) && isText(item.desc, SHEET_LIMITS.desc)));
+      && section.items.every((item) => isObject(item) && isText(item.name, SHEET_LIMITS.name) && isText(item.desc, SHEET_LIMITS.desc) && (item.rollable === undefined || item.rollable === true)));
 }
 
 function isSheetResource(value: unknown): value is SheetResource {

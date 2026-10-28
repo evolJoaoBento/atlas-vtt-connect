@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTokenSheets, sheetRollFormula } from '../../../src/app/online/tools/sheets';
+import { isTokenSheets, rollableName, sheetRollFormula, textParts, type SheetItem } from '../../../src/app/online/tools/sheets';
 import { buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, templateHidesFields, templateId } from '../../../src/app/online/tools/templateSheets';
 
 /** A Daggerheart-like adversary template a GM made in Atlas (issue #9), its labels renamed into Portuguese. */
@@ -177,5 +177,42 @@ describe("a template's players settings (Atlas 0.9's `players`)", () => {
     expect(templateHidesFields({ ...ADVERSARY, players: { atk: 'hidden' } })).toBe(true);
     expect(templateHidesFields({ ...ADVERSARY, players: { atk: 'gm-only' } })).toBe(true);
     expect(templateHidesFields(null)).toBe(false);
+  });
+
+  it("keeps a block's rollable setting, so a plain number rolls for a player as it does in Atlas", () => {
+    const blocks = [
+      { id: 'r1', type: 'stat', field: 'difficulty', look: 'run-in', rollable: true },
+      { id: 'r2', type: 'metric', heading: 'Thresholds', fields: ['major', 'severe'], rollable: true },
+      { id: 'r3', type: 'stat', field: 'atk', look: 'run-in' },
+    ];
+    const sheet = buildTemplateSheet({ ...ADVERSARY, header: { hidden: ['hp', 'description', 'level'] }, layout: { maxColumns: 1, blocks } }, NOTE)!;
+    const [difficulty, thresholds, plain] = sheet.sections[0]!.items as [SheetItem, SheetItem, SheetItem];
+    expect(difficulty).toMatchObject({ name: 'Difficulty', rollable: true });
+    expect(thresholds).toMatchObject({ rollable: true });
+    expect(plain.rollable).toBeUndefined();
+    expect(isTokenSheets([{ tokenId: 't', name: 'x', resources: [], sheet }])).toBe(true);
+    expect(sheetRollFormula(sheet, { kind: 'text', section: 0, item: 0, index: 0, text: difficulty.desc })).toBe(`+${difficulty.desc}`);
+    // A block without the setting rolls nothing from a bare number.
+    expect(sheetRollFormula(sheet, { kind: 'text', section: 0, item: 2, index: 0, text: plain.desc })).toBeNull();
+  });
+
+  it("rolls a rollable item's plain numbers as Atlas does, and leaves text with dice of its own alone", () => {
+    const rolls = (desc: string, rollable = true): Array<[string, string]> => textParts(desc, rollable).flatMap((part) => ('roll' in part ? [[part.text, part.formula] as [string, string]] : []));
+    expect(rolls('14')).toEqual([['14', '+14']]);
+    expect(rolls('-2')).toEqual([['-2', '-2']]);
+    expect(rolls('−2')).toEqual([['−2', '-2']]);
+    expect(rolls('0')).toEqual([['0', '+0']]);
+    expect(rolls('Major 7 | Severe 14')).toEqual([['7', '+7'], ['14', '+14']]);
+    expect(rolls('45 (7d10 + 7)')).toEqual([['7d10 + 7', '7d10+7']]);
+    expect(rolls('1.5')).toEqual([]);
+    expect(rolls('14', false)).toEqual([]);
+  });
+
+  it('names a rolled number by the label before it, as Atlas names a rolled cell', () => {
+    const item: SheetItem = { name: 'Thresholds', desc: 'Major 7 | Severe 14', rollable: true };
+    expect(rollableName(item, 0)).toBe('Major');
+    expect(rollableName(item, 1)).toBe('Severe');
+    expect(rollableName({ name: 'Difficulty', desc: '12', rollable: true }, 0)).toBe('Difficulty');
+    expect(rollableName({ name: 'Attack', desc: 'Claws: +5' }, 0)).toBe('Attack');
   });
 });
