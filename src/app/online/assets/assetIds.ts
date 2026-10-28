@@ -73,6 +73,16 @@ export function mimeForPath(path: string): AssetMime | null {
   return Object.hasOwn(MIME_BY_EXTENSION, extension) ? MIME_BY_EXTENSION[extension] ?? null : null;
 }
 
+/** What an animated map's file ends in (Atlas plays these as a map): players get a still of the first frame instead. */
+const VIDEO_EXTENSIONS: ReadonlySet<string> = new Set(['mp4', 'm4v', 'webm', 'ogv', 'mov']);
+
+/** Whether `path` is an animated map, a video: it is sent to players as a PNG still (`videoStill.ts`), never as the video. */
+export function isVideoPath(path: string): boolean {
+  const dot = path.lastIndexOf('.');
+  if (dot < 0 || dot < path.lastIndexOf('/')) return false;
+  return VIDEO_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
+}
+
 const EXTENSION_BY_MIME: Readonly<Record<AssetMime, string>> = {
   'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg', 'model/gltf-binary': 'glb',
 };

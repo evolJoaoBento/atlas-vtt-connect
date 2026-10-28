@@ -1,12 +1,16 @@
 /** The vault's images for the asset registry: sizes and times from Obsidian's file index, bytes with `readBinary`. */
 import { normalizePath, TFile, type App } from 'obsidian';
 import type { ImageFiles, ImageFileStat } from '../scene/sceneContracts';
+import { isVideoPath } from './assetIds';
+import { videoStill } from './videoStill';
 
 export function vaultImageFiles(app: App): ImageFiles {
   const fileAt = (path: string): TFile | null => {
     const file = app.vault.getAbstractFileByPath(normalizePath(path));
     return file instanceof TFile ? file : null;
   };
+  /** The still of each animated map as of the file's last change: asked for at every request, taken once. */
+  const stills = new Map<string, { mtime: number; bytes: Promise<ArrayBuffer> }>();
   return {
     stat: (path: string): ImageFileStat | null => {
       const file = fileAt(path);
@@ -15,7 +19,16 @@ export function vaultImageFiles(app: App): ImageFiles {
     read: async (path: string): Promise<ArrayBuffer> => {
       const file = fileAt(path);
       if (!file) throw new Error('The image is no longer in the vault');
-      return app.vault.readBinary(file);
+      if (!isVideoPath(path)) return app.vault.readBinary(file);
+      // An animated map: its first frame, read from the video where it lies, never the video itself.
+      const kept = stills.get(path);
+      // A copy each time: the bytes of a still may go to a transfer that takes them.
+      if (kept?.mtime === file.stat.mtime) return (await kept.bytes).slice(0);
+      const bytes = videoStill(activeDocument, app.vault.getResourcePath(file));
+      stills.set(path, { mtime: file.stat.mtime, bytes });
+      // A video that cannot give a frame is asked again next time, not remembered as failed.
+      bytes.catch(() => { if (stills.get(path)?.bytes === bytes) stills.delete(path); });
+      return (await bytes).slice(0);
     },
     onChange: (listener: (path: string) => void): (() => void) => {
       const { vault } = app;

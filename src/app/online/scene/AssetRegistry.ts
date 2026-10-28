@@ -6,7 +6,7 @@
  * `onChange` tells the broadcaster to project again. Paths never leave the
  * GM's machine. Imports nothing from Obsidian: the vault is an `ImageFiles`.
  */
-import { ASSET_LIMITS, mimeForPath, sha256Id, type AssetMime, type Hasher } from '../assets/assetIds';
+import { ASSET_LIMITS, isVideoPath, mimeForPath, sha256Id, type AssetMime, type Hasher } from '../assets/assetIds';
 import type { AssetFile, AssetIds, AssetInfo, ImageFiles } from './sceneContracts';
 
 export type { AssetFile, AssetIds, AssetInfo, ImageFiles, ImageFileStat } from './sceneContracts';
@@ -48,14 +48,16 @@ export class AssetRegistry implements AssetIds {
 
   idFor(path: string | null | undefined): string | null {
     if (this.disposed || typeof path !== 'string' || path.length === 0) return null;
-    const mime = mimeForPath(path);
+    // An animated map goes as the still the files give for it (a PNG), whatever the size of the video.
+    const video = isVideoPath(path);
+    const mime = mimeForPath(path) ?? (video ? 'image/png' : null);
     const stat = mime ? this.options.files.stat(path) : null;
     if (!mime || !stat) return null;
     const known = this.paths.get(path);
     if (known && known.mtime === stat.mtime && known.size === stat.size) return known.id;
     this.paths.set(path, { mtime: stat.mtime, size: stat.size, mime, id: null });
     if (known?.id && this.release(path, known.id)) this.emit();
-    if (stat.size > ASSET_LIMITS.fileBytes) this.tooLarge();
+    if (stat.size > ASSET_LIMITS.fileBytes && !video) this.tooLarge();
     else this.enqueue(path);
     return null;
   }
