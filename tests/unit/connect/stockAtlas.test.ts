@@ -27,6 +27,28 @@ describe('stock Atlas stand-in', () => {
     expect(api.has('tokens')).toBe(true);
   });
 
+  it("hands out how Atlas aligned the map: the grid's stretch, or the shown level's own alignment (Atlas 0.7.1, 0.10)", () => {
+    const { app, atlas, a } = setup();
+    const extension = stockAtlasApi(app, atlas).connect(fakeConnectPlugin(app));
+    const aligned = (): unknown => (extension.views.snapshot('view-a') as { mapAlignment?: unknown } | null)?.mapAlignment;
+    expect(aligned()).toBeNull();
+    const grid = { enabled: true, visible: true, type: 'square', size: 70, offsetX: 0, offsetY: 0, opacity: 0.5, lineType: 'solid', lineWidth: 1 };
+    a.scene.set({ grid: { ...grid, mapStretch: { x: 1.1, y: 1.2, rotation: 2 } } } as never);
+    expect(aligned()).toEqual({ x: 1.1, y: 1.2, rotation: 2 });
+    // A stretch outside Atlas's limits is no stretch, as Atlas draws such a map unstretched.
+    a.scene.set({ grid: { ...grid, mapStretch: { x: 3, y: 1 } } } as never);
+    expect(aligned()).toBeNull();
+    // Several levels: the shown one's alignment, its stretch times its scale, wins over the grid's.
+    a.scene.set({
+      grid: { ...grid, mapStretch: { x: 1.2, y: 1.2 } },
+      levels: [{ id: 'l1' }, { id: 'l2' }], viewedLevel: 'l2',
+      levelAlignments: { l2: { stretch: { x: 1, y: 1, rotation: 1 }, scale: 2, offset: { x: 30, y: 0 } } },
+    } as never);
+    expect(aligned()).toEqual({ x: 2, y: 2, rotation: 1, offset: { x: 30, y: 0 } });
+    a.scene.set({ viewedLevel: 'l1' } as never);
+    expect(aligned()).toEqual({ x: 1.2, y: 1.2 });
+  });
+
   it('lists views, reads a snapshot with its tab, and follows store changes', () => {
     const { app, atlas, a } = setup();
     const extension = stockAtlasApi(app, atlas).connect(fakeConnectPlugin(app));

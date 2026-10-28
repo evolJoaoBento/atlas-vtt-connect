@@ -75,6 +75,8 @@ export interface ViewSurface {
   circle(x: number, y: number, radius: number, style: ShapeStyle): void;
   /** Several open or closed paths stroked or filled as one shape: grid lines, hexes, ink. */
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void;
+  /** `image` drawn with its unit square mapped by `matrix` (`[a, b, c, d, e, f]`, as a canvas takes it): a map Atlas aligned turned or shifted. */
+  imageMatrix(image: SurfaceImage, matrix: readonly [number, number, number, number, number, number]): void;
   /** `image` stretched over the rectangle, clipped to `clip` when given. */
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void;
   /**

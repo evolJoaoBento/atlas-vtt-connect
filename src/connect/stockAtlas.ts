@@ -12,7 +12,8 @@
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { tabletopBoardViews } from './tabletopMinis';
-import { backgroundOfLevel, objectsOnLevel } from './stockLevels';
+import { backgroundOfLevel, objectsOnLevel, shownLevel } from './stockLevels';
+import { effectiveAlignment } from '../app/online/scene/mapPlacement';
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
@@ -51,6 +52,8 @@ interface StockSceneState {
   /** Atlas 0.10's levels (floors) and the one this view shows; an older Atlas has neither. */
   levels?: unknown;
   viewedLevel?: unknown;
+  /** Atlas 0.10's alignment of each level's map image, by level id. */
+  levelAlignments?: unknown;
   widgetSettings: SceneSnapshot['widgets']['settings'];
   widgetValues: SceneSnapshot['widgets']['values'];
   initiative: SceneSnapshot['initiative'];
@@ -187,6 +190,8 @@ function snapshot(view: StockView): SceneSnapshot {
     mapSize: Object.freeze(mapSize(view)),
     // A scene of several floors is sent as the one floor shown (Atlas 0.10), never all of them.
     background: backgroundOfLevel(state.background, state.levels, state.viewedLevel),
+    // How Atlas aligned that floor's map image (the grid's stretch, or the level's own alignment): players draw it so.
+    mapAlignment: effectiveAlignment(state.grid, state.levelAlignments, shownLevel(state.levels, state.viewedLevel)),
     grid: state.grid,
     objects: objectsOnLevel(state.objects, state.levels, state.viewedLevel),
     widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
@@ -215,7 +220,7 @@ function snapshotSlice(view: StockView): readonly unknown[] {
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
     // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
     (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights,
-    s.levels, s.viewedLevel];
+    s.levels, s.viewedLevel, s.levelAlignments];
 }
 
 function guard(what: string, call: () => void): void {

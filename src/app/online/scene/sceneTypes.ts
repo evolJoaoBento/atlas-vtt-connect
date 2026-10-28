@@ -21,6 +21,11 @@ export interface PlayerMap {
   height: number;
   /** Grid cell size in world pixels, sent even when the grid is hidden so tokens keep their size. */
   cellSize: number;
+  /**
+   * Where the image goes when Atlas aligned it turned or shifted (`mapPlacement.ts`): its unit square in the world, as a
+   * canvas matrix. Absent when the image just fills the width and height, so a page that does not know it draws that.
+   */
+  matrix?: readonly [number, number, number, number, number, number];
 }
 
 export const PLAYER_GRID_TYPES = ['square', 'hex-horizontal', 'hex-vertical'] as const;

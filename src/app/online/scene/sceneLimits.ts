@@ -45,6 +45,8 @@ export const SCENE_RANGES = {
   gridSize: [1, 10_000],
   cellSize: [1, 10_000],
   mapSize: [0, 200_000],
+  /** A number of a map's matrix: its scale and turn terms are a map's size at most, its offsets that and more. */
+  mapMatrix: [-1_000_000, 1_000_000],
   coordinate: [-10_000_000, 10_000_000],
   stroke: [0, 10_000],
   fontSize: [1, 1_000],

@@ -6,6 +6,7 @@ import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
+import { readAlignment } from './mapPlacement';
 import type { PlayerViewRules } from './playerViewRules';
 import type { MiniPlacement, ProjectionContext } from './projectForPlayers';
 import type { ResourceVisibilitySource } from './resourceVisibility';
@@ -153,12 +154,14 @@ export class FogCoverageCache {
 export function sceneContext(
   snapshot: SceneSnapshot,
   options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis'> {
+): Pick<ProjectionContext, 'mapSize' | 'mapAlignment' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis'> {
   const { mapPath } = snapshot;
+  const mapAlignment = readAlignment((snapshot as { mapAlignment?: unknown }).mapAlignment);
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
   return {
     mapSize: snapshot.mapSize,
+    ...(mapAlignment ? { mapAlignment } : {}),
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],

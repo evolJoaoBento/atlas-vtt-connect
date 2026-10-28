@@ -7,6 +7,7 @@ import { SCENE_RANGES } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { notePathOf, type ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
+import { mapMatrix } from '../../../src/app/online/scene/mapPlacement';
 
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 const ALL_OFF: PlayerViewRules = { showGrid: false, showTokenNameplates: false, showWidgets: false, showInitiative: false };
@@ -379,5 +380,42 @@ describe('projectForPlayers fix round 1', () => {
     const state = { ...withTokens({ a: hero({ id: 'a', x: 200, y: 200 }), b: hero({ id: 'b', x: 800, y: 200 }) }), initiative, initiativeTrackerOpen: true };
     const scene = projectForPlayers(state, context({ coverage: fogOver(0, 0, 500, 500) }));
     expect(scene.initiative?.entries.map((entry) => entry.tokenId)).toEqual(['b']);
+  });
+});
+
+describe("the map as Atlas aligned it (Atlas 0.7.1 and 0.10)", () => {
+  const world = { width: 3100, height: 2100 };
+  const aligned = { x: 1, y: 1, rotation: 3 } as const;
+
+  it('sends the place of a map Atlas turned or shifted, and nothing for one that fills its world rect', () => {
+    const turned = projectForPlayers(withTokens({}), context({ mapSize: world, mapAlignment: aligned }));
+    expect(turned.map.matrix).toEqual(mapMatrix(aligned, world));
+    expect(turned.map.matrix).toHaveLength(6);
+    expect(isPlayerSceneBody(turned)).toBe(true);
+    for (const alignment of [undefined, null, { x: 1.2, y: 1.1 }]) {
+      const plain = projectForPlayers(withTokens({}), context({ mapSize: world, ...(alignment !== undefined ? { mapAlignment: alignment } : {}) }));
+      expect(plain.map).not.toHaveProperty('matrix');
+    }
+    // No map image, nothing to place.
+    expect(projectForPlayers({ ...withTokens({}), background: null }, context({ mapSize: world, mapAlignment: aligned })).map).not.toHaveProperty('matrix');
+  });
+
+  it("keeps the world rect as it is: tokens, fog and grid stay in Atlas's world", () => {
+    const withMatrix = projectForPlayers(withTokens({ hero: hero() }), context({ mapSize: world, mapAlignment: aligned }));
+    const without = projectForPlayers(withTokens({ hero: hero() }), context({ mapSize: world }));
+    expect({ ...withMatrix.map, matrix: undefined }).toEqual({ ...without.map, matrix: undefined });
+    expect(withMatrix.tokens).toEqual(without.tokens);
+  });
+
+  it('is read by a page that does not know it, and one that does refuses a matrix a drawing could not stand', () => {
+    const scene = projectForPlayers(withTokens({}), context({ mapSize: world, mapAlignment: aligned }));
+    // An older page: the same scene without the field is still a scene.
+    const { matrix: _matrix, ...bare } = scene.map;
+    expect(isPlayerSceneBody({ ...scene, map: bare })).toBe(true);
+    const body = (matrix: unknown): unknown => ({ ...scene, map: { ...scene.map, matrix } });
+    expect(isPlayerSceneBody(body([1, 0, 0, 1, 0, 0]))).toBe(true);
+    for (const bad of [[1, 0, 0, 1, 0], [1, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, Number.NaN], [1, 0, 0, 1, 0, '5'], [1, 0, 0, 1, 0, 9e9], 'matrix', {}]) {
+      expect(isPlayerSceneBody(body(bad))).toBe(false);
+    }
   });
 });

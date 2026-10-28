@@ -13,6 +13,7 @@ import type { AssetIds } from './sceneContracts';
 import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
+import { mapMatrix, type MapAlignment } from './mapPlacement';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -50,6 +51,8 @@ export interface ProjectionContext {
   lighting?: LightingFrame | null;
   assets: AssetIds;
   mapSize: MapSize;
+  /** How Atlas aligned the map image (`mapPlacement.ts`); unset or null where it is drawn as it is. */
+  mapAlignment?: MapAlignment | null;
   /** The grid defaults of the map's collection, which decide the measurement; without them the map's grid does. */
   collectionGrid?: CollectionGridDefaults | null;
   /** The cone angle the GM's measure tool opens on this map (`mapConeAngle`); without it, the collection's grid defaults decide. */
@@ -238,11 +241,16 @@ function darkCovers(fog: Shows, lighting: LightingFrame): Shows {
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {
+  const width = finiteOr(context.mapSize.width, 0, SCENE_RANGES.mapSize);
+  const height = finiteOr(context.mapSize.height, 0, SCENE_RANGES.mapSize);
+  // Only an image Atlas turned or shifted needs its place sent; one that fills its world rect is drawn as ever.
+  const matrix = background === null ? null : mapMatrix(context.mapAlignment ?? null, { width, height });
   return {
     asset: context.assets.idFor(background),
-    width: finiteOr(context.mapSize.width, 0, SCENE_RANGES.mapSize),
-    height: finiteOr(context.mapSize.height, 0, SCENE_RANGES.mapSize),
+    width,
+    height,
     cellSize: positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize),
+    ...(matrix ? { matrix } : {}),
   };
 }
 

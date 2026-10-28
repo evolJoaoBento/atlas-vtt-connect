@@ -407,6 +407,14 @@ class CanvasSurface implements ViewSurface {
     });
   }
 
+  imageMatrix(image: SurfaceImage, matrix: readonly [number, number, number, number, number, number]): void {
+    const context = this.context;
+    context.save();
+    context.transform(...matrix);
+    context.drawImage(image, 0, 0, 1, 1);
+    context.restore();
+  }
+
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void {
     const source = look?.lifeless ? lifelessCopy(image, () => this.blank()) : image;
     if (!source) return;

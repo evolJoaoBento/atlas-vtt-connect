@@ -12,7 +12,9 @@ export function createMapLayer(): PlayerLayer {
       if (!(map.width > 0) || !(map.height > 0)) return;
       if (!intersects({ x: 0, y: 0, width: map.width, height: map.height }, frame.visible)) return;
       const art = frame.images(map.asset);
-      if (art) surface.image(art.image, 0, 0, map.width, map.height, null);
+      // A map Atlas aligned turned or shifted sits inside its world rect by its matrix; any other fills the rect.
+      if (art && map.matrix) surface.imageMatrix(art.image, map.matrix);
+      else if (art) surface.image(art.image, 0, 0, map.width, map.height, null);
       else surface.rect(0, 0, map.width, map.height, { fill: MAP_PLACEHOLDER });
     },
   };

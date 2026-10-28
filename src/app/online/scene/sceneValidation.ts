@@ -133,9 +133,14 @@ function isCondition(value: unknown): boolean {
     && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(value.icon);
 }
 
+/** Six finite numbers, the map's matrix (`mapPlacement.ts`): nothing a drawing could not stand. */
+function isMapMatrix(value: unknown): boolean {
+  return Array.isArray(value) && value.length === 6 && value.every(inRange(SCENE_RANGES.mapMatrix));
+}
+
 function isPlayerMap(value: unknown): boolean {
   return isFields(value) && nullable(isString)(value.asset) && inRange(SCENE_RANGES.mapSize)(value.width)
-    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize);
+    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize) && optional(isMapMatrix)(value.matrix);
 }
 
 function isPlayerGrid(value: unknown): boolean {

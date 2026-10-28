@@ -14,6 +14,7 @@ export type SurfaceCall =
   | { op: 'circle'; x: number; y: number; radius: number; style: ShapeStyle }
   | { op: 'paths'; paths: ScenePoint[][]; closed: boolean; style: ShapeStyle }
   | { op: 'image'; image: SurfaceImage; x: number; y: number; width: number; height: number; clip: ImageClip | null; look?: ImageLook }
+  | { op: 'imageMatrix'; image: SurfaceImage; matrix: number[] }
   | { op: 'tokenRing'; x: number; y: number; diameter: number; artSize: number; color: string; look?: ImageLook }
   | { op: 'downedEmblem'; x: number; y: number; size: number; alpha: number }
   | { op: 'glassDome'; x: number; y: number; size: number }
@@ -46,6 +47,9 @@ export class RecordingSurface implements ViewSurface {
   circle(x: number, y: number, radius: number, style: ShapeStyle): void { this.calls.push({ op: 'circle', x, y, radius, style }); }
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void {
     this.calls.push({ op: 'paths', paths: paths.map((path) => [...path]), closed, style });
+  }
+  imageMatrix(image: SurfaceImage, matrix: readonly [number, number, number, number, number, number]): void {
+    this.calls.push({ op: 'imageMatrix', image, matrix: [...matrix] });
   }
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void {
     this.calls.push({ op: 'image', image, x, y, width, height, clip, ...(look ? { look } : {}) });
