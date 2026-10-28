@@ -14,6 +14,7 @@ import type { Point, TokenMove, TokenMoveOptions, TokenMoveResult, TokensApi } f
 import { movementWalls } from './ported/movementWalls';
 import { stopAtWalls } from './ported/wallCollision';
 import { wallList } from './ported/walls';
+import { objectsOnLevel } from '../stockLevels';
 
 /** Farthest a position may be from the origin, so no arithmetic on it later can overflow. */
 const MAX_COORDINATE = 1e9;
@@ -36,6 +37,9 @@ interface TokenScene {
     tokens: Readonly<Record<string, { x: number; y: number; size?: number | undefined; isHidden?: boolean | undefined } | undefined>>;
     walls?: unknown;
   };
+  /** Atlas 0.10's levels (floors) and the one this view shows: only that floor's walls stop a token. */
+  levels?: unknown;
+  viewedLevel?: unknown;
   dropTokens?: (positions: readonly TokenPlace[]) => void;
 }
 
@@ -163,7 +167,8 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi {
       const lit = state.lighting.enabled === true && deps.dynamicLighting() !== false;
       let walls: ReturnType<typeof movementWalls> | null = null;
       try {
-        walls = lit && isObject(state.objects.walls) ? movementWalls(wallList(state.objects.walls), map.width > 0 && map.height > 0 ? map : null) : null;
+        const floorWalls = objectsOnLevel(state.objects, state.levels, state.viewedLevel).walls;
+        walls = lit && isObject(floorWalls) ? movementWalls(wallList(floorWalls), map.width > 0 && map.height > 0 ? map : null) : null;
       } catch {
         // Walls that cannot be read stop nothing: a lit scene refuses the move instead.
         if (lit) return { ok: false, reason: 'not-loaded' };

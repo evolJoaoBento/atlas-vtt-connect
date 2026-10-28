@@ -1,5 +1,5 @@
 /**
- * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7.x and 0.8.x) that has none.
+ * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7 to 0.10) that has none.
  *
  * It reads what stock Atlas leaves reachable at runtime: the map views in the workspace (`viewId`, `atlasStore`,
  * `tabMetaStore`, `renderer`, `serviceManager`), the plugin's `settingsService` and its `presentedScene`. It is hacky by
@@ -12,6 +12,7 @@
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { tabletopBoardViews } from './tabletopMinis';
+import { backgroundOfLevel, objectsOnLevel } from './stockLevels';
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
@@ -47,6 +48,9 @@ interface StockSceneState {
   background: SceneSnapshot['background'];
   grid: SceneSnapshot['grid'];
   objects: SceneSnapshot['objects'];
+  /** Atlas 0.10's levels (floors) and the one this view shows; an older Atlas has neither. */
+  levels?: unknown;
+  viewedLevel?: unknown;
   widgetSettings: SceneSnapshot['widgets']['settings'];
   widgetValues: SceneSnapshot['widgets']['values'];
   initiative: SceneSnapshot['initiative'];
@@ -181,9 +185,10 @@ function snapshot(view: StockView): SceneSnapshot {
     loaded: loaded(state),
     tabId: snapshotTabId(view),
     mapSize: Object.freeze(mapSize(view)),
-    background: state.background,
+    // A scene of several floors is sent as the one floor shown (Atlas 0.10), never all of them.
+    background: backgroundOfLevel(state.background, state.levels, state.viewedLevel),
     grid: state.grid,
-    objects: state.objects,
+    objects: objectsOnLevel(state.objects, state.levels, state.viewedLevel),
     widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
@@ -209,7 +214,8 @@ function snapshotSlice(view: StockView): readonly unknown[] {
   return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
     // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
-    (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights];
+    (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights,
+    s.levels, s.viewedLevel];
 }
 
 function guard(what: string, call: () => void): void {
