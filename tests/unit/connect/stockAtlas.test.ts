@@ -200,7 +200,8 @@ describe('stock Atlas stand-in', () => {
     const { app, atlas } = setup();
     const plugin = fakeConnectPlugin(app);
     const extension = stockAtlasApi(app, atlas).connect(plugin);
-    expect(extension.settings.get('playerView')).toEqual({ showGrid: true, showTokenNameplates: false, showWidgets: false, showInitiative: false });
+    // The GM's rolls stay private unless the GM shares them (`showDiceRolls`, off by default in Atlas).
+    expect(extension.settings.get('playerView')).toEqual({ showGrid: true, showTokenNameplates: false, showWidgets: false, showInitiative: false, showDiceRolls: false });
     expect(extension.rules.forMap('maps/one.atlasmap').collectionId).toBeNull();
     extension.presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
     plugin.unload();

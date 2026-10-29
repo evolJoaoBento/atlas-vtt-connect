@@ -70,6 +70,11 @@ export interface DiceHostOptions {
   feed: DiceFeed;
   /** The dice rules of the collection holding `mapPath`, as the GM offers them; without it players' physical rolls are ignored. */
   rules?: (mapPath: string | null) => OfferedDiceRules;
+  /**
+   * Whether the GM's own rolls reach players (Atlas's "Show my rolls to players", the `showDiceRolls` rule of its player
+   * view): asked at each roll. Without it they do, as before Atlas 0.7 made them private unless shared.
+   */
+  gmRollsShared?: () => boolean;
 }
 
 /** Names a roll of a player's sheet from the GM's own copy of it; null when the player has no such roll there. */
@@ -216,6 +221,8 @@ export class DiceHost implements SessionHandler {
   }
 
   private rolled(result: DiceRollResult): void {
+    // The GM's own rolls are private unless the GM shares them; a roll made for a player is always the table's.
+    if (!result.rolledBy && !(this.options.gmRollsShared?.() ?? true)) return;
     // A roll from a player's sheet reads "Anna: Dagger" in the players' log, as Atlas's toast names its ability.
     const ability = result.rolledBy ? result.source?.abilityName?.trim() : undefined;
     const roller = result.rolledBy ? playerName(result.rolledBy) : GM_ROLLER_NAME;

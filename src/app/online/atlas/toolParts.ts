@@ -33,13 +33,25 @@ export function offeredRulesOf(atlas: Pick<AtlasExtension, 'rules'>): (mapPath: 
  * Player rolls are rolled by Atlas with the collection's rules, and every roll Atlas logs reaches the players' log.
  * With `rules`, players' physical rolls are judged by them and published into that log.
  */
-export function diceHostPart(dice: DiceApi, rules?: (mapPath: string | null) => OfferedDiceRules): NonNullable<OptionalParts['dice']> {
+export function diceHostPart(dice: DiceApi, rules?: (mapPath: string | null) => OfferedDiceRules, gmRollsShared?: () => boolean): NonNullable<OptionalParts['dice']> {
   return ({ session, projection }) => new DiceHost({
-    session, projection, ...(rules ? { rules } : {}),
+    session, projection, ...(rules ? { rules } : {}), ...(gmRollsShared ? { gmRollsShared } : {}),
     // Connect's stock stand-in hands the ability and the side to Atlas's dice tool; an Atlas API takes neither.
     roll: (request) => dice.roll(SHEET_AWARE_DICE.has(dice) ? request : foldedRequest(request)),
     feed: { subscribe: (listener) => dice.onRolled(listener), publish: (result) => { dice.publish(result); } },
   });
+}
+
+/**
+ * Whether the GM shares their own rolls with players (Atlas's `showDiceRolls`, off by default): read at each roll, and
+ * true where Atlas reports no such rule, which is how rolls went before it had one.
+ */
+export function gmRollsShared(settings: Pick<SettingsApi, 'get'>): boolean {
+  try {
+    return (settings.get('playerView') as { showDiceRolls?: unknown }).showDiceRolls !== false;
+  } catch {
+    return true;
+  }
 }
 
 /** Lasers are heard from and shown in the view of the scene the GM's view shows; the GM's own is the colour set in Atlas. */

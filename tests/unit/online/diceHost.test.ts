@@ -35,6 +35,32 @@ describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it("keeps the GM's own rolls private unless the GM shares them, as Atlas's \"Show my rolls to players\" does (Atlas 0.7)", async () => {
+    let shared = false;
+    const w = toolsWorld({ gmRollsShared: () => shared });
+    w.present();
+    const a = await w.join('A');
+    const b = await w.join('B');
+    const live = (player: typeof a) => w.logs(player).filter((log) => !log.replay).flatMap((log) => log.entries.map((entry) => entry.formula));
+    // A secret roll of the GM reaches nobody, and is not in the replay of a player who comes later.
+    w.publish(rollFormula('d20'));
+    expect(live(a)).toEqual([]);
+    const late = await w.join('C');
+    expect(w.logs(late)[0]).toMatchObject({ replay: true, entries: [] });
+    // A player's roll is the table's whatever the GM shares: everyone hears it, the roller included.
+    expect(a.session.sendDiceRoll({ d6: 2 }, 1)).toBe(true);
+    expect(live(a)).toEqual(['2d6+1']);
+    expect(live(b)).toEqual(['2d6+1']);
+    // Shared, the GM's rolls go out; the setting is read at each roll, so turning it off hides the next ones again.
+    shared = true;
+    w.publish(rollFormula('d8'));
+    expect(live(b)).toEqual(['2d6+1', 'd8']);
+    shared = false;
+    w.publish(rollFormula('d10'));
+    expect(live(b)).toEqual(['2d6+1', 'd8']);
+    w.finish();
+  });
+
   it("rolls a player's roll with Atlas's dice code, named after them", async () => {
     const w = toolsWorld();
     w.present();
@@ -309,5 +335,17 @@ describe('a roll from a player sheet', () => {
     expect(foldedRequest({ formula: '1d6+2', rolledBy: 'Ana', advantage: 'advantage' })).toEqual({ formula: '1d6+2', rolledBy: 'Ana' });
     expect(foldedRequest({ formula: 'd20', mapPath: 'm' })).toEqual({ formula: 'd20', mapPath: 'm' });
     expect(foldedRequest({ formula: '+1', rolledBy: 'A'.repeat(30), abilityName: 'Long ability name' }).rolledBy).toHaveLength(40);
+  });
+});
+
+describe('whether the GM shares their rolls (Atlas `showDiceRolls`)', () => {
+  const settings = (view: unknown) => ({ get: () => view }) as never;
+
+  it('reads the player view rule, and takes a missing one to mean shared, as rolls went before Atlas had it', async () => {
+    const { gmRollsShared } = await import('../../../src/app/online/atlas/toolParts');
+    expect(gmRollsShared(settings({ showDiceRolls: true }))).toBe(true);
+    expect(gmRollsShared(settings({ showDiceRolls: false }))).toBe(false);
+    expect(gmRollsShared(settings({ showGrid: true }))).toBe(true);
+    expect(gmRollsShared({ get: () => { throw new Error('gone'); } } as never)).toBe(true);
   });
 });

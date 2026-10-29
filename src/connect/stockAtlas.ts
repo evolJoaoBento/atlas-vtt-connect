@@ -273,7 +273,8 @@ function settingsView(service: StockSettings): AtlasSettingsView {
     diceLook: { colour: look.colour, font: look.font },
     diceDisplay: service.getDiceDisplay(),
     // Stock 0.7 has no `showGrid` rule: players see the grid as the GM set it (the scene's own `visible` still hides it).
-    playerView: Object.fromEntries(PLAYER_VIEW_KEYS.map((key) => [key, key === 'showGrid' ? player[key] !== false : player[key] === true])) as AtlasSettingsView['playerView'],
+    // `showDiceRolls` is no rule of the API's: it says whether the GM's rolls are shared with players, as Atlas's own online play reads it.
+    playerView: { ...Object.fromEntries(PLAYER_VIEW_KEYS.map((key) => [key, key === 'showGrid' ? player[key] !== false : player[key] === true])), showDiceRolls: player.showDiceRolls === true } as unknown as AtlasSettingsView['playerView'],
   };
 }
 

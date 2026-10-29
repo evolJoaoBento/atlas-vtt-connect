@@ -16,7 +16,7 @@ export const MIDDLE_ROLL = (): number => 0.5;
 type Laser = Extract<ControlMessage, { type: 'laser' }>;
 type DiceLog = Extract<ControlMessage, { type: 'dice-log' }>;
 
-export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
+export function toolsWorld(options: { rules?: Partial<PlayerViewRules>; gmRollsShared?: () => boolean } = {}) {
   const world = controlWorld({ scene: { rules: { showTokenNameplates: true, ...options.rules } } });
   const scene = world.scene!;
   const { atlas, extension } = scene.presented;
@@ -25,7 +25,7 @@ export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
   const logged: DiceRollResult[] = [];
   extension.dice.onRolled((result) => logged.push(result));
   const context: HostedContext = { session: world.gm, presented: scene.presented, projection: scene.broadcaster };
-  const dice = diceHostPart(extension.dice, offeredRulesOf(extension))(context);
+  const dice = diceHostPart(extension.dice, offeredRulesOf(extension), options.gmRollsShared)(context);
   const lasers = laserRelayPart(extension.lasers, extension.settings)(context);
   dice.start();
   lasers.start();
