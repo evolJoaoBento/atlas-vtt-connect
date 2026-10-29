@@ -132,6 +132,8 @@ let assetsFrame: number | null = null;
 const loader = new AssetLoader({
   cache,
   decode: decodeImage,
+  // This page plays an animated map's video.
+  video: () => true,
   // Chunks arrive many times a second: the bar and the map update at most once per frame.
   onChange: () => {
     if (assetsFrame !== null) return;

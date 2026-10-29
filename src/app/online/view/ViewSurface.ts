@@ -40,7 +40,7 @@ export interface TextStyle {
 
 /** A decoded image (`DecodedImage.image`): an `ImageBitmap` or a loaded `<img>`. */
 /** A canvas is the minis' picture (`minis/miniLayer.ts`). */
-export type SurfaceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+export type SurfaceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 
 /** How an image or a token ring is drawn: its opacity, and greyed as Atlas greys a downed token (`DownedTokenOverlay`). */
 export interface ImageLook {

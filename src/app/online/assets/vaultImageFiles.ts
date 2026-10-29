@@ -35,9 +35,10 @@ export function vaultImageFiles(app: App, shrink: ShrinkImage = shrinkInWindow):
       const file = fileAt(path);
       return file ? { size: file.stat.size, mtime: file.stat.mtime } : null;
     },
-    read: async (path: string): Promise<ArrayBuffer> => {
+    read: async (path: string, raw?: boolean): Promise<ArrayBuffer> => {
       const file = fileAt(path);
       if (!file) throw new Error('The image is no longer in the vault');
+      if (raw) return app.vault.readBinary(file);
       if (!isVideoPath(path)) {
         const mime = mimeForPath(path);
         if (file.stat.size > ASSET_LIMITS.fileBytes && mime !== null && isRasterMime(mime)) return reducedCopy(path, file, mime);

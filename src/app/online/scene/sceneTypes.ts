@@ -26,6 +26,8 @@ export interface PlayerMap {
    * canvas matrix. Absent when the image just fills the width and height, so a page that does not know it draws that.
    */
   matrix?: readonly [number, number, number, number, number, number];
+  /** An animated map's video (an asset id), played over its still `asset` by a view that can; absent for any other map. */
+  video?: string;
   /** The liquids of the map, drawn over its image and under the grid and the fog; absent without any, and from an older GM. */
   liquids?: readonly PlayerLiquid[];
 }

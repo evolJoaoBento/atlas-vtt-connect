@@ -22,12 +22,23 @@ function drawLiquids(surface: ViewSurface, liquids: readonly PlayerLiquid[], cel
 }
 
 export function createMapLayer(): PlayerLayer {
+  /** Whether the last frame drew a video: the layer then asks to be drawn again, as the video moves on its own. */
+  let playing = false;
   return {
+    animating: () => playing,
     draw(surface, frame): void {
+      playing = false;
       const { map } = frame.scene;
       if (!(map.width > 0) || !(map.height > 0)) return;
       if (!intersects({ x: 0, y: 0, width: map.width, height: map.height }, frame.visible)) return;
-      const art = frame.images(map.asset);
+      // An animated map plays where the view could load its video; until then (and everywhere else) its still shows.
+      const clip = frame.images(map.video ?? null);
+      const video = clip && 'videoWidth' in clip.image ? clip.image : null;
+      if (video) {
+        if (video.paused) void video.play().catch(() => undefined);
+        playing = true;
+      }
+      const art = video ? clip : frame.images(map.asset);
       // A map Atlas aligned turned or shifted sits inside its world rect by its matrix; any other fills the rect.
       if (art && map.matrix) surface.imageMatrix(art.image, map.matrix);
       else if (art) surface.image(art.image, 0, 0, map.width, map.height, null);

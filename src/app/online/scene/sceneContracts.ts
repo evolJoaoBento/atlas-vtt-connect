@@ -12,7 +12,8 @@ export interface ImageFileStat {
 export interface ImageFiles {
   /** Synchronous; null when there is no such file. */
   stat(path: string): ImageFileStat | null;
-  read(path: string): Promise<ArrayBuffer>;
+  /** The file's bytes; `raw` (an animated map's video) asks for the file itself where `read` would give its still. */
+  read(path: string, raw?: boolean): Promise<ArrayBuffer>;
   /**
    * Set when `read` gives a smaller copy of a raster image over the file limit (`imageShrink.ts`) instead of the image:
    * such an image is then sent, as that copy, rather than refused.
@@ -25,6 +26,8 @@ export interface ImageFiles {
 /** Where a fingerprint's file is. */
 export interface AssetInfo {
   path: string;
+  /** The file itself, not what `read` makes of it (a video, not its still). */
+  raw?: boolean;
   size: number;
   mime: AssetMime;
 }
@@ -38,6 +41,8 @@ export interface AssetFile {
 /** What the projection needs: a fingerprint for a path, or null. */
 export interface AssetIds {
   idFor(path: string | null | undefined): string | null;
+  /** The fingerprint of an animated map's video itself (`idFor` gives its still); null for any other file, or while it is hashed. */
+  videoIdFor?(path: string | null | undefined): string | null;
 }
 
 /** What the scene handlers need of the session: register a handler, send to a player, list the players. */

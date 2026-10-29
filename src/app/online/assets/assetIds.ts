@@ -31,7 +31,7 @@ export const ASSET_LIMITS = {
   cacheBytes: 500 * MB,
 } as const;
 
-export const ASSET_MIMES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/avif', 'image/svg+xml', 'model/gltf-binary'] as const;
+export const ASSET_MIMES = ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/avif', 'image/svg+xml', 'model/gltf-binary', 'video/mp4', 'video/webm'] as const;
 export type AssetMime = typeof ASSET_MIMES[number];
 
 /** SHA-256 of some bytes as an asset id. */
@@ -65,6 +65,20 @@ export function isModelMime(mime: AssetMime): boolean {
   return mime === 'model/gltf-binary';
 }
 
+/** Whether an asset is an animated map's video (played on the web page; every other view keeps its still). */
+export function isVideoMime(mime: AssetMime): boolean {
+  return mime === 'video/mp4' || mime === 'video/webm';
+}
+
+/** The video type browsers play from a vault path, by its extension: MP4 and WebM only; null for any other (`.mov` and `.ogv` stay a still). */
+export function videoMimeForPath(path: string): AssetMime | null {
+  const dot = path.lastIndexOf('.');
+  if (dot < 0 || dot < path.lastIndexOf('/')) return null;
+  const extension = path.slice(dot + 1).toLowerCase();
+  if (extension === 'mp4' || extension === 'm4v') return 'video/mp4';
+  return extension === 'webm' ? 'video/webm' : null;
+}
+
 /** The image type a vault path stands for, by its extension; null for anything else. */
 export function mimeForPath(path: string): AssetMime | null {
   const dot = path.lastIndexOf('.');
@@ -90,6 +104,7 @@ export function isVideoPath(path: string): boolean {
 
 const EXTENSION_BY_MIME: Readonly<Record<AssetMime, string>> = {
   'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg', 'model/gltf-binary': 'glb',
+  'video/mp4': 'mp4', 'video/webm': 'webm',
 };
 
 /** The file extension an image type is saved under (the inverse of `mimeForPath`). */
@@ -104,9 +119,9 @@ export async function sha256Id(bytes: ArrayBuffer): Promise<string> {
 
 /**
  * The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), each once.
- * `minis: false` leaves the minis' models out, for a player view that does not draw them (the web page).
+ * `minis: false` leaves the minis' models out, for a player view that does not draw them (the web page); `video: false`, the map's video.
  */
-export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: boolean } = {}): string[] {
+export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: boolean; video?: boolean } = {}): string[] {
   if (!scene) return [];
   const ids = new Set<string>();
   if (isAssetId(scene.map.asset)) ids.add(scene.map.asset);
@@ -116,6 +131,8 @@ export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: bool
   }
   // The GM's handout reaches the players of every scene in use.
   if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);
+  // An animated map's video comes last, so its size never holds up the still, the tokens or the handout; `video: false` for a view that plays none.
+  if (options.video !== false && isAssetId(scene.map.video)) ids.add(scene.map.video);
   return [...ids];
 }
 

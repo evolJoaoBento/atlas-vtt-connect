@@ -247,8 +247,10 @@ function projectMap(background: string | null, cellSize: number, context: Projec
   // Only an image Atlas turned or shifted needs its place sent; one that fills its world rect is drawn as ever.
   const matrix = background === null ? null : mapMatrix(context.mapAlignment ?? null, { width, height });
   const liquids = projectLiquids(liquidRecord);
+  const video = background === null ? null : context.assets.videoIdFor?.(background) ?? null;
   return {
     asset: context.assets.idFor(background),
+    ...(video !== null ? { video } : {}),
     width,
     height,
     cellSize: positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize),

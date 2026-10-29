@@ -11,6 +11,7 @@ import {
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
+import { isAssetId } from '../assets/assetIds';
 
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => boolean;
@@ -159,7 +160,7 @@ function isLiquids(value: unknown): boolean {
 function isPlayerMap(value: unknown): boolean {
   return isFields(value) && nullable(isString)(value.asset) && inRange(SCENE_RANGES.mapSize)(value.width)
     && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize) && optional(isMapMatrix)(value.matrix)
-    && optional(isLiquids)(value.liquids);
+    && optional(isLiquids)(value.liquids) && optional(isAssetId)(value.video);
 }
 
 function isPlayerGrid(value: unknown): boolean {

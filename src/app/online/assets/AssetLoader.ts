@@ -18,7 +18,8 @@ import { TransferAssembler } from './TransferAssembler';
 export type { AssetProgress };
 
 export interface DecodedImage {
-  image: ImageBitmap | HTMLImageElement;
+  /** A playing `<video>` for an animated map's video. */
+  image: ImageBitmap | HTMLImageElement | HTMLVideoElement;
   width: number;
   height: number;
   release(): void;
@@ -38,6 +39,8 @@ export interface AssetLoaderOptions {
    * Read on every scene; the web page never asks for them.
    */
   models?: () => boolean;
+  /** Whether to fetch an animated map's video too: only a view that plays it (the web page). */
+  video?: () => boolean;
 }
 
 /** `refused`: denied, broken twice or undecodable; not asked for again while it stays in the scene. */
@@ -104,7 +107,7 @@ export class AssetLoader implements PlayerAssetHandler {
   private want(): void {
     if (this.disposed) return;
     // The board's files are wanted only by a player showing the board, which draws them (and the minis) in 3D.
-    const ids = [...new Set([...sceneAssetIds(this.scene, { minis: this.options.models?.() === true }), ...boardAssetIds(this.board)])];
+    const ids = [...new Set([...sceneAssetIds(this.scene, { minis: this.options.models?.() === true, video: this.options.video?.() === true }), ...boardAssetIds(this.board)])];
     const keep = new Set(ids);
     const cancelled: string[] = [];
     for (const [id, wanted] of [...this.wanted]) {
