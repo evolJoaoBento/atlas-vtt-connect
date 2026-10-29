@@ -4,7 +4,7 @@
  * sessions, so the section is there whether a session runs or not, for a GM preparing a fight. It is the GM's own:
  * never in a remote view. Choices apply when the dialog saves.
  */
-import { visibleResources } from '@atlas-vtt/shared/rules';
+import { visibleResources } from '../scene/visibleResources';
 import type { AtlasExtension, Character, ResourceDefinition } from '@atlas-vtt/api-types';
 import { collectionShow, statblockKey, statblockLabel, RESOURCE_SHOWS, type ResourceShow, type ResourceVisibilityStore } from '../scene/resourceVisibility';
 import type { EditTokenChoice, EditTokenSectionProvider } from './editTokenSection';

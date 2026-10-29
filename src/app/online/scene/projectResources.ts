@@ -11,12 +11,13 @@
  * players see. `visibleResources` stays the one place that picks the resources and their sockets, so a rule the
  * window follows is followed here.
  */
-import { isDefeated, isSpent, resourceColor, shapeOf, visibleResources } from '@atlas-vtt/shared/rules';
+import { isDefeated, isSpent, resourceColor, shapeOf } from '@atlas-vtt/shared/rules';
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '@atlas-vtt/api-types';
 import { finiteOr } from './coerce';
 import { collectionShow, type ResourceShow } from './resourceVisibility';
 import { SCENE_RANGES } from './sceneLimits';
 import type { PlayerResource, PlayerWheel } from './sceneTypes';
+import { visibleResources } from './visibleResources';
 
 /** How each resource of one token is shown; without one, as its collection shows it. */
 export type ShowOf = (definition: ResourceDefinition) => ResourceShow;
