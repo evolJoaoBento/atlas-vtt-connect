@@ -189,7 +189,7 @@ export class MapView {
     this.note = options.note && options.requestNote
       ? new NoteView({ ...options.note, ...(options.active ? { active: options.active } : {}), ...(options.doc ? { doc: options.doc } : {}) })
       : null;
-    this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
+    this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images, onFind: (tokenId) => this.findToken(tokenId) }) : null;
     this.preview = options.statblockPreview ? new StatblockPreviewView(options.statblockPreview) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
@@ -256,6 +256,12 @@ export class MapView {
   }
 
   /** The camera follows the GM's again (the Follow GM button). */
+  /** Brings a token into view: the camera glides to it. Nothing for a token players do not see. */
+  private findToken(tokenId: string): void {
+    const token = this.scene !== null && Object.hasOwn(this.scene.tokens, tokenId) ? this.scene.tokens[tokenId] : undefined;
+    if (token) this.camera.lookAt({ x: token.x, y: token.y });
+  }
+
   followGm(): void {
     this.camera.followGm();
   }

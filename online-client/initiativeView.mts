@@ -24,6 +24,8 @@ export interface InitiativeViewOptions {
   panel: HTMLElement;
   /** A decoded token image by asset id, or null while it has not arrived. */
   images(assetId: string): DecodedImage | null;
+  /** Called with the token of a combatant a player clicked (Atlas 0.9.1: the click finds the token); without it the cards do nothing. */
+  onFind?: (tokenId: string) => void;
 }
 
 export class InitiativeView {
@@ -105,6 +107,18 @@ export class InitiativeView {
       card.setAttribute('aria-current', 'true');
     }
     if (entry.sitsOut === true) card.classList.add('is-sitting-out');
+    // A click, Enter or Space on a combatant whose token players see brings that token into view.
+    const { onFind } = this.options;
+    if (onFind && token) {
+      card.classList.add('is-findable');
+      card.tabIndex = 0;
+      card.addEventListener('click', () => onFind(entry.tokenId));
+      card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        onFind(entry.tokenId);
+      });
+    }
     const portrait = token ? this.portrait(token, entry.name ?? '') : null;
     if (portrait) card.append(portrait);
     if (showValue) {

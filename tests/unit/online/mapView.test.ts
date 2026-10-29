@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MapView } from '../../../online-client/mapView.mts';
+import { MapView, type MapViewOptions } from '../../../online-client/mapView.mts';
 import { MOVE_REFUSED_TEXT, REFUSED_NOTICE_MS } from '../../../src/app/online/view/TokenMoves';
 import { fakeFrames, RecordingSurface } from './recordingSurface';
 import { playerScene } from './sceneFixtures';
@@ -10,7 +10,7 @@ function pointer(target: EventTarget, type: string, x: number, y: number): void 
   target.dispatchEvent(event);
 }
 
-function setup() {
+function setup(extra: Partial<MapViewOptions> = {}) {
   document.body.innerHTML = [
     '<section><canvas id="map"></canvas>',
     '<div id="view-buttons" hidden><button id="follow-gm" type="button">Follow GM</button>',
@@ -33,6 +33,7 @@ function setup() {
     },
     sendLaser: () => true,
     notice: element('move-notice'),
+    ...extra,
   });
   return {
     view, canvas, surface, frames, sent, notice: element('move-notice'),
@@ -108,6 +109,19 @@ describe('MapView', () => {
     pointer(t.canvas, 'pointerdown', 100, 100);
     pointer(t.canvas, 'pointermove', 160, 100);
     pointer(t.canvas, 'pointerup', 160, 100);
+    expect(t.buttons.hidden).toBe(false);
+    t.follow.click();
+    expect(t.buttons.hidden).toBe(true);
+  });
+
+  it("brings a token into view when its combatant is clicked in the initiative list (Atlas 0.9.1), and the player then looks for themselves", () => {
+    const panel = document.createElement('div');
+    const t = setup({ initiative: panel });
+    t.view.setScene(playerScene({
+      initiative: { round: 1, active: true, entries: [{ id: 'e1', tokenId: 't1', initiative: 12, name: 'Ana', hp: null, isActive: true }] },
+    }));
+    expect(t.buttons.hidden).toBe(true);
+    panel.querySelector<HTMLElement>('.initiative-card')!.click();
     expect(t.buttons.hidden).toBe(false);
     t.follow.click();
     expect(t.buttons.hidden).toBe(true);

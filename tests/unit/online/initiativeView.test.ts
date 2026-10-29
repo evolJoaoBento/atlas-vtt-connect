@@ -7,10 +7,10 @@ const entry = (tokenId: string, patch: Partial<PlayerInitiativeEntry> = {}): Pla
   id: tokenId, tokenId, initiative: 10, name: tokenId, hp: null, isActive: false, ...patch,
 });
 
-function setup() {
+function setup(onFind?: (tokenId: string) => void) {
   const panel = document.createElement('div');
   document.body.replaceChildren(panel);
-  const view = new InitiativeView({ panel, images: () => null });
+  const view = new InitiativeView({ panel, images: () => null, ...(onFind ? { onFind } : {}) });
   const show = (initiative: PlayerInitiative | null): void => {
     view.update(playerScene({ initiative, tokens: { orc: playerToken({ side: 'opponents' }), ana: playerToken({ side: 'players' }) } }));
   };
@@ -64,5 +64,38 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     show({ round: 1, active: true, entries: [entry('ana', { name: '<img src=x onerror=alert(1)>' })] });
     expect(panel.querySelector('img')).toBeNull();
     expect(panel.textContent).toContain('<img');
+  });
+});
+
+describe('finding a combatant on the map (Atlas 0.9.1)', () => {
+  const fight: PlayerInitiative = { round: 1, active: true, entries: [entry('ana', { isActive: true }), entry('orc'), entry('ghost')] };
+
+  it('brings the token of a clicked card into view, by click, Enter or Space', () => {
+    const found: string[] = [];
+    const { panel, show } = setup((tokenId) => found.push(tokenId));
+    show(fight);
+    const cards = [...panel.querySelectorAll<HTMLElement>('.initiative-card')];
+    cards[0]!.click();
+    cards[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    cards[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    cards[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(found).toEqual(['ana', 'orc', 'ana']);
+    expect(cards[0]!.tabIndex).toBe(0);
+  });
+
+  it('leaves a combatant whose token players do not see, and every card without a handler, alone', () => {
+    const found: string[] = [];
+    const { panel, show } = setup((tokenId) => found.push(tokenId));
+    show(fight);
+    // `ghost` has no token in the scene: its card finds nothing.
+    const ghost = [...panel.querySelectorAll<HTMLElement>('.initiative-card')][2]!;
+    ghost.click();
+    expect(found).toEqual([]);
+    expect(ghost.classList.contains('is-findable')).toBe(false);
+    const plain = setup();
+    plain.show(fight);
+    const card = plain.panel.querySelector<HTMLElement>('.initiative-card')!;
+    expect(card.classList.contains('is-findable')).toBe(false);
+    expect(() => card.click()).not.toThrow();
   });
 });

@@ -497,6 +497,8 @@
     border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);
   }
   .initiative-card.is-sitting-out { opacity: 0.45; }
+  .initiative-card.is-findable { cursor: pointer; }
+  .initiative-card.is-findable:hover { border-color: var(--interactive-accent); }
   .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
   .initiative-value { font-weight: var(--font-semibold); }
   .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: var(--font-ui-smaller); }

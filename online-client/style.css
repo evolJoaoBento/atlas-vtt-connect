@@ -544,6 +544,8 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .initiative-card.is-active, .initiative-side.is-active .initiative-card:not(.is-sitting-out) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .initiative-card.is-sitting-out { opacity: 0.45; }
+.initiative-card.is-findable { cursor: pointer; }
+.initiative-card.is-findable:hover { border-color: var(--accent); }
 .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
 .initiative-value { font-weight: 600; }
 .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 12px; }
