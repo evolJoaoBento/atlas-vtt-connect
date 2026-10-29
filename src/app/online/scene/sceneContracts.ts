@@ -13,6 +13,11 @@ export interface ImageFiles {
   /** Synchronous; null when there is no such file. */
   stat(path: string): ImageFileStat | null;
   read(path: string): Promise<ArrayBuffer>;
+  /**
+   * Set when `read` gives a smaller copy of a raster image over the file limit (`imageShrink.ts`) instead of the image:
+   * such an image is then sent, as that copy, rather than refused.
+   */
+  readonly reducesLarge?: boolean;
   /** Tells when a file was modified, deleted or renamed (both paths); returns the unsubscribe. */
   onChange?(listener: (path: string) => void): () => void;
 }

@@ -6,12 +6,13 @@
  * `onChange` tells the broadcaster to project again. Paths never leave the
  * GM's machine. Imports nothing from Obsidian: the vault is an `ImageFiles`.
  */
-import { ASSET_LIMITS, isVideoPath, mimeForPath, sha256Id, type AssetMime, type Hasher } from '../assets/assetIds';
+import { ASSET_LIMITS, isRasterMime, isVideoPath, mimeForPath, sha256Id, type AssetMime, type Hasher } from '../assets/assetIds';
 import type { AssetFile, AssetIds, AssetInfo, ImageFiles } from './sceneContracts';
 
 export type { AssetFile, AssetIds, AssetInfo, ImageFiles, ImageFileStat } from './sceneContracts';
 
 export const IMAGE_TOO_LARGE_NOTICE = 'This image is too large to send to online players.';
+export const IMAGE_REDUCED_NOTICE = 'A map image over 64 MB is sent to online players as a smaller copy.';
 
 export interface AssetRegistryOptions {
   files: ImageFiles;
@@ -40,6 +41,7 @@ export class AssetRegistry implements AssetIds {
   private hashing = false;
   private disposed = false;
   private tooLargeNoticeShown = false;
+  private reducedNoticeShown = false;
 
   constructor(private readonly options: AssetRegistryOptions) {
     this.hash = options.hash ?? sha256Id;
@@ -57,7 +59,9 @@ export class AssetRegistry implements AssetIds {
     if (known && known.mtime === stat.mtime && known.size === stat.size) return known.id;
     this.paths.set(path, { mtime: stat.mtime, size: stat.size, mime, id: null });
     if (known?.id && this.release(path, known.id)) this.emit();
-    if (stat.size > ASSET_LIMITS.fileBytes && !video) this.tooLarge();
+    // Over the limit: refused, unless the files give a smaller copy of a raster image (an animated map's still is small whatever the video).
+    const reduced = this.options.files.reducesLarge === true && isRasterMime(mime);
+    if (stat.size > ASSET_LIMITS.fileBytes && !video && !reduced) this.tooLarge();
     else this.enqueue(path);
     return null;
   }
@@ -160,9 +164,17 @@ export class AssetRegistry implements AssetIds {
     }
     // The file changed while it was read: its newer entry is queued already.
     if (this.disposed || this.paths.get(path) !== entry || id === null) return;
+    // A file over the limit that came out under it was cut down to a smaller copy: the GM is told, once.
+    if (entry.size > ASSET_LIMITS.fileBytes && size <= ASSET_LIMITS.fileBytes && !isVideoPath(path)) this.reduced();
     entry.id = id;
     if (!this.infos.has(id)) this.infos.set(id, { path, size, mime: entry.mime });
     this.emit();
+  }
+
+  private reduced(): void {
+    if (this.reducedNoticeShown) return;
+    this.reducedNoticeShown = true;
+    this.options.notify(IMAGE_REDUCED_NOTICE);
   }
 
   private tooLarge(): void {

@@ -73,6 +73,11 @@ export function mimeForPath(path: string): AssetMime | null {
   return Object.hasOwn(MIME_BY_EXTENSION, extension) ? MIME_BY_EXTENSION[extension] ?? null : null;
 }
 
+/** Whether an image type is pixels (not a vector or a model): one that can be cut down to a smaller copy (`imageShrink.ts`). */
+export function isRasterMime(mime: AssetMime): boolean {
+  return mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/webp' || mime === 'image/avif' || mime === 'image/gif';
+}
+
 /** What an animated map's file ends in (Atlas plays these as a map): players get a still of the first frame instead. */
 const VIDEO_EXTENSIONS: ReadonlySet<string> = new Set(['mp4', 'm4v', 'webm', 'ogv', 'mov']);
 
