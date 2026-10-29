@@ -34,7 +34,7 @@ export function fakeView(viewId: string, tabs: Array<{ id: string; filePath: str
 }
 
 export function fakePresented() {
-  let scene: { tabId: string; filePath: string } | null = null;
+  let scene: { tabId: string; filePath: string; levelId?: string } | null = null;
   const listeners = new Set<(s: typeof scene) => void>();
   let elsewhere = 0;
   return {

@@ -12,7 +12,7 @@
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { tabletopBoardViews } from './tabletopMinis';
-import { backgroundOfLevel, objectsOnLevel, shownLevel } from './stockLevels';
+import { backgroundOfLevel, levelHeld, objectsOnLevel, shownLevel } from './stockLevels';
 import { effectiveAlignment } from '../app/online/scene/mapPlacement';
 import { normalizePath, type App, type Plugin } from 'obsidian';
 import type {
@@ -88,11 +88,17 @@ interface StockView {
   } | null;
   switchToTab(tabId: string): Promise<void>;
 }
+/** The scene shown to players: its tab, its file, and (Atlas 0.10, "Show this level on the player view") the level of it. */
+interface StockPresentedState {
+  tabId: string;
+  filePath: string;
+  levelId?: string;
+}
 interface StockPresentedScene {
-  get(): { tabId: string; filePath: string } | null;
-  onChange(listener: (scene: { tabId: string; filePath: string } | null) => void): () => void;
+  get(): StockPresentedState | null;
+  onChange(listener: (scene: StockPresentedState | null) => void): () => void;
   showElsewhere(): () => void;
-  set?(scene: { tabId: string; filePath: string } | null): void;
+  set?(scene: StockPresentedState | null): void;
 }
 interface StockSettings {
   getLaserPointerSettings(): { color: string; size: number };
@@ -165,11 +171,25 @@ function viewInfo(view: StockView): ViewInfo {
 }
 
 /** The tab whose scene the view's store holds, loaded: its active tab once the store holds that tab's map. */
-function snapshotTabId(view: StockView): string | null {
+function loadedTabId(view: StockView): string | null {
   const state = view.atlasStore.getState();
   const { tabs, activeTabId } = view.tabMetaStore.getState();
   const tab = tabs.find((entry) => entry.id === activeTabId);
   return tab && loaded(state) && state.mapPath === tab.filePath ? tab.id : null;
+}
+
+/**
+ * The tab whose scene a snapshot holds and shows players: the loaded tab (`loadedTabId`), except while it is the
+ * presented tab and the GM looks at another level than the player view shows (the presented scene's level, the first
+ * where none is named; Atlas's `N4e`). Players keep the last picture then, as Atlas's own online play holds it, instead of
+ * seeing a floor the GM is only browsing.
+ */
+function snapshotTabId(view: StockView, presented: StockPresentedScene | null): string | null {
+  const tabId = loadedTabId(view);
+  const scene = presented?.get();
+  if (tabId === null || !scene || scene.tabId !== tabId) return tabId;
+  const state = view.atlasStore.getState();
+  return levelHeld(state.levels, state.viewedLevel, scene.levelId) ? null : tabId;
 }
 
 /** The loaded background's size in world pixels; 0 × 0 while none is loaded. */
@@ -180,13 +200,13 @@ function mapSize(view: StockView): { width: number; height: number } {
   return sprite && !sprite.destroyed && sprite.width > 0 && sprite.height > 0 ? { width: sprite.width, height: sprite.height } : { width: 0, height: 0 };
 }
 
-function snapshot(view: StockView): SceneSnapshot {
+function snapshot(view: StockView, presented: StockPresentedScene | null): SceneSnapshot {
   const state = view.atlasStore.getState();
   return Object.freeze({
     viewId: view.viewId,
     mapPath: state.mapPath,
     loaded: loaded(state),
-    tabId: snapshotTabId(view),
+    tabId: snapshotTabId(view, presented),
     mapSize: Object.freeze(mapSize(view)),
     // A scene of several floors is sent as the one floor shown (Atlas 0.10), never all of them.
     background: backgroundOfLevel(state.background, state.levels, state.viewedLevel),
@@ -214,9 +234,9 @@ function camera(view: StockView): ViewCamera | null {
 }
 
 /** The slice of a view's stores a snapshot is made of; unchanged by reference means no new snapshot. */
-function snapshotSlice(view: StockView): readonly unknown[] {
+function snapshotSlice(view: StockView, presented: StockPresentedScene | null): readonly unknown[] {
   const s = view.atlasStore.getState();
-  return [snapshotTabId(view), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
+  return [snapshotTabId(view, presented), s.mapPath, s.mapLoaded, s.isMapLoading, s.background, s.grid, s.objects.tokens, s.objects.texts, s.objects.drawings, (s.objects as { pins?: unknown }).pins,
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
     // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
     (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights,
@@ -326,7 +346,7 @@ function trackedView(app: App, viewId: string): StockView | null {
 function presentationApi(app: App, atlas: StockPlugin, presented: StockPresentedScene, disposers: Set<Disposer>): AtlasExtension['presentation'] {
   let counter = 0;
   let presentationId = '';
-  const remember = (scene: { tabId: string; filePath: string } | null): void => {
+  const remember = (scene: StockPresentedState | null): void => {
     if (scene) presentationId = `stock-${Date.now()}-${++counter}`;
   };
   remember(presented.get());
@@ -346,7 +366,8 @@ function presentationApi(app: App, atlas: StockPlugin, presented: StockPresented
     const tab = owner.tabMetaStore.getState().tabs.find((entry) => entry.id === scene.tabId)
       ?? owner.tabMetaStore.getState().tabs.find((entry) => entry.filePath === scene.filePath);
     if (!tab) return null;
-    return Object.freeze({ presentationId, viewId: owner.viewId, tabId: tab.id, mapPath: tab.filePath, held: snapshotTabId(owner) !== tab.id });
+    // Held while the GM's view is not on the presented tab, nor on the presented level (`snapshotTabId`).
+    return Object.freeze({ presentationId, viewId: owner.viewId, tabId: tab.id, mapPath: tab.filePath, held: snapshotTabId(owner, presented) !== tab.id });
   };
 
   return Object.freeze({
@@ -432,7 +453,7 @@ function presentationApi(app: App, atlas: StockPlugin, presented: StockPresented
 /** The name Connect's data is kept under: Atlas's extension folder and the map files' extensions key. */
 export const CONNECT_STORAGE_ID = 'atlas-vtt-connect';
 
-function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
+function viewsApi(app: App, presented: StockPresentedScene | null, disposers: Set<Disposer>): AtlasExtension['views'] {
   const add = (dispose: Disposer): Disposer => {
     disposers.add(dispose);
     return () => { disposers.delete(dispose); dispose(); };
@@ -448,21 +469,23 @@ function viewsApi(app: App, disposers: Set<Disposer>): AtlasExtension['views'] {
     },
     snapshot: (viewId: string): SceneSnapshot | null => {
       const view = trackedView(app, viewId);
-      return view ? snapshot(view) : null;
+      return view ? snapshot(view, presented) : null;
     },
     subscribe: (viewId: string, listener: (snapshot: SceneSnapshot) => void): Disposer => {
       const view = trackedView(app, viewId);
       if (!view || typeof listener !== 'function') return () => undefined;
-      let slice = snapshotSlice(view);
+      let slice = snapshotSlice(view, presented);
       const changed = (): void => {
-        const next = snapshotSlice(view);
+        const next = snapshotSlice(view, presented);
         if (slice.length === next.length && slice.every((value, index) => value === next[index])) return;
         slice = next;
-        guard('view', () => listener(snapshot(view)));
+        guard('view', () => listener(snapshot(view, presented)));
       };
       const stopScene = view.atlasStore.subscribe(changed);
       const stopTabs = view.tabMetaStore.subscribe(changed);
-      return add(() => { stopScene(); stopTabs(); });
+      // Showing another level on the player view changes what is live, with nothing changed in the store.
+      const stopPresented = presented?.onChange(changed) ?? (() => undefined);
+      return add(() => { stopScene(); stopTabs(); stopPresented(); });
     },
     camera: (viewId: string): ViewCamera | null => {
       const view = trackedView(app, viewId);
@@ -491,7 +514,7 @@ const SHOW_TAB_POLL_MS = 500;
 
 /**
  * Makes a tab of a map view active without presenting it, and answers true once its map is loaded in the view's store
- * (`snapshotTabId`). False for an unknown view or tab, when another switch (a later `showTab`, or the GM's own click)
+ * (`loadedTabId`). False for an unknown view or tab, when another switch (a later `showTab`, or the GM's own click)
  * overtakes this one (the view then shows another tab), when the view closes meanwhile, and after 60 seconds. Never throws.
  */
 async function showTab(app: App, viewId: string, tabId: string, disposers: Set<Disposer>): Promise<boolean> {
@@ -512,7 +535,7 @@ async function showTab(app: App, viewId: string, tabId: string, disposers: Set<D
     const check = (): void => {
       const now = trackedView(app, viewId);
       if (!now || now.tabMetaStore.getState().activeTabId !== tabId) finish(false);
-      else if (snapshotTabId(now) === tabId) finish(true);
+      else if (loadedTabId(now) === tabId) finish(true);
     };
     stops.push(view.atlasStore.subscribe(check), view.tabMetaStore.subscribe(check));
     const poll = window.setInterval(check, SHOW_TAB_POLL_MS);
@@ -685,7 +708,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       disposers.add(ui.dispose);
       return Object.freeze({
         id: extensionId,
-        views: viewsApi(app, disposers),
+        views: viewsApi(app, presented, disposers),
         presentation: presentationApi(app, atlasPlugin, presented, disposers),
         rules: Object.freeze({
           forMap: (mapPath: string | null): MapRules => {

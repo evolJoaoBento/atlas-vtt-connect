@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backgroundOfLevel, objectsOnLevel, shownLevel } from '../../../src/connect/stockLevels';
+import { backgroundOfLevel, levelHeld, objectsOnLevel, shownLevel } from '../../../src/connect/stockLevels';
 
 const levels = [{ id: 'ground', background: null }, { id: 'upper', background: 'upper.png' }];
 const objects = {
@@ -32,5 +32,24 @@ describe('Atlas 0.10 levels', () => {
     expect(objectsOnLevel(objects, [{ id: 'only' }], 'only')).toBe(objects);
     expect(shownLevel(undefined, 'x')).toBeNull();
     expect(backgroundOfLevel('ground.png', undefined, undefined)).toBe('ground.png');
+  });
+});
+
+describe('the level players see against the one the GM looks at', () => {
+  it('holds while the GM looks at a level the player view does not show', () => {
+    // The player view shows the presented level, the first where none is named: not the GM's.
+    expect(levelHeld(levels, 'upper', undefined)).toBe(true);
+    expect(levelHeld(levels, 'upper', 'ground')).toBe(true);
+    expect(levelHeld(levels, 'ground', 'upper')).toBe(true);
+    expect(levelHeld(levels, 'ground', undefined)).toBe(false);
+    expect(levelHeld(levels, 'upper', 'upper')).toBe(false);
+    expect(levelHeld(levels, null, undefined)).toBe(false);
+  });
+
+  it('counts a level the scene lacks as none named, and holds nothing for a scene without levels', () => {
+    expect(levelHeld(levels, 'ground', 'gone')).toBe(false);
+    expect(levelHeld(levels, 'upper', 'gone')).toBe(true);
+    expect(levelHeld(undefined, 'upper', 'ground')).toBe(false);
+    expect(levelHeld([{ id: 'only' }], 'only', 'other')).toBe(false);
   });
 });

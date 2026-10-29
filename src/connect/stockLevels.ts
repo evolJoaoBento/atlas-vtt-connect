@@ -57,3 +57,13 @@ export function backgroundOfLevel(background: string | null, levels: unknown, vi
   if (levelId === null || !hasLevels(levels) || levelId === levels[0]?.id) return background;
   return levels.find((level) => level.id === levelId)?.background ?? null;
 }
+
+/**
+ * Whether the GM looks at another level than the one the player view shows (Atlas's `N4e`): the player view shows the
+ * level its presented scene names, the first level where it names none (a level the scene lacks counts as none), and
+ * not the one the GM browses. A scene without levels has nothing to hold.
+ */
+export function levelHeld(levels: unknown, viewed: unknown, presented: unknown): boolean {
+  const shown = shownLevel(levels, viewed);
+  return shown !== null && shown !== shownLevel(levels, presented);
+}
