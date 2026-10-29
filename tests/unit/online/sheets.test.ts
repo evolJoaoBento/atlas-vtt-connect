@@ -51,6 +51,39 @@ describe("a player's sheet", () => {
     expect(sheetRollLabel(sheet, { kind: 'save', index: 0 })).toBe('Dexterity save');
   });
 
+  it("reads Foundry and Roll20 notation as Atlas 0.8's links do: rerolls, success counts, d%, Fate dice, labels and the other operators", () => {
+    const rolls = (text: string): Array<[string, string]> => textParts(text).flatMap((part) => ('roll' in part ? [[part.text, part.formula] as [string, string]] : []));
+    expect(rolls('Roll 2d6r<2 for damage')).toEqual([['2d6r<2', '2d6r<2']]);
+    expect(rolls('6d10>=8 successes')).toEqual([['6d10>=8', '6d10>=8']]);
+    expect(rolls('6d10cs>5 and 4d6cf<2')).toEqual([['6d10cs>5', '6d10cs>5'], ['4d6cf<2', '4d6cf<2']]);
+    expect(rolls('Percentile d% or 2d%')).toEqual([['d%', 'd%'], ['2d%', '2d%']]);
+    expect(rolls('Fate 4dF and 4df')).toEqual([['4dF', '4dF'], ['4df', '4df']]);
+    expect(rolls('Exploding 1d6xo and 2d6x>=5 and 1d6!!3')).toEqual([['1d6xo', '1d6xo'], ['2d6x>=5', '2d6x>=5'], ['1d6!!3', '1d6!!3']]);
+    expect(rolls('Advantage 2d20dl1 or 4d6dh1')).toEqual([['2d20dl1', '2d20dl1'], ['4d6dh1', '4d6dh1']]);
+    expect(rolls('Fire 2d6[Fire] + 1d4[Cold] damage')).toEqual([['2d6[Fire] + 1d4[Cold]', '2d6[Fire]+1d4[Cold]']]);
+    expect(rolls('A label with a space: 1d8[Light Fire]')).toEqual([['1d8[Light Fire]', '1d8[Light Fire]']]);
+    expect(rolls('Multiplied 2d6 * 2 and 1d8 / 2 and 1d4 × 3')).toEqual([['2d6 * 2', '2d6*2'], ['1d8 / 2', '1d8/2'], ['1d4 × 3', '1d4*3']]);
+  });
+
+  it("makes one roll of a run of bonuses, as Atlas 0.9.1 does (`+4+1`), and leaves a value that is an `@` reference alone", () => {
+    const rolls = (text: string): Array<[string, string]> => textParts(text).flatMap((part) => ('roll' in part ? [[part.text, part.formula] as [string, string]] : []));
+    expect(rolls('Attack +4+1 to hit')).toEqual([['+4+1', '+4+1']]);
+    expect(rolls('Hit: 2d8+3-1')).toEqual([['2d8+3-1', '2d8+3-1']]);
+    // A reference Atlas resolves is no roll, nor the number beside it.
+    expect(rolls('1d8 + @str.mod')).toEqual([]);
+    expect(rolls('@agility + 2d6')).toEqual([]);
+    expect(rolls('Damage 2d8 and @str')).toEqual([['2d8', '2d8']]);
+  });
+
+  it('does not take for a roll what only looks like one', () => {
+    const rolls = (text: string): string[] => textParts(text).filter((part) => 'roll' in part).map((part) => part.text);
+    for (const text of ['Recharge 5-6', 'levels 1–3', 'he said 0d6 is nothing', 'pi is 3.14', 'x2d6 and 5d', 'a d is a letter', 'Very Close - Far', 'paid3d6gold', 'a [label]']) {
+      expect(rolls(text)).toEqual([]);
+    }
+    // A single ! after dice is a sentence's end, and a decimal after a sign is no whole bonus.
+    expect(rolls('Roll 2d6! now')).toEqual(['2d6']);
+  });
+
   it("reads dice notation as Atlas's stat blocks do (statblockDiceLinks.test.ts)", () => {
     const linked = (text: string): string[] => textParts(text).filter((part) => 'roll' in part).map((part) => part.text);
     expect(linked('Hit: 19 (2d10 + 8) slashing')).toEqual(['2d10 + 8']);

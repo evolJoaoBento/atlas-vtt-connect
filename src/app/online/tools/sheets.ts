@@ -232,25 +232,89 @@ export function buildSheet(creature: unknown, fallbackName: string | null = null
 export type TextPart = { text: string } | { text: string; roll: number; formula: string };
 
 /**
- * Atlas's dice notation in a stat block's text (`statblockDiceLinks.ts`), so players can roll what Atlas's own stat
- * block would let them. One dice term: `2d8`, `d20`, exploding (`1d6!i`, `1d6!3`, `1d6!!`) and keep marks (`4d6kh3`);
- * a single `!` ends a sentence far more often than it explodes a die.
+ * Atlas's dice notation in a stat block's text, as its link detector reads it (Atlas 0.10.2: `sUn`, `mke`, `D_`; the
+ * Foundry and Roll20 notation of 0.8), © Fabian Urbanek, AGPL-3.0-only, so players can roll what Atlas's own stat block
+ * lets them. One dice term is `2d8`, `d20`, `d%`, `4dF`, with rerolls (`2d6r<2`), explosions (`1d6!i`, `1d6!3`, `1d6!!`,
+ * `1d6xo`), keep and drop (`4d6kh3`, `2d20dl1`) and success counts (`6d10>=8`, `cs>5`), and may carry a `[label]`; terms
+ * join with `+`, `-`, `*`, `/` and `×`. A single `!` ends a sentence far more often than it explodes a die.
  */
-const DIE = String.raw`\d*d\d+(?:!!?(?:\d+|i(?![a-z]))|!!)?(?:k[hl]\d*(?![a-z]))?`;
-/** A further signed term: a die or a constant after `+`, `-`, a minus sign or an en dash, or after "+ -" ("3d6 + -1"). */
-const NEXT_TERM = String.raw`\s*(?:\+\s*-|[+\-−–])\s*(?:${DIE}|\d+)`;
+const BEFORE = String.raw`(?<![\p{L}\p{N}_])`;
+const AFTER = String.raw`(?![\p{L}\p{N}_])`;
+const DIE = String.raw`\d*d(?:\d+|%|f)(?:r[or]?(?:(?:<=|>=|<|>)?\d+)?)?(?:!!(?:\d+|i)?|!(?:\d+|i)|xo?(?:>=?\d+)?)?(?:[kd][hl]?\d*)?(?:(?:c[sf](?:>=|<=|[<>=])|>=|<=)\d+)?`;
+const LABEL = String.raw`(?:\[[\p{L}\p{N} '\-]{1,24}\])?`;
+/** A dice term, or a number that is not the start of a decimal, with its label. */
+const TERM = String.raw`(?:${DIE}|\d+(?!\.\d))${LABEL}${AFTER}`;
+const SIGN = String.raw`[+\-−]`;
+/** What joins terms: `+`, `-`, a minus sign, an en dash, `*`, `/`, `×`, or "+ -" ("3d6 + -1"). */
+const OPERATOR = String.raw`[ \t]*(?:\+[ \t]*-|[+\-−–*/×])[ \t]*`;
 /**
- * Dice expressions (`2d8+3`, `2d6 - 1d4`) and bare bonuses (`+4`, `−1`, `ATK: +4`). Neither starts inside a word or a
- * number; a bare sign must sit on its digits and not open a dice term, so the dash in "Very Close - 1d12+2" is no roll.
+ * Dice expressions (`2d8+3`, `2d6 - 1d4`) and bonuses (`+4`, `−1`, `+4+1`, `ATK: +4`). None starts inside a word or a
+ * number; a bare sign must sit on its digits, so the dash in "Very Close - 1d12+2" is no roll.
  */
-const DICE_PATTERN = new RegExp(String.raw`((?<!\w)${DIE}(?:${NEXT_TERM})*|(?:ATK|Attack)\s*:\s*[+-]\d+|(?<!\w)[+\-−]\d+(?!\s*d\d))`, 'gi');
+const DICE_PATTERN = new RegExp(String.raw`${BEFORE}(?:(?:ATK|Attack)[ \t]*:[ \t]*${SIGN}${TERM}|${SIGN}${TERM}|${DIE}${LABEL}${AFTER})(?:${OPERATOR}${TERM})*`, 'giu');
+/** A whole text that is one expression, to the end (`aUn`). */
+const WHOLE_EXPRESSION = new RegExp(String.raw`^(?:(?:ATK|Attack)[ \t]*:[ \t]*)?${SIGN}?${TERM}(?:${OPERATOR}${TERM})*$`, 'iu');
+/** A value written as `@name` is a reference Atlas resolves, never part of a link beside it (`iUn`, `oUn`). */
+const REFERENCE_AFTER = /^[\s()+\-−–*/×]*(?<![\w.])@[A-Za-z_]/u;
+const REFERENCE_BEFORE = /(?<![\w.])@[A-Za-z_][\w.-]*[\s()+\-−–*/×]*$/u;
+
+/** The text as Atlas writes a formula (`qSt`): trimmed, without a leading `ATK:`, with plain minus signs, `*` for `×`, `-` for "+ -". */
+function normalised(text: string): string {
+  return text.trim().replace(/^(?:ATK|Attack)[ \t]*:[ \t]*/i, '').replace(/[−–]/g, '-').replace(/×/g, '*').replace(/\+[ \t]*-/g, '-');
+}
 
 /**
- * The formula Atlas rolls for matched text (`toRollFormula`). A bare bonus stays bare: Atlas adds it to the dice set's
- * default roll, so "+5 to hit" rolls the collection's own die.
+ * The formula Atlas rolls for matched text (`N_`): normalised, without spaces except in a `[label]`. A bare bonus stays
+ * bare: Atlas adds it to the dice set's default roll, so "+5 to hit" rolls the collection's own die.
  */
 export function toRollFormula(text: string): string {
-  return text.replace(/\s+/g, '').replace(/^(?:ATK|Attack):/i, '').replace(/[−–]/g, '-').replace(/\+-/g, '-');
+  return normalised(text).replace(/\s+(?![^[]*\])/g, '');
+}
+
+/** Whether matched text is a roll (`BSt`): it opens with a sign, or holds a dice term of at least one die ("0d6" is none). */
+function isRoll(text: string): boolean {
+  const formula = normalised(text);
+  if (/^[+-]/.test(formula)) return true;
+  return [...formula.matchAll(/(?<![\p{L}\p{N}_])(\d*)d(?:\d+|%|f)/giu)].some((term) => term[1] === '' || Number(term[1]) > 0);
+}
+
+/** A text cut into plain pieces and the rolls Atlas's detector finds in it (`rUn`); a roll is no roll beside an `@` reference. */
+function rollPieces(desc: string): Array<{ text: string; formula: string | null }> {
+  const pieces: Array<{ text: string; formula: string | null }> = [];
+  const plain = (text: string): void => {
+    const last = pieces[pieces.length - 1];
+    if (last && last.formula === null) last.text += text;
+    else pieces.push({ text, formula: null });
+  };
+  let last = 0;
+  for (const match of desc.matchAll(DICE_PATTERN)) {
+    const at = match.index ?? 0;
+    if (at > last) plain(desc.slice(last, at));
+    const end = at + match[0].length;
+    const linked = !REFERENCE_AFTER.test(desc.slice(end)) && !REFERENCE_BEFORE.test(desc.slice(0, at)) && isRoll(match[0]);
+    if (linked) pieces.push({ text: match[0], formula: toRollFormula(match[0]) });
+    else plain(match[0]);
+    last = end;
+  }
+  if (last < desc.length) plain(desc.slice(last));
+  return pieces;
+}
+
+/**
+ * The detector's pieces (`D_`): where plain text with a digit is left over, the whole text is tried as one expression
+ * (a cell that is only "d20 + 3 - 1"), and kept as the pieces where it is none.
+ */
+function dicePieces(desc: string): Array<{ text: string; formula: string | null }> {
+  const pieces = rollPieces(desc);
+  if (!pieces.some((piece) => piece.formula === null && /\d/.test(piece.text))) return pieces;
+  const whole = desc.trim();
+  if (whole === '' || !WHOLE_EXPRESSION.test(whole) || !isRoll(whole)) return pieces;
+  const start = desc.indexOf(whole);
+  return [
+    { text: desc.slice(0, start), formula: null },
+    { text: whole, formula: toRollFormula(whole) },
+    { text: desc.slice(start + whole.length), formula: null },
+  ].filter((piece) => piece.text !== '');
 }
 
 /** A number on its own, signed or not; a template block with `rollable` rolls it. */
@@ -270,9 +334,14 @@ export function textParts(desc: string, rollable = false): TextPart[] {
   const parts: TextPart[] = [];
   let last = 0;
   let index = 0;
-  const own = [...desc.matchAll(DICE_PATTERN)];
+  const own: Array<{ at: number; text: string; formula: string }> = [];
+  let at = 0;
+  for (const piece of dicePieces(desc)) {
+    if (piece.formula !== null) own.push({ at, text: piece.text, formula: piece.formula });
+    at += piece.text.length;
+  }
   const matches = own.length > 0 || !rollable
-    ? own.map((match) => ({ at: match.index ?? 0, text: match[0], formula: toRollFormula(match[0]) }))
+    ? own
     : [...desc.matchAll(PLAIN_NUMBER)].map((match) => ({ at: match.index ?? 0, text: match[0], formula: rollableBonus(match[0]) }));
   for (const match of matches) {
     if (match.at > last) parts.push({ text: desc.slice(last, match.at) });
