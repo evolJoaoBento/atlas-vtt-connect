@@ -5,12 +5,12 @@ import type { DiceSelection } from '@atlas-vtt/shared/rules';
 function setup(sends = true) {
   document.body.innerHTML = '<div id="dice-tray" hidden></div>';
   const root = document.getElementById('dice-tray')!;
-  const rolls: Array<{ dice: DiceSelection; modifier: number }> = [];
+  const rolls: Array<{ dice: DiceSelection; modifier: number; advantage?: string }> = [];
   let closed = 0;
   const view = new DiceTrayView({
     root,
-    roll: (dice, modifier) => {
-      rolls.push({ dice, modifier });
+    roll: (dice, modifier, advantage) => {
+      rolls.push({ dice, modifier, ...(advantage ? { advantage } : {}) });
       return sends;
     },
     onClose: () => { closed++; },
@@ -81,5 +81,54 @@ describe('the join page dice tray', () => {
     clear.click();
     expect(t.view.tray.isEmpty()).toBe(true);
     expect(clear.hidden).toBe(true);
+  });
+});
+
+describe('rolling with advantage or disadvantage from the tray', () => {
+  const sideButton = (root: HTMLElement, name: string): HTMLButtonElement => root.querySelector<HTMLButtonElement>(`.tray-side[aria-label="${name}"]`)!;
+
+  it('offers Normal, Advantage and Disadvantage for a roll of one d20, and for no other', () => {
+    const { root, die } = setup();
+    const choices = [...root.querySelectorAll<HTMLButtonElement>('.tray-side')];
+    expect(choices.map((choice) => choice.textContent)).toEqual(['Normal', 'Advantage', 'Disadvantage']);
+    // Off with an empty tray, with a d6, with two d20 and with a d20 beside another die.
+    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    die('d6').click();
+    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    root.querySelector<HTMLButtonElement>('.tray-clear')!.click();
+    die('d20').click();
+    expect(choices.every((choice) => !choice.disabled)).toBe(true);
+    expect(sideButton(root, 'Normal').getAttribute('aria-pressed')).toBe('true');
+    die('d20').click();
+    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    root.querySelector<HTMLButtonElement>('.tray-clear')!.click();
+    die('d20').click();
+    die('d4').click();
+    expect(choices.every((choice) => choice.disabled)).toBe(true);
+  });
+
+  it('sends the side the player chose with a roll of one d20, and nothing for Normal', () => {
+    const { root, die, named, rolls } = setup();
+    die('d20').click();
+    sideButton(root, 'Advantage').click();
+    expect(sideButton(root, 'Advantage').getAttribute('aria-pressed')).toBe('true');
+    expect(sideButton(root, 'Normal').getAttribute('aria-pressed')).toBe('false');
+    named('Roll').click();
+    expect(rolls).toEqual([{ dice: { d20: 1 }, modifier: 0, advantage: 'advantage' }]);
+    // The tray opens empty and normal again.
+    die('d20').click();
+    sideButton(root, 'Disadvantage').click();
+    sideButton(root, 'Normal').click();
+    named('Roll').click();
+    expect(rolls[1]).toEqual({ dice: { d20: 1 }, modifier: 0 });
+  });
+
+  it('forgets a side the roll no longer takes: with a second die the roll goes without it, and back to one d20 it is normal', () => {
+    const { root, die, named, rolls } = setup();
+    die('d20').click();
+    sideButton(root, 'Advantage').click();
+    die('d6').click();
+    named('Roll').click();
+    expect(rolls[0]).toEqual({ dice: { d20: 1, d6: 1 }, modifier: 0 });
   });
 });

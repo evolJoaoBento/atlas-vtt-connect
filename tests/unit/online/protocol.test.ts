@@ -189,3 +189,21 @@ describe('online protocol', () => {
     });
   });
 });
+
+describe('a tray roll with a side', () => {
+  const roll = { v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 };
+
+  it('carries advantage or disadvantage, and is as before without one', () => {
+    for (const advantage of ['advantage', 'disadvantage']) {
+      const message = { ...roll, advantage } as ControlMessage;
+      expect(decodeControl(encodeControl(message))).toEqual({ kind: 'message', message });
+    }
+    expect(decodeControl(encodeControl(roll as ControlMessage))).toEqual({ kind: 'message', message: roll });
+  });
+
+  it('refuses a side that is neither', () => {
+    for (const advantage of ['sideways', '', 1, null, true]) {
+      expect(decodeControl(JSON.stringify({ ...roll, advantage })).kind).not.toBe('message');
+    }
+  });
+});

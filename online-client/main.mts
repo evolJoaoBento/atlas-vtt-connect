@@ -89,7 +89,7 @@ const map = surface
   : null;
 const diceTray = new DiceTrayView({
   root: element('dice-tray'),
-  roll: (dice, modifier) => session?.sendDiceRoll(dice, modifier) ?? false,
+  roll: (dice, modifier, advantage) => session?.sendDiceRoll(dice, modifier, advantage) ?? false,
   onClose: () => setDiceOpen(false),
 });
 const diceDisplay = new DiceDisplayView(element('dice-display'), loadDiceDisplay(() => localStorage), (display) => {

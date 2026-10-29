@@ -164,7 +164,8 @@ export class DiceHost implements SessionHandler {
       console.warn('[Atlas VTT Connect] A player roll was ignored: Atlas does not roll that formula.');
       return;
     }
-    this.rollFor(player, formula);
+    // A side the player chose in the tray goes with the roll, as one from a sheet does.
+    this.rollFor(player, formula, message.advantage ? { advantage: message.advantage } : {});
   }
 
   /**

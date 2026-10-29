@@ -10,7 +10,7 @@ import type { BoardCamera, BoardExtras } from './scene/boardTypes';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
-import type { SheetRollRef, TokenSheet } from './tools/sheets';
+import type { AdvantageSide, SheetRollRef, TokenSheet } from './tools/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
@@ -161,9 +161,9 @@ export class PlayerSession {
   }
 
   /** Asks the GM to roll; false when it cannot go (not admitted, no link). */
-  sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
+  sendDiceRoll(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean {
     if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier }));
+    this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier, ...(advantage ? { advantage } : {}) }));
     return true;
   }
 

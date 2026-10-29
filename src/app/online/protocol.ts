@@ -10,7 +10,7 @@ import {
 } from './scene/sceneValidation';
 import type { BoardCamera, BoardExtras } from './scene/boardTypes';
 import { isBoardCamera, isBoardExtras, isBoardPart } from './scene/boardValidation';
-import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
+import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
 import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
@@ -104,8 +104,8 @@ export type ControlMessage =
   | { v: 1; type: 'token-move'; sceneId: string; tokenId: string; x: number; y: number }
   /** GM to the player who sent the move: it failed a check, so the token stays where the scene has it. */
   | { v: 1; type: 'token-move-refused'; tokenId: string }
-  /** Player to GM: a roll from the dice tray, rolled on the GM's side. */
-  | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number }
+  /** Player to GM: a roll from the dice tray, rolled on the GM's side; with `advantage`, on the side the player chose (a lone d20). */
+  | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number; advantage?: AdvantageSide }
   /** Player to GM: dice thrown on Tabletop's board, every die as it landed; sent only when the GM offered `diceResults`. */
   | { v: 1; type: 'dice-result'; rolls: PhysicalDie[]; modifier: number; label?: string; sheet?: { tokenId: string; roll: SheetRollRef } }
   /** GM to players: dice log entries, newest first; `replay` replaces a player's log (sent on every admission). */
@@ -195,7 +195,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
   'token-move-refused': (m) => isSceneId(m.tokenId),
-  'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier),
+  'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier) && (m.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(m.advantage)),
   'dice-result': (m) => isPhysicalRoll(m),
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'

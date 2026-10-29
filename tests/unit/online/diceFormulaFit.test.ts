@@ -68,6 +68,15 @@ describe('DiceHost with a roll Atlas refuses', () => {
     expect(warn).toHaveBeenCalledOnce();
   });
 
+  it('hands the side a player chose in the tray to Atlas with the roll, and none for a normal roll', () => {
+    const roll = vi.fn();
+    const dice = host(roll as never);
+    dice.onMessage(player, { v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2, advantage: 'advantage' });
+    dice.onMessage(player, { v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 });
+    expect(roll).toHaveBeenNthCalledWith(1, expect.objectContaining({ formula: 'd20+2', advantage: 'advantage', rolledBy: 'Anna' }));
+    expect(roll.mock.calls[1]?.[0]).not.toHaveProperty('advantage');
+  });
+
   it('rolls the widest roll a player can send', () => {
     const roll = vi.fn();
     host(roll as never).onMessage(player, { v: 1, type: 'dice-roll', dice: { d4: 3, d6: 3, d8: 3, d10: 3, d12: 3, d20: 3, d100: 2 }, modifier: -1000 });

@@ -6,7 +6,7 @@
  * remote view; it needs nothing of Atlas's map.
  */
 import { SheetView } from '../../../../online-client/sheetView.mts';
-import type { SheetRollRef, TokenSheet } from '../tools/sheets';
+import type { AdvantageSide, SheetRollRef, TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { PinNoteAnswer } from '../tools/pinNotes';
@@ -98,7 +98,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.view = this.makeMap();
     this.tray = new DiceTrayView({
       root: dom.diceTray,
-      roll: (dice, modifier) => this.rollDice(dice, modifier),
+      roll: (dice, modifier, advantage) => this.rollDice(dice, modifier, advantage),
       onClose: () => this.setDiceOpen(false),
     });
 
@@ -416,8 +416,12 @@ export class CanvasScene implements OnlineSceneSink {
     return admitted && this.view instanceof BoardSceneView && this.diceOffer && this.view.throwsDice ? this.view : null;
   }
 
-  /** A roll from the tray: thrown on the board where it can be, else rolled by the GM; false when it did not go. */
-  private rollDice(dice: DiceSelection, modifier: number): boolean {
+  /**
+   * A roll from the tray: thrown on the board where it can be, else rolled by the GM; false when it did not go. One with
+   * a side (advantage or disadvantage) is the GM's to roll, as the board throws no second die to keep or drop.
+   */
+  private rollDice(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean {
+    if (advantage) return this.options.service.sendDiceRoll(dice, modifier, advantage);
     return this.throwOr({ dice, modifier }, () => this.options.service.sendDiceRoll(dice, modifier));
   }
 

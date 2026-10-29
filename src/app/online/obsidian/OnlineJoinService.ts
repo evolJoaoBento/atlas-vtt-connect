@@ -5,7 +5,7 @@
  * Images stay until the session is left, so the tab keeps the last scene after the session ends and
  * Reconnect still has them. Nothing here reads or writes the vault.
  */
-import type { SheetRollRef } from '../tools/sheets';
+import type { AdvantageSide, SheetRollRef } from '../tools/sheets';
 import type { PhysicalRoll } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 import { Notice, type App } from 'obsidian';
@@ -274,8 +274,8 @@ export class OnlineJoinService {
     return this.joined?.session?.sendTokenMove(tokenId, x, y) ?? false;
   }
 
-  sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
-    return this.joined?.session?.sendDiceRoll(dice, modifier) ?? false;
+  sendDiceRoll(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean {
+    return this.joined?.session?.sendDiceRoll(dice, modifier, advantage) ?? false;
   }
 
   /** Sends dice the player threw on Tabletop's board; false when the GM takes none or it cannot go. */

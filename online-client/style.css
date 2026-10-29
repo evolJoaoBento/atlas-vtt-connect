@@ -245,6 +245,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tray-modifier-label { margin-right: auto; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .tray-step { width: 32px; height: 32px; }
 .tray-modifier-value { width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.tray-sides { display: flex; gap: 4px; }
+.tray-sides.is-off { opacity: 0.5; }
+.tray-side { flex: 1; min-height: 32px; padding: 0 8px; font-size: 12px; }
+.tray-side.is-chosen { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .tray-formula {
   margin: 0; padding: 4px var(--inset); border: 1px solid var(--border); border-radius: 8px; background: var(--hover);
   text-align: center; font-variant-numeric: tabular-nums;

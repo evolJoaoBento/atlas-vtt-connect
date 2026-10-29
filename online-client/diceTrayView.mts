@@ -6,8 +6,9 @@
  * formula, Roll and Clear. The tray's rules live in `DiceTray` (`src/app/online/page/diceTray.ts`).
  */
 import {
-  addDieLabel, CLEAR_LABEL, DiceTray, EMPTY_TRAY_TEXT, MODIFIER_LABEL, removeDieLabel, ROLL_LABEL,
+  addDieLabel, CLEAR_LABEL, DiceTray, EMPTY_TRAY_TEXT, MODIFIER_LABEL, removeDieLabel, ROLL_LABEL, SIDE_LABEL, SIDE_NAMES,
 } from '../src/app/online/page/diceTray';
+import type { AdvantageSide } from '../src/app/online/tools/sheets';
 import { DIE_ART } from '../src/app/online/page/dieArt';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import { MAX_MODIFIER, TRAY_DICE, type TrayDie } from '@atlas-vtt/shared/rules';
@@ -16,8 +17,8 @@ import { iconElement } from './icons.mts';
 
 export interface DiceTrayViewOptions {
   root: HTMLElement;
-  /** Sends the roll to the GM; false when it could not go. */
-  roll(dice: DiceSelection, modifier: number): boolean;
+  /** Sends the roll to the GM, with the side the player chose where one applies; false when it could not go. */
+  roll(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean;
   /** The tray rolled and wants to close. */
   onClose(): void;
 }
@@ -57,6 +58,8 @@ export class DiceTrayView {
   private readonly rollButton: HTMLButtonElement;
   private readonly clearButton: HTMLButtonElement;
   private readonly note: HTMLElement;
+  private readonly sides: HTMLElement;
+  private readonly sideButtons = new Map<'normal' | AdvantageSide, HTMLButtonElement>();
 
   constructor(private readonly options: DiceTrayViewOptions) {
     const row = document.createElement('div');
@@ -73,6 +76,22 @@ export class DiceTrayView {
     this.modifierValue = document.createElement('span');
     this.modifierValue.className = 'tray-modifier-value';
     modifier.append(label, this.decrease, this.modifierValue, this.increase);
+
+    // Normal, Advantage or Disadvantage, for the one d20 roll that can take a side; there but off for any other.
+    this.sides = document.createElement('div');
+    this.sides.className = 'tray-sides';
+    this.sides.setAttribute('role', 'group');
+    this.sides.setAttribute('aria-label', SIDE_LABEL);
+    for (const side of ['normal', 'advantage', 'disadvantage'] as const) {
+      const choice = button('tray-side', SIDE_NAMES[side]);
+      choice.textContent = SIDE_NAMES[side];
+      choice.addEventListener('click', () => {
+        this.tray.chooseSide(side === 'normal' ? null : side);
+        this.render();
+      });
+      this.sideButtons.set(side, choice);
+      this.sides.append(choice);
+    }
 
     // Always there, even empty: a region that appears with its content goes unheard by screen readers.
     this.formula = document.createElement('p');
@@ -93,7 +112,7 @@ export class DiceTrayView {
     this.note = document.createElement('p');
     this.note.className = 'dice-note';
     this.note.setAttribute('role', 'status');
-    options.root.replaceChildren(row, modifier, this.formula, actions, this.note);
+    options.root.replaceChildren(row, modifier, this.sides, this.formula, actions, this.note);
     this.render();
   }
 
@@ -143,7 +162,7 @@ export class DiceTrayView {
   private roll(): void {
     const roll = this.tray.roll();
     if (!roll) return;
-    if (!this.options.roll(roll.dice, roll.modifier)) {
+    if (!this.options.roll(roll.dice, roll.modifier, roll.advantage)) {
       // Not sent (too fast, or not connected): the tray keeps its dice for another try.
       this.note.textContent = ROLL_WAIT_NOTE;
       return;
@@ -176,6 +195,14 @@ export class DiceTrayView {
     const formula = this.tray.formula();
     this.formula.textContent = formula === '' ? EMPTY_TRAY_TEXT : formula;
     this.formula.classList.toggle('is-empty', formula === '');
+    const applies = this.tray.canChooseSide();
+    const chosen = this.tray.side ?? 'normal';
+    this.sides.classList.toggle('is-off', !applies);
+    for (const [side, choice] of this.sideButtons) {
+      choice.disabled = !applies;
+      choice.setAttribute('aria-pressed', String(applies && side === chosen));
+      choice.classList.toggle('is-chosen', applies && side === chosen);
+    }
     this.rollButton.disabled = formula === '';
     this.clearButton.hidden = this.tray.isEmpty();
   }
