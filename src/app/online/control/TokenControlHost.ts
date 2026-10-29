@@ -18,6 +18,8 @@ export interface TokenControlHostOptions {
   /** The scene each player has (the scene hub): lists and moves are worked out against it. */
   projection: SlotProjection;
   tokens: Pick<TokensApi, 'move'>;
+  /** Whether players move only on their turn (`TokenMoveHandler`); without it they move at any time. */
+  movesOnTurn?: () => boolean;
 }
 
 /** What the GM reads when this Atlas cannot land players' moves (no `tokens` capability): nobody can drag. */

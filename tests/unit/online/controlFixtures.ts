@@ -75,7 +75,7 @@ export interface ControlPlayer {
   controlLists(): string[][];
 }
 
-export function controlWorld(options: { scene?: ControlScene } = {}) {
+export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let host: TokenControlHost | null = null;
@@ -87,7 +87,7 @@ export function controlWorld(options: { scene?: ControlScene } = {}) {
   gm.start();
   const scene = presentedScene(gm, options.scene ?? {});
   const { tokens } = scene.presented.extension;
-  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens });
+  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}) });
   host = controlHost;
   controlHost.start();
   const players: ControlPlayer[] = [];

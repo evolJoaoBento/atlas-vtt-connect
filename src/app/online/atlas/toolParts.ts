@@ -13,8 +13,20 @@ import type { MapTemplate } from '../tools/templates';
 import type { SheetCard } from '../tools/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
-export function tokenControlPart(tokens: TokensApi): NonNullable<OptionalParts['tokenControl']> {
-  return ({ session, projection }) => new TokenControlHost({ session, projection, tokens });
+export function tokenControlPart(tokens: TokensApi, movesOnTurn?: () => boolean): NonNullable<OptionalParts['tokenControl']> {
+  return ({ session, projection }) => new TokenControlHost({ session, projection, tokens, ...(movesOnTurn ? { movesOnTurn } : {}) });
+}
+
+/**
+ * Whether the GM lets players move only on their turn (Atlas's `initiativeMovesOnTurn`, off by default): read at each
+ * move, and false where Atlas reports no such rule, which is how moves went before it had one.
+ */
+export function movesOnTurn(settings: Pick<SettingsApi, 'get'>): boolean {
+  try {
+    return (settings.get('playerView') as { movesOnTurn?: unknown }).movesOnTurn === true;
+  } catch {
+    return false;
+  }
 }
 
 /** The dice rules of the collection holding a map, as the GM offers them and judges players' physical rolls by; Atlas's defaults when they cannot be read. */

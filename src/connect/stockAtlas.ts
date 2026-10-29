@@ -105,6 +105,8 @@ interface StockSettings {
   getDiceLook(): { colour: string; font: string };
   getDiceDisplay(): AtlasSettingsView['diceDisplay'];
   getLocalPlayerViewSettings(): Record<string, unknown>;
+  /** What the initiative tracker does as the turn moves on (`movesOnTurn`: players move only on their turn); absent on an Atlas without it. */
+  initiativeTurnOptions?(): { movesOnTurn?: unknown };
   /** Whether an experimental feature is switched on (`dynamicLighting`); absent on an Atlas without them. */
   isExperimentalOn?(id: string): unknown;
   onChange(listener: () => void): () => void;
@@ -264,6 +266,16 @@ function defaultRules(): MapRules {
   });
 }
 
+/** The initiative tracker's turn options, read as they are; none where this Atlas keeps no such setting or it cannot be read. */
+function turnOptions(service: StockSettings): { movesOnTurn?: unknown } {
+  try {
+    const options = service.initiativeTurnOptions?.();
+    return isObj(options) ? options : {};
+  } catch {
+    return {};
+  }
+}
+
 function settingsView(service: StockSettings): AtlasSettingsView {
   const laser = service.getLaserPointerSettings();
   const look = service.getDiceLook();
@@ -274,7 +286,12 @@ function settingsView(service: StockSettings): AtlasSettingsView {
     diceDisplay: service.getDiceDisplay(),
     // Stock 0.7 has no `showGrid` rule: players see the grid as the GM set it (the scene's own `visible` still hides it).
     // `showDiceRolls` is no rule of the API's: it says whether the GM's rolls are shared with players, as Atlas's own online play reads it.
-    playerView: { ...Object.fromEntries(PLAYER_VIEW_KEYS.map((key) => [key, key === 'showGrid' ? player[key] !== false : player[key] === true])), showDiceRolls: player.showDiceRolls === true } as unknown as AtlasSettingsView['playerView'],
+    // `movesOnTurn` is none either: whether players may move a token only while it has the turn.
+    playerView: {
+      ...Object.fromEntries(PLAYER_VIEW_KEYS.map((key) => [key, key === 'showGrid' ? player[key] !== false : player[key] === true])),
+      showDiceRolls: player.showDiceRolls === true,
+      movesOnTurn: turnOptions(service).movesOnTurn === true,
+    } as unknown as AtlasSettingsView['playerView'],
   };
 }
 

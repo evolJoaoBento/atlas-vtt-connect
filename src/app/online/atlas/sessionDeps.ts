@@ -6,7 +6,7 @@ import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
 import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, gmRollsShared, laserRelayPart, offeredRulesOf, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, gmRollsShared, laserRelayPart, movesOnTurn, offeredRulesOf, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -74,7 +74,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
       onChange: (cb) => atlas.on('settings-changed', (key) => { if (key === 'playerView') cb(); }),
     },
     ...(diceLooks ? { diceLook: diceLooks } : {}),
-    ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
+    ...(tokens ? { tokenControl: tokenControlPart(tokens, () => movesOnTurn(atlas.settings)) } : {}),
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
     // Players' physical rolls are judged by the rules the board offer tells them.
     ...(dice ? { dice: diceHostPart(dice, diceRules, () => gmRollsShared(atlas.settings)), diceRules } : {}),

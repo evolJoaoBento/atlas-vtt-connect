@@ -349,3 +349,15 @@ describe('whether the GM shares their rolls (Atlas `showDiceRolls`)', () => {
     expect(gmRollsShared({ get: () => { throw new Error('gone'); } } as never)).toBe(true);
   });
 });
+
+describe('whether players move only on their turn (Atlas initiativeMovesOnTurn)', () => {
+  const settings = (view: unknown) => ({ get: () => view }) as never;
+
+  it('reads the player view rule, and takes a missing one to mean no hold, as moves went before Atlas had it', async () => {
+    const { movesOnTurn } = await import('../../../src/app/online/atlas/toolParts');
+    expect(movesOnTurn(settings({ movesOnTurn: true }))).toBe(true);
+    expect(movesOnTurn(settings({ movesOnTurn: false }))).toBe(false);
+    expect(movesOnTurn(settings({ showGrid: true }))).toBe(false);
+    expect(movesOnTurn({ get: () => { throw new Error('gone'); } } as never)).toBe(false);
+  });
+});

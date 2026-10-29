@@ -17,6 +17,7 @@ import type { SceneSession } from '../scene/sceneSources';
 import type { ScenePoint } from '../scene/sceneTypes';
 import type { SlotProjection } from '../scene/slotViews';
 import type { TokenControl } from './TokenControl';
+import { heldOffTurn } from './turnHold';
 
 export const MOVES_PER_SECOND = 10;
 
@@ -29,6 +30,8 @@ export interface TokenMoveHandlerOptions {
   control: TokenControl;
   /** Atlas's token moves: the snapping, the map edge and the undo step are its. */
   tokens: Pick<TokensApi, 'move'>;
+  /** Whether the GM lets players move only on their turn (Atlas's "Players move only on their turn"); asked at each move. Without it they may move at any time. */
+  movesOnTurn?: () => boolean;
 }
 
 /** At most `MOVES_PER_SECOND` moves per player in any one-second window; refused ones count. */
@@ -72,6 +75,8 @@ export class TokenMoveHandler implements SessionHandler {
     const slot = projection.slotOf(playerId);
     const scene = slot?.lastSent;
     if (!slot || !scene || scene.sceneId !== move.sceneId) return false;
+    // During a fight the token must have the turn, where the GM asks for that: judged on what the player was sent.
+    if (this.options.movesOnTurn?.() === true && heldOffTurn(scene, move.tokenId)) return false;
     // Checked before the clamp: a clamp would turn an infinite coordinate into a point on the map's edge.
     if (!Number.isFinite(move.x) || !Number.isFinite(move.y)) return false;
     const { x, y } = clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene));
