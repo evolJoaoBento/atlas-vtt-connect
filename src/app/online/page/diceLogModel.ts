@@ -6,7 +6,7 @@
  */
 import type { RolledDie } from '@atlas-vtt/shared/rules';
 import { diceRollerLabel } from '../split/splitCopy';
-import { DICE_LIMITS, type DiceLogEntry } from '../tools/toolMessages';
+import { DICE_LIMITS, type DiceLogEntry, type LoggedDie } from '../tools/toolMessages';
 
 /** Who rolled, as the log shows it: "Anna · Cave" while the roll carries its roller's scene (D7), else the name. */
 export function rollerLabel(entry: DiceLogEntry): string {
@@ -110,16 +110,31 @@ export class PlayerDiceLog {
   }
 }
 
+/** The sides of a logged die: a Fate die (dF) has one, as Atlas writes it. */
+const sidesOf = (die: string): number => (die === 'dF' ? 1 : Number(die.slice(1)));
+
 /** A logged roll's dice as Atlas rolled them: each with its sides (`max`) and flags. */
 export function entryRolls(entry: Pick<DiceLogEntry, 'dice'>): RolledDie[] {
   return entry.dice.map(({ die, value, negative, exploded, color, colorName }) => ({
-    die, value, max: Number(die.slice(1)), ...(negative && { negative }), ...(exploded && { exploded }),
+    die, value, max: sidesOf(die), ...(negative && { negative }), ...(exploded && { exploded }),
     ...(color !== undefined && { color }), ...(colorName !== undefined && { colorName }),
   }));
 }
 
-/** A die at its highest face is 'max' and at 1 'min', as Atlas's log marks them (`DiceRollEntry`). */
+/** A die at its highest face is 'max' and at 1 'min', as Atlas's log marks them (`DiceRollEntry`); a Fate die has neither. */
 export function dieExtreme(die: { die: string; value: number }): 'max' | 'min' | null {
-  if (die.value === Number(die.die.slice(1))) return 'max';
+  if (die.die === 'dF') return null;
+  if (die.value === sidesOf(die.die)) return 'max';
   return die.value === 1 ? 'min' : null;
+}
+
+/**
+ * How a logged die is marked, as Atlas's log marks it: a die counted for nothing (dropped, or rolled again) is struck
+ * through, and where a roll counts successes, each die shows as one or as a failure.
+ */
+export function dieMarks(die: Pick<LoggedDie, 'dropped' | 'rerolled' | 'success' | 'failure'>): string[] {
+  return [
+    ...(die.dropped ? ['is-dropped'] : []), ...(die.rerolled ? ['is-rerolled'] : []),
+    ...(die.success ? ['is-success'] : []), ...(die.failure ? ['is-failure'] : []),
+  ];
 }

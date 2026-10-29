@@ -43,6 +43,11 @@ export interface LoggedDie {
   colorName?: string;
   /** Counted for nothing: a die advantage or a keep mark dropped (Atlas 0.8's `RolledDie.dropped`); an older page ignores it. */
   dropped?: true;
+  /** Counted for nothing: rolled again (Atlas 0.8's rerolls), the die that replaced it follows; an older page ignores it. */
+  rerolled?: true;
+  /** Counted as a success or a failure, where the roll counts them (`6d10>=8`); an older page ignores them. */
+  success?: true;
+  failure?: true;
 }
 
 /** One roll in the shared dice log. */
@@ -192,9 +197,16 @@ const isFlag = (value: unknown): boolean => value === undefined || value === tru
 
 function isLoggedDie(value: unknown): value is LoggedDie {
   if (!isFields(value) || typeof value.die !== 'string') return false;
-  const sides = DIE.exec(value.die)?.[1];
-  return sides !== undefined && Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= Number(sides)
-    && isFlag(value.negative) && isFlag(value.exploded) && isFlag(value.dropped);
+  const number = value.value;
+  // A Fate die (Atlas 0.8's dF) reads -1, 0 or 1; any other die from 1 up to its sides.
+  const read = value.die === 'dF'
+    ? number === -1 || number === 0 || number === 1
+    : (() => {
+      const sides = DIE.exec(value.die)?.[1];
+      return sides !== undefined && Number.isSafeInteger(number) && (number as number) >= 1 && (number as number) <= Number(sides);
+    })();
+  return read && isFlag(value.negative) && isFlag(value.exploded) && isFlag(value.dropped)
+    && isFlag(value.rerolled) && isFlag(value.success) && isFlag(value.failure);
 }
 
 export function isDiceLogEntry(value: unknown): value is DiceLogEntry {
@@ -243,8 +255,13 @@ export function isLaserColor(value: unknown): value is string {
 export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry | null {
   const all = result.rolls.map((rolled): LoggedDie => {
     const { die, value, negative, exploded } = rolled;
-    const dropped = (rolled as { dropped?: unknown }).dropped === true;
-    return { die, value, ...(negative && { negative }), ...(exploded && { exploded }), ...(dropped && { dropped: true as const }), ...dieTagOf(rolled) };
+    const flags = rolled as { dropped?: unknown; rerolled?: unknown; success?: unknown; failure?: unknown };
+    return {
+      die, value, ...(negative && { negative }), ...(exploded && { exploded }),
+      ...(flags.dropped === true && { dropped: true as const }), ...(flags.rerolled === true && { rerolled: true as const }),
+      ...(flags.success === true && { success: true as const }), ...(flags.failure === true && { failure: true as const }),
+      ...dieTagOf(rolled),
+    };
   });
   const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
   // A roll made elsewhere (physical dice) may come with dice its own list leaves out already.

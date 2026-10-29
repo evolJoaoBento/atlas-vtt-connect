@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DICE_TOAST_MS, dieExtreme, mergeDiceLog, ownRolls, PlayerDiceLog } from '../../../src/app/online/page/diceLogModel';
+import { DICE_TOAST_MS, dieExtreme, dieMarks, entryRolls, mergeDiceLog, ownRolls, PlayerDiceLog } from '../../../src/app/online/page/diceLogModel';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 
 const entry = (id: string): DiceLogEntry => ({ id, name: 'Anna', formula: 'd20', dice: [{ die: 'd20', value: 20 }], modifier: 0, total: 20, at: 0 });
@@ -85,5 +85,16 @@ describe('the join page dice log', () => {
     expect(dieExtreme({ die: 'd20', value: 20 })).toBe('max');
     expect(dieExtreme({ die: 'd20', value: 1 })).toBe('min');
     expect(dieExtreme({ die: 'd6', value: 3 })).toBeNull();
+  });
+
+  it('gives a Fate die one side and no highest or lowest face, and marks the dice counted for nothing', () => {
+    expect(entryRolls({ dice: [{ die: 'dF', value: -1 }, { die: 'd6', value: 2 }] }).map((roll) => roll.max)).toEqual([1, 6]);
+    expect(dieExtreme({ die: 'dF', value: 1 })).toBeNull();
+    expect(dieExtreme({ die: 'dF', value: -1 })).toBeNull();
+    expect(dieMarks({ dropped: true })).toEqual(['is-dropped']);
+    expect(dieMarks({ rerolled: true })).toEqual(['is-rerolled']);
+    expect(dieMarks({ success: true })).toEqual(['is-success']);
+    expect(dieMarks({ failure: true })).toEqual(['is-failure']);
+    expect(dieMarks({})).toEqual([]);
   });
 });

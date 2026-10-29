@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeControl, encodeControl, PLAYER_MESSAGE_TYPES, type ControlMessage } from '../../../src/app/online/protocol';
-import { diceLogEntry, type DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
+import { diceLogEntry, isDiceLogEntry, type DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 import type { DiceRollResult } from '@atlas-vtt/shared/rules';
 
 const valid = (message: object): boolean => decodeControl(JSON.stringify(message)).kind === 'message';
@@ -149,5 +149,40 @@ describe('diceLogEntry', () => {
 
   it('makes no entry of a roll players would refuse', () => {
     expect(diceLogEntry({ ...result, total: Number.NaN }, 'Anna')).toBeNull();
+  });
+});
+
+describe("dice as Atlas 0.8's notation rolls them: Fate dice, rerolls and success counts", () => {
+  const roll = (rolls: unknown[], extra: Record<string, unknown> = {}): DiceRollResult =>
+    ({ id: 'roll_f', timestamp: 9, formula: '4dF', modifiers: 0, total: 1, rolls, ...extra }) as unknown as DiceRollResult;
+
+  it('lists Fate dice, which read -1, 0 or +1, as the dice they are', () => {
+    const logged = diceLogEntry(roll([{ die: 'dF', value: 1, max: 1, min: -1 }, { die: 'dF', value: -1, max: 1, min: -1 }, { die: 'dF', value: 0, max: 1, min: -1 }]), 'GM')!;
+    expect(logged.dice).toEqual([{ die: 'dF', value: 1 }, { die: 'dF', value: -1 }, { die: 'dF', value: 0 }]);
+    expect(logged.unlisted).toBeUndefined();
+    expect(isDiceLogEntry(logged)).toBe(true);
+  });
+
+  it('refuses a Fate die that reads outside -1 to 1, and a die that is neither a Fate die nor a dN', () => {
+    const entryWith = (die: unknown) => ({ ...diceLogEntry(roll([{ die: 'd6', value: 3, max: 6 }]), 'GM')!, dice: [die] });
+    expect(isDiceLogEntry(entryWith({ die: 'dF', value: 2 }))).toBe(false);
+    expect(isDiceLogEntry(entryWith({ die: 'dF', value: 0.5 }))).toBe(false);
+    expect(isDiceLogEntry(entryWith({ die: 'dX', value: 1 }))).toBe(false);
+    expect(isDiceLogEntry(entryWith({ die: 'd6', value: 0 }))).toBe(false);
+  });
+
+  it('carries the marks that strike a die through or count it, and nothing else Atlas may put on one', () => {
+    const logged = diceLogEntry(roll([
+      { die: 'd10', value: 3, max: 10, rerolled: true }, { die: 'd10', value: 9, max: 10, success: true },
+      { die: 'd10', value: 2, max: 10, failure: true }, { die: 'd10', value: 7, max: 10, dropped: true }, { die: 'd10', value: 5, max: 10, success: false, label: 'Fire' },
+    ]), 'GM')!;
+    expect(logged.dice).toEqual([
+      { die: 'd10', value: 3, rerolled: true }, { die: 'd10', value: 9, success: true },
+      { die: 'd10', value: 2, failure: true }, { die: 'd10', value: 7, dropped: true }, { die: 'd10', value: 5 },
+    ]);
+    expect(isDiceLogEntry(logged)).toBe(true);
+    // A mark must be exactly true, as Atlas sends it.
+    expect(isDiceLogEntry({ ...logged, dice: [{ die: 'd10', value: 3, rerolled: 'yes' }] })).toBe(false);
+    expect(isDiceLogEntry({ ...logged, dice: [{ die: 'd10', value: 3, success: false }] })).toBe(false);
   });
 });

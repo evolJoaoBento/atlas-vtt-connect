@@ -7,7 +7,7 @@
  * a critical roll marked, and "+N more" for dice a large roll does not list. The log's rules live
  * in `PlayerDiceLog` (`src/app/online/page/diceLogModel.ts`).
  */
-import { dieExtreme, entryRolls, PlayerDiceLog, rollerLabel, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
+import { dieExtreme, dieMarks, entryRolls, PlayerDiceLog, rollerLabel, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
 import { dieLabel } from '@atlas-vtt/shared/rules';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import type { DiceLogEntry } from '../src/app/online/tools/toolMessages';
@@ -50,8 +50,11 @@ function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
   const rolls = entryRolls(entry);
   entry.dice.forEach((die, index) => {
     const badge = text('die-badge', dieLabel(rolls, index));
-    const extreme = dieExtreme(die);
+    const marks = dieMarks(die);
+    // A die counted for nothing is struck through, and not also coloured as the highest or lowest face.
+    const extreme = marks.includes('is-dropped') || marks.includes('is-rerolled') ? null : dieExtreme(die);
     if (extreme) badge.classList.add(`is-${extreme}`);
+    badge.classList.add(...marks);
     const tag = tagElement(die);
     if (tag) badge.append(tag);
     dice.append(badge);

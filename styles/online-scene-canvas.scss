@@ -258,6 +258,9 @@
   .die-badge.is-max { color: #2f9e44; }
   .die-badge.is-min { color: #e03131; }
   .die-badge.is-more { color: var(--muted); }
+  .die-badge.is-dropped, .die-badge.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .die-badge.is-success { color: #2f9e44; }
+  .die-badge.is-failure { color: #e03131; }
   .die-tag { color: var(--muted); }
   .die-tag-dot { color: var(--die-tag-colour, currentColor); }
   /* A critical roll, as Atlas's log marks it: a coloured edge. */
@@ -348,7 +351,9 @@
   }
   .dice-card-die.is-max { background: color-mix(in oklch, var(--color-green) 15%, transparent); color: var(--color-green); }
   .dice-card-die.is-min { background: color-mix(in oklch, var(--color-red) 15%, transparent); color: var(--color-red); }
-  .dice-card-die.is-dropped { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .dice-card-die.is-dropped, .dice-card-die.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .dice-card-die.is-success { background: color-mix(in oklch, var(--color-green) 15%, transparent); color: var(--color-green); }
+  .dice-card-die.is-failure { background: color-mix(in oklch, var(--color-red) 15%, transparent); color: var(--color-red); }
   @media (prefers-reduced-motion: reduce) {
     .dice-card, .dice-card-avatar, .dice-card-content, .dice-card-result, .dice-card-total { animation-duration: 1ms !important; animation-delay: 0ms !important; }
   }
