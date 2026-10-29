@@ -14,6 +14,7 @@ import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
 import { mapMatrix, type MapAlignment } from './mapPlacement';
+import { projectLiquids } from './projectLiquids';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -124,7 +125,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
-    map: projectMap(state.background, cellSize, context),
+    map: projectMap(state.background, cellSize, context, (objects as { liquids?: unknown } | undefined)?.liquids),
     grid: projectGrid(state.grid, context.rules),
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
@@ -240,17 +241,19 @@ function darkCovers(fog: Shows, lighting: LightingFrame): Shows {
   return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds) };
 }
 
-function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {
+function projectMap(background: string | null, cellSize: number, context: ProjectionContext, liquidRecord: unknown): PlayerMap {
   const width = finiteOr(context.mapSize.width, 0, SCENE_RANGES.mapSize);
   const height = finiteOr(context.mapSize.height, 0, SCENE_RANGES.mapSize);
   // Only an image Atlas turned or shifted needs its place sent; one that fills its world rect is drawn as ever.
   const matrix = background === null ? null : mapMatrix(context.mapAlignment ?? null, { width, height });
+  const liquids = projectLiquids(liquidRecord);
   return {
     asset: context.assets.idFor(background),
     width,
     height,
     cellSize: positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize),
     ...(matrix ? { matrix } : {}),
+    ...(liquids.length > 0 ? { liquids } : {}),
   };
 }
 

@@ -242,6 +242,8 @@ function snapshotSlice(view: StockView, presented: StockPresentedScene | null): 
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
     // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
     (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights,
+    // Atlas 0.10's water, lava and acid: map art players are sent.
+    (s.objects as { liquids?: unknown }).liquids,
     s.levels, s.viewedLevel, s.levelAlignments];
 }
 

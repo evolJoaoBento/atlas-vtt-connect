@@ -603,10 +603,12 @@ class CanvasSurface implements ViewSurface {
           }
         }
         context.fillStyle = gradient;
-        context.fill();
+        if (style.evenOdd) context.fill('evenodd');
+        else context.fill();
       } else if (style.fill !== undefined) {
         context.fillStyle = style.fill;
-        context.fill();
+        if (style.evenOdd) context.fill('evenodd');
+        else context.fill();
       }
       if (style.stroke !== undefined) {
         context.strokeStyle = style.stroke;

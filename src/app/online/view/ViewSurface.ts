@@ -21,6 +21,8 @@ export interface ShapeStyle {
   round?: boolean;
   /** Cuts the shape out of what was drawn before (fog erasing). */
   erase?: boolean;
+  /** Fills by the even-odd rule: a path inside another is a hole in it (a liquid's holes). */
+  evenOdd?: boolean;
   /** Fills with a linear gradient from `from` to `to` (current frame) instead of `fill`: offsets 0 to 1 and colours. */
   gradient?: { from: ScenePoint; to: ScenePoint; stops: ReadonlyArray<readonly [offset: number, color: string]> };
 }

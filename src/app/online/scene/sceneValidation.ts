@@ -10,6 +10,7 @@ import {
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
+import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
 
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => boolean;
@@ -138,9 +139,27 @@ function isMapMatrix(value: unknown): boolean {
   return Array.isArray(value) && value.length === 6 && value.every(inRange(SCENE_RANGES.mapMatrix));
 }
 
+/** An outline of 3 to `LIQUID_LIMITS.points` points. */
+const isRing = (value: unknown): boolean => Array.isArray(value) && value.length >= 3 && value.length <= LIQUID_LIMITS.points && value.every((point) => isPoint(point));
+
+function isLiquid(value: unknown): boolean {
+  if (!isFields(value) || !(LIQUID_KINDS as readonly unknown[]).includes(value.liquid) || !isRing(value.polygon)) return false;
+  const { holes, colors } = value;
+  return (holes === undefined || (Array.isArray(holes) && holes.length <= LIQUID_LIMITS.holes && holes.every((hole) => isRing(hole))))
+    && isFields(colors) && ['surface', 'deep', 'glint'].every((key) => typeof colors[key] === 'string' && HEX_COLOR.test(colors[key]));
+}
+
+/** At most `LIQUID_LIMITS.liquids`, and `LIQUID_LIMITS.totalPoints` points in all. */
+function isLiquids(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > LIQUID_LIMITS.liquids || !value.every((liquid) => isLiquid(liquid))) return false;
+  const points = (value as Array<{ polygon: unknown[]; holes?: unknown[][] }>).reduce((sum, liquid) => sum + liquid.polygon.length + (liquid.holes ?? []).reduce((inner, hole) => inner + hole.length, 0), 0);
+  return points <= LIQUID_LIMITS.totalPoints;
+}
+
 function isPlayerMap(value: unknown): boolean {
   return isFields(value) && nullable(isString)(value.asset) && inRange(SCENE_RANGES.mapSize)(value.width)
-    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize) && optional(isMapMatrix)(value.matrix);
+    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize) && optional(isMapMatrix)(value.matrix)
+    && optional(isLiquids)(value.liquids);
 }
 
 function isPlayerGrid(value: unknown): boolean {

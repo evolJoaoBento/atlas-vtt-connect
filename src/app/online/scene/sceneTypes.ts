@@ -26,6 +26,17 @@ export interface PlayerMap {
    * canvas matrix. Absent when the image just fills the width and height, so a page that does not know it draws that.
    */
   matrix?: readonly [number, number, number, number, number, number];
+  /** The liquids of the map, drawn over its image and under the grid and the fog; absent without any, and from an older GM. */
+  liquids?: readonly PlayerLiquid[];
+}
+
+/** Water, lava or acid on the map (Atlas 0.10): an outline with holes, and the colours Atlas draws it in. */
+export interface PlayerLiquid {
+  liquid: 'water' | 'lava' | 'acid';
+  polygon: ScenePoint[];
+  holes?: ScenePoint[][];
+  /** `#rrggbb` each: the liquid's surface, its depths and the glint on it. */
+  colors: { surface: string; deep: string; glint: string };
 }
 
 export const PLAYER_GRID_TYPES = ['square', 'hex-horizontal', 'hex-vertical'] as const;
