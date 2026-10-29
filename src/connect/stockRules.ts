@@ -13,7 +13,8 @@
  *
  * Everything read is checked and copied: a stock Atlas's objects are its own, never handed on.
  */
-import type { ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
+import type { CollectionGridDefaults, ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
+import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { isDieType } from '@atlas-vtt/shared/rules';
 
 /** A map view as the rules read it. */
@@ -87,6 +88,38 @@ function readInitiative(value: unknown): InitiativeRules | null {
     mode: value.mode as InitiativeRules['mode'],
     roll: typeof value.roll === 'string' && value.roll !== '' ? value.roll : '1d20',
     firstSide: value.firstSide === 'opponents' ? 'opponents' : 'players',
+  });
+}
+
+const UNIT_TYPES: readonly unknown[] = ['feet', 'yards', 'meters', 'units', 'custom'];
+const MEASUREMENT_MODES: readonly unknown[] = ['metric', 'abstract'];
+const DIAGONAL_RULES: readonly unknown[] = ['equidistant', 'alternating', 'euclidean'];
+const MAX_RANGE_BANDS = 12;
+const MAX_BAND_NAME = 40;
+/** The most a distance per square may be: far past any game, short of anything that overflows a label. */
+const MAX_UNIT_DISTANCE = 1_000_000;
+const isPositive = (value: unknown, max: number): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= max;
+
+/**
+ * A collection's measurement rules (`gridDefaults`: the unit, the distance per square, metric or range bands, the
+ * diagonal rule, the cone angle), checked field by field as Atlas reads them: null where the unit, the distance or the
+ * mode is not one it knows (the map's own grid then decides, as Atlas does for a map outside a collection). A diagonal
+ * rule or cone angle it cannot read is left unset, which means `equidistant` and 90 degrees.
+ */
+function readGridDefaults(value: unknown): CollectionGridDefaults | null {
+  if (!isObject(value) || !UNIT_TYPES.includes(value.unitType) || !MEASUREMENT_MODES.includes(value.measurementMode) || !isPositive(value.unitDistance, MAX_UNIT_DISTANCE)) return null;
+  const bands = Array.isArray(value.abstractRangeBands)
+    ? value.abstractRangeBands.flatMap((band: unknown) => (isObject(band) && typeof band.name === 'string' && isPositive(band.maxSquares, MAX_UNIT_DISTANCE)
+      ? [{ name: band.name.slice(0, MAX_BAND_NAME), maxSquares: band.maxSquares }] : [])).slice(0, MAX_RANGE_BANDS)
+    : [];
+  return Object.freeze({
+    unitType: value.unitType as CollectionGridDefaults['unitType'],
+    unitDistance: value.unitDistance,
+    measurementMode: value.measurementMode as CollectionGridDefaults['measurementMode'],
+    ...(bands.length > 0 ? { abstractRangeBands: Object.freeze(bands) as unknown as NonNullable<CollectionGridDefaults['abstractRangeBands']> } : {}),
+    ...(DIAGONAL_RULES.includes(value.diagonalRule) ? { diagonalRule: value.diagonalRule as NonNullable<CollectionGridDefaults['diagonalRule']> } : {}),
+    // A cone opens by more than nothing and at most a full turn (Atlas's `n0t`).
+    ...(isPositive(value.coneAngle, 360) ? { coneAngle: value.coneAngle } : {}),
   });
 }
 
@@ -170,10 +203,16 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
   // A dice set the tool cannot give a default roll for (mixed dice) takes the collection's stored one before the defaults.
   const storedDice = stored ? readDice(stored.settings.dice, defaults.dice) : null;
   const dice = (showing ? readDice(toolDice(showing), storedDice ?? defaults.dice) : null) ?? storedDice;
+  // How the map measures: the collection's own rules, which the map's grid only completes (a scene's own distance per cell).
+  const gridDefaults = stored ? readGridDefaults(stored.settings.gridDefaults) : null;
   if (!stored && !resources && !conditions && !dice) return defaults;
   return Object.freeze({
     ...defaults,
     collectionId: stored?.collectionId ?? null,
+    ...(gridDefaults ? {
+      gridDefaults,
+      measurement: Object.freeze({ ...resolveMeasurementSettings(gridDefaults, null), coneAngle: gridDefaults.coneAngle ?? defaults.measurement.coneAngle }),
+    } : {}),
     resources: resources ?? defaults.resources,
     conditions: conditions ?? defaults.conditions,
     initiative: initiative ?? defaults.initiative,

@@ -108,3 +108,47 @@ describe("a stock Atlas map's dice rules", () => {
     expect(rules.dice).toEqual({ defaultRoll: '1d20', crit: 'natural' });
   });
 });
+
+describe("how a stock Atlas map measures (the collection's grid defaults)", () => {
+  const MAP = 'atlas-vtt/collections/Main/scenes/a.atlasmap';
+  // What Atlas's 5e preset saves into a collection: the very block in a collection.json.
+  const FIVE_E = { unitType: 'feet', unitDistance: 5, measurementMode: 'metric', diagonalRule: 'equidistant', coneAngle: 53.13, abstractRangeBands: [] };
+  const rulesOf = (gridDefaults: unknown) => stockMapRules([view(MAP, { assets: assets({ conditions: [], gridDefaults }) })], MAP, { ...DEFAULTS, measurement: { mode: 'abstract', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 } as unknown as MapRules['measurement'] });
+
+  it("reads the collection's measurement rules, which players' rulers and cones then follow", () => {
+    const rules = rulesOf(FIVE_E);
+    expect(rules.gridDefaults).toEqual({ unitType: 'feet', unitDistance: 5, measurementMode: 'metric', diagonalRule: 'equidistant', coneAngle: 53.13 });
+    expect(rules.measurement).toMatchObject({ mode: 'metric', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', coneAngle: 53.13 });
+    expect(Object.isFrozen(rules.gridDefaults)).toBe(true);
+  });
+
+  it('reads metres, range bands and a diagonal rule the collection sets, and 90 degrees where it sets no cone', () => {
+    const rules = rulesOf({ unitType: 'meters', unitDistance: 1.5, measurementMode: 'abstract', diagonalRule: 'alternating', abstractRangeBands: [{ name: 'Close', maxSquares: 2 }, { name: 'Far', maxSquares: 12 }] });
+    expect(rules.measurement).toMatchObject({ mode: 'abstract', unitType: 'meters', diagonalRule: 'alternating', coneAngle: 90 });
+    expect(rules.measurement.rangeBands).toEqual([{ name: 'Close', maxSquares: 2 }, { name: 'Far', maxSquares: 12 }]);
+    expect(rules.gridDefaults?.coneAngle).toBeUndefined();
+  });
+
+  it('keeps what it cannot read as Atlas does: no collection rules, and a cone or diagonal rule left unset', () => {
+    for (const bad of [undefined, null, 'x', {}, { ...FIVE_E, unitType: 'miles' }, { ...FIVE_E, unitDistance: 0 }, { ...FIVE_E, unitDistance: Number.NaN }, { ...FIVE_E, unitDistance: 1e9 }, { ...FIVE_E, measurementMode: 'both' }]) {
+      const rules = rulesOf(bad);
+      expect(rules.gridDefaults).toBeNull();
+      expect(rules.measurement).toMatchObject({ mode: 'abstract', coneAngle: 90 });
+    }
+    const odd = rulesOf({ ...FIVE_E, diagonalRule: 'manhattan', coneAngle: 400 });
+    expect(odd.gridDefaults).toEqual({ unitType: 'feet', unitDistance: 5, measurementMode: 'metric' });
+    expect(odd.measurement).toMatchObject({ mode: 'metric', diagonalRule: 'equidistant', coneAngle: 90 });
+    expect(rulesOf({ ...FIVE_E, coneAngle: 0 }).gridDefaults?.coneAngle).toBeUndefined();
+  });
+
+  it('drops range bands it cannot read and keeps at most twelve', () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({ name: `Band ${index}`, maxSquares: index + 1 }));
+    const rules = rulesOf({ ...FIVE_E, measurementMode: 'abstract', abstractRangeBands: [{ name: 5, maxSquares: 1 }, { name: 'Bad', maxSquares: -2 }, null, ...many] });
+    expect(rules.gridDefaults?.abstractRangeBands).toHaveLength(12);
+    expect(rules.gridDefaults?.abstractRangeBands?.[0]).toEqual({ name: 'Band 0', maxSquares: 1 });
+  });
+
+  it("leaves a map outside every collection to Atlas's defaults and the map's own grid", () => {
+    expect(stockMapRules([view(MAP, { assets: assets({ gridDefaults: FIVE_E }) })], 'loose/map.atlasmap', DEFAULTS).gridDefaults).toBeNull();
+  });
+});
