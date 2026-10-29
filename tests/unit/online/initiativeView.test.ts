@@ -43,6 +43,45 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     expect(panel.querySelector('.initiative-round')?.textContent).toBe('Round 3');
   });
 
+  it('lists a delayed combatant apart under "Delayed", after the order, and dashes a number not rolled', () => {
+    const { panel, show } = setup();
+    show({ round: 2, active: true, entries: [entry('ana', { initiative: 18, isActive: true }), entry('orc', { delayed: true, initiative: 12 }), entry('bo', { awaiting: true, initiative: 0 })] });
+    const list = panel.querySelector('.initiative-list')!;
+    expect([...list.children].map((child) => child.className)).toEqual(['initiative-card is-active', 'initiative-card', 'initiative-side']);
+    const delayed = list.querySelector('.initiative-side')!;
+    expect(delayed.getAttribute('aria-label')).toBe('Delayed');
+    expect(delayed.querySelector('.initiative-side-label')?.textContent).toBe('Delayed');
+    expect(delayed.querySelector('.initiative-name')?.textContent).toBe('orc');
+    expect(delayed.querySelector('.is-active')).toBeNull();
+    expect([...panel.querySelectorAll('.initiative-value')].map((value) => value.textContent)).toEqual(['18', '–', '12']);
+  });
+
+  it('greys a defeated combatant and marks it with a skull, and redraws when the token goes down or is healed', () => {
+    const panel = document.createElement('div');
+    document.body.replaceChildren(panel);
+    const view = new InitiativeView({ panel, images: () => null });
+    const initiative: PlayerInitiative = { round: 1, active: true, entries: [entry('ana', { isActive: true }), entry('orc')] };
+    const show = (downed: boolean): void => view.update(playerScene({ initiative, tokens: { ana: playerToken({ side: 'players' }), orc: playerToken({ side: 'opponents', downed }) } }));
+    show(false);
+    expect(panel.querySelector('.is-defeated, .initiative-defeated')).toBeNull();
+    show(true);
+    const cards = [...panel.querySelectorAll('.initiative-card')];
+    expect(cards.map((card) => card.classList.contains('is-defeated'))).toEqual([false, true]);
+    const skull = cards[1]!.querySelector('.initiative-defeated')!;
+    expect(skull.getAttribute('role')).toBe('img');
+    expect(skull.getAttribute('aria-label')).toBe('Defeated');
+    expect(skull.querySelector('svg')).not.toBeNull();
+    expect(cards[0]!.querySelector('.initiative-defeated')).toBeNull();
+    show(false);
+    expect(panel.querySelector('.is-defeated')).toBeNull();
+  });
+
+  it('shows no Delayed group when nobody delayed', () => {
+    const { panel, show } = setup();
+    show({ round: 1, active: true, entries: [entry('ana', { isActive: true })] });
+    expect(panel.querySelector('.initiative-side')).toBeNull();
+  });
+
   it('marks no turn and shows no round between fights', () => {
     const { panel, show } = setup();
     show({ round: 1, active: false, entries: [entry('ana', { isActive: true })] });

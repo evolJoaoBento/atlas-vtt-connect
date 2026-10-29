@@ -11,13 +11,21 @@
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
 import { SIDE_LABELS, sidesInOrder } from '@atlas-vtt/shared/rules';
 import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
-import type { PlayerInitiativeEntry, PlayerScene, PlayerToken } from '../src/app/online/scene/sceneTypes';
+import { listedSide } from '../src/app/online/scene/initiativeSides';
+import type { PlayerInitiativeEntry, PlayerScene, PlayerSideRow, PlayerToken } from '../src/app/online/scene/sceneTypes';
 import { createCanvasSurface } from '../src/app/online/view/canvasSurface';
 
 /** A portrait's canvas is drawn this many device pixels across: sharp at the card's width on a dense screen. */
 const PORTRAIT_PIXELS = 160;
 /** A portrait is drawn as a medium token on Atlas's reference grid, so its ring has the map's proportions. */
 const REFERENCE_CELL = 70;
+/** The heading of the group of combatants that delayed their turn (Atlas's `playerInit.delayed`). */
+const DELAYED_LABEL = 'Delayed';
+/** The label of the skull on a defeated combatant's card (Atlas's `playerInit.defeated`). */
+const DEFEATED_LABEL = 'Defeated';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** Lucide's skull, the icon Atlas marks a defeated combatant with (its eyes are drawn apart). */
+const SKULL_PATHS = ['m12.5 17-.5-1-.5 1h1z', 'M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z'];
 
 export interface InitiativeViewOptions {
   /** The column; hidden while there is no fight to show. */
@@ -57,26 +65,49 @@ export class InitiativeView {
     const tokenOf = (entry: PlayerInitiativeEntry): PlayerToken | undefined => (Object.hasOwn(scene.tokens, entry.tokenId) ? scene.tokens[entry.tokenId] : undefined);
     const { sides } = initiative;
     if (sides) {
-      for (const side of sidesInOrder(sides.first)) {
-        const members = initiative.entries.filter((entry) => (tokenOf(entry)?.side ?? 'opponents') === side);
+      // Atlas's own list of sides, in the order they act; from an older GM, the two built-in sides, `first` first.
+      const rows: readonly PlayerSideRow[] = initiative.sideList
+        ?? sidesInOrder(sides.first).map((side) => ({ id: side, name: SIDE_LABELS[side], ...(sides.active === side && { turn: true as const }) }));
+      for (const row of rows) {
+        const members = initiative.entries.filter((entry) => listedSide(scene.tokens, entry) === row.id);
         if (members.length === 0) continue;
         const group = doc.createElement('div');
         group.className = 'initiative-side';
         group.setAttribute('role', 'list');
-        group.setAttribute('aria-label', SIDE_LABELS[side]);
-        if (sides.active === side) {
+        group.setAttribute('aria-label', row.roll !== undefined ? `${row.name}, rolled ${row.roll}` : row.name);
+        if (row.turn === true) {
           group.classList.add('is-active');
           group.setAttribute('aria-current', 'true');
         }
         const label = doc.createElement('div');
         label.className = 'initiative-side-label';
         label.setAttribute('aria-hidden', 'true');
-        label.textContent = SIDE_LABELS[side];
+        label.textContent = row.name;
+        if (row.roll !== undefined) {
+          const roll = doc.createElement('span');
+          roll.className = 'initiative-side-roll';
+          roll.textContent = String(row.roll);
+          label.append(roll);
+        }
         group.append(label, ...members.map((entry) => this.card(entry, tokenOf(entry), false, false)));
         list.append(group);
       }
     } else {
-      list.append(...initiative.entries.map((entry) => this.card(entry, tokenOf(entry), initiative.active, true)));
+      // In turn order, a combatant that delayed its turn is listed apart, after the order, as Atlas's list does.
+      const waiting = initiative.entries.filter((entry) => entry.delayed === true);
+      list.append(...initiative.entries.filter((entry) => entry.delayed !== true).map((entry) => this.card(entry, tokenOf(entry), initiative.active, true)));
+      if (waiting.length > 0) {
+        const group = doc.createElement('div');
+        group.className = 'initiative-side';
+        group.setAttribute('role', 'list');
+        group.setAttribute('aria-label', DELAYED_LABEL);
+        const label = doc.createElement('div');
+        label.className = 'initiative-side-label';
+        label.setAttribute('aria-hidden', 'true');
+        label.textContent = DELAYED_LABEL;
+        group.append(label, ...waiting.map((entry) => this.card(entry, tokenOf(entry), false, true)));
+        list.append(group);
+      }
     }
     const children: HTMLElement[] = [list];
     if (initiative.active) {
@@ -94,7 +125,38 @@ export class InitiativeView {
   /** What a portrait is drawn from: its image (and whether it has arrived) and its ring. */
   private portraitKey(token: PlayerToken | undefined): string {
     if (!token) return '';
-    return `${token.image ?? ''}|${token.image && this.options.images(token.image) ? 1 : 0}|${token.ring ?? ''}`;
+    return `${token.image ?? ''}|${token.image && this.options.images(token.image) ? 1 : 0}|${token.ring ?? ''}|${token.downed === true ? 1 : 0}`;
+  }
+
+  /** Atlas's mark of a defeated combatant (`atlas-player-initiative__defeated`): a skull, over the portrait when there is one. */
+  private skull(over: boolean): HTMLElement {
+    const doc = this.options.panel.ownerDocument;
+    const mark = doc.createElement('span');
+    mark.className = over ? 'initiative-defeated initiative-defeated--over' : 'initiative-defeated';
+    mark.setAttribute('role', 'img');
+    mark.setAttribute('aria-label', DEFEATED_LABEL);
+    const svg = doc.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of SKULL_PATHS) {
+      const path = doc.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      svg.append(path);
+    }
+    for (const cx of [9, 15]) {
+      const eye = doc.createElementNS(SVG_NS, 'circle');
+      eye.setAttribute('cx', String(cx));
+      eye.setAttribute('cy', '12');
+      eye.setAttribute('r', '1');
+      svg.append(eye);
+    }
+    mark.append(svg);
+    return mark;
   }
 
   private card(entry: PlayerInitiativeEntry, token: PlayerToken | undefined, fightActive: boolean, showValue: boolean): HTMLElement {
@@ -121,10 +183,15 @@ export class InitiativeView {
     }
     const portrait = token ? this.portrait(token, entry.name ?? '') : null;
     if (portrait) card.append(portrait);
+    // A defeated combatant (a resource that defeats it is spent, whether players see it or not) is greyed and marked, as Atlas's list does.
+    if (token?.downed === true) {
+      card.classList.add('is-defeated');
+      card.append(this.skull(portrait !== null));
+    }
     if (showValue) {
       const value = doc.createElement('span');
       value.className = 'initiative-value';
-      value.textContent = String(entry.initiative);
+      value.textContent = entry.awaiting === true ? '–' : String(entry.initiative);
       card.append(value);
     }
     if (entry.name) {

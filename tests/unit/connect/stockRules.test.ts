@@ -54,7 +54,20 @@ describe('the rules of a stock Atlas map', () => {
 
   it("reads a side the collection named as first (Atlas 0.9) as the players'", () => {
     const shown = view('atlas-vtt/collections/Main/scenes/a.atlasmap', { assets: assets({ initiative: { mode: 'sides', roll: '1d20', firstSide: 'monsters', sides: [{ id: 'monsters', name: 'Monsters' }] } }) });
-    expect(stockMapRules([shown], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS).initiative).toEqual({ mode: 'sides', roll: '1d20', firstSide: 'players' });
+    // The named side is kept as a side of the collection (Atlas 0.10), with both built-in sides after it, as Atlas reads the list.
+    expect(stockMapRules([shown], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS).initiative).toEqual({
+      mode: 'sides', roll: '1d20', firstSide: 'players', sides: [{ id: 'monsters', name: 'Monsters' }, { id: 'players' }, { id: 'opponents' }],
+    });
+  });
+
+  it("reads the sides a collection names (Atlas 0.10), checked, and none where it names only the two built-in ones", () => {
+    const sides = [{ id: 'opponents' }, { id: 'goblins', name: ' Goblins ' }, { id: 'goblins', name: 'Dup' }, { id: 'nameless' }, { id: 7 }, { id: 'players', name: 'Mine' }];
+    const named = view('atlas-vtt/collections/Main/scenes/a.atlasmap', { assets: assets({ initiative: { mode: 'sides', roll: '1d20', firstSide: 'opponents', sides } }) });
+    const rules = stockMapRules([named], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS).initiative as unknown as { sides: unknown[] };
+    expect(rules.sides).toEqual([{ id: 'opponents' }, { id: 'goblins', name: 'Goblins' }, { id: 'players' }]);
+    expect(Object.isFrozen(rules.sides)).toBe(true);
+    const plain = view('atlas-vtt/collections/Main/scenes/a.atlasmap', { assets: assets({ initiative: { mode: 'sides', roll: '1d20', firstSide: 'players', sides: [{ id: 'players' }, { id: 'opponents' }] } }) });
+    expect(stockMapRules([plain], 'atlas-vtt/collections/Main/scenes/a.atlasmap', DEFAULTS).initiative).toEqual({ mode: 'sides', roll: '1d20', firstSide: 'players' });
   });
 
   it('keeps the defaults without a map, a view, an index or a collection, and drops what it cannot read', () => {

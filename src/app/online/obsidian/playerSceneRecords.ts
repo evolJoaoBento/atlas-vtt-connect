@@ -5,6 +5,7 @@
  * (`remote/toRemoteScene.ts`) shows the same records. Only fields players are sent are read; nothing else can reach Atlas.
  */
 import type { GridState, InitiativeState, SavedMapInput } from '@atlas-vtt/api-types';
+import { namedSidesOf } from '../scene/initiativeSides';
 import { playerCellNumbers } from '../scene/playerCellNumbers';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerMeasurement, PlayerScene } from '../scene/sceneTypes';
@@ -84,7 +85,8 @@ export function atlasGrid(scene: Pick<PlayerScene, 'grid' | 'map' | 'measurement
 }
 
 export function playerSceneRecords(scene: PlayerScene, images: PlayerImages): PlayerSceneRecords {
-  const tokens = mapRecords(scene.tokens, (id, token) => atlasToken(id, token, images.token(token.image) ?? ''));
+  const named = namedSidesOf(scene.initiative);
+  const tokens = mapRecords(scene.tokens, (id, token) => atlasToken(id, token, images.token(token.image) ?? '', null, named.get(id)));
   const { widgetSettings, widgetValues } = atlasWidgets(scene.widgets);
   const { initiative, initiativeTrackerOpen } = atlasInitiative(scene.initiative, tokens);
   return {

@@ -2,7 +2,8 @@
 import { SIDE_LABELS, sidesInOrder } from '@atlas-vtt/shared/rules';
 import { formatTimerTime } from '../../utils/timerWidget';
 import type { PresencePlayer } from '../protocol';
-import type { PlayerInitiative, PlayerInitiativeEntry, PlayerSide, PlayerToken, PlayerWidget } from '../scene/sceneTypes';
+import { listedSide } from '../scene/initiativeSides';
+import type { PlayerInitiative, PlayerInitiativeEntry, PlayerSideRow, PlayerToken, PlayerWidget } from '../scene/sceneTypes';
 
 export function widgetLines(widgets: readonly PlayerWidget[]): string[] {
   return widgets.map((widget) => {
@@ -28,11 +29,6 @@ const bar = (entry: PlayerInitiativeEntry): Pick<ListRow, 'share' | 'sittingOut'
   ...(entry.sitsOut === true && { sittingOut: true as const }),
 });
 
-/** The side a combatant is listed under; the window files a token it has no side for among the opponents. */
-function sideOfEntry(tokens: Readonly<Record<string, Pick<PlayerToken, 'side'>>>, entry: PlayerInitiativeEntry): PlayerSide {
-  return (Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.side : undefined) ?? 'opponents';
-}
-
 /**
  * The initiative list's rows, as the player window lists them. In turn order a row is the number, the
  * name and a bar for the creature's health; by sides (`initiative.sides`) the combatants stand under
@@ -44,10 +40,13 @@ export function initiativeLines(initiative: PlayerInitiative | null, tokens: Rea
   const lines: ListRow[] = initiative.active ? [{ text: `Round ${initiative.round}` }] : [];
   const { sides } = initiative;
   if (sides) {
-    for (const side of sidesInOrder(sides.first)) {
-      const members = initiative.entries.filter((entry) => sideOfEntry(tokens, entry) === side);
+    // The side list of Atlas, in the order the sides act; from an older GM, the two built-in sides, `first` first.
+    const rows: readonly PlayerSideRow[] = initiative.sideList
+      ?? sidesInOrder(sides.first).map((side) => ({ id: side, name: SIDE_LABELS[side], ...(sides.active === side && { turn: true as const }) }));
+    for (const row of rows) {
+      const members = initiative.entries.filter((entry) => listedSide(tokens, entry) === row.id);
       if (members.length === 0) continue;
-      lines.push({ text: SIDE_LABELS[side], heading: true, ...(sides.active === side && { current: true as const }) });
+      lines.push({ text: row.roll !== undefined ? `${row.name}, rolled ${row.roll}` : row.name, heading: true, ...(row.turn === true && { current: true as const }) });
       for (const entry of members) lines.push({ text: entry.name ?? 'Unnamed', ...bar(entry) });
     }
     return lines;

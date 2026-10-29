@@ -68,6 +68,41 @@ describe('a list in turn order', () => {
   });
 });
 
+describe("the marks of Atlas 0.9's list in turn order", () => {
+  const withFlags = (flags: Record<string, unknown>) => ({ ...entry('hero', 0, 1), ...flags }) as InitiativeEntry;
+
+  it('sends a delayed combatant flagged and with no turn, and a number not rolled yet as awaiting', () => {
+    const entries = [entry('orc', 21, 0, { isActive: true }), withFlags({ delayed: true, isActive: true }), withFlags({ id: 'e-ally', tokenId: 'ally', awaitingInitiative: true })];
+    const sent = project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries;
+    expect(sent?.map((e) => [e.tokenId, e.isActive, e.delayed ?? false, e.awaiting ?? false])).toEqual([
+      ['orc', true, false, false], ['hero', false, true, false], ['ally', false, false, true],
+    ]);
+  });
+
+  it('shows a dash only while the awaited number is still 0, and for a card not dealt in a fight by cards', () => {
+    const rolled = withFlags({ awaitingInitiative: true, initiative: 14 });
+    expect(project(state({ entries: [rolled] }), TURN_ORDER).initiative?.entries[0]).not.toHaveProperty('awaiting');
+    const cards = { isActive: true, cards: {}, entries: [withFlags({ card: 12 }), withFlags({ id: 'e-ally', tokenId: 'ally' })] } as unknown as Partial<InitiativeState>;
+    expect(project(state(cards), TURN_ORDER).initiative?.entries.map((e) => [e.initiative, e.awaiting ?? false])).toEqual([[12, false], [0, true]]);
+  });
+
+  it('sends neither mark by sides, where the window lists no numbers and no delay', () => {
+    const entries = [withFlags({ delayed: true, awaitingInitiative: true })];
+    const sent = project(state({ isActive: true, sides: { first: 'players', active: 'players' }, entries }), SIDES).initiative?.entries[0];
+    expect(sent).not.toHaveProperty('delayed');
+    expect(sent).not.toHaveProperty('awaiting');
+  });
+
+  it('is checked on the wire: only `true` is a mark', () => {
+    const body = (patch: Record<string, unknown>) => {
+      const sent = project(state({ entries: [entry('orc', 1, 0)] }), TURN_ORDER);
+      return { ...sent, initiative: { ...sent.initiative, entries: [{ ...sent.initiative!.entries[0], ...patch }] } };
+    };
+    expect(isPlayerSceneBody(body({ delayed: true, awaiting: true }))).toBe(true);
+    for (const patch of [{ delayed: false }, { awaiting: 1 }, { delayed: 'true' }]) expect(isPlayerSceneBody(body(patch)), JSON.stringify(patch)).toBe(false);
+  });
+});
+
 describe('a list by sides', () => {
   it('before a fight follows the collection: first side, no active side, no numbers, no turn', () => {
     const sent = project(state(), { ...SIDES, firstSide: 'opponents' });
@@ -160,7 +195,9 @@ describe("the join page's list", () => {
     expect(rowsOf(state({ entries }), SIDES).map((row) => row.text)).toEqual(['Opponents', 'orc', 'boss']);
     const scene = project(state({ entries }), SIDES).initiative!;
     expect(initiativeLines(scene, {}).map((row) => row.text)).toEqual(['Opponents', 'orc', 'boss']);
-    expect(initiativeLines({ ...scene, sides: { first: 'opponents', active: 'opponents' } }, {})[0]).toMatchObject({ heading: true, current: true });
+    // From an older GM, which sends no side list: the two built-in sides, as `sides` names them.
+    const older = { round: scene.round, active: scene.active, entries: scene.entries, sides: { first: 'opponents', active: 'opponents' } } as const;
+    expect(initiativeLines(older, {})[0]).toMatchObject({ heading: true, current: true });
   });
 
   it('hides a side whose combatants are all hidden', () => {

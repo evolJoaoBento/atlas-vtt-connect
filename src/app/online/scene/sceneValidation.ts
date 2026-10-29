@@ -10,6 +10,7 @@ import {
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
+import { SIDE_LIMITS } from './initiativeSides';
 import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
 import { isAssetId } from '../assets/assetIds';
 
@@ -224,7 +225,17 @@ function isPlayerWidgets(value: unknown): boolean {
 function isInitiativeEntry(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && isText(value.tokenId, SCENE_LIMITS.idLength)
     && isNumber(value.initiative) && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp)
-    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut);
+    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut)
+    && optional((flag) => flag === true)(value.delayed) && optional((flag) => flag === true)(value.awaiting)
+    && optional((id) => isText(id, SIDE_LIMITS.idLength) && id !== '')(value.sideId);
+}
+function isSideRow(value: unknown): boolean {
+  return isFields(value) && isText(value.id, SIDE_LIMITS.idLength) && value.id !== '' && isText(value.name, SIDE_LIMITS.nameLength) && value.name !== ''
+    && optional(isNumber)(value.roll) && optional((flag) => flag === true)(value.turn);
+}
+function isSideList(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SIDE_LIMITS.sides && value.every((row) => isSideRow(row))
+    && new Set(value.map((row: { id: string }) => row.id)).size === value.length;
 }
 function isPlayerSides(value: unknown): boolean {
   return isFields(value) && oneOf(PLAYER_SIDES)(value.first) && optional(oneOf(PLAYER_SIDES))(value.active);
@@ -232,7 +243,7 @@ function isPlayerSides(value: unknown): boolean {
 function isPlayerInitiative(value: unknown): boolean {
   return isFields(value) && isNumber(value.round) && isBoolean(value.active) && Array.isArray(value.entries)
     && value.entries.length <= SCENE_LIMITS.initiativeEntries && value.entries.every((entry) => isInitiativeEntry(entry))
-    && optional(isPlayerSides)(value.sides);
+    && optional(isPlayerSides)(value.sides) && optional(isSideList)(value.sideList) && (value.sideList === undefined || value.sides !== undefined);
 }
 
 function isRecordOf(value: unknown, check: Check): boolean {

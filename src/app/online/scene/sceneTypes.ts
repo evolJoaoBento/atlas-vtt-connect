@@ -256,6 +256,25 @@ export interface PlayerInitiativeEntry {
   isActive: boolean;
   /** The combatant does not act in the running round; the window fades it. Absent from an older GM. */
   sitsOut?: true;
+  /** The combatant delayed its turn (Atlas 0.9): the window lists it apart, under "Delayed", with no turn. Never sent by sides. Absent from an older GM. */
+  delayed?: true;
+  /** The combatant has no number yet (rolled for none, or dealt no card): the window shows a dash. Absent from an older GM, whose page shows the number. */
+  awaiting?: true;
+  /**
+   * The named side (not `players` or `opponents`) the list by sides files the combatant under; sent only by sides, and
+   * only for a named side. Its token's `side` then reads `opponents`, as an older page knows no other. Absent from an older GM.
+   */
+  sideId?: string;
+}
+
+/** One side of the list by sides, in the order the sides act (Atlas Online's own list). */
+export interface PlayerSideRow {
+  id: string;
+  name: string;
+  /** This round's roll, where the collection rolls for the order and the side has one. */
+  roll?: number;
+  /** The side acts now; several can, where their rolls are equal. */
+  turn?: true;
 }
 
 /** How the list is grouped while it is by sides; the combatants' sides are on their tokens. */
@@ -277,6 +296,12 @@ export interface PlayerInitiative {
    * the active one. Absent for a list in turn order, and from an older GM.
    */
   sides?: PlayerInitiativeSides;
+  /**
+   * With `sides`: every side that has a combatant in the list, in the order they act this round, as Atlas lists them. A
+   * side nobody is listed under is left out, so a name tells nothing of a hidden combatant. Absent from an older GM, whose
+   * page knows the two built-in sides by `sides` alone (`first` and `active` always read `players` or `opponents`).
+   */
+  sideList?: PlayerSideRow[];
 }
 
 export const PLAYER_MEASUREMENT_MODES = ['metric', 'abstract'] as const;

@@ -28,7 +28,7 @@ function conditionFields(conditions: readonly PlayerCondition[]): Partial<Pick<B
  * (Atlas then draws its default token). `position` replaces the GM's while a view shows the
  * token elsewhere: a drag, or a drop the GM has not answered.
  */
-export function atlasToken(id: string, token: PlayerToken, imagePath: string, position: ScenePoint | null = null): TokenEntity {
+export function atlasToken(id: string, token: PlayerToken, imagePath: string, position: ScenePoint | null = null, sideId?: string): TokenEntity {
   const base = {
     id,
     x: position?.x ?? token.x,
@@ -40,8 +40,9 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     showRing: token.ring !== null,
     ...(token.ring !== null ? { ringColor: token.ring } : {}),
     ...conditionFields(token.conditions),
-    // Where the list by sides files the combatant (`sideOf`); sent only for combatants while the list is by sides
-    ...(token.side && { side: token.side }),
+    // Where the list by sides files the combatant (`sideOf`); sent only for combatants while the list is by sides. A named
+    // side (`sideId`, from the combatant's entry) wins: the token's own `side` reads `opponents` for an older page.
+    ...((sideId ?? token.side) && { side: (sideId ?? token.side) as NonNullable<TokenEntity['side']> }),
   };
   const bars = atlasBars(token);
   if (token.name === null && bars === null) {

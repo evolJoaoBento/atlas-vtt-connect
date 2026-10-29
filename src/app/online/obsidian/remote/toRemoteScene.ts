@@ -10,6 +10,7 @@
 import type {
   DrawingStroke, FogOperation, GridState, InitiativeState, RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput, TextElement, TokenEntity,
 } from '@atlas-vtt/api-types';
+import { namedSidesOf } from '../../scene/initiativeSides';
 import { sameValue, setOwn } from '../../scene/sceneDiff';
 import { withMeasurementDefaults } from '../../scene/sceneLimits';
 import type { PlayerMeasurement, PlayerScene, ScenePoint } from '../../scene/sceneTypes';
@@ -118,11 +119,13 @@ export class RemoteSceneMemo {
     const tokenImages: Record<string, string | null> = {};
     for (const [id, token] of Object.entries(scene.tokens)) setOwn(tokenImages, id, images.token(token.image));
     const urlOf = (id: string): string => tokenImages[id] ?? '';
+    // A combatant of a named side is filed under it, which its token's own `side` cannot say.
+    const named = namedSidesOf(scene.initiative);
     const keyOf = (id: string): string => {
       const point = positionOf(id);
-      return `${urlOf(id)}|${point ? `${point.x},${point.y}` : ''}`;
+      return `${urlOf(id)}|${point ? `${point.x},${point.y}` : ''}|${named.get(id) ?? ''}`;
     };
-    const tokens = this.tokens.build(scene.tokens, keyOf, (id, token) => atlasToken(id, token, urlOf(id), positionOf(id)));
+    const tokens = this.tokens.build(scene.tokens, keyOf, (id, token) => atlasToken(id, token, urlOf(id), positionOf(id), named.get(id)));
     // An entry's avatar is its token's art.
     const avatars = (scene.initiative?.entries ?? []).map((entry) => urlOf(entry.tokenId)).join('|');
     return {

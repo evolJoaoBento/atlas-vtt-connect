@@ -538,6 +538,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .initiative-list::-webkit-scrollbar { display: none; }
 .initiative-side-label { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
 .initiative-side.is-active .initiative-side-label { color: var(--accent); }
+.initiative-side-roll { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--hover); font-weight: 600; }
 .initiative-card {
   display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
   background: var(--hover); border: 1px solid var(--border); border-radius: 12px;
@@ -548,6 +549,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .initiative-card.is-active, .initiative-side.is-active .initiative-card:not(.is-sitting-out) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .initiative-card.is-sitting-out { opacity: 0.45; }
+.initiative-card.is-defeated { position: relative; opacity: 0.45; filter: grayscale(70%); }
+.initiative-defeated { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.initiative-defeated svg { width: 24px; height: 24px; }
+.initiative-defeated--over { position: absolute; top: var(--inset); left: var(--inset); right: var(--inset); aspect-ratio: 1; border-radius: 50%; background: #0009; }
 .initiative-card.is-findable { cursor: pointer; }
 .initiative-card.is-findable:hover { border-color: var(--accent); }
 .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }

@@ -16,6 +16,7 @@
 import type { CollectionGridDefaults, ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
 import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
 import { isDieType } from '@atlas-vtt/shared/rules';
+import { isBuiltInSide, readRuleSides, type RuleSide } from '../app/online/scene/initiativeSides';
 
 /** A map view as the rules read it. */
 export interface RulesView {
@@ -83,13 +84,19 @@ function readList<T>(value: unknown, read: (item: unknown) => T | null, max: num
  */
 function readInitiative(value: unknown): InitiativeRules | null {
   if (!isObject(value) || (value.mode !== 'turn-order' && value.mode !== 'sides' && value.mode !== 'cards')) return null;
+  const named = readRuleSides(value.sides);
   return Object.freeze({
     // The API's type predates `cards`; what reads the mode only asks whether it is `sides`.
     mode: value.mode as InitiativeRules['mode'],
     roll: typeof value.roll === 'string' && value.roll !== '' ? value.roll : '1d20',
     firstSide: value.firstSide === 'opponents' ? 'opponents' : 'players',
+    // Atlas 0.10's named sides, kept only where they differ from the two built-in ones (as Atlas stores them).
+    ...(named && !isPlainSides(named) ? { sides: Object.freeze(named.map((side) => Object.freeze(side))) } : {}),
   });
 }
+
+/** Whether a list names only the two built-in sides, unnamed: Atlas stores that as `firstSide` alone (`fAn`). */
+const isPlainSides = (sides: readonly RuleSide[]): boolean => sides.length === 2 && sides.every((side) => isBuiltInSide(side.id) && side.name === undefined);
 
 const UNIT_TYPES: readonly unknown[] = ['feet', 'yards', 'meters', 'units', 'custom'];
 const MEASUREMENT_MODES: readonly unknown[] = ['metric', 'abstract'];

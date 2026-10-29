@@ -7,6 +7,7 @@
  * It is judged on what the player was sent, which is what Atlas shows them: no list (the tracker closed, hidden from
  * players, no fight) holds nothing, as Atlas holds nothing then.
  */
+import { listedSide, sidesActing } from '../scene/initiativeSides';
 import type { PlayerScene } from '../scene/sceneTypes';
 
 /** Whether a player may not move `tokenId` now: it is in the running fight shown to them and has not got the turn. */
@@ -16,8 +17,8 @@ export function heldOffTurn(scene: Pick<PlayerScene, 'initiative' | 'tokens'>, t
   const entry = initiative.entries.find((candidate) => candidate.tokenId === tokenId);
   if (!entry) return false;
   if (initiative.sides) {
-    const side = Object.hasOwn(scene.tokens, tokenId) ? scene.tokens[tokenId]?.side ?? 'opponents' : 'opponents';
-    return entry.sitsOut === true || initiative.sides.active === undefined || side !== initiative.sides.active;
+    // Every side whose turn it is moves (sides with equal rolls act together); with none acting, all are held.
+    return entry.sitsOut === true || !sidesActing(initiative).has(listedSide(scene.tokens, entry));
   }
   return !entry.isActive;
 }
