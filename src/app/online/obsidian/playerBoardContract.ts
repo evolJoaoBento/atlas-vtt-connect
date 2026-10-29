@@ -66,6 +66,8 @@ export interface PlayerBoardHandle {
   /** Glides to the GM's 3D view. */
   followGm(): void;
   fitMap(): void;
+  /** Moves the camera to a point of the map (an initiative card's click); absent from an older Tabletop. */
+  lookAt?(x: number, y: number): void;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;

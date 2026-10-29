@@ -71,7 +71,7 @@ export class BoardSceneView implements SceneViewport {
     const extra = { ...(options.active ? { active: options.active } : {}), ...(options.doc ? { doc: options.doc } : {}) };
     this.hoverCard = new HoverCardView(options.hoverCard);
     this.preview = new StatblockPreviewView(options.statblockPreview);
-    this.initiative = new InitiativeView({ panel: options.initiative, images: (id) => options.image(id) });
+    this.initiative = new InitiativeView({ panel: options.initiative, images: (id) => options.image(id), onFind: (tokenId) => this.findToken(tokenId) });
     this.handout = new HandoutView({ ...options.handout, ...(options.active ? { active: options.active } : {}) });
     this.note = options.requestNote ? new NoteView({ ...options.note, ...extra }) : null;
     this.board = options.factory.create(options.parent, {
@@ -90,6 +90,12 @@ export class BoardSceneView implements SceneViewport {
         diceRules: () => options.diceRules?.() ?? null,
       } : {}),
     });
+  }
+
+  /** Atlas 0.9.1: a combatant's card takes the camera to its token (the board must offer it, and the token be one players see). */
+  private findToken(tokenId: string): void {
+    const token = this.scene?.tokens[tokenId];
+    if (token) this.board.lookAt?.(token.x, token.y);
   }
 
   setScene(scene: PlayerScene | null): void {
