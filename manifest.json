@@ -1,7 +1,7 @@
 {
   "id": "atlas-vtt-connect",
   "name": "Connect for Atlas VTT",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "minAppVersion": "1.8.7",
   "description": "Community extension, not made, endorsed or supported by Atlas VTT or Atlas Online. Online play: host sessions, let players join from a web page or a tab, and share notes and maps.",
   "author": "Bento's Grimoire of Things",

@@ -1,11 +1,13 @@
 {
   "name": "atlas-vtt-connect",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Online play and sharing for Atlas VTT: host a session, the web join page, the player tab, and note and map sharing.",
   "main": "dist/main.js",
   "license": "AGPL-3.0-only",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "vite build",
     "build:page": "vite build -c vite.page.config.mts",

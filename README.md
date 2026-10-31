@@ -1,5 +1,7 @@
 # Connect for Atlas VTT
 
+**Compatible with Atlas VTT 0.11.0** (Mosaic Canvas).
+
 Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
 Play [Atlas VTT](https://github.com/ByteMirror/atlas-vtt) maps online with your group. You host from Obsidian; players join from a web page or from their own Obsidian. No accounts, no server to run.
