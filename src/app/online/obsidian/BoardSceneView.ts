@@ -165,6 +165,11 @@ export class BoardSceneView implements SceneViewport {
     return this.board.diceAvailable === true && typeof this.board.throwDice === 'function';
   }
 
+  /** Whether the board throws a die again under a reroll rule (an older Tabletop ignores one, and sends no mark). */
+  get throwsRerolls(): boolean {
+    return this.throwsDice && this.board.rerolls === true;
+  }
+
   /** Throws the roll on the board; false when it cannot now (no dice, no scene). */
   throwDice(request: PlayerDiceRequest): boolean {
     return this.throwsDice && this.board.throwDice?.(request) === true;

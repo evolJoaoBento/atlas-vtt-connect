@@ -18,7 +18,7 @@ import type { SceneSession } from '../scene/sceneSources';
 import { admitted } from '../scene/slotAudience';
 import type { SlotProjection } from '../scene/slotViews';
 import { cleanSceneLabel, DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry, type OfferedDiceRules, type PhysicalRoll } from './toolMessages';
-import { physicalRollResult } from './physicalRolls';
+import { physicalRollResult, rerollExpectation, type RerollExpectation } from './physicalRolls';
 import type { AdvantageSide, SheetRollRef } from './sheets';
 
 /** What a roll from a player's sheet adds: the ability Atlas's toast names it after, and the side it is rolled with. */
@@ -80,6 +80,8 @@ export interface DiceHostOptions {
 /** Names a roll of a player's sheet from the GM's own copy of it; null when the player has no such roll there. */
 export interface SheetRollLabels {
   rollLabel(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null;
+  /** The formula of that roll on the GM's copy; without it a thrown sheet roll expects no reroll, so a rerolled die in it is refused. */
+  rollFormula?(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null;
 }
 
 /** Longest name Atlas takes for who rolled (`DiceRollRequest.rolledBy`). */
@@ -201,12 +203,15 @@ export class DiceHost implements SessionHandler {
     this.rolling = { playerId: player.playerId, name: label };
     try {
       let ability: string | undefined;
+      // The rerolls the roll may hold are those of the sheet roll on the GM's copy; a free roll from the tray holds none.
+      let rerolls: RerollExpectation = {};
       if (message.sheet) {
         const found = this.sheets?.rollLabel(player, message.sheet.tokenId, message.sheet.roll) ?? null;
         if (!found) throw new Error('it is for a sheet roll the player does not have');
         ability = found;
+        rerolls = rerollExpectation(this.sheets?.rollFormula?.(player, message.sheet.tokenId, message.sheet.roll) ?? undefined);
       }
-      const result = physicalRollResult(message, rules(this.options.projection.slotOf(player.playerId)?.mapPath || null), label, ability);
+      const result = physicalRollResult(message, rules(this.options.projection.slotOf(player.playerId)?.mapPath || null), label, ability, rerolls);
       this.options.feed.publish(result);
     } catch (error) {
       // A roll the rules refuse, or Atlas does not take, must not stop the session's other messages.

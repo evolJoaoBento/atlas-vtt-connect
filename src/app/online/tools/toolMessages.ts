@@ -141,6 +141,8 @@ export interface PhysicalDie {
   exploded?: true;
   negative?: true;
   dropped?: true;
+  /** Thrown again under a reroll rule and counted for nothing; the die that replaced it follows. Never also `dropped`. An older GM or page ignores it. */
+  rerolled?: true;
   color?: string;
   colorName?: string;
 }
@@ -168,7 +170,9 @@ const CRIT_RULES: readonly unknown[] = ['natural', 'roll-under', 'doubles', 'hig
 function isPhysicalDie(value: unknown): value is PhysicalDie {
   if (!isFields(value) || typeof value.die !== 'string' || !Object.hasOwn(PHYSICAL_SIDES, value.die)) return false;
   return Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= (PHYSICAL_SIDES[value.die] ?? 0)
-    && isFlag(value.exploded) && isFlag(value.negative) && isFlag(value.dropped)
+    && isFlag(value.exploded) && isFlag(value.negative) && isFlag(value.dropped) && isFlag(value.rerolled)
+    // A die is set aside by advantage or thrown away by a reroll rule, never both.
+    && !(value.rerolled === true && value.dropped === true)
     && (value.color === undefined || isLaserColor(value.color))
     && (value.colorName === undefined || isText(value.colorName, 0, DICE_LIMITS.nameLength));
 }

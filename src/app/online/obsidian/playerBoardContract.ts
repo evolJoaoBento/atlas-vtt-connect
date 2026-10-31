@@ -79,6 +79,12 @@ export interface PlayerBoardHandle {
   readonly diceAvailable?: true;
   /** Throws the roll on the board (one still settling is dropped, unsent); false when there are no dice or no scene. */
   throwDice?(request: PlayerDiceRequest): boolean;
+  /**
+   * This board throws a die again under a reroll rule (`PlayerDiceRequest.reroll`) and marks the die it threw away
+   * `rerolled`. Set by a Tabletop that does: one that does not ignores `reroll`, throws the dice plain and sends no mark,
+   * which the GM would refuse, so Connect asks for a reroll only of a board that says so.
+   */
+  readonly rerolls?: true;
 }
 
 /** What the board throws: dice by kind, the modifier, and the sheet roll it is for, handed back with the result unchanged. */
@@ -88,6 +94,12 @@ export interface PlayerDiceRequest {
   advantage?: 'advantage' | 'disadvantage';
   label?: string;
   colors?: Partial<Record<'d4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100', string>>;
+  /**
+   * Per kind of die, a reroll rule (Atlas's `r`, `ro`, `rr`): a die meeting `op value` is thrown again, up to `limit` times
+   * (1 for `r` and `ro`, 10 for `rr`); the die thrown away stays in the roll, marked `rerolled`. Applies to a whole kind.
+   * Sent only to a board that says it `rerolls`.
+   */
+  reroll?: Partial<Record<'d4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100', { op: '<' | '<=' | '>' | '>=' | '='; value: number; limit: number }>>;
   sheet?: { tokenId: string; roll: SheetRollRef };
 }
 

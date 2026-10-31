@@ -428,8 +428,10 @@ export class CanvasScene implements OnlineSceneSink {
   /** A roll from the player's sheet: its dice thrown on the board where it can be, else rolled by the GM. */
   private rollSheet(tokenId: string, roll: SheetRollRef): boolean {
     const send = (): boolean => this.options.service.sendSheetRoll(tokenId, roll);
-    const entry = this.diceBoard() ? this.sheetEntries.find((candidate) => candidate.tokenId === tokenId) : undefined;
-    const thrown = entry ? sheetThrow(entry, roll, this.diceOffer?.rules ?? null) : null;
+    const board = this.diceBoard();
+    const entry = board ? this.sheetEntries.find((candidate) => candidate.tokenId === tokenId) : undefined;
+    // A reroll is asked of a board that says it throws one (`rerolls`); any other throws the dice plain and marks none.
+    const thrown = entry ? sheetThrow(entry, roll, this.diceOffer?.rules ?? null, board?.throwsRerolls === true) : null;
     return thrown ? this.throwOr({ ...thrown, sheet: { tokenId, roll } }, send) : send();
   }
 

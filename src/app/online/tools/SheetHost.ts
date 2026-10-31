@@ -155,6 +155,11 @@ export class SheetHost implements SessionHandler {
     return this.sheetRoll(player, tokenId, roll)?.label ?? null;
   }
 
+  /** The formula of a roll of `player`'s sheet, from the GM's own copy of it (the rerolls it throws are judged by this, never by the message); null when they have no such roll. */
+  rollFormula(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null {
+    return this.sheetRoll(player, tokenId, roll)?.formula ?? null;
+  }
+
   /**
    * A roll of the sheet of a token `player` controls and their scene shows, found again on the GM's own copy: its
    * formula and the ability it is named after. Null when the player has no such roll.

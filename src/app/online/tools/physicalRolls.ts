@@ -7,7 +7,8 @@
 import type { DiceRollResult } from '@atlas-vtt/api-types';
 import { randomId } from '../ids';
 import { dieTagOf } from './diceTags';
-import { isOfferedDiceRules, playerRollFormula, type OfferedDiceRules, type PhysicalDie, type PhysicalRoll } from './toolMessages';
+import { meetsReroll, readThrownTerms, type RerollRule } from './diceRerolls';
+import { DICE_LIMITS, isOfferedDiceRules, playerRollFormula, type OfferedDiceRules, type PhysicalDie, type PhysicalRoll } from './toolMessages';
 
 /** Atlas's defaults: what a map outside every collection rolls by. */
 export const DEFAULT_DICE_RULES: OfferedDiceRules = Object.freeze({ defaultRoll: '1d20', crit: 'natural' as const });
@@ -22,6 +23,7 @@ export interface CountedDie {
   exploded?: true;
   negative?: true;
   dropped?: true;
+  rerolled?: true;
 }
 
 /** The die of the rules' default roll (`NdS`), e.g. `d20`; null when it is not one dice group. */
@@ -43,10 +45,10 @@ function explosion(rules: OfferedDiceRules, die: PhysicalDie, isDefault: boolean
   return null;
 }
 
-/** The roll's critical result, from its default dice that count: not dropped, not thrown for an explosion. */
+/** The roll's critical result, from its default dice that count: not dropped, not rerolled, not thrown for an explosion. */
 export function critOf(rules: OfferedDiceRules, rolls: readonly CountedDie[]): 'success' | 'failure' | undefined {
   const kind = defaultDieOf(rules);
-  const dice = rolls.filter((roll) => roll.die === kind && !roll.dropped && !roll.exploded && !roll.negative);
+  const dice = rolls.filter((roll) => roll.die === kind && !roll.dropped && !roll.rerolled && !roll.exploded && !roll.negative);
   if (dice.length === 0) return undefined;
   switch (rules.crit) {
     case 'natural':
@@ -67,9 +69,9 @@ export function critOf(rules: OfferedDiceRules, rolls: readonly CountedDie[]): '
   }
 }
 
-/** The dice that count, a negative one subtracting, and the modifier. */
+/** The dice that count (not dropped, not rerolled), a negative one subtracting, and the modifier. */
 export function totalOf(rolls: readonly CountedDie[], modifier: number): number {
-  return rolls.reduce((acc, roll) => (roll.dropped ? acc : acc + (roll.negative ? -roll.value : roll.value)), modifier);
+  return rolls.reduce((acc, roll) => (roll.dropped || roll.rerolled ? acc : acc + (roll.negative ? -roll.value : roll.value)), modifier);
 }
 
 /**
@@ -87,6 +89,11 @@ function checkExplosions(rules: OfferedDiceRules, rolls: readonly PhysicalDie[])
     const earned = owed.get(die.die) ?? { adds: 0, subtracts: 0 };
     owed.set(die.die, earned);
     if (die.exploded && die.dropped) throw new Error(`a dropped ${die.die} marked exploded`);
+    // A die thrown away by a reroll rule is no die of the roll: it earns no explosion and is not an explosion's die.
+    if (die.rerolled) {
+      if (die.exploded || die.negative) throw new Error(`a rerolled ${die.die} marked ${die.exploded ? 'exploded' : 'negative'}`);
+      continue;
+    }
     if (die.exploded) {
       const side = die.negative ? 'subtracts' : 'adds';
       if (earned[side] === 0) throw new Error(`a ${die.die} marked exploded that no die of the roll exploded into`);
@@ -102,14 +109,56 @@ function checkExplosions(rules: OfferedDiceRules, rolls: readonly PhysicalDie[])
 }
 
 /**
+ * What the GM's own copy of the player's sheet roll says about rerolls, per kind of die: its rule and how many dice of
+ * that kind the roll throws. A free roll from the tray, or a sheet roll with no reroll, expects none.
+ */
+export type RerollExpectation = Partial<Record<PhysicalDie['die'], { rule: RerollRule; count: number }>>;
+
+/** The rerolls a sheet roll's formula (from the GM's copy) throws; none for no formula or one with no reroll. */
+export function rerollExpectation(formula: string | undefined): RerollExpectation {
+  const terms = formula === undefined ? null : readThrownTerms(formula);
+  const expected: RerollExpectation = {};
+  if (!terms) return expected;
+  for (const [die, rule] of Object.entries(terms.reroll) as Array<[PhysicalDie['die'], RerollRule]>) expected[die] = { rule, count: terms.dice[die] ?? 0 };
+  return expected;
+}
+
+/**
+ * Throws unless every `rerolled` die was earned by the roll's reroll rule, which is the GM's (from its own copy of the
+ * sheet roll), never the message's. For each kind with a rule, whatever the order of its dice: each rerolled die shows a
+ * value the rule rerolls; the dice that stand (not rerolled, not an explosion's) are as many as the roll throws; at most
+ * `limit` rerolls went to each of them; and every standing die that still meets the rule used all of its rerolls, unless
+ * the roll holds the 20 dice it stops at (Tabletop stops rerolling when the roll is full). A rerolled die of a kind
+ * with no rule, or in a roll with no rule at all, is refused: a player cannot strike out their own bad dice.
+ */
+function checkRerolls(rolls: readonly PhysicalDie[], expected: RerollExpectation): void {
+  for (const kind of new Set(rolls.map((die) => die.die))) {
+    if (!expected[kind] && rolls.some((die) => die.die === kind && die.rerolled)) throw new Error(`a ${kind} marked rerolled where the roll has no reroll rule for it`);
+  }
+  for (const [kind, { rule, count }] of Object.entries(expected) as Array<[PhysicalDie['die'], { rule: RerollRule; count: number }]>) {
+    const ofKind = rolls.filter((die) => die.die === kind);
+    const rerolled = ofKind.filter((die) => die.rerolled);
+    const standing = ofKind.filter((die) => !die.rerolled && !die.exploded);
+    const bad = rerolled.find((die) => !meetsReroll(rule, die.value));
+    if (bad) throw new Error(`a ${kind} marked rerolled showing ${bad.value}, which the rule ${rule.op}${rule.value} does not reroll`);
+    if (standing.length !== count) throw new Error(`${standing.length} ${kind} stand where the roll throws ${count}`);
+    if (rerolled.length > standing.length * rule.limit) throw new Error(`${rerolled.length} ${kind} rerolled, more than ${rule.limit} for each of ${standing.length}`);
+    const unmarked = standing.filter((die) => meetsReroll(rule, die.value)).length;
+    if (rolls.length < DICE_LIMITS.dicePerRoll && unmarked * rule.limit > rerolled.length) throw new Error(`a ${kind} that meets the rule ${rule.op}${rule.value} was not rerolled`);
+  }
+}
+
+/**
  * The roll Atlas logs for a player's physical throw, under `rolledBy` (the player's name, as `dice-roll` names it) and
  * named after `ability` when it is a roll of their sheet the GM found. Every die states its lowest face (`min: 1`), so
  * Atlas shows a result card and does not throw its own dice: these were thrown on the board. Throws when the GM
- * refuses the roll: every die dropped, or an explosion the rules do not allow.
+ * refuses the roll: every die dropped, an explosion the rules do not allow, or a reroll the sheet roll's rule
+ * (`rerolls`, from the GM's copy of it) does not allow.
  */
-export function physicalRollResult(message: PhysicalRoll, rules: OfferedDiceRules, rolledBy: string, ability?: string): DiceRollResult {
+export function physicalRollResult(message: PhysicalRoll, rules: OfferedDiceRules, rolledBy: string, ability?: string, rerolls: RerollExpectation = {}): DiceRollResult {
   checkExplosions(rules, message.rolls);
-  if (message.rolls.every((die) => die.dropped)) throw new Error('every die was dropped');
+  checkRerolls(message.rolls, rerolls);
+  if (message.rolls.every((die) => die.dropped || die.rerolled)) throw new Error('every die was dropped or rerolled');
   const rolls = message.rolls.map((die) => ({
     die: die.die,
     value: die.value,
@@ -118,12 +167,13 @@ export function physicalRollResult(message: PhysicalRoll, rules: OfferedDiceRule
     ...(die.negative ? { negative: true as const } : {}),
     ...(die.exploded ? { exploded: true as const } : {}),
     ...(die.dropped ? { dropped: true as const } : {}),
+    ...(die.rerolled ? { rerolled: true as const } : {}),
     // A tag goes only well-formed: a name without controls or invisible formatting, at most 32 characters.
     ...dieTagOf(die),
   }));
-  // The dice thrown, not those an explosion added nor those set aside, as `dice-roll` formulas read ("2d6+1").
+  // The dice thrown, not those an explosion added nor those set aside or thrown away, as `dice-roll` formulas read ("2d6+1").
   const thrown: Partial<Record<string, number>> = {};
-  for (const die of rolls) if (!die.exploded && !die.dropped) thrown[die.die] = (thrown[die.die] ?? 0) + 1;
+  for (const die of rolls) if (!die.exploded && !die.dropped && !die.rerolled) thrown[die.die] = (thrown[die.die] ?? 0) + 1;
   const formula = Object.keys(thrown).length > 0 ? playerRollFormula(thrown, message.modifier) : null;
   if (formula === null) throw new Error('no die of the roll counts as thrown');
   const crit = critOf(rules, rolls);
