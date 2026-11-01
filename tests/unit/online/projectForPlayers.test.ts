@@ -349,6 +349,7 @@ describe('projectForPlayers fix round 1', () => {
       a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md#The Cellar', readable: true, label: '1', icon: 'number' },
       b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Secrets/Guard.md' },
       c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gm.md', readable: true, gmOnly: true },
+      g: { id: 'g', kind: 'pin', x: 180, y: 100, notePath: 'Room.md#Room 1', gmOnly: true },
       d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'scenes/Cave.atlasmap', readable: true },
       e: { id: 'e', kind: 'pin', x: 700, y: 700, notePath: 'Fogged.md', readable: true },
       f: { id: 'f', kind: 'pin', x: 300, y: 100, notePath: 'Dock.md', readable: true, icon: 'coins' },
@@ -356,12 +357,14 @@ describe('projectForPlayers fix round 1', () => {
     const scene = projectForPlayers(withTokens({}, { pins } as never), context({ coverage: fogOver(600, 600, 300, 200) }));
     expect(scene.pins).toEqual([
       { id: 'pin-0', x: 100, y: 100, label: '1', title: 'The Cellar', icon: 'number' },
+      // Atlas 0.11: the pin menu's readable switch wins over `gmOnly`, the mark the dungeon generator gives its room pins.
+      { id: 'pin-1', x: 140, y: 100, label: null, title: 'Gm', icon: expect.any(String) },
       // A legacy Lucide icon reads as Atlas's pin icon for it.
-      { id: 'pin-1', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
+      { id: 'pin-2', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
     ]);
     expect(JSON.stringify(scene.pins)).not.toContain('Secrets');
     // The note each sent pin links stays on the GM's side, for a player who opens it (`NoteHost`).
-    expect(scene.pins?.map((pin) => notePathOf(pin))).toEqual(['Secrets/Tavern.md#The Cellar', 'Dock.md']);
+    expect(scene.pins?.map((pin) => notePathOf(pin))).toEqual(['Secrets/Tavern.md#The Cellar', 'Gm.md', 'Dock.md']);
     expect(notePathOf({ id: 'pin-0', x: 100, y: 100, label: null, title: 'The Cellar' })).toBeNull();
   });
 

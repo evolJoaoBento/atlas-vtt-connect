@@ -215,8 +215,8 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
   for (const [, value] of entries) {
     if (found.length >= SCENE_LIMITS.pins) break;
     if (typeof value !== 'object' || value === null) continue;
-    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown; icon?: unknown };
-    if (pin.readable !== true || pin.gmOnly === true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; icon?: unknown };
+    if (pin.readable !== true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
     const x = finiteOrNull(pin.x);
     const y = finiteOrNull(pin.y);
     const around = { x: (x ?? 0) - cellSize / 4, y: (y ?? 0) - cellSize / 4, width: cellSize / 2, height: cellSize / 2 };

@@ -76,6 +76,25 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     expect(panel.querySelector('.is-defeated')).toBeNull();
   });
 
+  it("shows the token's conditions and look-alike number on its card, and redraws when they change", () => {
+    const panel = document.createElement('div');
+    document.body.replaceChildren(panel);
+    const view = new InitiativeView({ panel, images: () => null });
+    const initiative: PlayerInitiative = { round: 1, active: true, entries: [entry('ana', { isActive: true }), entry('orc')] };
+    const show = (conditions: Array<{ id: string; value: number | null; name?: string; color?: string }>, instance?: number): void => view.update(playerScene({
+      initiative, tokens: { ana: playerToken({ side: 'players' }), orc: playerToken({ side: 'opponents', conditions, ...(instance !== undefined ? { instance } : {}) }) },
+    }));
+    show([]);
+    expect(panel.querySelector('.initiative-conditions')).toBeNull();
+    show([{ id: 'poisoned', value: null, name: 'Poisoned', color: '#16a34a' }, { id: 'exhaustion', value: 2, name: 'Exhaustion' }], 3);
+    const card = [...panel.querySelectorAll('.initiative-card')][1]!;
+    expect([...card.querySelectorAll('.initiative-condition')].map((chip) => [chip.textContent, chip.getAttribute('aria-label')])).toEqual([['P', 'Poisoned'], ['E', 'Exhaustion 2']]);
+    expect(card.querySelector('.initiative-instance')?.textContent).toBe('#3');
+    const many = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, value: null }));
+    show(many);
+    expect(panel.querySelectorAll('.initiative-card')[1]!.querySelector('.initiative-condition--more')?.textContent).toBe('+2');
+  });
+
   it('shows no Delayed group when nobody delayed', () => {
     const { panel, show } = setup();
     show({ round: 1, active: true, entries: [entry('ana', { isActive: true })] });

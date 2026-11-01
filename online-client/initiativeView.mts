@@ -36,6 +36,9 @@ export interface InitiativeViewOptions {
   onFind?: (tokenId: string) => void;
 }
 
+/** The most condition chips on a card; the rest are counted. */
+const MAX_CARD_CONDITIONS = 4;
+
 export class InitiativeView {
   /** What the column was last drawn from, so a scene patch that changes nothing of it draws nothing. */
   private drawn = '';
@@ -125,7 +128,7 @@ export class InitiativeView {
   /** What a portrait is drawn from: its image (and whether it has arrived) and its ring. */
   private portraitKey(token: PlayerToken | undefined): string {
     if (!token) return '';
-    return `${token.image ?? ''}|${token.image && this.options.images(token.image) ? 1 : 0}|${token.ring ?? ''}|${token.downed === true ? 1 : 0}`;
+    return `${token.image ?? ''}|${token.image && this.options.images(token.image) ? 1 : 0}|${token.ring ?? ''}|${token.downed === true ? 1 : 0}|${JSON.stringify(token.conditions)}|${token.instance ?? ''}`;
   }
 
   /** Atlas's mark of a defeated combatant (`atlas-player-initiative__defeated`): a skull, over the portrait when there is one. */
@@ -199,6 +202,37 @@ export class InitiativeView {
       name.className = 'initiative-name';
       name.textContent = entry.name;
       card.append(name);
+    }
+    // Atlas's list shows the token's conditions and its look-alike number on the card.
+    if (token?.instance !== undefined) {
+      const instance = doc.createElement('span');
+      instance.className = 'initiative-instance';
+      instance.textContent = `#${token.instance}`;
+      instance.setAttribute('aria-label', `Number ${token.instance}`);
+      card.append(instance);
+    }
+    if (token && token.conditions.length > 0) {
+      const row = doc.createElement('span');
+      row.className = 'initiative-conditions';
+      for (const condition of token.conditions.slice(0, MAX_CARD_CONDITIONS)) {
+        const label = condition.name ?? condition.id;
+        const chip = doc.createElement('span');
+        chip.className = 'initiative-condition';
+        chip.setAttribute('role', 'img');
+        chip.setAttribute('aria-label', condition.value !== null ? `${label} ${condition.value}` : label);
+        if (condition.color) chip.style.setProperty('--condition', condition.color);
+        chip.textContent = (label.trim()[0] ?? '?').toUpperCase();
+        row.append(chip);
+      }
+      if (token.conditions.length > MAX_CARD_CONDITIONS) {
+        const more = doc.createElement('span');
+        more.className = 'initiative-condition initiative-condition--more';
+        more.textContent = `+${token.conditions.length - MAX_CARD_CONDITIONS}`;
+        more.setAttribute('role', 'img');
+        more.setAttribute('aria-label', token.conditions.slice(MAX_CARD_CONDITIONS).map((condition) => condition.name ?? condition.id).join(', '));
+        row.append(more);
+      }
+      card.append(row);
     }
     if (typeof entry.hpShare === 'number') {
       const hp = doc.createElement('progress');
