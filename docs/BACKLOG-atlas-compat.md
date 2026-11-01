@@ -1,10 +1,12 @@
 # Connect: Atlas compatibility backlog
 
-Written 2026-10-28 from Atlas VTT's patch notes (0.2.0 to 0.10.2) against a quick search of Connect's code (0.6.2).
+Written 2026-10-28 from Atlas VTT's patch notes (0.2.0 to 0.10.2) against a quick search of Connect's code (0.6.2). Updated 2026-11-01 for Atlas 0.12.0 (see "Atlas 0.12" below).
 Nothing here was run against a live Atlas. **Verify** means "check Connect's behaviour first; it may already be right".
 Atlas versions are in brackets. Order is priority: P0 first, and inside a tier top to bottom.
 
 ## Done
+
+- [x] **Atlas 0.12.0 audit (2026-11-01).** Read from the source diff of the tags 0.11.0 and 0.12.0, not run against a live 0.12. Nothing Connect's stock shim reads was removed or changed: the map view's store and `tabMetaStore`, `presentedScene` (`get`, `onChange`, `showElsewhere`), the settings service (`getLocalPlayerViewSettings` and the rest), the dice path (`rollDice`, `getDiceRules`, the event bus, the `dice-rolled` event), the rules path, the tile service (`open`, `overview`, `close`), the lighting controller (`playerSight` and the rest), the map file format (only `playerFrames` was added, and Connect ignores it) and the toolbar classes Connect injects into. Tabletop and Atlas Physical Dice read the same objects and are unaffected. The audit did not cover the generator's output shapes (`toLiquids`, `toWalls`).
 
 - [x] Atlas 0.10 levels: players get only the floor a view shows (0.6.2)
 - [x] Dice rules per collection: default roll, critical rule, exploding (0.5.0)
@@ -67,26 +69,47 @@ Atlas versions are in brackets. Order is priority: P0 first, and inside a tier t
 - [x] **Players can click a combatant in the list to find its token (0.9.1).** Done 2026-10-29 for the 2D views (committed locally, not released): a click, Enter or Space on a combatant's card glides the camera to its token, keeping the zoom, and the player then looks for themselves (Follow GM brings the view back). Only for a combatant whose token players see; the list does nothing for others. It is in the shared map view, so the web page and the Obsidian scene tab both have it. Tests: `initiativeView.test.ts`, `cameraController.test.ts`, `mapView.test.ts`. Tabletop's 3D board too, 2026-10-29: the board handle has an optional `lookAt(x, y)` (Tabletop moves its camera there; an older Tabletop without it does nothing). The web page must be republished.
 - [x] **GM can let players move only on their turn (0.9.0).** Done 2026-10-29 (committed locally, not released). Atlas's setting (`initiativeMovesOnTurn`) holds a token that is in a running fight shown to players and is not among those whose turn it is. Connect now reads the setting (the shim reports it as `movesOnTurn`, beside `showDiceRolls`) and refuses a player's move of such a token, judged on the scene the player was sent: in a list in turn order the one combatant whose turn it is moves, by sides every combatant of the side whose turn it is (not those who sit out), and a token outside the fight, a closed tracker, a hidden tracker or no fight hold nothing. The setting is read at each move; where an Atlas reports none, moves are free as before. A refused player sees the usual "Move not allowed". Decision made: I used Connect's own projected turn information, not a port of Atlas 0.10's initiative engine, so a case Atlas decides by its internals (a defeated combatant, a delayed one, several active sides) may differ; the common cases match. Tests: `turnHold.test.ts`, `tokenMoveHandler.test.ts` (both session paths). Not run live.
 
+## Atlas 0.12 (2026-11-01): what is new for hosted players
+
+Atlas 0.12.0 ("TrueScale and the player window bar") and Atlas Online's changes in it. 0.12.1-beta.0 has no notes yet.
+
+- [x] **P0: the curtain ("Hide the map", 0.12).** Done 2026-11-01 (decided by the user: yes; not run against a live Atlas). A GM who lowers Atlas's curtain in the player window bar now blacks out hosted players too. Atlas keeps its state out of reach (a module's store and a singleton), so Connect reads the one place it shows: the `atlas-player-window--curtain` class on the player window's body (`atlas/curtain.ts`, a mutation observer on the open `atlas-vtt-local-player` popouts). It also has its own curtain, the command "Hide the map from players" (while hosting), which works without the player window; the two are ORed. While it is down, players get no map image, grid, tokens, initiative, widgets, handout, texts, drawings or pins and the whole map in the dark (the closed frame), and Tabletop's board extras are not sent. Because the data itself is withheld, an older player page leaks nothing either. Tests: `projectForPlayers.test.ts`, `hostingService.test.ts`. **Open:** there is no switch to turn the mirroring of Atlas's curtain off (not asked for yet); the command's name does not change with its state; and this reads Atlas's DOM class, so it is the first thing to recheck on an Atlas release.
+- [ ] **P1: check the hidden-information switches in the new bar.** "Choose what players see" (widgets, initiative, dice rolls, resource bars, nameplates) is a menu over the settings that already existed in 0.11 (`localPlayerView.showWidgets`, `showInitiative`, `showDiceRolls`, `showTokenNameplates`; resource `visibleToPlayers`). Connect reads them through `getLocalPlayerViewSettings` and Atlas's online adapter reads the same keys the same way, so no leak was found. Verify live that flipping each switch reaches a connected player at once.
+- [x] **P1: player names must be unique (Atlas Online, 0.12).** Checked 2026-11-01 by code, no change needed. Connect does not refuse a duplicate name by itself: a waiting join whose name another player of the session already has reaches the GM with `sameNameAs` ("connected" or "disconnected"), and the GM admits or denies (`gmSessionEntries.earlierOf`, `playerView`). Players are keyed by their own id and key, not by name, so two people of one name do not merge. Atlas Online's automatic refusal (code 4017) and its case and Unicode folding are not copied.
+- [ ] **P2: notes and pins players place on the world map stay when the GM presents another scene (Atlas Online, 0.12).** Atlas keeps each player's writings in a per-player book (`player:<id>`, `playerWritings.ts`). Check whether anything Connect's players write or pin is lost on a scene change.
+- [ ] **P2: layout with the new bar and chip.** The player window bar (`.atlas-player-window-bar` in the top bar's start-below slot) and the saved-frame chip on the map view could overlap Connect's floating dock. Checked by reading code only. Look at it live.
+- [x] **Shim header.** Says 0.7 to 0.12 now; `lightingIsStandard` passes 0.12.0.
+- Not Connect's: TrueScale, the saved frames of the players' TV (`playerFrames` in the map file), the 4K player view and full screen. They concern the local player window, which Connect's players do not use.
+
+## P2: Atlas Online compatibility (small, in the order to do them)
+
+Features Atlas Online has that players of Connect would notice first. Each is smaller than a whole Online feature.
+
+- [ ] **Clickable dice rolls in the player view (0.9.0).** Atlas Online's players click a roll in the log to see it again; Connect's players see rolls but do not open them.
+- [ ] **Player-visible resource wheels, a switch per resource (0.8.0; shown to players in 0.11).** Atlas Online shows players the wheels shown to them, not only the bars (0.11.0). *Verify: Connect has per-token visibility and sends bars; check wheels.*
+- [ ] **Room pins of a generated dungeon on the players' page (0.11.0).** Atlas Online players see them; check that Connect sends the pins with their text and that a pin the GM did not share stays hidden.
+- [ ] **Explored areas no longer go black while players move (0.11.0).** Connect keeps its own explored memory: check the same walk does not blank the explored area.
+- [ ] **Values typed into a character sheet table do not disappear (0.11.0).** Check Connect's sheet editing of tables.
+
 ## P3: Atlas Online parity (large, optional)
 
 These are Atlas Online features. Doing them would bring Connect's player side close to Atlas Online's.
 
+- [ ] Per-player books for what players write and pin, kept across scenes (0.12.0)
 - [ ] Campaigns, and a Players tab with player-character values shared across scenes and devices (0.8.0)
 - [ ] Tokens of the same player character share hit points (0.9.0)
 - [ ] Players edit every value on their sheet, including maximums (0.9.1)
 - [ ] Abilities, Inventory and Notes panels on the player's sheet (0.9.0, 0.10.2)
 - [ ] Send items from random tables and bases to players (0.9.0)
-- [ ] Clickable dice rolls in the player view (0.9.0)
-- [ ] Player-visible resource wheels, a switch per resource (0.8.0). *Verify; Connect has per-token visibility.*
 
 ## P3: platform and upkeep
 
 - [ ] **Atlas runs in the main Obsidian window only (0.10.2).** A popped-out Atlas moves back. Check Connect's scene tabs and any popout assumption.
-- [ ] **Stock shim fragility.** Connect reads Atlas's private objects. 0.10.0 fixed a crash with third-party Atlas plugins, so retest on every Atlas release, and move to the extension API when Atlas ships one.
+- [ ] **Stock shim fragility.** Connect reads Atlas's private objects. 0.10.0 fixed a crash with third-party Atlas plugins, so retest on every Atlas release, and move to the extension API when Atlas ships one. Last audited by source diff for 0.12.0 (2026-11-01), nothing live. A cheap guard to add: on each Atlas release, diff the private members listed in the shim (the audit's list) against the new tag before testing.
 - [ ] **Library sync (0.6.0).** Atlas's library now syncs through Obsidian Sync and others. Check Connect's own stored data is sync-safe.
 - [ ] **Translations (0.6.0, 0.9.0).** Atlas follows Obsidian's language (Russian, Simplified Chinese). Connect's strings are English only.
 - [ ] **Cosmetic parity:** toasts matching the theme (0.8.0), animated grid detection (0.8.0).
 
 ## Not Connect's job
 
-Dungeon generator, random encounters, encounter builder, Armarium store, asset manager changes, map and token importers, grid auto-detection (Spectral Engine), the Atlas Dice browser extension, and Atlas Online's hosted service.
+TrueScale, the player window bar, the players' saved frames and the 4K player view (the local player window), dungeon generator, random encounters, encounter builder, Armarium store, asset manager changes, map and token importers, grid auto-detection (Spectral Engine), the Atlas Dice browser extension, and Atlas Online's hosted service.

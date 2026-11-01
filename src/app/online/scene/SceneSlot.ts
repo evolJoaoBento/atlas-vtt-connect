@@ -341,7 +341,8 @@ export class SceneSlot {
   /** Tabletop's board extras, by the same rules as the scene just projected (`visibleShows`). */
   private projectBoard(snapshot: SceneSnapshot, lighting: LightingFrame | null, coverage: FogCoverage, scene: PlayerScene): void {
     const board = this.host.options.board;
-    const next = board?.available()
+    // Under the curtain players are sent no walls, lights or props either.
+    const next = board?.available() && this.host.rules().curtain !== true
       ? projectBoard(snapshot, this.sceneId, visibleShows(snapshot, { lighting, coverage, mapSize: snapshot.mapSize }), scene.tokens, board.lookFor(this.mapPath), this.host.options.assets)
       : null;
     const text = JSON.stringify(next);

@@ -45,6 +45,14 @@ describe('board messages', () => {
     expect(bad({ extras: extras({ walls: [{ id: '__proto__', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 1, y: 1 }, height: null, material: null }] }) })).toBe('invalid');
   });
 
+  it('carries a material\'s tuning, and refuses one that is not numbers', () => {
+    const tuning = { relief: 1, occlusion: 1, shine: 0, depth: 0.5, displace: 0.5, outward: 0 };
+    const send = (value: unknown) => decodeControl(JSON.stringify({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: 1, extras: extras({ materials: [{ id: 'stone', scale: 1, maps: { color: 'b'.repeat(64) }, tuning: value as typeof tuning }] }) })).kind;
+    expect(send(tuning)).toBe('message');
+    expect(send({ ...tuning, depth: 'deep' })).toBe('invalid');
+    expect(send({ relief: 1 })).toBe('invalid');
+  });
+
   it('only board-request is something a player may send', () => {
     expect(PLAYER_MESSAGE_TYPES.has('board-request')).toBe(true);
     for (const type of ['board-offer', 'board-extras', 'board-camera'] as const) expect(PLAYER_MESSAGE_TYPES.has(type)).toBe(false);

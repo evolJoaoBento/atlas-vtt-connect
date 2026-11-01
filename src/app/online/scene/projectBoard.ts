@@ -81,7 +81,7 @@ function materialOf(entry: BoardLook['materials'][number] | undefined, assets: P
     if (id) maps[role] = id;
   }
   const color = maps.color;
-  return color ? { id: color, scale: entry.scale, maps } : null;
+  return color ? { id: color, scale: entry.scale, maps, ...(entry.tuning ? { tuning: { ...entry.tuning } } : {}) } : null;
 }
 
 function projectWall(raw: Raw, visible: Shows, look: BoardLook | null, assets: Pick<AssetIds, 'idFor'>, material: (id: string | null) => string | null): BoardWallRecord | null {

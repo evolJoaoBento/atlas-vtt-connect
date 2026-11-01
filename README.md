@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.11.0** (Mosaic Canvas).
+**Compatible with Atlas VTT 0.12.0** (TrueScale and the player window bar), and 0.11.
 
 Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
@@ -133,6 +133,10 @@ Connect follows Obsidian's light or dark theme:
 ![Light and dark](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/37-theme.gif)
 
 ## More for the GM
+
+### Hide the map
+
+While you host, run **Hide the map from players** to black out every player's screen (it toggles: run it again to show the map). Players get no map, tokens, fog, initiative or images while it is down, and the data is not sent at all. With Atlas 0.12 or later, Atlas's own **Hide the map** in the player window bar does the same for your online players too.
 
 ### Show an image
 

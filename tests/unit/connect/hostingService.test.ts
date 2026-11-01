@@ -61,7 +61,7 @@ describe('hosting through the Atlas API', () => {
   it('registers the session commands, not Atlas\'s own present commands, beside the join command', async () => {
     const { connect } = connected();
     await vi.advanceTimersByTimeAsync(0);
-    expect([...connect.commands.entries()].filter(([id]) => !SHARE_COMMANDS.includes(id)).map(([, command]) => command.name)).toEqual(['Join online session…', 'Online session…', 'Start online session', 'Stop online session', "Clear players' templates", 'Show image to players…', 'Stop showing image to players']);
+    expect([...connect.commands.entries()].filter(([id]) => !SHARE_COMMANDS.includes(id)).map(([, command]) => command.name)).toEqual(['Join online session…', 'Online session…', 'Start online session', 'Stop online session', 'Hide the map from players', "Clear players' templates", 'Show image to players…', 'Stop showing image to players']);
     expect(connect.statusBar.children).toHaveLength(1);
     expect((connect.statusBar.children[0] as HTMLElement).style.display).toBe('none');
   });
@@ -98,7 +98,7 @@ describe('hosting through the Atlas API', () => {
     // The first setup adds nothing once its folder arrives: the newer one's commands stay, once each.
     expect(connect.added()).toBe(added);
     expect(new Set(connect.commands.keys()).size).toBe(connect.commands.size);
-    expect(withoutSharing(connect.commands.keys())).toEqual(['join-online-session', 'online-session', 'start-online-session', 'stop-online-session', 'clear-templates', 'show-handout', 'stop-handout']);
+    expect(withoutSharing(connect.commands.keys())).toEqual(['join-online-session', 'online-session', 'start-online-session', 'stop-online-session', 'toggle-curtain', 'clear-templates', 'show-handout', 'stop-handout']);
     expect(connect.statusBar.children).toHaveLength(1);
     expect(connect.run('start-online-session')).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
@@ -113,7 +113,7 @@ describe('hosting through the Atlas API', () => {
     const again = new FakeAtlas({ capabilities: HOSTING });
     fire('atlas-vtt:api-ready', again);
     await vi.advanceTimersByTimeAsync(0);
-    expect(withoutSharing(connect.commands.keys())).toHaveLength(7);
+    expect(withoutSharing(connect.commands.keys())).toHaveLength(8);
     expect(connect.statusBar.children).toHaveLength(1);
     connect.run('start-online-session');
     await vi.advanceTimersByTimeAsync(0);

@@ -1,3 +1,4 @@
+import { Curtain } from '../app/online/atlas/curtain';
 import { obsidianStatblocks } from './statblockSource';
 import type { Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
@@ -63,8 +64,18 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   const minis = tabletopMinis(plugin.app);
   // And its 3D board, for players who show it.
   const board = tabletopBoard(plugin.app);
+  // Players see black while the curtain is down: Atlas 0.12's own (its player window bar) or Connect's command.
+  const curtain = new Curtain(plugin.app);
+  const asAtlas = sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) });
   const deps: Deps = {
-    ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) }),
+    ...asAtlas,
+    playerViewSettings: {
+      getLocalPlayerViewSettings: () => ({ ...asAtlas.playerViewSettings.getLocalPlayerViewSettings(), curtain: curtain.down() }),
+      onChange: (listener) => {
+        const stops = [asAtlas.playerViewSettings.onChange(listener), curtain.subscribe(listener)];
+        return () => { for (const stop of stops) stop(); };
+      },
+    },
     people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, board, attachBoard: (session) => board.attachSession(session), ...options.hosting,
   };
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
@@ -75,12 +86,13 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
     presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app),
     ...(resourceVisibility && resources ? { resourceVisibility: { store: resourceVisibility, resources } } : {}),
   }) : undefined;
-  const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), ...(gmUi ? { gmUi } : {}) });
+  const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), curtain, ...(gmUi ? { gmUi } : {}) });
   return {
     service,
     stop: () => {
       gmUi?.();
       stopOnline();
+      curtain.dispose();
       minis.dispose();
       board.dispose();
     },

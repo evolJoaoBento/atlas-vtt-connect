@@ -1,5 +1,5 @@
 /**
- * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7 to 0.10) that has none.
+ * A stand-in for Atlas's extension API on a stock Atlas (ByteMirror 0.7 to 0.12) that has none.
  *
  * It reads what stock Atlas leaves reachable at runtime: the map views in the workspace (`viewId`, `atlasStore`,
  * `tabMetaStore`, `renderer`, `serviceManager`), the plugin's `settingsService` and its `presentedScene`. It is hacky by

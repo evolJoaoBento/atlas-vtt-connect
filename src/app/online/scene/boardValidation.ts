@@ -42,10 +42,16 @@ function isProp(value: unknown): boolean {
     && isNumber(value.scale) && isNumber(value.turn);
 }
 
+const TUNING_KEYS = ['relief', 'occlusion', 'shine', 'depth', 'displace', 'outward'] as const;
+
+function isTuning(value: unknown): boolean {
+  return isFields(value) && TUNING_KEYS.every((key) => isNumber(value[key]));
+}
+
 function isMaterial(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.id) || !isNumber(value.scale) || !isFields(value.maps)) return false;
   const maps = Object.entries(value.maps);
-  return maps.length <= BOARD_PART_LIMITS.maps && maps.every(([role, id]) => isSceneId(role) && isSceneId(id));
+  return maps.length <= BOARD_PART_LIMITS.maps && maps.every(([role, id]) => isSceneId(role) && isSceneId(id)) && (value.tuning === undefined || isTuning(value.tuning));
 }
 
 /** One part of a scene's board extras. */

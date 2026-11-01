@@ -47,11 +47,23 @@ export interface BoardLightRecord {
   activeBelowAmbient: number | null;
 }
 
+/** How strongly a material shows its texture on Tabletop's board (the GM's sliders); players' boards draw it the same way. */
+export interface BoardMaterialTuning {
+  relief: number;
+  occlusion: number;
+  shine: number;
+  depth: number;
+  displace: number;
+  outward: number;
+}
+
 export interface BoardMaterialRecord {
   id: string;
   scale: number;
   /** Texture role (`color`, `normal`, `roughness`…) to asset id. */
   maps: Record<string, string>;
+  /** Absent when the material is as made. */
+  tuning?: BoardMaterialTuning;
 }
 
 export interface BoardPropRecord { id: string; asset: string; x: number; y: number; scale: number; turn: number }

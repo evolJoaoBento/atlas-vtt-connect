@@ -65,5 +65,5 @@ export interface BoardLook {
   readonly wallThickness: number | null;
   readonly ambient: number | null;
   readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
-  readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string> }>;
+  readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
 }

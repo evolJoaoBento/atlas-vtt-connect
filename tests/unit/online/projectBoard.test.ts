@@ -91,6 +91,14 @@ describe('projectBoard', () => {
     expect(extras.materials).toEqual([{ id: 'id:mat/brick/c.jpg', scale: 2, maps: { color: 'id:mat/brick/c.jpg' } }]);
   });
 
+  it('a material carries its tuning, and one as made carries none', () => {
+    const tuning = { relief: 1.5, occlusion: 1, shine: 0.2, depth: 0.8, displace: 0.5, outward: 0.3 };
+    const tuned = { ...look, materials: [{ id: 'mat/brick', scale: 2, maps: { color: 'mat/brick/c.jpg' }, tuning }, { id: 'mat/wood', scale: 1, maps: { color: 'mat/wood/c.jpg' } }] };
+    const extras = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, tuned, assets);
+    expect(extras.materials[0]?.tuning).toEqual(tuning);
+    expect(projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, look, assets).materials[0]).not.toHaveProperty('tuning');
+  });
+
   it('without the GM\'s look the walls come plain, and a file not hashed yet is left out until it is', () => {
     const plain = projectBoard(state([wall('w1', 'solid', 0)]), 's1', all, {}, null, assets);
     expect(plain.walls[0]).toMatchObject({ height: null, material: null });

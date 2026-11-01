@@ -112,7 +112,9 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // A scene saved lit whose lighting is missing, or whose frame is closed, shows players nothing but the dark map;
   // one Atlas says its lighting hides nothing (an open frame: dynamic lighting off) projects as unlit.
   const lit = state.lighting?.enabled === true;
-  const closed = context.lighting?.closed === true || (lit && !context.lighting);
+  // The curtain (Atlas 0.12's "Hide the map", or Connect's own) shows players black: the closed frame, and no map, grid, widgets, initiative or handout.
+  const curtained = context.rules.curtain === true;
+  const closed = curtained || context.lighting?.closed === true || (lit && !context.lighting);
   const lighting = closed ? closedFrame(context.mapSize) : context.lighting?.open === true ? null : context.lighting ?? null;
   const fogShows = context.coverage.within(context.mapSize);
   const visible: Shows = lighting ? darkCovers(fogShows, lighting) : fogShows;
@@ -125,19 +127,19 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
-    map: projectMap(state.background, cellSize, context, (objects as { liquids?: unknown } | undefined)?.liquids),
-    grid: projectGrid(state.grid, context.rules),
+    map: projectMap(curtained ? null : state.background, cellSize, context, curtained ? undefined : (objects as { liquids?: unknown } | undefined)?.liquids),
+    grid: curtained ? null : projectGrid(state.grid, context.rules),
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
     texts: closed ? {} : projectTexts(objects?.texts, visible),
     drawings: closed ? {} : projectDrawings(objects?.drawings, visible, memo),
-    widgets: projectWidgets(state, context.rules),
-    initiative,
+    widgets: curtained ? [] : projectWidgets(state, context.rules),
+    initiative: curtained ? null : initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
     // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
     ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
-    ...(context.handout !== undefined ? { handout: context.handout ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
+    ...(context.handout !== undefined ? { handout: context.handout && !curtained ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
   };
 }
 

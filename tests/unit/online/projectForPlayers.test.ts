@@ -1,3 +1,4 @@
+import { pickPlayerViewRules, samePlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { describe, expect, it } from 'vitest';
 import type { Character, FogOperation, GridState, ResourceDefinition, SceneSnapshot, Token } from '@atlas-vtt/api-types';
 import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
@@ -417,5 +418,42 @@ describe("the map as Atlas aligned it (Atlas 0.7.1 and 0.10)", () => {
     for (const bad of [[1, 0, 0, 1, 0], [1, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, Number.NaN], [1, 0, 0, 1, 0, '5'], [1, 0, 0, 1, 0, 9e9], 'matrix', {}]) {
       expect(isPlayerSceneBody(body(bad))).toBe(false);
     }
+  });
+});
+
+describe('the curtain (Atlas 0.12 "Hide the map", or Connect\'s own)', () => {
+  const curtained = (): ReturnType<typeof projectForPlayers> => projectForPlayers(
+    { ...withTokens({ hero: hero() }), background: 'maps/secret.png' } as SceneSnapshot,
+    context({ rules: { ...ALL_ON, curtain: true }, handout: { path: 'handouts/note.png', title: 'Note' } }),
+  );
+
+  it('sends players no map image, grid, tokens, initiative, widgets or handout', () => {
+    const scene = curtained();
+    expect(scene.map.asset).toBeNull();
+    expect(scene.grid).toBeNull();
+    expect(scene.tokens).toEqual({});
+    expect(scene.initiative).toBeNull();
+    expect(scene.widgets).toEqual([]);
+    expect(scene.handout).toBeNull();
+  });
+
+  it('covers the whole map in the dark, so a page that draws what it is given shows black', () => {
+    const scene = curtained();
+    expect(Object.keys(scene.fog).length).toBeGreaterThan(0);
+  });
+
+  it('leaves a scene without the curtain as it was', () => {
+    const scene = projectForPlayers(withTokens({ hero: hero() }), context());
+    expect(Object.keys(scene.tokens)).toEqual(['hero']);
+    expect(scene.grid).not.toBeNull();
+  });
+});
+
+describe('the player view rules with a curtain', () => {
+  it('keep it only where it is down, and tell a lowered curtain from none', () => {
+    expect(pickPlayerViewRules({ ...ALL_ON, curtain: true }).curtain).toBe(true);
+    expect(pickPlayerViewRules({ ...ALL_ON, curtain: false })).not.toHaveProperty('curtain');
+    expect(samePlayerViewRules(pickPlayerViewRules({ ...ALL_ON, curtain: true }), pickPlayerViewRules(ALL_ON))).toBe(false);
+    expect(samePlayerViewRules(pickPlayerViewRules(ALL_ON), pickPlayerViewRules({ ...ALL_ON, curtain: false }))).toBe(true);
   });
 });
