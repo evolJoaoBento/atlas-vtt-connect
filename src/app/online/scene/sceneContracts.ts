@@ -56,14 +56,41 @@ export interface SceneSession {
  * What the GM gave a map on Tabletop's 3D board (Tabletop's `api.boardLook`): heights in grid squares, materials by id
  * with their texture maps, door props and props by vault path. Paths never leave the GM's machine: only asset ids do.
  */
+/** A scene stacked with the map (Tabletop's `boardLook(...).layers`): vault paths, which become asset ids. */
+export interface BoardLayerLook {
+  elevation: number;
+  stands: { x: number; y: number; turn: number };
+  image: string;
+  grid: { size: number; offsetX: number; offsetY: number };
+  walls: ReadonlyArray<{
+    id: string; type: 'solid' | 'door' | 'secret-door'; p1: { x: number; y: number }; p2: { x: number; y: number }; closed: boolean;
+    direction: 'left' | 'right' | null; blocks: 'sight' | 'light' | null; limited: boolean; chain: string | null;
+    height: number | null; material: string | null; doorProp: string | null; flip: { hinge: boolean; side: boolean };
+  }>;
+  lights: ReadonlyArray<{
+    id: string; x: number; y: number; height: number | null; bright: number; dim: number; color: string; intensity: number;
+    animation: string | null; angle: number | null; rotation: number; darkness: boolean; activeBelowAmbient: number | null;
+  }>;
+  props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
+  materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
+  fogHeight: number | null;
+  wallThickness: number | null;
+}
+
 export interface BoardLook {
   wallHeight(id: string): number | null;
   wallMaterial(id: string): string | null;
   doorProp(id: string): string | null;
+  /** How the GM turned a door from the way Atlas draws it (Tabletop's Rotate 180° and Mirror); absent from an older Tabletop. */
+  doorFlip?(id: string): { hinge: boolean; side: boolean };
   lightHeight(id: string): number | null;
   readonly fogHeight: number | null;
   readonly wallThickness: number | null;
   readonly ambient: number | null;
+  /** The colour the GM tinted the board's daylight; absent from an older Tabletop. */
+  readonly tint?: string | null;
+  /** The scenes stacked with the map; absent from an older Tabletop, or when the GM does not share them. */
+  readonly layers?: ReadonlyArray<BoardLayerLook>;
   readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
   readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
 }

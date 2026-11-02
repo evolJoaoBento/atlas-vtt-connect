@@ -4,6 +4,7 @@ import { PlayerSession } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMessage } from '../../../src/app/online/protocol';
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { AssetServer } from '../../../src/app/online/assets/AssetServer';
+import { isBoardExtras } from '../../../src/app/online/scene/boardValidation';
 import { boardAssetIds } from '../../../src/app/online/assets/assetIds';
 import { BOARD_CAMERA_INTERVAL_MS, BoardSender, boardParts } from '../../../src/app/online/scene/BoardSender';
 import { SceneHub } from '../../../src/app/online/scene/SceneHub';
@@ -261,5 +262,41 @@ describe('board parts by size', () => {
     }
     expect(parts.reduce((sum, part) => sum + part.walls.length, 0)).toBe(3000);
     expect(parts.reduce((sum, part) => sum + part.lights.length, 0)).toBe(800);
+  });
+});
+
+describe('board layers', () => {
+  const layer = {
+    id: 'layer-1', elevation: 3, stands: { x: 10, y: 20, turn: 90 }, image: ID.tex1, grid: { size: 70, offsetX: 0, offsetY: 0 },
+    walls: [{ id: 'd', type: 'door' as const, p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: null, material: null, door: { open: false, swing: 'left' as const, prop: ID.glb1, hinge: true as const } }],
+    lights: [], props: [{ id: 'p', asset: ID.glb2, x: 0, y: 0, scale: 1, turn: 0 }], fogHeight: null, wallThickness: null,
+  };
+  const base = { sceneId: 's1', walls: [], lights: [], props: [], materials: [], ambient: null, fogHeight: null, wallThickness: null, lighting: { enabled: false, ambient: 1, ambientColor: null } };
+
+  it("the files of a stacked scene (its floor, door props and props) are the board's files too", () => {
+    expect(boardAssetIds({ ...base, layers: [layer] }).sort()).toEqual([ID.glb1, ID.glb2, ID.tex1].sort());
+  });
+
+  it('the layers ride on the first part only, whatever the walls, and come back whole in a valid message', () => {
+    const many = Array.from({ length: 3000 }, (_, i) => ({ id: `wall-${i.toString(36)}-${'x'.repeat(30)}`, type: 'solid' as const, p1: { x: 1234.5678901234 + i, y: 987.6543210987 }, p2: { x: 1304.5678901234 + i, y: 987.6543210987 }, height: 2.5, material: 'M'.repeat(43) }));
+    const parts = boardParts({ ...base, walls: many, layers: [layer] });
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts[0]!.layers).toEqual([layer]);
+    for (const part of parts.slice(1)) expect(part).not.toHaveProperty('layers');
+    const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: parts.length, extras: parts[0]! });
+    expect(decodeControl(text).kind).toBe('message');
+  });
+
+  it('extras without layers are valid and have no layers key', () => {
+    const parts = boardParts(base);
+    expect(parts[0]).not.toHaveProperty('layers');
+    expect(decodeControl(encodeControl({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: 1, extras: parts[0]! })).kind).toBe('message');
+  });
+
+  it('a layer that is malformed fails validation', () => {
+    expect(isBoardExtras({ ...base, layers: [layer] })).toBe(true);
+    expect(isBoardExtras({ ...base, layers: [{ ...layer, image: 5 }] })).toBe(false);
+    expect(isBoardExtras({ ...base, layers: [{ ...layer, grid: { size: 0, offsetX: 0, offsetY: 0 } }] })).toBe(false);
+    expect(isBoardExtras({ ...base, layers: 'x' })).toBe(false);
   });
 });

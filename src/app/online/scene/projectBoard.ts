@@ -6,8 +6,8 @@
  * and one whose file is not hashed yet is left out until it is (the registry asks for another projection).
  */
 import type { Shows } from './FogCoverage';
-import type { BoardExtras, BoardLightRecord, BoardMaterialRecord, BoardPropRecord, BoardWallRecord } from './boardTypes';
-import type { AssetIds, BoardLook } from './sceneContracts';
+import { BOARD_LAYER_LIMITS, type BoardExtras, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import type { AssetIds, BoardLayerLook, BoardLook } from './sceneContracts';
 
 type Raw = Record<string, unknown>;
 
@@ -34,6 +34,7 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     props: [],
     materials: [],
     ambient: look?.ambient ?? null,
+    ...(look?.tint ? { tint: look.tint } : {}),
     lighting: { enabled: lighting.enabled === true, ambient: Math.min(1, Math.max(0, num(lighting.ambient, 0.1))), ambientColor: str(lighting.ambientColor) },
     fogHeight: look?.fogHeight ?? null,
     wallThickness: look?.wallThickness ?? null,
@@ -51,6 +52,21 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     const wall = projectWall(raw, visible, look, assets, material);
     if (wall) extras.walls.push(wall);
   }
+  // The scenes stacked with this one: their form, never what is on them. A layer whose floor is not hashed yet waits for it.
+  const layers: BoardLayerRecord[] = [];
+  let layerBytes = 0;
+  for (const [index, layer] of (look?.layers ?? []).slice(0, BOARD_LAYER_LIMITS.layers).entries()) {
+    const record = projectLayer(layer, `layer-${index + 1}`, assets, (id) => {
+      if (!id) return null;
+      if (!materialIds.has(id)) materialIds.set(id, materialOf(layer.materials.find((entry) => entry.id === id), assets));
+      return materialIds.get(id)?.id ?? null;
+    });
+    const weight = record ? JSON.stringify(record).length + 1 : 0;
+    if (!record || layerBytes + weight > BOARD_LAYER_LIMITS.bytes) continue;
+    layerBytes += weight;
+    layers.push(record);
+  }
+  if (layers.length > 0) extras.layers = layers;
   extras.materials = [...new Map([...materialIds.values()].filter((entry): entry is BoardMaterialRecord => entry !== null).map((entry) => [entry.id, entry])).values()];
   for (const raw of items(objects.lights)) {
     // Only a light players could find: switched on, and standing where they see.
@@ -71,6 +87,42 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn } satisfies BoardPropRecord);
   }
   return extras;
+}
+
+function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 'idFor'>, material: (id: string | null) => string | null): BoardLayerRecord | null {
+  const image = assets.idFor(layer.image);
+  if (!image) return null;
+  const walls: BoardWallRecord[] = [];
+  for (const wall of layer.walls.slice(0, BOARD_LAYER_LIMITS.walls)) {
+    if ((wall.p1.x === wall.p2.x && wall.p1.y === wall.p2.y) || !wall.id) continue;
+    const open = !wall.closed;
+    // As on the presented scene: a closed secret door is plain wall.
+    const door = wall.type === 'door' || (wall.type === 'secret-door' && open);
+    const record: BoardWallRecord = { id: wall.id, type: door ? 'door' : 'solid', p1: { ...wall.p1 }, p2: { ...wall.p2 }, height: wall.height, material: material(wall.material) };
+    if (door) {
+      const prop = wall.doorProp ? assets.idFor(wall.doorProp) : null;
+      record.door = { open, swing: wall.direction === 'right' ? 'right' : 'left', prop, ...(wall.chain ? { chainId: wall.chain } : {}), ...(wall.flip.hinge ? { hinge: true as const } : {}), ...(wall.flip.side ? { side: true as const } : {}) };
+    }
+    const secret = wall.type === 'secret-door' && !door;
+    if (!secret && wall.direction) record.direction = wall.direction;
+    if (wall.blocks) record.blocks = wall.blocks;
+    if (!secret && wall.limited) record.limited = true;
+    walls.push(record);
+  }
+  const lights: BoardLightRecord[] = layer.lights.slice(0, BOARD_LAYER_LIMITS.lights).map((light) => ({
+    id: light.id, x: light.x, y: light.y, height: light.height, color: light.color, bright: Math.min(light.dim, Math.max(0, light.bright)), dim: Math.max(0, light.dim),
+    intensity: Math.max(0, light.intensity), animation: light.animation, angle: light.angle !== null && light.angle > 0 && light.angle < 360 ? light.angle : null,
+    rotation: light.rotation, darkness: light.darkness, activeBelowAmbient: light.activeBelowAmbient !== null && light.activeBelowAmbient < 1 ? light.activeBelowAmbient : null,
+  }));
+  const props: BoardPropRecord[] = [];
+  for (const prop of layer.props.slice(0, BOARD_LAYER_LIMITS.props)) {
+    const asset = assets.idFor(prop.path);
+    if (asset) props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn });
+  }
+  return {
+    id, elevation: layer.elevation, stands: { ...layer.stands }, image, grid: { ...layer.grid }, walls, lights, props,
+    fogHeight: layer.fogHeight, wallThickness: layer.wallThickness,
+  };
 }
 
 function materialOf(entry: BoardLook['materials'][number] | undefined, assets: Pick<AssetIds, 'idFor'>): BoardMaterialRecord | null {
@@ -97,7 +149,8 @@ function projectWall(raw: Raw, visible: Shows, look: BoardLook | null, assets: P
   if (door) {
     const chain = str(raw.chainId);
     const prop = look?.doorProp(id) ?? null;
-    wall.door = { open, swing: raw.direction === 'right' ? 'right' : 'left', prop: prop ? assets.idFor(prop) : null, ...(chain ? { chainId: chain } : {}) };
+    const flip = look?.doorFlip?.(id);
+    wall.door = { open, swing: raw.direction === 'right' ? 'right' : 'left', prop: prop ? assets.idFor(prop) : null, ...(chain ? { chainId: chain } : {}), ...(flip?.hinge ? { hinge: true as const } : {}), ...(flip?.side ? { side: true as const } : {}) };
   }
   // A closed secret door keeps nothing that would set it apart from the wall around it.
   const secret = raw.type === 'secret-door' && !door;

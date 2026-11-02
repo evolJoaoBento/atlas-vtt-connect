@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { WorldBounds } from '../../../src/app/online/scene/FogCoverage';
 import { projectBoard } from '../../../src/app/online/scene/projectBoard';
 import type { BoardLook } from '../../../src/app/online/scene/sceneContracts';
+import { isBoardExtras } from '../../../src/app/online/scene/boardValidation';
 
 /** Everything left of x = 500 is shown; the rest is under fog (or dark). */
 const leftHalf = { shows: (bounds: WorldBounds) => bounds.x + bounds.width <= 500 };
@@ -76,6 +77,31 @@ describe('projectBoard', () => {
     expect(hidden.lights.map((light) => light.id)).toEqual([]);
   });
 
+  it('a door the GM turned carries how, and an unturned one carries nothing; a secret door closed carries nothing', () => {
+    const turned: BoardLook = { ...look, doorFlip: (id) => (id === 'd1' ? { hinge: true, side: true } : id === 'd2' ? { hinge: true, side: false } : { hinge: false, side: false }) };
+    const extras = projectBoard(state([wall('d1', 'door', 0, { closed: true }), wall('d2', 'door', 100, { closed: false }), wall('d3', 'door', 200, { closed: true }), wall('s', 'secret-door', 300, { closed: true })]), 's1', all, {}, turned, assets);
+    expect(extras.walls[0]!.door).toMatchObject({ hinge: true, side: true });
+    expect(extras.walls[1]!.door).toMatchObject({ hinge: true });
+    expect(extras.walls[1]!.door).not.toHaveProperty('side');
+    expect(extras.walls[2]!.door).not.toHaveProperty('hinge');
+    expect(extras.walls[3]!.door).toBeUndefined();
+    expect(isBoardExtras(extras)).toBe(true);
+    // A Tabletop that does not know turned doors sends none.
+    expect(projectBoard(state([wall('d1', 'door', 0, { closed: true })]), 's1', all, {}, look, assets).walls[0]!.door).not.toHaveProperty('hinge');
+  });
+
+  it('the daylight tint goes when the GM set one; extras with or without it, and a turned door, are valid; a bad colour is not', () => {
+    expect(projectBoard(state([]), 's1', all, {}, { ...look, tint: '#ffcc88' }, assets).tint).toBe('#ffcc88');
+    expect(projectBoard(state([]), 's1', all, {}, { ...look, tint: null }, assets)).not.toHaveProperty('tint');
+    expect(projectBoard(state([]), 's1', all, {}, look, assets)).not.toHaveProperty('tint');
+    const extras = projectBoard(state([]), 's1', all, {}, { ...look, tint: '#ffcc88' }, assets);
+    expect(isBoardExtras(extras)).toBe(true);
+    expect(isBoardExtras({ ...extras, tint: 'red' })).toBe(false);
+    expect(isBoardExtras({ ...extras, tint: null })).toBe(true);
+    const door = projectBoard(state([wall('d1', 'door', 0, { closed: true })]), 's1', all, {}, look, assets);
+    expect(isBoardExtras({ ...door, walls: [{ ...door.walls[0], door: { ...door.walls[0]!.door, hinge: false } }] })).toBe(false);
+  });
+
   it('in the dark (the frame shows nothing there) walls and props are not sent; a closed frame sends nothing', () => {
     const dark = { shows: () => false };
     const extras = projectBoard(state([wall('w1', 'solid', 0)]), 's1', dark, {}, look, assets);
@@ -107,5 +133,51 @@ describe('projectBoard', () => {
     expect(unhashed.props).toEqual([]);
     expect(unhashed.materials).toEqual([]);
     expect(unhashed.walls[0]!.material).toBeNull();
+  });
+  describe('stacked scenes', () => {
+    const upstairs: NonNullable<BoardLook['layers']>[number] = {
+      elevation: 3, stands: { x: 10, y: 20, turn: 90 }, image: 'maps/up.png', grid: { size: 70, offsetX: 5, offsetY: 6 },
+      walls: [
+        { id: 'a', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, closed: true, direction: null, blocks: null, limited: false, chain: null, height: 2, material: 'mat/brick', doorProp: null, flip: { hinge: false, side: false } },
+        { id: 'd', type: 'door', p1: { x: 70, y: 0 }, p2: { x: 140, y: 0 }, closed: false, direction: 'right', blocks: null, limited: false, chain: 'c', height: null, material: null, doorProp: 'minis/door.glb', flip: { hinge: true, side: true } },
+        { id: 's', type: 'secret-door', p1: { x: 140, y: 0 }, p2: { x: 210, y: 0 }, closed: true, direction: 'left', blocks: null, limited: true, chain: null, height: null, material: null, doorProp: 'minis/door.glb', flip: { hinge: true, side: false } },
+      ],
+      lights: [{ id: 'l', x: 5, y: 5, height: 1, bright: 20, dim: 40, color: '#ffaa00', intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null }],
+      props: [{ id: 'p', path: 'minis/barrel.glb', x: 1, y: 2, scale: 1, turn: 0 }],
+      materials: [{ id: 'mat/brick', scale: 2, maps: { color: 'mat/brick/c.jpg' } }],
+      fogHeight: 2, wallThickness: null,
+    };
+
+    it('a scene stacked with the map goes as its floor, walls, doors, lights and props, by asset id, at its height and place', () => {
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [upstairs] }, assets);
+      expect(extras.layers).toHaveLength(1);
+      const layer = extras.layers![0]!;
+      expect(layer).toMatchObject({ id: 'layer-1', elevation: 3, stands: { x: 10, y: 20, turn: 90 }, image: 'id:maps/up.png', grid: { size: 70, offsetX: 5, offsetY: 6 }, fogHeight: 2 });
+      expect(layer.walls[0]).toMatchObject({ id: 'a', type: 'solid', height: 2, material: 'id:mat/brick/c.jpg' });
+      expect(layer.walls[1]).toMatchObject({ type: 'door', direction: 'right', door: { open: true, swing: 'right', prop: 'id:minis/door.glb', chainId: 'c', hinge: true, side: true } });
+      expect(layer.props).toEqual([{ id: 'p', asset: 'id:minis/barrel.glb', x: 1, y: 2, scale: 1, turn: 0 }]);
+      expect(layer.lights[0]).toMatchObject({ id: 'l', color: '#ffaa00', animation: 'torch' });
+      expect(extras.materials.map((entry) => entry.id)).toContain('id:mat/brick/c.jpg');
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it('a closed secret door of a stacked scene is plain wall and keeps nothing that sets it apart', () => {
+      const wall = projectBoard(state([]), 's1', all, {}, { ...look, layers: [upstairs] }, assets).layers![0]!.walls[2]!;
+      expect(wall).toEqual({ id: 's', type: 'solid', p1: { x: 140, y: 0 }, p2: { x: 210, y: 0 }, height: null, material: null });
+    });
+
+    it('a scene whose floor is not hashed yet is left out until it is; no layers means no key', () => {
+      const unhashed = { idFor: (path: string | null | undefined) => (path === 'maps/up.png' ? null : path ? `id:${path}` : null) };
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, layers: [upstairs] }, unhashed)).not.toHaveProperty('layers');
+      expect(projectBoard(state([]), 's1', all, {}, look, assets)).not.toHaveProperty('layers');
+    });
+
+    it('nothing is sent of a stack when the frame cannot be read, and the layers are capped by size', () => {
+      expect(projectBoard(state([]), 's1', null, {}, { ...look, layers: [upstairs] }, assets)).not.toHaveProperty('layers');
+      const wide = { ...upstairs, walls: Array.from({ length: 400 }, (_, i) => ({ ...upstairs.walls[0]!, id: `wall-${i}-${'x'.repeat(60)}` })) };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [wide, wide, wide, wide, wide, wide] }, assets);
+      expect(extras.layers!.length).toBeLessThan(6);
+      expect(JSON.stringify(extras.layers).length).toBeLessThan(115 * 1024);
+    });
   });
 });

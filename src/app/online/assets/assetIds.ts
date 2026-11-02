@@ -143,6 +143,11 @@ export function boardAssetIds(board: BoardExtras | null): string[] {
   for (const material of board.materials) for (const id of Object.values(material.maps)) if (isAssetId(id)) ids.add(id);
   for (const wall of board.walls) if (isAssetId(wall.door?.prop)) ids.add(wall.door.prop);
   for (const prop of board.props) if (isAssetId(prop.asset)) ids.add(prop.asset);
+  for (const layer of board.layers ?? []) {
+    if (isAssetId(layer.image)) ids.add(layer.image);
+    for (const wall of layer.walls) if (isAssetId(wall.door?.prop)) ids.add(wall.door.prop);
+    for (const prop of layer.props) if (isAssetId(prop.asset)) ids.add(prop.asset);
+  }
   return [...ids];
 }
 

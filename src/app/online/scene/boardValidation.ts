@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 
 type Fields = Record<string, unknown>;
@@ -18,7 +18,8 @@ const isList = (value: unknown, max: number, item: (entry: unknown) => boolean):
 
 function isDoor(value: unknown): boolean {
   return isFields(value) && typeof value.open === 'boolean' && (value.swing === 'left' || value.swing === 'right')
-    && isNullable(isSceneId)(value.prop) && (value.chainId === undefined || isText(value.chainId));
+    && isNullable(isSceneId)(value.prop) && (value.chainId === undefined || isText(value.chainId))
+    && (value.hinge === undefined || value.hinge === true) && (value.side === undefined || value.side === true);
 }
 
 function isWall(value: unknown): boolean {
@@ -54,13 +55,23 @@ function isMaterial(value: unknown): boolean {
   return maps.length <= BOARD_PART_LIMITS.maps && maps.every(([role, id]) => isSceneId(role) && isSceneId(id)) && (value.tuning === undefined || isTuning(value.tuning));
 }
 
+function isLayer(value: unknown): boolean {
+  if (!isFields(value) || !isSceneId(value.id) || !isNumber(value.elevation) || !isSceneId(value.image)) return false;
+  const { stands, grid } = value;
+  return isFields(stands) && isNumber(stands.x) && isNumber(stands.y) && isNumber(stands.turn)
+    && isFields(grid) && isNumber(grid.size) && grid.size > 0 && isNumber(grid.offsetX) && isNumber(grid.offsetY)
+    && isList(value.walls, BOARD_LAYER_LIMITS.walls, isWall) && isList(value.lights, BOARD_LAYER_LIMITS.lights, isLight) && isList(value.props, BOARD_LAYER_LIMITS.props, isProp)
+    && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness);
+}
+
 /** One part of a scene's board extras. */
 export function isBoardExtras(value: unknown): value is BoardExtras {
   if (!isFields(value) || !isSceneId(value.sceneId)) return false;
   const lighting = value.lighting;
   return isList(value.walls, BOARD_PART_LIMITS.walls, isWall) && isList(value.lights, BOARD_PART_LIMITS.lights, isLight)
     && isList(value.props, BOARD_PART_LIMITS.props, isProp) && isList(value.materials, BOARD_PART_LIMITS.materials, isMaterial)
-    && isNullable(isNumber)(value.ambient) && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
+    && isNullable(isNumber)(value.ambient) && (value.tint === undefined || value.tint === null || (typeof value.tint === 'string' && /^#[0-9a-f]{6}$/i.test(value.tint))) && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
+    && (value.layers === undefined || isList(value.layers, BOARD_LAYER_LIMITS.layers, isLayer))
     && isFields(lighting) && typeof lighting.enabled === 'boolean' && isNumber(lighting.ambient) && isNullable(isText)(lighting.ambientColor);
 }
 

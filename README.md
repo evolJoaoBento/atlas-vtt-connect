@@ -53,6 +53,8 @@ Players see the scene you present, as Atlas's own player window shows it: hidden
 
 **Dynamic lighting:** with Atlas's dynamic lighting experiment on, players see only what their tokens see, plus the places they explored.
 
+**Tabletop's 3D board:** with the [Tabletop for Atlas](https://github.com/evolJoaoBento/atlas-vtt-tabletop) plugin, players in Obsidian can see the scene on its 3D board: walls, doors (hung as you turned them with Rotate 180° or Mirror), lights, props, your daylight tint, and the other scenes stacked with it (Tabletop's elevation layers: each floor with its walls, doors, lights and props, at its height and place). Players never get what is on a stacked scene (tokens, pins, notes, fog), and a stacked scene is not hidden by its own fog; **Show layers to Connect players** in Tabletop's settings turns it off. Both plugins should be updated together.
+
 ### Health bars, per token
 
 Resources a collection marks **visible to players** (its settings, Resources) show as bars and small wheels on tokens. To choose per token, right-click it → **Edit Token** → **Players see**. Each resource gets two choices, applied on **Save**:
