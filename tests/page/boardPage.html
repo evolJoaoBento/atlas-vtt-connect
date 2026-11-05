@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Board page test</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="boardPage.css">
+</head>
+<body>
+  <section id="table" class="table" aria-label="Scene">
+    <canvas id="map" role="img" aria-label="Map"></canvas>
+    <div id="board-3d" class="board-3d" hidden></div>
+    <div id="view-buttons" class="view-buttons" hidden>
+      <button id="follow-gm" type="button">Follow GM</button>
+      <button id="fit-map" class="secondary" type="button">Fit map</button>
+    </div>
+    <div class="board-buttons">
+      <button id="dimension-button" class="secondary" type="button" hidden>3D</button>
+      <button id="eye-button" class="secondary" type="button" aria-haspopup="menu" aria-pressed="false" hidden>Eyes</button>
+      <div id="eye-menu" class="eye-menu" role="menu" aria-label="See through" hidden></div>
+    </div>
+    <p id="turn-notice" class="turn-notice" role="status" hidden></p>
+    <div id="hover-card" class="hover-card" hidden></div>
+    <div id="initiative-panel" class="initiative-panel" hidden></div>
+    <div id="statblock-preview" class="statblock-preview" hidden></div>
+    <section id="handout" class="handout" hidden>
+      <h2 id="handout-title"></h2><p id="handout-status"></p><canvas id="handout-canvas"></canvas>
+      <button id="handout-close" type="button">Close</button><button id="handout-button" type="button" hidden>Image</button>
+    </section>
+    <section id="note-panel" hidden><h2 id="note-title"></h2><div id="note-body"></div><button id="note-close" type="button">Close</button></section>
+  </section>
+  <script type="module" src="boardPage.js"></script>
+</body>
+</html>

@@ -160,6 +160,21 @@ export class BoardSceneView implements SceneViewport {
     return { tool, shape, templateShape: templateShape as TemplateShape, ownTemplates, laserColor, laserSize: this.laserSize };
   }
 
+  /** Whether the board sees through a token's eyes (an older Tabletop's does not). */
+  get firstPerson(): boolean {
+    return this.board.firstPerson === true && typeof this.board.seeFrom === 'function';
+  }
+
+  /** Sees through a token's eyes (null: the usual camera again); false where the board cannot. */
+  seeFrom(tokenId: string | null, gyro: boolean): boolean {
+    return this.firstPerson && this.board.seeFrom?.(tokenId, gyro) === true;
+  }
+
+  /** The token the view is seen through, or null. */
+  seeingFrom(): string | null {
+    return this.board.seeingFrom?.() ?? null;
+  }
+
   /** Whether the board throws dice (an older Tabletop's has none). */
   get throwsDice(): boolean {
     return this.board.diceAvailable === true && typeof this.board.throwDice === 'function';

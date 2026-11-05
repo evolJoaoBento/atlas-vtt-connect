@@ -31,6 +31,7 @@
   </div>
   <section id="table" class="table" hidden aria-label="Scene">
     <canvas id="map" role="img" aria-label="Map"></canvas>
+    <div id="board-3d" class="board-3d" hidden></div>
     <header class="top-bar">
       <div class="top-pill top-info">
         <span id="connection" class="connection" role="status"></span>
@@ -50,6 +51,12 @@
     <div id="view-buttons" class="view-buttons" hidden>
       <button id="follow-gm" type="button">Follow GM</button>
       <button id="fit-map" class="secondary" type="button">Fit map</button>
+    </div>
+    <!-- The 3D board's own buttons: 2D/3D, and seeing through one of your tokens' eyes. -->
+    <div class="board-buttons">
+      <button id="dimension-button" class="secondary" type="button" hidden>3D</button>
+      <button id="eye-button" class="secondary" type="button" aria-haspopup="menu" aria-pressed="false" hidden>Eyes</button>
+      <div id="eye-menu" class="eye-menu" role="menu" aria-label="See through" hidden></div>
     </div>
     <!-- What shows at the top of the map, one under another so none covers another: a refused move, a roll, your own throw. -->
     <div class="top-stack">

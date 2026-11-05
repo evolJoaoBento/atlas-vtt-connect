@@ -22,13 +22,17 @@ Atlas VTT, © Fabian Urbanek, is licensed under AGPL-3.0-only. Source: <https://
 - The knotwork in the corners of the roll result card (`src/app/online/page/diceToastOrnament.ts`) is "Celtic knot border" by pitr, from [ClipSafari](https://www.clipsafari.com/), dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), as Atlas uses it.
 - Connect ships none of Atlas's starter class tokens (icons by [Sketch Studio](https://www.fiverr.com/sketchstudioart), CC BY 4.0), sounds or fonts. If a later version vendors any of them, this file must credit them first.
 
+## Tabletop for Atlas VTT
+
+The join page's 3D board (`vendor/tabletop/`, a chunk of its own the page loads only when the GM offers the board) is the player board of [Tabletop for Atlas VTT](https://github.com/evolJoaoBento/atlas-vtt-tabletop), by the same author, licensed under AGPL-3.0-only. It is built from the Tabletop commit recorded in `vendor/tabletop/SOURCE.json`, whose source is the corresponding source for it. It contains code Tabletop ported from Atlas VTT (credited above, and in Tabletop's own notices), the dice face artwork of Interactive Dice for Atlas VTT, and these packages, credited below: cannon-es, meshoptimizer, clipper2-ts, React, React DOM, scheduler and lucide-react.
+
 ## Network hosts
 
 Connect does not run or bundle a STUN server. While a session runs it contacts the public STUN server `stun.l.google.com:19302` (operated by Google) to find your public address; the join page does the same. It is a host Connect talks to, not code in it. See [PRIVACY.md](PRIVACY.md).
 
 ## Bundled packages
 
-Connect bundles the following open-source packages. PeerJS and its dependencies are in both `main.js` and the join page. three.js is only in the join page's lazy dice chunk. React, React DOM, scheduler, zustand and lucide-react are only in `main.js`.
+Connect bundles the following open-source packages. PeerJS and its dependencies are in both `main.js` and the join page. three.js is only in the join page's lazy dice and 3D board chunks. React, React DOM, scheduler and lucide-react are in `main.js` and the join page's 3D board chunk; zustand only in `main.js`. cannon-es, meshoptimizer and clipper2-ts are only in the 3D board chunk.
 
 ### peerjs@1.5.5
 
@@ -351,4 +355,91 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+### cannon-es@0.20.0
+
+Licence: MIT
+
+```
+/*
+ * Copyright (c) 2015 cannon.js Authors
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy,
+ * modify, merge, publish, distribute, sublicense, and/or sell copies
+ * of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+```
+
+### meshoptimizer@1.3.0
+
+Licence: MIT
+
+```
+MIT License
+
+Copyright (c) 2016-2026 Arseny Kapoulkine
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### clipper2-ts@2.0.1-18
+
+Licence: BSL-1.0
+
+```
+Boost Software License - Version 1.0 - August 17th, 2003
+
+Permission is hereby granted, free of charge, to any person or organization
+obtaining a copy of the software and accompanying documentation covered by
+this license (the "Software") to use, reproduce, display, distribute,
+execute, and transmit the Software, and to prepare derivative works of the
+Software, and to permit third-parties to whom the Software is furnished to
+do so, all subject to the following:
+
+The copyright notices in the Software and this entire statement, including
+the above license grant, this restriction and the following disclaimer,
+must be included in all copies of the Software, in whole or in part, and
+all derivative works of the Software, unless such copies or derivative
+works are solely in the form of machine-executable object code generated by
+a source language processor.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE
+FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
 ```

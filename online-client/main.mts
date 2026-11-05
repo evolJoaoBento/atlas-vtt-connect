@@ -30,7 +30,11 @@ import { SheetView } from './sheetView.mts';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
-import { MapView } from './mapView.mts';
+import { MapView, type MapViewOptions } from './mapView.mts';
+import { SceneSwitch } from './sceneSwitch.mts';
+import { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
+import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
+import type { AssetMime } from '../src/app/online/assets/assetIds';
 import { Menu } from './menu.mts';
 import { PageToolbar } from './toolbar.mts';
 
@@ -57,14 +61,16 @@ const cache = new AssetCache({ keep: rememberedKeep(), openStore: openIndexedDbI
 const panel = new AssetsPanel(cache);
 new Menu(element<HTMLButtonElement>('menu-button'), element<HTMLElement>('menu'), element<HTMLButtonElement>('menu-close'));
 const surface = createCanvasSurface(canvas);
+const boardEl = element<HTMLElement>('board-3d');
+const followButton = element<HTMLButtonElement>('follow-gm');
+const fitButton = element<HTMLButtonElement>('fit-map');
 /** Set once the player joins; until then a drop, a laser or a roll has nowhere to go. */
 let session: PlayerSession | null = null;
 // The lookup runs at draw time, in a later animation frame, so `loader` below is already set;
 // it asks the loader every time, so a released image is never drawn.
-const map = surface
-  ? new MapView({
-    canvas, surface, images: (id) => loader.image(id),
-    viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
+const mapOptions = (): MapViewOptions => ({
+    canvas, surface: createCanvasSurface(canvas) ?? surface!, images: (id) => loader.image(id),
+    viewButtons: element('view-buttons'), followButton, fitButton,
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
@@ -85,8 +91,54 @@ const map = surface
     note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
     requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
     onToolsChange: () => syncToolbar(),
+  });
+/** An image's URL, for Tabletop's board (which loads its textures by URL): the page's decoder gives one. */
+const urlOf = (image: (DecodedImage & { url?: string }) | null): string | null => image?.url ?? null;
+// The 2D map, or Tabletop's 3D board while the GM offers it (its code loads with the first offer).
+const map: SceneSwitch | null = surface
+  ? new SceneSwitch({
+    makeMap: () => new MapView(mapOptions()),
+    makeBoard: (factory, parent) => new BoardSceneView({
+      parent, factory,
+      image: (id) => loader.image(id),
+      imageUrl: (id) => urlOf(loader.image(id)),
+      model: (id) => loader.model(id),
+      sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
+      sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
+      sendPing: (x, y) => session?.sendPing(x, y) ?? false,
+      sendTemplate: (change) => session?.sendTemplate(change) ?? false,
+      requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
+      onToolsChange: () => syncToolbar(),
+      hoverCard: element('hover-card'),
+      statblockPreview: element('statblock-preview'),
+      initiative: element('initiative-panel'),
+      turnNotice: element('turn-notice'),
+      handout: {
+        panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
+        status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
+      },
+      note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
+      doc: document,
+    }),
+    loadBoard: () => import('./tabletopBoard.mts').then((chunk) => chunk.webPlayerBoard()),
+    canvas, boardEl,
+    dimensionButton: element('dimension-button'),
+    eyeButton: element('eye-button'),
+    eyeMenu: element('eye-menu'),
+    viewButtons: element('view-buttons'),
+    requestBoard: (on) => session?.sendBoardRequest(on) ?? false,
+    onViewChange: () => {
+      // The board draws minis: their models are asked for now (or let go).
+      if (scene) loader.setScene(scene);
+      syncToolbar();
+    },
+    tokenName: (tokenId) => scene?.tokens[tokenId]?.name ?? 'Token',
+    onError: (message, error) => { console.warn(message, error); },
   })
   : null;
+// On the board, Follow GM and Fit map are the board's (the 2D map listens to them itself).
+followButton.addEventListener('click', () => { if (map?.showsBoard) map.followGm(); });
+fitButton.addEventListener('click', () => { if (map?.showsBoard) map.fitMap(); });
 const diceTray = new DiceTrayView({
   root: element('dice-tray'),
   roll: (dice, modifier, advantage) => session?.sendDiceRoll(dice, modifier, advantage) ?? false,
@@ -129,9 +181,18 @@ const toolbar = new PageToolbar({
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
 let assetsFrame: number | null = null;
-const loader = new AssetLoader({
+/** The page's images, each with a URL of its bytes too (Tabletop's board loads textures by URL). */
+async function decodeWithUrl(bytes: ArrayBuffer, mime: AssetMime): Promise<DecodedImage | null> {
+  const decoded = await decodeImage(bytes, mime);
+  if (!decoded) return null;
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  return { ...decoded, url, release: () => { decoded.release?.(); URL.revokeObjectURL(url); } } as DecodedImage;
+}
+const loader: AssetLoader = new AssetLoader({
   cache,
-  decode: decodeImage,
+  decode: decodeWithUrl,
+  // Minis' and props' models only while Tabletop's board draws them.
+  models: () => map?.showsBoard === true,
   // This page plays an animated map's video.
   video: () => true,
   // Chunks arrive many times a second: the bar and the map update at most once per frame.
@@ -329,6 +390,15 @@ if (!target) {
         map.setSheets(entries);
       },
       onPinNote: (answer) => map.receiveNote(answer),
+      onBoardOffer: (available) => {
+        log.event('board offer', { available });
+        map.boardOffer(available);
+      },
+      onBoardExtras: (extras) => {
+        loader.setBoard(extras);
+        map.boardExtras(extras);
+      },
+      onBoardCamera: (camera) => map.setBoardCamera(camera),
     });
     session.start();
   });

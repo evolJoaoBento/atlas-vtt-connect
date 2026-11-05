@@ -12,7 +12,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 const SCRIPT_FILES = ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"];
 
 export default defineConfig([
-  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
+  globalIgnores(["dist/", "dist-page/", ".page-test/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
   ...obsidianmd.configs.recommended,
   {
     files: SCRIPT_FILES,

@@ -68,6 +68,15 @@ export interface PlayerBoardHandle {
   fitMap(): void;
   /** Moves the camera to a point of the map (an initiative card's click); absent from an older Tabletop. */
   lookAt?(x: number, y: number): void;
+  /** This board sees through a token's eyes (`seeFrom`); absent from an older Tabletop. */
+  readonly firstPerson?: true;
+  /**
+   * Sees through a token's eyes, the phone's gyroscope turning the view when `gyro` (the caller has the permission), a drag
+   * otherwise; null goes back to the usual camera. False for a token the board does not have.
+   */
+  seeFrom?(tokenId: string | null, gyro: boolean): boolean;
+  /** The token the view is seen through, or null. */
+  seeingFrom?(): string | null;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;

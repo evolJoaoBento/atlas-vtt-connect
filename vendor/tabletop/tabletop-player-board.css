@@ -1,0 +1,1923 @@
+/* Atlas VTT Extension - Tabletop */
+.atlas-tabletop-gallery,
+.atlas-tabletop-picker .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+
+.atlas-tabletop-gallery.is-dropping,
+.atlas-tabletop-picker .modal-content.is-dropping {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: -4px;
+}
+
+.atlas-tabletop-picker {
+  width: min(760px, 92vw);
+}
+
+.atlas-tabletop-bar {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
+}
+
+.atlas-tabletop-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.atlas-tabletop-hint {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.atlas-tabletop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--size-4-2);
+  overflow-y: auto;
+  max-height: 60vh;
+  padding: 2px;
+}
+
+.atlas-tabletop-gallery .atlas-tabletop-grid {
+  max-height: none;
+}
+
+.atlas-tabletop-empty {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  padding: var(--size-4-4);
+  text-align: center;
+}
+
+.atlas-tabletop-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-2);
+  padding: var(--size-2-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  cursor: pointer;
+}
+
+.atlas-tabletop-card:hover,
+.atlas-tabletop-card:focus-visible {
+  border-color: var(--interactive-accent);
+}
+
+.atlas-tabletop-card.is-selected {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.atlas-tabletop-thumb {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-s);
+  background: radial-gradient(circle at 50% 40%, var(--background-primary), var(--background-secondary-alt));
+  color: var(--text-faint);
+}
+
+.atlas-tabletop-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.atlas-tabletop-thumb.is-loading {
+  animation: atlas-tabletop-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes atlas-tabletop-pulse {
+  50% { opacity: 0.5; }
+}
+
+.atlas-tabletop-name {
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-tabletop-picker-lower {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-4-4);
+  flex-wrap: wrap;
+}
+
+/* The mini on its token's square, to judge its size by. */
+.atlas-tabletop-preview {
+  flex: 0 0 auto;
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.atlas-tabletop-preview__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.atlas-tabletop-picker-controls {
+  display: flex;
+  flex: 1 1 14em;
+  flex-direction: column;
+  gap: var(--size-4-2);
+}
+
+.atlas-tabletop-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+}
+
+.atlas-tabletop-slider-value {
+  min-width: 3.5em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The 3D board's tab: the board fills it, with a tooltip for condition rings and stat badges. */
+.atlas-tabletop-board-view {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Nothing on the board (a tooltip, the toolbar of a narrow pane) makes the pane scroll. */
+.atlas-tabletop-board-view.atlas-tabletop-board-view.atlas-tabletop-board-view {
+  padding: 0;
+  overflow: hidden;
+}
+
+.atlas-tabletop-board {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+
+.atlas-tabletop-tooltip {
+  position: absolute;
+  pointer-events: none;
+  padding: var(--size-4-1) var(--size-4-2);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  box-shadow: var(--shadow-s);
+}
+
+.atlas-tabletop-tabs {
+  display: flex;
+  gap: var(--size-4-1);
+}
+
+.atlas-tabletop-tab.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.atlas-tabletop-gallery-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  min-height: 0;
+}
+
+/* A GLB drawn thinned (too many triangles). */
+.atlas-tabletop-heavy {
+  color: var(--text-warning);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+}
+
+/* The selected token's resource controls on the 3D board, as Atlas draws them: an overlay on each bar and wheel that
+   lights up on hover (outlined in the resource's colour while its editor is open) and round − / + buttons. */
+.atlas-tabletop-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.atlas-tabletop-resource-hit,
+.atlas-tabletop-resource-button {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.atlas-tabletop-resource-hit[hidden],
+.atlas-tabletop-resource-button[hidden] {
+  display: none;
+}
+
+.atlas-tabletop-resource-hit:hover {
+  background: rgba(255, 255, 255, 0.14);
+  outline: 1px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 1px;
+}
+
+.atlas-tabletop-resource-hit.is-active {
+  background: transparent;
+  outline: 1.5px solid var(--atlas-tabletop-accent, #ffffff);
+  outline-offset: 1px;
+}
+
+.atlas-tabletop-resource-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e3e3e3;
+  border: 0.75px solid rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .atlas-tabletop-resource-button {
+  background: #2a2a2a;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.atlas-tabletop-resource-button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.atlas-tabletop-resource-button svg {
+  width: 50%;
+  height: 50%;
+}
+
+/* Atlas's value editor; Atlas's own styles draw it the same when Atlas is loaded. */
+.atlas-tabletop-value-editor {
+  position: fixed;
+  transform: translate(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  z-index: var(--layer-popover, 1000);
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--text-normal) 18%, transparent);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-value-editor .atlas-token-value-editor__input {
+  width: 56px;
+  text-align: center;
+  border-radius: var(--radius-m);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-tabletop-value-editor .atlas-token-value-editor__input[aria-invalid] {
+  border-color: var(--text-error);
+}
+
+/* Kill and Delete side by side at the bottom of a token's menu, as in Atlas's. */
+.atlas-tabletop-danger-row {
+  display: flex;
+  gap: 4px;
+}
+
+.atlas-tabletop-danger-row > .menu-item {
+  flex: 1;
+}
+
+/* The graphics card setting: its long card names get a row of their own, under the text. */
+.atlas-tabletop-gpu-setting {
+  flex-wrap: wrap;
+}
+
+.atlas-tabletop-gpu-setting .setting-item-info {
+  flex-basis: 100%;
+  margin-inline-end: 0;
+}
+
+.atlas-tabletop-gpu-setting .setting-item-control {
+  flex-basis: 100%;
+  justify-content: flex-start;
+  padding-top: var(--size-4-2);
+}
+
+.atlas-tabletop-gpu-setting .setting-item-control select {
+  flex: 1;
+  max-width: none;
+}
+
+.atlas-tabletop-gpu-status {
+  margin-top: var(--size-4-1);
+  color: var(--text-normal);
+}
+
+/* What the GM has to do about the graphics card: restart, or pick the fast card. */
+.atlas-tabletop-gpu-alert {
+  margin-top: var(--size-4-1);
+  color: var(--text-error);
+  font-weight: var(--font-semibold);
+}
+
+/* The 3D board's toolbar, at the bottom of the board, in Atlas's look (its `.atlas-vtt-toolbar`). */
+.atlas-tabletop-toolbar-row {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.atlas-tabletop-toolbar,
+.atlas-tabletop-palette {
+  pointer-events: auto;
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-l);
+}
+
+.atlas-tabletop-toolbar {
+  order: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+
+
+
+
+
+
+/* The board's settings, above the toolbar, as Atlas's command palette opens. */
+.atlas-tabletop-palette {
+  order: 1;
+  width: min(360px, 100%);
+  padding: var(--size-4-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+}
+
+.atlas-tabletop-palette[hidden] {
+  display: none;
+}
+
+.atlas-tabletop-palette__title {
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-palette__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  padding: var(--size-4-3);
+  border-radius: var(--radius-l);
+  background: var(--background-secondary);
+}
+
+.atlas-tabletop-palette__heading {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.atlas-tabletop-palette__field {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-palette__label {
+  flex: 1;
+}
+
+.atlas-tabletop-palette__input {
+  width: 64px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-tabletop-palette__input[aria-invalid] {
+  border-color: var(--text-error);
+}
+
+.atlas-tabletop-palette__unit,
+.atlas-tabletop-palette__hint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* The local player view: the board fills its window, a screen for the players. */
+.atlas-tabletop-player-view {
+  position: relative;
+  overflow: hidden;
+  background: #0f0c0a;
+}
+
+.atlas-tabletop-player-view.atlas-tabletop-player-view.atlas-tabletop-player-view {
+  padding: 0;
+}
+
+.atlas-tabletop-player-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.atlas-tabletop-player-board {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.atlas-tabletop-player-waiting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2em;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* Its own window shows the board alone: no tabs, no view header (the GM closes it from the board's toolbar). */
+body.atlas-tabletop-player-window .workspace-tab-header-container,
+body.atlas-tabletop-player-window .view-header {
+  display: none;
+}
+
+/* Atlas's tool group and dropdown, as its stylesheet (0.8.0) draws them, for the laser's options: copied rule for rule
+   under Tabletop's own root (`.atlas-tabletop-atlas`), so they look the same with or without Atlas's styles. */
+.atlas-tabletop-atlas .atlas-dropdown-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-dropdown-menu {
+  border-radius: var(--radius-l);
+}
+
+
+
+
+
+.atlas-tabletop-atlas .atlas-dropdown-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  z-index: 9999;
+  padding: 8px;
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
+  --atlas-panel-inner-radius: calc(var(--radius-xl) - 1.5px);
+  border-radius: var(--radius-xl);
+  corner-shape: var(--corner-shape, round);
+  box-shadow: var(--shadow-l);
+  --atlas-menu-text-inset: 12px;
+  --atlas-bar-start-radius: initial;
+  --atlas-bar-end-radius: initial;
+  text-align: left;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content[hidden] {
+  display: none;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content--top {
+  bottom: 100%;
+  margin-bottom: 16px;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content--left {
+  left: -41px;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-section:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-label {
+  padding-inline: var(--atlas-menu-text-inset, 0px);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-swatches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-swatches__label {
+  padding-inline: var(--atlas-menu-text-inset, 0px);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-swatches__hint {
+  padding-inline: var(--atlas-menu-text-inset, 0px);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.atlas-tabletop-atlas .atlas-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.atlas-tabletop-atlas .atlas-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  border-radius: var(--radius-s);
+  border: 1px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 10%, transparent);
+  cursor: pointer;
+  box-shadow: 0 0 0 0 var(--text-normal);
+  transition-property: box-shadow, scale;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.atlas-tabletop-atlas .atlas-swatch:hover {
+  scale: 1.08;
+}
+
+.atlas-tabletop-atlas .atlas-swatch:active {
+  scale: 0.96;
+}
+
+.atlas-tabletop-atlas .atlas-swatch--active {
+  box-shadow: 0 0 0 2px var(--text-normal);
+}
+
+.atlas-tabletop-atlas .atlas-swatch-check {
+  width: 14px;
+  height: 14px;
+  padding: 3px;
+  box-sizing: content-box;
+  border-radius: 9999px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: 0 1px 2px #0000001a;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-slider-row__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-slider-row__head .atlas-dropdown-label {
+  padding-inline-end: 0;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-slider-row__value {
+  padding-inline-end: var(--atlas-menu-text-inset, 0px);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Atlas's slider (its Radix slider's parts). */
+.atlas-tabletop-atlas .slider-root {
+  position: relative;
+  display: flex;
+  width: 100%;
+  touch-action: none;
+  user-select: none;
+  align-items: center;
+  height: 16px;
+}
+
+.atlas-tabletop-atlas .slider-track {
+  position: relative;
+  height: 0.375rem;
+  width: 100%;
+  flex-grow: 1;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: var(--background-modifier-border);
+}
+
+.atlas-tabletop-atlas .slider-range {
+  position: absolute;
+  height: 100%;
+  background-color: var(--interactive-accent);
+}
+
+.atlas-tabletop-atlas .atlas-tabletop-slider-thumb-place {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+}
+
+.atlas-tabletop-atlas .slider-thumb {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9999px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.atlas-tabletop-atlas .slider-thumb:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+/* Atlas's dropdown menu items (DropdownMenuItem: a ghost, small button): a check, the icon, the name, the key. */
+.atlas-tabletop-atlas .atlas-dropdown-content .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-weight: var(--font-medium);
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  corner-shape: var(--corner-shape, round);
+  border-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px));
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content .btn--ghost {
+  background: transparent;
+  color: inherit;
+  border: none;
+  box-shadow: none;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content .btn--ghost:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content .btn--sm {
+  height: var(--input-height);
+  padding: 0 12px;
+  font-size: var(--font-ui-small);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-content .btn svg {
+  pointer-events: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-menu-item {
+  grid-template-columns: 16px 16px 1fr auto;
+  gap: 0 8px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-dropdown-menu-item {
+  display: grid;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-menu-item__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-menu-item__shortcut {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Atlas's toolbar (0.8.0), copied rule for rule under Tabletop's root: the bar, its ToolButtons (each wrapped as Atlas
+   wraps them) and its tool group. Toolbar buttons are forced flat, as Atlas forces them, so the theme's own button look
+   never shows; the tool in use is filled with the accent colour; the bar's first and last buttons (and a group's two
+   ends) follow the bar's rounding. */
+.atlas-tabletop-atlas .atlas-vtt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  pointer-events: auto;
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
+  box-shadow: var(--shadow-l);
+  --atlas-panel-inner-radius: calc(var(--radius-xl) - 1.5px);
+  border-radius: var(--radius-xl);
+  corner-shape: var(--corner-shape, round);
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar > :nth-child(1 of :not([hidden])) {
+  --atlas-bar-start-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px));
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar > :nth-last-child(1 of :not([hidden])) {
+  --atlas-bar-end-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px));
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-dropdown-content {
+  --atlas-bar-start-radius: initial;
+  --atlas-bar-end-radius: initial;
+}
+
+.atlas-tabletop-atlas .atlas-tool-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.atlas-tabletop-atlas .atlas-tool-button[hidden] {
+  display: none;
+}
+
+.atlas-tabletop-atlas .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  height: 40px;
+  padding: 8px 16px;
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.atlas-tabletop-atlas .btn svg {
+  pointer-events: none;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.atlas-tabletop-atlas .btn--toolbar {
+  color: var(--text-muted);
+  width: 20px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  outline: none;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .btn--toolbar {
+  background: transparent;
+}
+
+.atlas-tabletop-atlas .btn--icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-tool-button > span > .btn {
+  border-radius: var(--atlas-bar-start-radius, var(--radius-m)) var(--atlas-bar-end-radius, var(--radius-m)) var(--atlas-bar-end-radius, var(--radius-m)) var(--atlas-bar-start-radius, var(--radius-m));
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *) {
+  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *) {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *):active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *):focus-visible {
+  outline-offset: -2px;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *):focus-visible {
+  outline: 2px solid var(--interactive-accent);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *):hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *).is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar button.btn:not(.atlas-dice-tray *).is-active:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
+
+.atlas-tabletop-atlas .atlas-tool-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--background-secondary);
+  corner-shape: var(--corner-shape, round);
+  border-radius: var(--atlas-bar-start-radius, var(--radius-m)) var(--atlas-bar-end-radius, var(--radius-m)) var(--atlas-bar-end-radius, var(--radius-m)) var(--atlas-bar-start-radius, var(--radius-m));
+  padding: 0;
+  gap: 0;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group > .atlas-tool-button button.btn,
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group > .atlas-dropdown-menu > button.btn {
+  border-radius: 0;
+  background: transparent;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group > .atlas-tool-button:first-child button.btn {
+  border-top-left-radius: var(--atlas-bar-start-radius, var(--radius-m));
+  border-bottom-left-radius: var(--atlas-bar-start-radius, var(--radius-m));
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group > .atlas-dropdown-menu:last-child > button.btn {
+  border-top-right-radius: var(--atlas-bar-end-radius, var(--radius-m));
+  border-bottom-right-radius: var(--atlas-bar-end-radius, var(--radius-m));
+}
+
+/*
+ * The end slot (Connect's buttons, the dice) carries Atlas's root class, so Atlas's own `.atlas-vtt-plugin .btn--toolbar`
+ * rule reaches it and clears every button's background with !important, while the rule above still makes an active
+ * button's icon white: a white icon on nothing. Atlas's toolbar shows an active button as a white icon on the accent.
+ */
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-tabletop-extensions button.btn.is-active {
+  background: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-tabletop-extensions button.btn.is-active:hover {
+  background: var(--interactive-accent-hover) !important;
+  color: var(--text-on-accent) !important;
+}
+
+/* The tool in use keeps its accent inside a group too (Atlas's `is-active` rule outranks the group's flat one). */
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-tool-group > .atlas-tool-button button.btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-vtt-toolbar .atlas-tool-group > .atlas-tool-button button.btn.is-active:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-dropdown-menu {
+  border-radius: var(--radius-l);
+}
+
+.atlas-tabletop-atlas .atlas-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--radius-m);
+}
+
+.atlas-tabletop-atlas .atlas-tool-group .atlas-dropdown-trigger.btn {
+  width: 20px;
+  height: 40px;
+  padding: 0;
+  margin-left: 0;
+  color: var(--text-muted);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group .atlas-dropdown-trigger.btn {
+  border-left: 1px solid var(--divider-color);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group .atlas-dropdown-trigger.btn:hover:not(.atlas-is-active) {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-atlas.atlas-tabletop-atlas.atlas-tabletop-atlas .atlas-tool-group .atlas-dropdown-trigger.btn.atlas-is-active {
+  background-color: var(--background-secondary-alt);
+  box-shadow: inset 0 1px 2px #00000012;
+}
+
+/* Atlas's context menu (0.8.0), copied rule for rule: the token menu on the 3D board is drawn as Atlas draws its own. */
+.atlas-ctx-menu{background:var(--background-primary);border:1.5px solid color-mix(in oklch,var(--mono-100, var(--text-normal)) 18%,transparent);--atlas-panel-inner-radius: 18px ;border-radius:19.5px;corner-shape:var(--corner-shape, round);box-shadow:var(--shadow-s);display:flex;flex-direction:column;padding:4px;gap:var(--size-2-1);min-width:180px;max-width:280px;max-height:70vh;overflow-y:auto;z-index:9999;scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb-bg) transparent}
+.atlas-ctx-menu::-webkit-scrollbar{width:8px;height:8px}
+.atlas-ctx-menu::-webkit-scrollbar-track{background:transparent}
+.atlas-ctx-menu::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb-bg);border-radius:9999px}
+.atlas-ctx-menu::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-active-thumb-bg)}
+.atlas-ctx-separator{height:1px;margin:4px 0;background:var(--background-modifier-border)}
+.atlas-ctx-item{display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:28px;padding:0 8px;corner-shape:var(--corner-shape, round);border-radius:max(0px,calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 4px));background:transparent;color:var(--text-normal);font-size:var(--font-ui-small);cursor:pointer;white-space:nowrap;width:100%;text-align:left;box-sizing:border-box;border:none;outline:none}
+.atlas-ctx-item[data-highlighted]{background:var(--background-modifier-hover)}
+.atlas-ctx-item:active{background:var(--background-modifier-active-hover)}
+.atlas-ctx-item[data-disabled]{opacity:.4;cursor:not-allowed;pointer-events:none}
+.atlas-ctx-item--destructive{color:var(--text-error)}
+.atlas-ctx-item--destructive .atlas-ctx-icon svg{color:var(--text-error)}
+.atlas-ctx-item__leading{display:flex;align-items:center;gap:8px;min-width:0}
+.atlas-ctx-item__label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.atlas-ctx-item__trailing{display:flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0}
+.atlas-ctx-item__trailing .atlas-ctx-icon{width:12px;height:12px}
+.atlas-ctx-item__trailing .atlas-ctx-icon svg{width:12px;height:12px}
+.atlas-ctx-item__detail{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50%;margin-left:auto;color:var(--text-muted);font-size:var(--font-ui-smaller)}
+.atlas-ctx-item__detail+.atlas-ctx-item__trailing{margin-left:0}
+.atlas-ctx-item__check{display:flex}
+.atlas-ctx-item__check[data-state=unchecked]{visibility:hidden}
+.atlas-ctx-stepper{display:flex;align-items:center;gap:4px}
+.atlas-ctx-menu .atlas-ctx-stepper__button{display:flex;align-items:center;justify-content:center;width:20px;height:16px;padding:0;border:none;border-radius:var(--radius-s);background:transparent;box-shadow:none;color:var(--text-muted);cursor:pointer}
+.atlas-ctx-menu .atlas-ctx-stepper__button:hover:not(:disabled){background:var(--background-modifier-hover);color:var(--text-normal)}
+.atlas-ctx-menu .atlas-ctx-stepper__button:disabled{opacity:.4;cursor:default}
+.atlas-ctx-menu .atlas-ctx-stepper__button .atlas-ctx-icon,.atlas-ctx-menu .atlas-ctx-stepper__button .atlas-ctx-icon svg{width:12px;height:12px}
+.atlas-ctx-stepper__value{min-width:2ch;color:var(--text-normal);font-size:var(--font-ui-smaller);font-variant-numeric:tabular-nums;text-align:center}
+.atlas-ctx-icon{display:flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0}
+.atlas-ctx-icon svg{width:16px;height:16px;color:var(--text-muted)}
+.atlas-ctx-icon-spacer{width:16px;height:16px;flex-shrink:0}
+.atlas-ctx-destructive-row{display:flex;gap:4px}
+.atlas-ctx-destructive-btn{flex:1;display:flex;align-items:center;gap:8px;min-height:28px;padding:0 8px;border:none;corner-shape:var(--corner-shape, round);border-radius:max(0px,calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 4px));background:transparent;color:var(--text-error);font-size:var(--font-ui-small);cursor:pointer;white-space:nowrap}
+.atlas-ctx-destructive-btn svg{flex-shrink:0;color:var(--text-error)}
+.atlas-ctx-destructive-btn:hover{background:color-mix(in oklch,var(--color-red) 15%,transparent)}
+.atlas-ctx-destructive-btn:active{background:color-mix(in oklch,var(--color-red) 25%,transparent)}
+.atlas-condition-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;color:#fff;font-weight:var(--font-bold);line-height:1;background:linear-gradient(to bottom,color-mix(in srgb,var(--atlas-condition-color),#fff 18%),var(--atlas-condition-color) 55%,color-mix(in srgb,var(--atlas-condition-color),#000 20%));box-shadow:0 0 0 1px #111114,inset 0 1px #ffffff59,0 1px 2px #0000004d}
+.atlas-condition-badge--light{color:#16161a}
+
+/* Atlas's initiative tracker (0.8.0, `initiative-tracker.scss` and `token-portrait.scss`), copied rule for rule under
+   Tabletop's root, its classes renamed `tabletop-initiative-*`: Atlas 0.9 restyled its own tracker with global rules
+   on the `atlas-initiative-*` names, which would otherwise reach this one. Atlas fixes it to its window's right edge; here it stands at the board's, centred, clear of the
+   toolbar. Atlas's ring is an image tinted with the token's colour; here a ring of that colour, as wide. */
+.atlas-tabletop-initiative[hidden] { display: none; }
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 96px;
+  max-height: calc(100% - 2 * 88px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  z-index: 25;
+  font-family: var(--font-interface);
+  pointer-events: auto;
+  box-sizing: border-box;
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
+  box-shadow: var(--shadow-l);
+  --atlas-panel-inner-radius: calc(var(--radius-xl) - 1.5px);
+  border-radius: var(--radius-xl);
+  corner-shape: var(--corner-shape, round);
+  overflow: hidden;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__controls,
+.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__round {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-align: center;
+  min-width: 0;
+}
+
+/* The first and last rows sit 8px inside the border: their outer buttons' outer corners run with the panel's. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker__controls > .tabletop-initiative-tracker__btn:first-child { corner-shape: var(--corner-shape, round); border-top-left-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
+.atlas-tabletop-atlas .tabletop-initiative-tracker__controls > .tabletop-initiative-tracker__btn:last-child { corner-shape: var(--corner-shape, round); border-top-right-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
+.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls > .tabletop-initiative-tracker__btn:first-child { corner-shape: var(--corner-shape, round); border-bottom-left-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
+.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls > .tabletop-initiative-tracker__btn:last-child { corner-shape: var(--corner-shape, round); border-bottom-right-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__btn {
+  flex: 1;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__btn--end { color: var(--color-red); }
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__btn--pressed {
+  transform: scale(0.9);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-tabletop-atlas .tabletop-initiative-tracker__content { scroll-behavior: auto; }
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__content::-webkit-scrollbar { display: none; }
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker__empty {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-side__label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-side--active .tabletop-initiative-side__label { color: var(--interactive-accent); }
+
+.atlas-tabletop-atlas .tabletop-initiative-side--active .tabletop-initiative-card:not(.tabletop-initiative-card--sitting-out) {
+  border-color: var(--interactive-accent);
+  box-shadow: inset 0 0 0 1px var(--interactive-accent);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  width: 100%;
+  background: var(--background-modifier-hover);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 6%, transparent);
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card:hover {
+  background: var(--background-modifier-active-hover);
+  border-color: color-mix(in oklch, var(--mono-100, var(--text-normal)) 12%, transparent);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card:active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card--active {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    inset 0 0 0 1px var(--interactive-accent),
+    inset 0 0 12px color-mix(in oklch, var(--interactive-accent) 25%, transparent);
+  animation: atlas-tabletop-initiative-pulse 2s ease-in-out infinite;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card--defeated {
+  opacity: 0.45;
+  filter: grayscale(70%);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card--sitting-out { opacity: 0.45; }
+
+.atlas-tabletop-atlas .tabletop-initiative-card--hidden .tabletop-initiative-card__portrait { opacity: 0.5; }
+
+.atlas-tabletop-atlas .tabletop-initiative-card--drop-above::before,
+.atlas-tabletop-atlas .tabletop-initiative-card--drop-below::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--interactive-accent);
+  border-radius: 1px;
+  box-shadow: 0 0 8px var(--interactive-accent);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card--drop-above::before { top: -3px; }
+.atlas-tabletop-atlas .tabletop-initiative-card--drop-below::after { bottom: -3px; }
+
+@keyframes atlas-tabletop-initiative-pulse {
+  50% {
+    box-shadow:
+      inset 0 0 0 1px var(--interactive-accent),
+      inset 0 0 16px color-mix(in oklch, var(--interactive-accent) 45%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-tabletop-atlas .tabletop-initiative-card--active { animation: none; }
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__drag-handle { display: none; }
+
+.atlas-tabletop-atlas .tabletop-initiative-card__avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__instance-badge,
+.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge {
+  position: absolute;
+  bottom: -2px;
+  left: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: #000;
+  border: 1.5px solid #555;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-sizing: border-box;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge {
+  top: -2px;
+  right: -4px;
+  bottom: auto;
+  left: auto;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__portrait { width: 48px; }
+
+.atlas-tabletop-atlas .tabletop-initiative-card__avatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--background-secondary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__avatar svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__defeated-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-muted);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__defeated-overlay svg {
+  width: 24px;
+  height: 24px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__initiative {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  line-height: 1;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__resources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__hp-bar {
+  width: 100%;
+  height: 4px;
+  background: color-mix(in oklch, var(--mono-100, var(--text-normal)) 10%, transparent);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-card__hp-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--atlas-resource-color, var(--color-green));
+  transition: width 0.3s ease;
+}
+
+.atlas-tabletop-atlas .atlas-token-portrait {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.atlas-tabletop-atlas .atlas-token-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2.5px solid var(--atlas-token-ring-color, #fff);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.atlas-tabletop-atlas .atlas-token-image-wrapper {
+  position: absolute;
+  inset: 5%;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 2px 6px color-mix(in oklch, var(--mono-0, #000) 35%, transparent);
+}
+
+.atlas-tabletop-atlas .atlas-token-image-wrapper img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.atlas-tabletop-atlas .atlas-token-portrait--unframed .atlas-token-image-wrapper {
+  inset: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.atlas-tabletop-atlas .atlas-token-portrait--unframed .atlas-token-image-wrapper img { object-fit: contain; }
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup {
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: atlas-tabletop-initiative-popup-slide-in 0.15s ease-out;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input {
+  width: 80px;
+  height: auto;
+  background: color-mix(in srgb, var(--background-primary) 95%, transparent);
+  backdrop-filter: blur(12px);
+  border: 2px solid var(--interactive-accent);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-normal);
+  text-align: center;
+  outline: none;
+  box-shadow:
+    0 0 0 4px color-mix(in oklch, var(--interactive-accent) 15%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+  -moz-appearance: textfield;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input:focus { border-color: var(--interactive-accent); }
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input::-webkit-outer-spin-button,
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__fields {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__caption,
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--background-primary) 80%, transparent);
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__hint { white-space: nowrap; }
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input--modifier {
+  width: 64px;
+  font-size: 16px;
+  border-color: var(--background-modifier-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input--modifier::placeholder {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.atlas-tabletop-atlas .tabletop-initiative-edit-popup__input--modifier:focus {
+  border-color: var(--interactive-accent);
+  box-shadow:
+    0 0 0 4px color-mix(in oklch, var(--interactive-accent) 15%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes atlas-tabletop-initiative-popup-slide-in {
+  from { opacity: 0; transform: translateX(10px) scale(0.9); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.atlas-tabletop-palette__check { margin: 0; }
+
+/* The material editor: a wall's worth of the texture (four squares by two) at the chosen scale. */
+.atlas-tabletop-material-preview {
+  display: block;
+  aspect-ratio: 2 / 1;
+  width: 100%;
+  margin-bottom: var(--size-4-3);
+  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+  background-repeat: repeat;
+  background-color: var(--background-secondary);
+}
+
+.atlas-tabletop-material-scale {
+  width: 5em;
+}
+
+/* Connect hosting: the banner over the board's top, and the handout shown to players in a corner. */
+.atlas-tabletop-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2) var(--size-4-1) var(--size-4-3);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  box-shadow: var(--shadow-l);
+}
+.atlas-tabletop-banner[hidden], .atlas-tabletop-handout[hidden] { display: none; }
+.atlas-tabletop-handout {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  max-width: 220px;
+  padding: var(--size-4-1);
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+.atlas-tabletop-handout img { display: block; max-width: 100%; max-height: 160px; margin-top: var(--size-4-1); border-radius: var(--radius-s); }
+/* Atlas's end slot in the board's toolbar: Connect's buttons sit there as in Atlas's own toolbar. */
+.atlas-tabletop-extensions { display: flex; align-items: center; gap: 8px; }
+.atlas-tabletop-extensions:empty { display: none; }
+
+/* Atlas's scene tabs over the GM's board: laid over its top as in Atlas's map view; only the bar takes the pointer. */
+.atlas-tabletop-scene-tabs { position: absolute; top: 0; left: 0; right: 0; height: 0; z-index: 7; pointer-events: none; }
+.atlas-tabletop-scene-tabs[hidden] { display: none; }
+.atlas-tabletop-scene-tabs .atlas-scene-tab-bar { pointer-events: auto; }
+/* The banner and the handout sit below the tabs. */
+.atlas-tabletop-banner, .atlas-tabletop-handout { top: 52px; }
+
+/* The GM's dice tray, opened from the Dice button in the toolbar's end slot: Atlas's own tray (its styles), over the button. */
+.atlas-tabletop-atlas .atlas-dice-tray.atlas-tabletop-dice-picker { cursor: default; }
+.atlas-tabletop-atlas .atlas-dice-tray.atlas-tabletop-dice-picker[hidden] { display: none; }
+/* A render of the pack's own die (Atlas's line art blends into the button; a picture must not). */
+.atlas-tabletop-die-picture { display: block; width: 40px; height: 40px; pointer-events: none; }
+.atlas-tabletop-dice-face-name { font-size: var(--font-ui-small); font-weight: var(--font-semibold); color: var(--text-muted); }
+/* A die picked in colours of its own (right-click): a stripe of each colour's share under the picture. */
+.atlas-tabletop-atlas .atlas-tabletop-dice-picker .atlas-dice-tray__face.has-color::after {
+  content: ''; position: absolute; left: 6px; right: 6px; bottom: 3px; height: 4px; border-radius: 2px; background: var(--atlas-tabletop-die-colors);
+}
+/* A die's colours, laid out as the dice are: a button of each colour (its badge how many), the grip under it taking one back. */
+.atlas-tabletop-atlas .atlas-tabletop-dice-picker .atlas-dice-tray__face.atlas-tabletop-dice-colour__face { background: var(--atlas-tabletop-swatch); }
+.atlas-tabletop-atlas .atlas-tabletop-dice-picker .atlas-dice-tray__face.atlas-tabletop-dice-colour__face.atlas-tabletop-dice-swatch--pack {
+  background: repeating-linear-gradient(45deg, var(--background-secondary), var(--background-secondary) 4px, var(--background-modifier-border) 4px, var(--background-modifier-border) 8px);
+}
+.atlas-tabletop-atlas .atlas-tabletop-dice-picker .atlas-dice-tray__face.atlas-tabletop-dice-colour__face:hover:not(:disabled) { filter: brightness(1.15); }
+.atlas-tabletop-atlas .atlas-tabletop-dice-picker .atlas-segmented[aria-disabled="true"] .atlas-segmented__option { opacity: 0.45; cursor: default; }
+.atlas-tabletop-dice-swatches { display: flex; flex-direction: column; gap: 6px; }
+.atlas-tabletop-dice-swatches[hidden] { display: none; }
+.atlas-tabletop-atlas .atlas-tabletop-dice-swatches .atlas-swatch { height: auto; }
+.atlas-tabletop-atlas .atlas-swatch.atlas-tabletop-dice-swatch--pack {
+  background: repeating-linear-gradient(45deg, var(--background-secondary), var(--background-secondary) 3px, var(--background-modifier-border) 3px, var(--background-modifier-border) 6px);
+}
+
+/* What a roll waits on (a die caught on an edge, an explosion to throw), as a line over the board. */
+.atlas-tabletop-dice-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%);
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-3);
+  max-width: calc(100% - 32px);
+  padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
+  border-radius: var(--radius-l);
+  background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--text-normal) 18%, transparent);
+  box-shadow: var(--shadow-l);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  white-space: pre-line;
+}
+.atlas-tabletop-dice-prompt[hidden], .atlas-tabletop-dice-prompt.is-covered { display: none; }
+.atlas-tabletop-dice-prompt__throw { height: 28px; padding: 0 12px; }
+.atlas-tabletop-dice-prompt__clear { height: 28px; padding: 0 12px; }
+.atlas-tabletop-dice-prompt__throw[hidden], .atlas-tabletop-dice-prompt__clear[hidden] { display: none; }
+
+/* The GM's dice log, opened from the Log button beside Dice: Atlas's dropdown above the button, the rolls newest first. */
+.atlas-tabletop-atlas .atlas-tabletop-dice-log { right: -8px; width: 320px; cursor: default; }
+.atlas-tabletop-dice-log__list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+.atlas-tabletop-dice-log__empty { margin: 0; padding: 16px 4px; text-align: center; color: var(--text-muted); font-size: var(--font-ui-small); }
+.atlas-tabletop-dice-log__empty[hidden] { display: none; }
+.atlas-tabletop-dice-log__entry { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); }
+.atlas-tabletop-dice-log__who { font-size: var(--font-ui-small); font-weight: var(--font-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-tabletop-dice-log__summary { display: flex; align-items: baseline; gap: 6px; }
+.atlas-tabletop-dice-log__formula, .atlas-tabletop-dice-log__eq { color: var(--text-muted); font-size: var(--font-ui-small); }
+.atlas-tabletop-dice-log__total { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.atlas-tabletop-dice-log__more { align-self: center; color: var(--text-muted); font-size: var(--font-ui-smaller); }
+.atlas-tabletop-dice-log__formula, .atlas-tabletop-dice-card__formula { overflow-wrap: anywhere; min-width: 0; }
+.atlas-tabletop-dice-log__dice, .atlas-tabletop-dice-card__dice { display: flex; flex-wrap: wrap; gap: 4px; }
+.atlas-tabletop-dice-log__die {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 4px; box-sizing: border-box;
+  border-radius: 4px; background: var(--background-secondary); color: var(--text-normal);
+  border-bottom: 2px solid var(--die-tag-colour, transparent);
+  font-family: var(--font-monospace); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.atlas-tabletop-dice-log__die.is-max { color: var(--color-green, #2f9e44); }
+.atlas-tabletop-dice-log__die.is-min { color: var(--color-red, #e03131); }
+.atlas-tabletop-dice-log__die.is-dropped,
+.atlas-tabletop-dice-log__die.is-rerolled { background: transparent; color: var(--text-faint); text-decoration: line-through; }
+.atlas-tabletop-dice-log__entry.is-crit-success { border-color: var(--color-green, #2f9e44); box-shadow: inset 3px 0 0 var(--color-green, #2f9e44); }
+.atlas-tabletop-dice-log__entry.is-crit-failure { border-color: var(--color-red, #e03131); box-shadow: inset 3px 0 0 var(--color-red, #e03131); }
+
+/* A new roll as a card over the board, as Atlas's result card: the roller, the ability in small caps, a hero total;
+   yellow for a critical success, red for a failure. */
+.atlas-tabletop-dice-toasts { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 22; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100% - 32px); pointer-events: none; }
+.atlas-tabletop-dice-toasts[hidden] { display: none; }
+@keyframes atlas-tabletop-card-enter { from { opacity: 0; transform: translateY(-32px) scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes atlas-tabletop-card-land { from { opacity: 0; transform: scale(1.7); filter: blur(5px); } 60% { opacity: 1; transform: scale(0.95); filter: blur(0); } to { opacity: 1; transform: scale(1); filter: blur(0); } }
+.atlas-tabletop-dice-card {
+  --card-accent: var(--interactive-accent);
+  display: flex; align-items: center; gap: 16px; box-sizing: border-box; width: max-content; min-width: 240px; max-width: 360px; padding: 14px 16px;
+  border-radius: 12px; color: var(--text-normal); font-size: 13px;
+  border: 1.5px solid color-mix(in oklch, var(--card-accent) 35%, color-mix(in oklch, var(--text-normal) 18%, transparent));
+  background: radial-gradient(120% 90% at 100% 50%, color-mix(in oklch, var(--card-accent) 14%, transparent), transparent 60%), var(--background-primary);
+  box-shadow: 0 1px 2px color-mix(in oklch, #000 30%, transparent), 0 12px 32px color-mix(in oklch, #000 45%, transparent), 0 0 28px color-mix(in oklch, var(--card-accent) 18%, transparent);
+  animation: atlas-tabletop-card-enter 0.35s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.atlas-tabletop-dice-card.is-crit-success { --card-accent: var(--color-yellow, #f0b429); }
+.atlas-tabletop-dice-card.is-crit-failure { --card-accent: var(--color-red, #e03131); }
+.atlas-tabletop-dice-card__content { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.atlas-tabletop-dice-card__who { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-tabletop-dice-card__label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklch, var(--card-accent) 75%, var(--text-normal)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-tabletop-dice-card__formula { font-family: var(--font-monospace); font-size: 12px; color: var(--text-muted); }
+.atlas-tabletop-dice-card__total { flex-shrink: 0; font-size: 36px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--card-accent); animation: atlas-tabletop-card-land 0.5s cubic-bezier(0.23, 1, 0.32, 1) 250ms both; }
+@media (prefers-reduced-motion: reduce) { .atlas-tabletop-dice-card.atlas-tabletop-dice-card, .atlas-tabletop-dice-card__total.atlas-tabletop-dice-card__total { animation-duration: 1ms; animation-delay: 0ms; } }
+
+/* The selected token's stat sheet, opened from the toolbar: a drawer at the board's left edge, under the scene tabs, its rolls as small chips. */
+.atlas-tabletop-sheet {
+  position: absolute; top: 56px; left: 16px; bottom: 88px; z-index: 21; box-sizing: border-box; width: 340px; max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; border-radius: var(--radius-l); background: var(--background-primary);
+  border: 1.5px solid color-mix(in oklch, var(--text-normal) 18%, transparent); box-shadow: var(--shadow-l);
+  color: var(--text-normal); font-size: var(--font-ui-small); cursor: default;
+}
+.atlas-tabletop-sheet[hidden] { display: none; }
+/* Pinned, the drawer lies under the toolbar's panels (the toolbar is at 20) and stays open. */
+.atlas-tabletop-sheet.is-pinned { z-index: 19; }
+.atlas-tabletop-sheet__pin svg { width: 16px; height: 16px; }
+.atlas-tabletop-sheet__pin.is-active { color: var(--interactive-accent); }
+.atlas-tabletop-sheet__pin.is-active svg { fill: currentColor; }
+.atlas-tabletop-sheet__head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 6px 14px; }
+.atlas-tabletop-sheet__name { flex: 1; min-width: 0; margin: 0; font-size: var(--font-ui-large); overflow-wrap: anywhere; }
+.atlas-tabletop-sheet__close svg { width: 16px; height: 16px; }
+.atlas-tabletop-sheet__notice { margin: 0 14px 6px; padding: 6px 8px; border-radius: var(--radius-s); background: color-mix(in oklch, var(--text-error) 14%, transparent); color: var(--text-error); }
+.atlas-tabletop-sheet__notice[hidden] { display: none; }
+.atlas-tabletop-sheet__body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; user-select: text; }
+.atlas-tabletop-sheet__body p { margin: 4px 0; line-height: 1.45; }
+.atlas-tabletop-sheet__card { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 14px; user-select: text; }
+.atlas-tabletop-sheet__card[hidden] { display: none; }
+.atlas-tabletop-sheet__card.is-drawing { visibility: hidden; }
+.atlas-tabletop-sheet__subtitle { color: var(--text-muted); font-style: italic; }
+.atlas-tabletop-sheet__label { font-weight: var(--font-semibold); }
+.atlas-tabletop-sheet__empty { padding: 16px 0; text-align: center; color: var(--text-muted); }
+.atlas-tabletop-sheet__stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 8px 0; }
+.atlas-tabletop-sheet__stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.atlas-tabletop-sheet__stat-name { font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); color: var(--text-muted); }
+.atlas-tabletop-sheet__stat-score { font-size: var(--font-ui-medium); font-variant-numeric: tabular-nums; }
+.atlas-tabletop-sheet__bonuses { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; }
+.atlas-tabletop-sheet__section { margin: 12px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-medium); color: var(--text-accent); }
+.atlas-tabletop-sheet button.atlas-tabletop-sheet__roll {
+  display: inline; height: auto; margin: 0 1px; padding: 0 5px; border-radius: var(--radius-s); box-shadow: none;
+  background: color-mix(in oklch, var(--interactive-accent) 16%, transparent); color: var(--text-normal);
+  font: inherit; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.atlas-tabletop-sheet button.atlas-tabletop-sheet__roll:hover { background: var(--interactive-accent); color: var(--text-on-accent); }
+
+/* A dice setting typed out of its range. */
+.atlas-tabletop-invalid.atlas-tabletop-invalid.atlas-tabletop-invalid {
+  border-color: var(--text-error);
+}
+
+/* Where the 3D board would be, when this window cannot use WebGL. */
+.atlas-tabletop-no-webgl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-8);
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--background-primary);
+}
+.atlas-tabletop-no-webgl strong { color: var(--text-normal); font-size: var(--font-ui-large); }
+.atlas-tabletop-no-webgl p { max-width: 36em; margin: 0; }
+
+/* The lighting menu: its choices, then ambient light and the two extra looks. */
+.atlas-tabletop-lighting-options {
+  min-width: 260px;
+}
+
+.atlas-tabletop-lighting-extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  padding: var(--size-4-2) var(--size-4-3);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* The right-click row of a die: advantage and disadvantage under its colours. */
+.atlas-tabletop-dice-edges {
+  margin-top: var(--size-4-2);
+}
+
+/* The turn banner: flashes at the top of the board when the turn passes, then fades. */
+.atlas-tabletop-turn-banner {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--size-4-2, 8px) var(--size-4-6, 24px);
+  border-radius: var(--radius-xl, 16px);
+  background: color-mix(in oklch, var(--background-primary, #1c1c1c) 88%, transparent);
+  border: 1.5px solid #f5b73d;
+  color: var(--text-normal, #eee);
+  font-size: var(--font-ui-large, 18px);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  z-index: 6;
+  box-shadow: var(--shadow-l);
+  animation: atlas-tabletop-turn-banner 2.4s ease-out forwards;
+}
+
+@keyframes atlas-tabletop-turn-banner {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-tabletop-turn-banner { animation: atlas-tabletop-turn-banner-still 2.4s linear forwards; }
+  @keyframes atlas-tabletop-turn-banner-still { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+}
+
+/* The bar over the board while a group of tokens is selected: how many, rotate, hurt or heal, let go. */
+.atlas-tabletop-group-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xl, 16px);
+  background: var(--background-primary, #1c1c1c);
+  border: 1.5px solid color-mix(in oklch, var(--text-normal, #eee) 18%, transparent);
+  box-shadow: var(--shadow-l);
+  color: var(--text-normal, #eee);
+  font-size: var(--font-ui-small, 13px);
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.atlas-tabletop-group-bar[hidden] { display: none; }
+
+.atlas-tabletop-group-bar__count { padding: 0 6px; font-weight: var(--font-semibold, 600); white-space: nowrap; }
+
+.atlas-tabletop-group-bar__divider { width: 1px; height: 20px; background: var(--background-modifier-border, #444); }
+
+.atlas-tabletop-group-bar__amount { width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.atlas-tabletop-group-bar__amount[aria-invalid] { border-color: var(--text-error, #e5484d); }
+
+/* More tools: the tools that do not fit a narrow pane, in a menu above the bar. */
+.atlas-tabletop-more[hidden] { display: none; }
+
+.atlas-tabletop-more-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  min-width: 0;
+  width: max-content;
+  left: auto;
+  right: 0;
+}
+
+.atlas-tabletop-more-menu[hidden] { display: none; }
+
+.atlas-tabletop-more-menu > .atlas-toolbar-end { display: flex; flex-direction: column; gap: 6px; }
+
+/* Atlas's own root sets its text colour; so does Tabletop's, or its menus took the colour of whatever the board sits in. */
+.atlas-tabletop-atlas {
+  color: var(--text-normal);
+}
+
+/* The card a `tabletop` code block shows in a note. */
+.atlas-tabletop-board-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  overflow: hidden;
+  background: var(--background-secondary);
+  max-width: 640px;
+}
+
+.atlas-tabletop-board-card__snapshot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.atlas-tabletop-board-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2, 8px);
+  padding: var(--size-4-2, 8px) var(--size-4-3, 12px);
+}
+
+.atlas-tabletop-board-card__title {
+  font-weight: var(--font-semibold, 600);
+  color: var(--text-normal);
+}
+
+.atlas-tabletop-board-card__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-tabletop-board-card__open svg { width: 16px; height: 16px; }
+
+.atlas-tabletop-board-card__error { color: var(--text-error, #e5484d); }
+
+/* A label in the dice log (`2d6[fire]`): names the run of dice that share it. */
+.atlas-tabletop-dice-log__tag {
+  font-size: var(--font-ui-smaller, 12px);
+  color: var(--text-muted);
+  align-self: center;
+  padding: 0 2px;
+}
+
+/* The wall edges choice in the board settings: three buttons side by side, the chosen one filled. */
+.atlas-tabletop-palette__choices {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+
+.atlas-tabletop-palette__choice {
+  padding: 2px 10px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.atlas-tabletop-palette__choice + .atlas-tabletop-palette__choice {
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.atlas-tabletop-palette__choice.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* The chip that says whose point of view the board is shown from, and stops it. */
+.atlas-tabletop-pov {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; border-radius: 999px;
+  background: var(--background-primary, #1e1e1e); color: var(--text-normal, #ddd); border: 1px solid var(--background-modifier-border, #444); box-shadow: 0 2px 10px #0006; font-size: 13px;
+}
+.atlas-tabletop-pov[hidden] { display: none; }
+.atlas-tabletop-pov button { border-radius: 999px; padding: 2px 10px; }
+
+/* The height ruler of a stack of scenes, as TaleSpire's: a rail from the lowest scene to the highest, a dash every few squares, a marker on each scene. Nothing is filled: only the rail, the dashes, the markers and the words are drawn, each with a soft dark halo to read on any map. */
+.atlas-tabletop-layers {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 6;
+  padding: 6px 4px; background: none; border: 0; box-shadow: none; backdrop-filter: none;
+  pointer-events: none;
+}
+.atlas-tabletop-layers[hidden] { display: none; }
+.atlas-tabletop-layers__track { position: relative; width: 190px; cursor: pointer; touch-action: none; pointer-events: auto; }
+.atlas-tabletop-layers__rail { position: absolute; right: 8px; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: #fff; opacity: .85; filter: drop-shadow(0 0 2px #000c) drop-shadow(0 0 1px #000); }
+.atlas-tabletop-layers__tick { position: absolute; right: 8px; width: 12px; height: 1px; background: #fff; opacity: .85; transform: translateY(50%); pointer-events: none; filter: drop-shadow(0 0 2px #000c); }
+.atlas-tabletop-layers .atlas-tabletop-layers__item,
+.atlas-tabletop-layers .atlas-tabletop-layers__item:hover,
+.atlas-tabletop-layers .atlas-tabletop-layers__item:focus,
+.atlas-tabletop-layers .atlas-tabletop-layers__item:active {
+  position: absolute; right: 0; display: flex; align-items: center; gap: 8px; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; background-color: transparent; box-shadow: none; outline: none;
+  color: #fff; cursor: pointer; transform: translateY(50%); height: 24px; min-width: 0;
+  transition: color 160ms ease, transform 200ms ease, bottom 220ms ease;
+}
+.atlas-tabletop-layers__label {
+  display: flex; align-items: baseline; gap: 6px; padding: 3px 11px; border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary, #1e1e1e) 88%, transparent); border: 1px solid var(--background-modifier-border, #ffffff2e); box-shadow: 0 1px 6px #0005;
+  color: var(--text-normal, #eee); text-shadow: none; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.atlas-tabletop-layers__height { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12px; min-width: 24px; text-align: right; }
+.atlas-tabletop-layers__name { font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atlas-tabletop-layers__marker { width: 12px; height: 12px; margin-right: 3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #000a, 0 0 6px #000c; transition: transform 200ms ease, background-color 160ms ease, border-radius 200ms ease; }
+.atlas-tabletop-layers .atlas-tabletop-layers__item:hover .atlas-tabletop-layers__label { border-color: var(--interactive-accent, #7c5cff); }
+.atlas-tabletop-layers__item.is-active .atlas-tabletop-layers__label { background: var(--interactive-accent, #7c5cff); border-color: transparent; color: var(--text-on-accent, #fff); }
+.atlas-tabletop-layers__item:hover .atlas-tabletop-layers__marker { transform: scale(1.3); }
+.atlas-tabletop-layers__item.is-active { cursor: default; }
+.atlas-tabletop-layers__item.is-active .atlas-tabletop-layers__marker { width: 14px; height: 14px; margin-right: 2px; border-radius: 3px; transform: rotate(45deg); background: var(--interactive-accent, #7c5cff); box-shadow: 0 0 0 2px #000a, 0 0 10px var(--interactive-accent, #7c5cff); }
+@media (prefers-reduced-motion: reduce) { .atlas-tabletop-layers__item, .atlas-tabletop-layers__marker { transition: none; } }
+
+/* The chip that says which scene of a stack is being placed on the plane, with Reset and Stop. */
+.atlas-tabletop-adjust {
+  position: absolute; left: 50%; top: 56px; transform: translateX(-50%); z-index: 6;
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-radius: 999px;
+  background: var(--background-primary, #1e1e1e); color: var(--text-normal, #ddd); border: 1px solid var(--background-modifier-border, #444); box-shadow: 0 2px 10px #0006; font-size: 13px;
+}
+.atlas-tabletop-adjust[hidden] { display: none; }
+.atlas-tabletop-adjust button { border-radius: 999px; padding: 2px 10px; }
+
+/* A token being carried over a scene's pill: the pill lights up, as the place it will go to. */
+.atlas-tabletop-layers .atlas-tabletop-layers__item.is-drop-target .atlas-tabletop-layers__label { background: var(--interactive-accent, #7c5cff); border-color: transparent; color: var(--text-on-accent, #fff); }
+.atlas-tabletop-layers .atlas-tabletop-layers__item.is-drop-target .atlas-tabletop-layers__marker { transform: scale(1.5); }
+
+.atlas-tabletop-palette__color {
+  width: 32px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+/* A scene the GM hid on the board (its pill's menu): dimmed and struck through on the height ruler. */
+.atlas-tabletop-layers__item.is-hidden .atlas-tabletop-layers__label { opacity: 0.5; }
+.atlas-tabletop-layers__item.is-hidden .atlas-tabletop-layers__name { text-decoration: line-through; }
+
+
+/* The undo/redo buttons with nothing to take back or bring back. */
+.atlas-tabletop-atlas .atlas-tabletop-history .atlas-tabletop-tool-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+
+/* The board's modes: a tool of the other mode is not on the bar. */
+.atlas-tabletop-off-mode { display: none !important; }
+/* The paint tool's materials. */
+.atlas-tabletop-paint-options { width: 300px; max-height: 360px; overflow-y: auto; padding: 8px; }
+.atlas-tabletop-paint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 6px; }
+.atlas-tabletop-paint-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; height: auto; border: 1px solid transparent; border-radius: 6px; background: transparent; cursor: pointer; color: var(--text-normal); }
+.atlas-tabletop-paint-card:hover { background: var(--background-modifier-hover); }
+.atlas-tabletop-paint-card.is-active { border-color: var(--interactive-accent); }
+.atlas-tabletop-paint-thumb { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden; background: var(--background-secondary); }
+.atlas-tabletop-paint-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.atlas-tabletop-paint-name { font-size: 11px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
