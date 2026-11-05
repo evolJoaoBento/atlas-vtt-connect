@@ -126,7 +126,11 @@ const map: SceneSwitch | null = surface
     eyeButton: element('eye-button'),
     eyeMenu: element('eye-menu'),
     viewButtons: element('view-buttons'),
-    requestBoard: (on) => session?.sendBoardRequest(on) ?? false,
+    requestBoard: (on) => {
+      // Back to 2D: the board's materials and models are let go.
+      if (!on) loader.setBoard(null);
+      return session?.sendBoardRequest(on) ?? false;
+    },
     onViewChange: () => {
       // The board draws minis: their models are asked for now (or let go).
       if (scene) loader.setScene(scene);
