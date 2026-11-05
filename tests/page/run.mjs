@@ -51,8 +51,19 @@ async function run(engine, label, device) {
   const context = await browser.newContext({ ...device });
   const page = await context.newPage();
   const errors = [];
+  // A screenshot in WebKit adds a style of Playwright's own, which the page's policy refuses: not the page's error.
+  let shooting = false;
+  const shoot = async (name) => {
+    shooting = true;
+    const image = await page.screenshot({ path: join(shots, `${label}-${name}.png`), caret: 'initial' });
+    await wait(300);
+    shooting = false;
+    return image;
+  };
   page.on('pageerror', (error) => errors.push(String(error)));
-  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('console', (message) => { if (message.type() === 'error' && !shooting) errors.push(message.text()); });
+  // The page's Content-Security-Policy is the join page's: anything it refuses is an error.
+  await page.addInitScript(() => document.addEventListener('securitypolicyviolation', (event) => console.error(`CSP refused ${event.violatedDirective}: ${event.blockedURI} at ${event.sourceFile}:${event.lineNumber}:${event.columnNumber} sample ${event.sample}`)));
   await page.goto(url);
   await page.waitForFunction(() => window.pageTest?.ready || window.boardError, null, { timeout: 30000 });
   const tag = (name) => `${label}: ${name}`;
@@ -63,7 +74,7 @@ async function run(engine, label, device) {
   check(tag('the board is asked of the GM'), await page.evaluate(() => window.pageTest.record.requests.includes(true)));
   await page.evaluate(() => window.pageTest.extrasNow());
   await wait(2500);
-  const shot = await page.screenshot({ path: join(shots, `${label}-board.png`) });
+  const shot = await shoot('board');
   // Something is drawn: the middle of the screen is not one flat colour.
   const drawn = await page.evaluate(async (data) => {
     const image = new Image();
@@ -155,7 +166,7 @@ async function run(engine, label, device) {
   check(tag('turning the phone a quarter turns the view a quarter'), Math.abs(turn - Math.PI / 2) < 0.25, JSON.stringify({ upright, turned, turn }));
   const tiltedDown = await tilt(90, 45, 0);
   check(tag('tipping the phone forward looks down'), tiltedDown.up < -0.4, JSON.stringify(tiltedDown));
-  await page.screenshot({ path: join(shots, `${label}-eyes.png`) });
+  await shoot('eyes');
   await page.click('#eye-button');
   await wait(300);
   check(tag('Leave eyes goes back to the usual camera'), await page.evaluate(() => document.getElementById('eye-button').getAttribute('aria-pressed') === 'false'));
