@@ -1,4 +1,5 @@
 /** The shapes the scene, asset and control code share with the session side (`AssetRegistry`, `sceneSources`). */
+import type { BoardWater } from './boardTypes';
 import type { AssetMime } from '../assets/assetIds';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
@@ -79,6 +80,8 @@ export interface BoardLayerLook {
   materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
   fogHeight: number | null;
   wallThickness: number | null;
+  /** The layer's painted water; absent from an older Tabletop. */
+  water?: BoardWater;
 }
 
 export interface BoardLook {
@@ -99,6 +102,10 @@ export interface BoardLook {
   readonly tint?: string | null;
   /** The scenes stacked with the map; absent from an older Tabletop, or when the GM does not share them. */
   readonly layers?: ReadonlyArray<BoardLayerLook>;
+  /** The map's painted water and its motion; absent for none, or from an older Tabletop. */
+  readonly water?: BoardWater;
+  /** How the GM draws the scenes stacked above (Upper layers); absent from an older Tabletop. */
+  readonly layerLook?: 'solid' | 'faded' | 'transparent';
   readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number; solid?: boolean; lift?: number }>;
   readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
 }

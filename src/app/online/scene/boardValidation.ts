@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_LAYER_LIMITS, BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 
 type Fields = Record<string, unknown>;
@@ -61,13 +61,25 @@ function isMaterial(value: unknown): boolean {
   return maps.length <= BOARD_PART_LIMITS.maps && maps.every(([role, id]) => isSceneId(role) && isSceneId(id)) && (value.tuning === undefined || isTuning(value.tuning));
 }
 
+/** Painted water: a mask no larger than the board draws, its text within the limit, and a motion of plain values. */
+function isWater(value: unknown, longest: number): boolean {
+  if (!isFields(value) || !isFields(value.mask)) return false;
+  const { width, height, data } = value.mask;
+  const side = (n: unknown): boolean => Number.isSafeInteger(n) && (n as number) > 0 && (n as number) <= BOARD_WATER_LIMITS.side;
+  if (!side(width) || !side(height) || typeof data !== 'string' || data.length > longest || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return false;
+  const motion = value.motion;
+  return motion === undefined || motion === null || (isFields(motion) && typeof motion.kind === 'string' && motion.kind.length <= 20
+    && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity));
+}
+
 function isLayer(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.id) || !isNumber(value.elevation) || !isSceneId(value.image)) return false;
   const { stands, grid } = value;
   return isFields(stands) && isNumber(stands.x) && isNumber(stands.y) && isNumber(stands.turn)
     && isFields(grid) && isNumber(grid.size) && grid.size > 0 && isNumber(grid.offsetX) && isNumber(grid.offsetY)
     && isList(value.walls, BOARD_LAYER_LIMITS.walls, isWall) && isList(value.lights, BOARD_LAYER_LIMITS.lights, isLight) && isList(value.props, BOARD_LAYER_LIMITS.props, isProp)
-    && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness);
+    && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
+    && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.layer));
 }
 
 /** One part of a scene's board extras. */
@@ -78,6 +90,8 @@ export function isBoardExtras(value: unknown): value is BoardExtras {
     && isList(value.props, BOARD_PART_LIMITS.props, isProp) && isList(value.materials, BOARD_PART_LIMITS.materials, isMaterial)
     && isNullable(isNumber)(value.ambient) && (value.tint === undefined || value.tint === null || (typeof value.tint === 'string' && /^#[0-9a-f]{6}$/i.test(value.tint))) && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
     && (value.layers === undefined || isList(value.layers, BOARD_LAYER_LIMITS.layers, isLayer))
+    && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.scene))
+    && (value.layerLook === undefined || value.layerLook === 'solid' || value.layerLook === 'faded' || value.layerLook === 'transparent')
     && isFields(lighting) && typeof lighting.enabled === 'boolean' && isNumber(lighting.ambient) && isNullable(isText)(lighting.ambientColor);
 }
 

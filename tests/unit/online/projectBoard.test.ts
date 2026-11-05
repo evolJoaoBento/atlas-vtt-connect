@@ -148,6 +148,24 @@ describe('projectBoard', () => {
     expect(extras.props[0]).toMatchObject({ lift: 1.5 });
   });
 
+  it('the Upper layers look of the GM goes to players, and an unknown one does not', () => {
+    expect(projectBoard(state([]), 's1', all, {}, { ...look, layerLook: 'faded' }, assets).layerLook).toBe('faded');
+    expect(projectBoard(state([]), 's1', all, {}, { ...look, layerLook: 'glass' as 'faded' }, assets)).not.toHaveProperty('layerLook');
+    expect(projectBoard(state([]), 's1', null, {}, { ...look, layerLook: 'hidden' as 'faded' }, assets)).not.toHaveProperty('layerLook');
+  });
+
+  it('the painted water of the scene goes with its motion; water too long to send, or a broken mask, does not', () => {
+    const water = { mask: { width: 40, height: 30, data: 'AQID' }, motion: { kind: 'flow', amount: 0.5, direction: 45, tint: '#2a6f8a', clarity: 0.7 } };
+    const sent = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, { ...look, water }, assets);
+    expect(sent.water).toEqual(water);
+    expect(isBoardExtras(sent)).toBe(true);
+    const huge = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, { ...look, water: { mask: { width: 40, height: 30, data: 'A'.repeat(200 * 1024) } } }, assets);
+    expect(huge.water).toBeUndefined();
+    expect(isBoardExtras({ ...sent, water: { mask: { width: 0, height: 30, data: 'AQID' } } })).toBe(false);
+    expect(isBoardExtras({ ...sent, water: { mask: { width: 40, height: 30, data: '<script>' } } })).toBe(false);
+    expect(isBoardExtras({ ...sent, water: { ...water, motion: { ...water.motion, tint: 'red' } } })).toBe(false);
+  });
+
   it('a material carries its tuning, and one as made carries none', () => {
     const tuning = { relief: 1.5, occlusion: 1, shine: 0.2, depth: 0.8, displace: 0.5, outward: 0.3 };
     const tuned = { ...look, materials: [{ id: 'mat/brick', scale: 2, maps: { color: 'mat/brick/c.jpg' }, tuning }, { id: 'mat/wood', scale: 1, maps: { color: 'mat/wood/c.jpg' } }] };
@@ -189,6 +207,13 @@ describe('projectBoard', () => {
       expect(layer.props).toEqual([{ id: 'p', asset: 'id:minis/barrel.glb', x: 1, y: 2, scale: 1, turn: 0 }]);
       expect(layer.lights[0]).toMatchObject({ id: 'l', color: '#ffaa00', animation: 'torch' });
       expect(extras.materials.map((entry) => entry.id)).toContain('id:mat/brick/c.jpg');
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it('a stacked scene goes with its painted water', () => {
+      const water = { mask: { width: 40, height: 30, data: 'AQID' }, motion: { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 } };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [{ ...upstairs, water }] }, assets);
+      expect(extras.layers![0]!.water).toEqual(water);
       expect(isBoardExtras(extras)).toBe(true);
     });
 

@@ -14,6 +14,20 @@ import type { PlayerScene } from '../../src/app/online/scene/sceneTypes';
 const MAP = 'M'.repeat(43);
 const ART = 'A'.repeat(43);
 const GLB = 'G'.repeat(43);
+const UPSTAIRS = 'U'.repeat(43);
+
+/** A saved water mask (Tabletop's run lengths, base64 varints) for a 1400 x 1000 map of 70 px squares: rows `from` to `to` wet. */
+function waterRows(from: number, to: number): { width: number; height: number; data: string } {
+  const width = 160;
+  const height = 115;
+  const bytes: number[] = [];
+  const push = (run: number): void => { do { let byte = run % 128; run = Math.floor(run / 128); if (run > 0) byte |= 0x80; bytes.push(byte); } while (run > 0); };
+  push(from * width);
+  push((to - from) * width);
+  push((height - to) * width);
+  return { width, height, data: btoa(String.fromCharCode(...bytes)) };
+}
+const motion = { kind: 'ripple', amount: 0.4, direction: 90, tint: '#2a6f8a', clarity: 0.6 };
 
 function drawn(width: number, height: number, color: string): string {
   const canvas = document.createElement('canvas');
@@ -57,6 +71,16 @@ const extras = {
   ],
   lights: [], props: [], materials: [],
   ambient: 0.8, fogHeight: 1, wallThickness: 0.12,
+  // Water across the middle of the map, and a floor stacked above with water of its own.
+  water: { mask: waterRows(60, 80), motion },
+  // The GM draws the floors above faded.
+  layerLook: 'faded',
+  layers: [{
+    id: 'layer-1', elevation: 3, stands: { x: 0, y: 0, turn: 0 }, image: UPSTAIRS, grid: { size: 70, offsetX: 0, offsetY: 0 },
+    walls: [{ id: 'u1', type: 'solid', p1: { x: 980, y: 140 }, p2: { x: 1260, y: 140 }, height: null, material: null }],
+    lights: [], props: [], fogHeight: 1, wallThickness: 0.12,
+    water: { mask: waterRows(10, 30), motion },
+  }],
   lighting: { enabled: false, ambient: 0.8, ambientColor: null },
 } as unknown as BoardExtras;
 
@@ -73,7 +97,7 @@ function quietMap(): SceneViewport {
 }
 
 async function main(): Promise<void> {
-  const images = new Map<string, string>([[MAP, drawn(1400, 1000, '#9c8a6e')], [ART, drawn(64, 64, '#3a8a3a')]]);
+  const images = new Map<string, string>([[MAP, drawn(1400, 1000, '#9c8a6e')], [ART, drawn(64, 64, '#3a8a3a')], [UPSTAIRS, drawn(1400, 1000, '#6e7a9c')]]);
   const glb = await heroGlb();
   const record = { requests: [] as boolean[], moves: [] as unknown[] };
   const el = (id: string): HTMLElement => document.getElementById(id)!;

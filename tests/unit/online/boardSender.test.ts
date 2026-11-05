@@ -7,6 +7,7 @@ import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import { isBoardExtras } from '../../../src/app/online/scene/boardValidation';
 import { boardAssetIds } from '../../../src/app/online/assets/assetIds';
 import { BOARD_CAMERA_INTERVAL_MS, BoardSender, boardParts } from '../../../src/app/online/scene/BoardSender';
+import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS } from '../../../src/app/online/scene/boardTypes';
 import { SceneHub } from '../../../src/app/online/scene/SceneHub';
 import type { BoardSource, BoardPose } from '../../../src/app/online/scene/sceneSources';
 import type { BoardLook } from '../../../src/app/online/scene/sceneContracts';
@@ -284,6 +285,19 @@ describe('board layers', () => {
     expect(parts[0]!.layers).toEqual([layer]);
     for (const part of parts.slice(1)) expect(part).not.toHaveProperty('layers');
     const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: parts.length, extras: parts[0]! });
+    expect(decodeControl(text).kind).toBe('message');
+  });
+
+  it('the water rides on the first part only, and the largest water with the largest layers still fits one message', () => {
+    const many = Array.from({ length: 3000 }, (_, i) => ({ id: `wall-${i.toString(36)}-${'x'.repeat(30)}`, type: 'solid' as const, p1: { x: 1234.5678901234 + i, y: 987.6543210987 }, p2: { x: 1304.5678901234 + i, y: 987.6543210987 }, height: 2.5, material: 'M'.repeat(43) }));
+    const water = { mask: { width: 2048, height: 2048, data: 'A'.repeat(BOARD_WATER_LIMITS.scene) } };
+    const heavy = { ...layer, walls: Array.from({ length: 400 }, (_, i) => ({ id: `w${i}`, type: 'solid' as const, p1: { x: i, y: 0 }, p2: { x: i + 70, y: 0 }, height: 2, material: null })) };
+    const layers = Array.from({ length: 8 }, (_, i) => ({ ...heavy, id: `layer-${i + 1}` })).filter((_, i, all) => JSON.stringify(all.slice(0, i + 1)).length <= BOARD_LAYER_LIMITS.bytes);
+    const parts = boardParts({ ...base, walls: many, layers, water });
+    expect(parts[0]!.water).toEqual(water);
+    for (const part of parts.slice(1)) expect(part).not.toHaveProperty('water');
+    const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: parts.length, extras: parts[0]! });
+    expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(MAX_CONTROL_MESSAGE_BYTES);
     expect(decodeControl(text).kind).toBe('message');
   });
 

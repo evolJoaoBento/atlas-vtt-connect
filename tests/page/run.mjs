@@ -74,6 +74,16 @@ async function run(engine, label, device) {
   check(tag('the board is asked of the GM'), await page.evaluate(() => window.pageTest.record.requests.includes(true)));
   await page.evaluate(() => window.pageTest.extrasNow());
   await wait(2500);
+  // The floor stacked above shows (as on the GM's board), with its painted water; the scene's own water too.
+  const stacked = await page.evaluate(() => {
+    const board = window.pageTest.inner();
+    const layer = board.layerViews?.get('layer-1');
+    const shown = (object) => { for (let node = object; node; node = node.parent) if (!node.visible) return false; return true; };
+    return { layer: !!layer && shown(layer.object3d), layerWater: !!layer?.water && shown(layer.water.object3d), water: !!board.water && shown(board.water.object3d) };
+  });
+  check(tag('the scene stacked above shows on the board'), stacked.layer, JSON.stringify(stacked));
+  check(tag('the floors above are drawn as the GM draws them (faded here)'), await page.evaluate(() => window.pageTest.inner().quality.layerLook === 'faded'));
+  check(tag('the painted water shows, the scene\'s and the stacked one\'s'), stacked.water && stacked.layerWater, JSON.stringify(stacked));
   const shot = await shoot('board');
   // Something is drawn: the middle of the screen is not one flat colour.
   const drawn = await page.evaluate(async (data) => {

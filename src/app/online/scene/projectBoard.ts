@@ -6,7 +6,7 @@
  * and one whose file is not hashed yet is left out until it is (the registry asks for another projection).
  */
 import type { Shows } from './FogCoverage';
-import { BOARD_LAYER_LIMITS, type BoardExtras, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardLayerLook, BoardLook } from './sceneContracts';
 
 type Raw = Record<string, unknown>;
@@ -38,6 +38,7 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     lighting: { enabled: lighting.enabled === true, ambient: Math.min(1, Math.max(0, num(lighting.ambient, 0.1))), ambientColor: str(lighting.ambientColor) },
     fogHeight: look?.fogHeight ?? null,
     wallThickness: look?.wallThickness ?? null,
+    ...(look?.layerLook === 'solid' || look?.layerLook === 'faded' || look?.layerLook === 'transparent' ? { layerLook: look.layerLook } : {}),
   };
   if (!visible) return extras;
   const objects = state.objects ?? {};
@@ -67,6 +68,8 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     layers.push(record);
   }
   if (layers.length > 0) extras.layers = layers;
+  const water = waterOf(look?.water, BOARD_WATER_LIMITS.scene);
+  if (water) extras.water = water;
   extras.materials = [...new Map([...materialIds.values()].filter((entry): entry is BoardMaterialRecord => entry !== null).map((entry) => [entry.id, entry])).values()];
   for (const raw of items(objects.lights)) {
     // Only a light players could find: switched on, and standing where they see.
@@ -87,6 +90,15 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) } satisfies BoardPropRecord);
   }
   return extras;
+}
+
+/** Painted water as the wire carries it; none when there is none, or when its mask is longer than `longest`. */
+function waterOf(water: BoardWater | undefined, longest: number): BoardWater | null {
+  if (!water?.mask || typeof water.mask.data !== 'string' || water.mask.data.length > longest) return null;
+  const { width, height, data } = water.mask;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > BOARD_WATER_LIMITS.side || height > BOARD_WATER_LIMITS.side) return null;
+  const motion = water.motion;
+  return { mask: { width, height, data }, ...(motion ? { motion: { kind: motion.kind, amount: motion.amount, direction: motion.direction, tint: motion.tint, clarity: motion.clarity } } : {}) };
 }
 
 function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 'idFor'>, material: (id: string | null) => string | null): BoardLayerRecord | null {
@@ -121,9 +133,11 @@ function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 
     const asset = assets.idFor(prop.path);
     if (asset) props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) });
   }
+  const water = waterOf(layer.water, BOARD_WATER_LIMITS.layer);
   return {
     id, elevation: layer.elevation, stands: { ...layer.stands }, image, grid: { ...layer.grid }, walls, lights, props,
     fogHeight: layer.fogHeight, wallThickness: layer.wallThickness,
+    ...(water ? { water } : {}),
   };
 }
 
