@@ -66,6 +66,7 @@ const map = surface
     canvas, surface, images: (id) => loader.image(id),
     viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
+    sendCopy: (tokenId) => session?.sendTokenCopy(tokenId) ?? false,
     sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
     sendTemplate: (change) => session?.sendTemplate(change) ?? false,

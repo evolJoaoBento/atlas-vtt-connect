@@ -102,6 +102,7 @@ export type ControlMessage =
   | { v: 1; type: 'token-control'; tokenIds: string[] }
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
   | { v: 1; type: 'token-move'; sceneId: string; tokenId: string; x: number; y: number }
+  | { v: 1; type: 'token-copy'; sceneId: string; tokenId: string }
   /** GM to the player who sent the move: it failed a check, so the token stays where the scene has it. */
   | { v: 1; type: 'token-move-refused'; tokenId: string }
   /** Player to GM: a roll from the dice tray, rolled on the GM's side; with `advantage`, on the side the player chose (a lone d20). */
@@ -141,7 +142,7 @@ export type ControlMessage =
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
+  'scene-resync', 'token-move', 'token-copy', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
 ]);
 
 export type Decoded =
@@ -194,6 +195,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
+  'token-copy': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId),
   'token-move-refused': (m) => isSceneId(m.tokenId),
   'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier) && (m.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(m.advantage)),
   'dice-result': (m) => isPhysicalRoll(m),

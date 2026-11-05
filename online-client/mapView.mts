@@ -68,6 +68,7 @@ export interface MapViewOptions {
   fitButton: HTMLButtonElement;
   /** Sends one drop of a controlled token; false when it could not be sent. */
   sendMove(tokenId: string, x: number, y: number): boolean;
+  sendCopy?(tokenId: string): boolean;
   /** Sends new points of the player's laser; false when they could not be sent. */
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   /** Sends a ping at a world point; false when it could not go. */
@@ -133,6 +134,10 @@ export class MapView {
   private hover: ScreenPoint | null = null;
   /** The token the player selected with a click (Atlas's selection): its UI grows and shows its numbers. */
   private selected: string | null = null;
+  private copied: string | null = null;
+  private controlled: ReadonlySet<string> = new Set();
+  private connected = false;
+  private paused = false;
   /** The token under the pointer: its numbers show, and its conditions card. */
   private hovered: string | null = null;
   /** Ctrl or Cmd is down: Atlas then shows a token's stat block instead of its conditions card. */
@@ -204,6 +209,7 @@ export class MapView {
 
   /** The scene to show; null shows nothing and resets the camera. */
   setScene(scene: PlayerScene | null): void {
+    if (this.scene?.sceneId !== scene?.sceneId) this.copied = null;
     // Another scene: the frame players saw fades into it, as Atlas's player window crossfades (`crossfadeToNextMap`).
     if (this.scene && scene && this.scene.sceneId !== scene.sceneId) this.crossfade();
     this.hasScene = scene !== null;
@@ -231,11 +237,15 @@ export class MapView {
 
   /** The tokens this player controls, from the GM's latest list. */
   setControlled(tokenIds: readonly string[]): void {
+    this.controlled = new Set(tokenIds);
+    if (this.copied && !this.controlled.has(this.copied)) this.copied = null;
     this.moves.setControlled(tokenIds);
   }
 
   /** Whether the player is admitted: only then can tokens be dragged and tools send. */
   setConnected(connected: boolean): void {
+    this.connected = connected;
+    if (!connected) this.copied = null;
     this.moves.setConnected(connected);
     this.tools.setConnected(connected);
   }
@@ -247,6 +257,7 @@ export class MapView {
 
   /** The scene is paused (the GM is on another scene) or live again: the move notice shows the paused banner while paused. */
   setPaused(paused: boolean): void {
+    this.paused = paused;
     this.moves.setPaused(paused);
   }
 
@@ -637,6 +648,20 @@ export class MapView {
     };
     doc.addEventListener('keydown', (event) => {
       modifierFrom(event);
+      const target = event.target as Element | null;
+      const editing = target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]');
+      const dialog = doc.querySelector('dialog[open], [role="dialog"], [aria-modal="true"]');
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && !event.repeat
+        && !event.defaultPrevented && !editing && !dialog && this.options.active?.() !== false
+        && this.connected && !this.paused && this.options.sendCopy) {
+        const key = event.key.toLowerCase();
+        if (key === 'c' && this.selected && this.controlled.has(this.selected) && this.scene && Object.hasOwn(this.scene.tokens, this.selected)) {
+          this.copied = this.selected;
+          event.preventDefault();
+        } else if (key === 'v' && this.copied && this.controlled.has(this.copied) && this.scene && Object.hasOwn(this.scene.tokens, this.copied)) {
+          if (this.options.sendCopy(this.copied)) event.preventDefault();
+        }
+      }
       // Escape lets go of the selection, as in Atlas, when nothing above the map took it.
       if (event.key === 'Escape' && this.selected !== null && this.options.active?.() !== false && !event.defaultPrevented) this.select({ x: -1e9, y: -1e9 });
     }, { signal });

@@ -41,6 +41,15 @@ A player who reconnects from the same browser or Obsidian takes their old place 
 
 ## What players see
 
+### Copying your token (custom build)
+
+On the web map, select a token you control, press **Ctrl+C**, then **Ctrl+V** (or **Cmd+C / Cmd+V** on macOS).
+The GM creates the copy at the same position; drag the top token to move it. Only the requesting player gains
+control of the copy. Text fields keep their normal shortcuts. Copying is refused while the scene is paused,
+after losing control, across scenes, or for hidden tokens. Both this player page and the GM's Connect plugin
+must use this custom build. Stock Atlas hosts use their existing token insertion operation; API hosts without
+that operation refuse copies. The original token's linked character note remains shared; no new note is created.
+
 Players see the scene you present, as Atlas's own player window shows it: hidden tokens, fog and line of sight stay hidden, and your map's look (rings, grid style, pin icons, numbered look-alike tokens) carries over.
 
 **Present a scene:** click the eye on its scene tab; players' maps fade over to it.

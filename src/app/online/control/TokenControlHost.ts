@@ -4,7 +4,6 @@
  * (`TokenMoveHandler`, through Atlas's `tokens.move`, on the sender's scene) and dropping tokens deleted from the
  * scene the GM's view shows. Started after the scene hub and the camera sender, so its messages follow theirs.
  */
-import type { TokensApi } from '@atlas-vtt/api-types';
 import type { SessionPlayer } from '../GmSession';
 import type { SceneSession } from '../scene/sceneSources';
 import type { SlotProjection } from '../scene/slotViews';
@@ -12,12 +11,13 @@ import { ControlLists } from './ControlLists';
 import { watchDeletedTokens } from './deletedTokens';
 import { TokenControl } from './TokenControl';
 import { TokenMoveHandler } from './TokenMoveHandler';
+import { TokenCopyHandler, type CopyableTokens } from './TokenCopyHandler';
 
 export interface TokenControlHostOptions {
   session: SceneSession;
   /** The scene each player has (the scene hub): lists and moves are worked out against it. */
   projection: SlotProjection;
-  tokens: Pick<TokensApi, 'move'>;
+  tokens: CopyableTokens;
   /** Whether players move only on their turn (`TokenMoveHandler`); without it they move at any time. */
   movesOnTurn?: () => boolean;
 }
@@ -29,17 +29,20 @@ export class TokenControlHost {
   readonly control = new TokenControl();
   private readonly lists: ControlLists;
   private readonly moves: TokenMoveHandler;
+  private readonly copies: TokenCopyHandler;
   private stopWatching: (() => void) | null = null;
 
   constructor(private readonly options: TokenControlHostOptions) {
     this.lists = new ControlLists({ session: options.session, control: this.control, projection: options.projection });
     this.moves = new TokenMoveHandler({ ...options, control: this.control });
+    this.copies = new TokenCopyHandler({ ...options, control: this.control });
   }
 
   start(): void {
     if (this.stopWatching) return;
     this.lists.start();
     this.moves.start();
+    this.copies.start();
     this.stopWatching = watchDeletedTokens(this.options.projection, this.control);
   }
 
@@ -48,6 +51,7 @@ export class TokenControlHost {
     this.stopWatching = null;
     this.lists.stop();
     this.moves.stop();
+    this.copies.stop();
   }
 
   /** The session's players changed: a removed (kicked) player loses their tokens; one who is only gone keeps them. */
@@ -55,5 +59,6 @@ export class TokenControlHost {
     const known = new Set(players.map((player) => player.playerId));
     this.control.retainPlayers(known);
     this.moves.retainPlayers(known);
+    this.copies.retainPlayers(known);
   }
 }

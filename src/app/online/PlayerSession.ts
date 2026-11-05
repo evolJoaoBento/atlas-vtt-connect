@@ -153,6 +153,13 @@ export class PlayerSession {
    * Sends one drop of a token for the scene this player has. False when it cannot go
    * (not admitted, no link, no scene), so the drag sends nothing. The GM checks it.
    */
+  sendTokenCopy(tokenId: string): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || !this.controlled.includes(tokenId)) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'token-copy', sceneId: scene.sceneId, tokenId }));
+    return true;
+  }
+
   sendTokenMove(tokenId: string, x: number, y: number): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;

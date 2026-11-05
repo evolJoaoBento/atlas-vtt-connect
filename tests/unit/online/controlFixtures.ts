@@ -7,6 +7,7 @@
 import { vi } from 'vitest';
 import type { TokenEntity } from '@atlas-vtt/api-types';
 import { TokenControlHost } from '../../../src/app/online/control/TokenControlHost';
+import type { CopyableTokens } from '../../../src/app/online/control/TokenCopyHandler';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession, type PlayerSessionOptions } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
@@ -75,7 +76,7 @@ export interface ControlPlayer {
   controlLists(): string[][];
 }
 
-export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean } = {}) {
+export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean; duplicate?: CopyableTokens['duplicate'] } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let host: TokenControlHost | null = null;
@@ -87,7 +88,7 @@ export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () =
   gm.start();
   const scene = presentedScene(gm, options.scene ?? {});
   const { tokens } = scene.presented.extension;
-  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}) });
+  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens: { ...tokens, ...(options.duplicate ? { duplicate: options.duplicate } : {}) }, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}) });
   host = controlHost;
   controlHost.start();
   const players: ControlPlayer[] = [];

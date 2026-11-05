@@ -57,6 +57,30 @@ function setup(options: Options = {}) {
 }
 
 describe('tokens on a stock Atlas', () => {
+  it('duplicates from the live token with a fresh id and independent attributes, at the same position', () => {
+    const t = setup();
+    Object.assign(t.tokens[CLERIC]!, { id: CLERIC, hp: { current: 7 } });
+    const addTokens = vi.fn<(entries: Record<string, unknown>[]) => string[]>().mockReturnValue(['new-token']);
+    Object.assign(t.state, { addTokens });
+    expect(t.api.duplicate?.('v1', CLERIC)).toBe('new-token');
+    const copy = addTokens.mock.calls[0]?.[0]?.[0];
+    expect(copy).toMatchObject({ x: t.tokens[CLERIC]!.x, y: t.tokens[CLERIC]!.y, hp: { current: 7 } });
+    expect(copy).not.toHaveProperty('id');
+    expect(copy?.hp).not.toBe((t.tokens[CLERIC] as unknown as { hp: unknown }).hp);
+  });
+  it('refuses copies while hidden, dragging, unloaded or without the Atlas add operation', () => {
+    const t = setup();
+    expect(t.api.duplicate?.('v1', CLERIC)).toBeNull();
+    const addTokens = vi.fn(() => ['new-token']);
+    Object.assign(t.state, { addTokens });
+    t.tokens[CLERIC]!.isHidden = true;
+    expect(t.api.duplicate?.('v1', CLERIC)).toBeNull();
+    t.tokens[CLERIC]!.isHidden = false; t.state.isDragging = true;
+    expect(t.api.duplicate?.('v1', CLERIC)).toBeNull();
+    t.state.isDragging = false; t.state.isMapLoading = true;
+    expect(t.api.duplicate?.('v1', CLERIC)).toBeNull();
+    expect(addTokens).not.toHaveBeenCalled();
+  });
   describe('snapPoint', () => {
     it('snaps a token to where the GM\'s drag puts it, and leaves a point alone without a grid, with snapping off, or for an unknown view', () => {
       const { api } = setup();

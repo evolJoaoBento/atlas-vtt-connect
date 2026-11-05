@@ -15,6 +15,7 @@ import { movementWalls } from './ported/movementWalls';
 import { stopAtWalls } from './ported/wallCollision';
 import { wallList } from './ported/walls';
 import { objectsOnLevel } from '../stockLevels';
+import type { CopyableTokens } from '../../app/online/control/TokenCopyHandler';
 
 /** Farthest a position may be from the origin, so no arithmetic on it later can overflow. */
 const MAX_COORDINATE = 1e9;
@@ -41,6 +42,7 @@ interface TokenScene {
   levels?: unknown;
   viewedLevel?: unknown;
   dropTokens?: (positions: readonly TokenPlace[]) => void;
+  addTokens?: (entries: Record<string, unknown>[]) => string[];
 }
 
 export interface TokenView {
@@ -125,11 +127,22 @@ function snapperOf(view: TokenView): ((point: Point, size: number) => Point) | n
   };
 }
 
-export function stockTokensApi(deps: StockTokensDeps): TokensApi {
+export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableTokens {
   /** Whether the GM's drop snaps in this scene (the grid's `snapToGrid`, on unless switched off). */
   const snaps = (state: TokenScene): boolean => state.grid != null && (state.grid.snapToGrid ?? true);
 
   return Object.freeze({
+    duplicate: (viewId: string, tokenId: string): string | null => {
+      const state = deps.view(viewId)?.atlasStore.getState();
+      if (!state || !state.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.addTokens) return null;
+      const source = tokenOf(state, tokenId);
+      if (!source || source.isHidden || !isCoordinate(source.x) || !isCoordinate(source.y)) return null;
+      const copy: Record<string, unknown> = structuredClone(source);
+      delete copy.id;
+      delete copy.instanceNumber;
+      // Same position: duplicating cannot teleport a token through a wall or reveal another room.
+      return state.addTokens([copy])[0] ?? null;
+    },
     snapPoint: (viewId: string, point: Point, tokenSize: number): Readonly<Point> => {
       if (typeof point !== 'object' || point === null || !isFiniteNumber(point.x) || !isFiniteNumber(point.y)) {
         throw new Error('[Atlas VTT Connect] tokens.snapPoint: "point" must be { x, y } numbers.');
