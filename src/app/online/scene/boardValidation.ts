@@ -22,11 +22,17 @@ function isDoor(value: unknown): boolean {
     && (value.hinge === undefined || value.hinge === true) && (value.side === undefined || value.side === true);
 }
 
+function isWindowSpan(value: unknown): boolean {
+  return isFields(value) && isNumber(value.bottom) && isNumber(value.top) && value.bottom >= 0 && value.top > value.bottom;
+}
+
 function isWall(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.id) || (value.type !== 'solid' && value.type !== 'door')) return false;
   if (!isPoint(value.p1) || !isPoint(value.p2) || !isNullable(isNumber)(value.height) || !isNullable(isSceneId)(value.material)) return false;
   if (value.direction !== undefined && value.direction !== 'left' && value.direction !== 'right') return false;
-  if (value.blocks !== undefined && value.blocks !== 'sight' && value.blocks !== 'light') return false;
+  if (value.blocks !== undefined && value.blocks !== 'sight' && value.blocks !== 'light' && value.blocks !== 'movement') return false;
+  if (value.window !== undefined && !isWindowSpan(value.window)) return false;
+  if (value.width !== undefined && !(isNumber(value.width) && value.width > 0)) return false;
   if (value.limited !== undefined && typeof value.limited !== 'boolean') return false;
   return value.type === 'door' ? isDoor(value.door) : value.door === undefined;
 }
@@ -40,7 +46,7 @@ function isLight(value: unknown): boolean {
 
 function isProp(value: unknown): boolean {
   return isFields(value) && isSceneId(value.id) && isSceneId(value.asset) && isNumber(value.x) && isNumber(value.y)
-    && isNumber(value.scale) && isNumber(value.turn);
+    && isNumber(value.scale) && isNumber(value.turn) && (value.solid === undefined || value.solid === true) && (value.lift === undefined || (isNumber(value.lift) && value.lift >= 0));
 }
 
 const TUNING_KEYS = ['relief', 'occlusion', 'shine', 'depth', 'displace', 'outward'] as const;

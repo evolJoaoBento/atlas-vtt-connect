@@ -64,14 +64,18 @@ export interface BoardLayerLook {
   grid: { size: number; offsetX: number; offsetY: number };
   walls: ReadonlyArray<{
     id: string; type: 'solid' | 'door' | 'secret-door'; p1: { x: number; y: number }; p2: { x: number; y: number }; closed: boolean;
-    direction: 'left' | 'right' | null; blocks: 'sight' | 'light' | null; limited: boolean; chain: string | null;
+    direction: 'left' | 'right' | null; blocks: 'sight' | 'light' | 'movement' | null; limited: boolean; chain: string | null;
     height: number | null; material: string | null; doorProp: string | null; flip: { hinge: boolean; side: boolean };
+    /** A window's opening (grid squares from the floor), where the GM set it; absent from an older Tabletop. */
+    window?: { bottom: number; top: number } | null;
+    /** A wall's own width in grid squares, where the GM set one; absent from an older Tabletop. */
+    width?: number | null;
   }>;
   lights: ReadonlyArray<{
     id: string; x: number; y: number; height: number | null; bright: number; dim: number; color: string; intensity: number;
     animation: string | null; angle: number | null; rotation: number; darkness: boolean; activeBelowAmbient: number | null;
   }>;
-  props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
+  props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number; solid?: boolean; lift?: number }>;
   materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
   fogHeight: number | null;
   wallThickness: number | null;
@@ -83,6 +87,10 @@ export interface BoardLook {
   doorProp(id: string): string | null;
   /** How the GM turned a door from the way Atlas draws it (Tabletop's Rotate 180° and Mirror); absent from an older Tabletop. */
   doorFlip?(id: string): { hinge: boolean; side: boolean };
+  /** A window's opening as the GM set it on Tabletop's board; null for the default, absent from an older Tabletop. */
+  windowOf?(id: string): { bottom: number; top: number } | null;
+  /** A wall's own width (thickness) in grid squares on Tabletop's board; null for the map's, absent from an older Tabletop. */
+  wallWidth?(id: string): number | null;
   lightHeight(id: string): number | null;
   readonly fogHeight: number | null;
   readonly wallThickness: number | null;
@@ -91,6 +99,6 @@ export interface BoardLook {
   readonly tint?: string | null;
   /** The scenes stacked with the map; absent from an older Tabletop, or when the GM does not share them. */
   readonly layers?: ReadonlyArray<BoardLayerLook>;
-  readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number }>;
+  readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number; solid?: boolean; lift?: number }>;
   readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
 }

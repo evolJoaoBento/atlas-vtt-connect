@@ -84,7 +84,7 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
   for (const prop of look?.props ?? []) {
     if (!visible.shows(at(prop.x, prop.y))) continue;
     const asset = assets.idFor(prop.path);
-    if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn } satisfies BoardPropRecord);
+    if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) } satisfies BoardPropRecord);
   }
   return extras;
 }
@@ -106,6 +106,8 @@ function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 
     const secret = wall.type === 'secret-door' && !door;
     if (!secret && wall.direction) record.direction = wall.direction;
     if (wall.blocks) record.blocks = wall.blocks;
+    if (typeof wall.width === 'number' && wall.width > 0) record.width = wall.width;
+    if (wall.blocks === 'movement' && !door && !secret && wall.window) record.window = { bottom: wall.window.bottom, top: wall.window.top };
     if (!secret && wall.limited) record.limited = true;
     walls.push(record);
   }
@@ -117,7 +119,7 @@ function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 
   const props: BoardPropRecord[] = [];
   for (const prop of layer.props.slice(0, BOARD_LAYER_LIMITS.props)) {
     const asset = assets.idFor(prop.path);
-    if (asset) props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn });
+    if (asset) props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) });
   }
   return {
     id, elevation: layer.elevation, stands: { ...layer.stands }, image, grid: { ...layer.grid }, walls, lights, props,
@@ -155,7 +157,12 @@ function projectWall(raw: Raw, visible: Shows, look: BoardLook | null, assets: P
   // A closed secret door keeps nothing that would set it apart from the wall around it.
   const secret = raw.type === 'secret-door' && !door;
   if (!secret && (raw.direction === 'left' || raw.direction === 'right')) wall.direction = raw.direction;
-  if (raw.blocks === 'sight' || raw.blocks === 'light') wall.blocks = raw.blocks;
+  if (raw.blocks === 'sight' || raw.blocks === 'light' || (raw.blocks === 'movement' && raw.type === 'solid')) wall.blocks = raw.blocks;
+  // A window: its opening on Tabletop's board, where the GM set one.
+  const span = wall.blocks === 'movement' ? look?.windowOf?.(id) ?? null : null;
+  if (span) wall.window = { bottom: span.bottom, top: span.top };
+  const width = look?.wallWidth?.(id) ?? null;
+  if (typeof width === 'number' && Number.isFinite(width) && width > 0) wall.width = width;
   if (!secret && raw.limited === true) wall.limited = true;
   return wall;
 }

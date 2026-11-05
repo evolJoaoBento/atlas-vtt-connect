@@ -63,6 +63,25 @@ describe('projectBoard', () => {
     expect(extras.walls[1]).toMatchObject({ type: 'solid', blocks: 'light', limited: true, direction: 'left' });
   });
 
+  it("a window (a wall that stops only tokens) goes as one, with the opening the GM set on Tabletop's board", () => {
+    const windowed: BoardLook = { ...look, windowOf: (id) => (id === 'w' ? { bottom: 0.5, top: 1.5 } : null) };
+    const extras = projectBoard(state([wall('w', 'solid', 0, { blocks: 'movement' }), wall('v', 'solid', 100, { blocks: 'movement' }), wall('d', 'door', 200, { blocks: 'movement' })]), 's1', all, {}, windowed, assets);
+    expect(extras.walls[0]).toMatchObject({ blocks: 'movement', window: { bottom: 0.5, top: 1.5 } });
+    expect(extras.walls[1]!.blocks).toBe('movement');
+    expect(extras.walls[1]!.window).toBeUndefined();
+    expect(extras.walls[2]!.blocks).toBeUndefined();
+    expect(isBoardExtras(extras)).toBe(true);
+    expect(isBoardExtras({ ...extras, walls: [{ ...extras.walls[0]!, window: { bottom: 2, top: 1 } }] })).toBe(false);
+  });
+
+  it("a wall's own width on Tabletop's board goes with it", () => {
+    const extras = projectBoard(state([wall('w', 'solid', 0), wall('v', 'solid', 100)]), 's1', all, {}, { ...look, wallWidth: (id) => (id === 'w' ? 0.3 : null) }, assets);
+    expect(extras.walls[0]!.width).toBe(0.3);
+    expect(extras.walls[1]!.width).toBeUndefined();
+    expect(isBoardExtras(extras)).toBe(true);
+    expect(isBoardExtras({ ...extras, walls: [{ ...extras.walls[0]!, width: 0 }] })).toBe(false);
+  });
+
   it('a token light goes when its token is not sent; a hidden fixed light is never sent, nor one under fog', () => {
     const lights = [
       { id: 'l1', x: 900, y: 10, emission: { bright: 10, dim: 20, color: '#ff0000', intensity: 1, animation: 'torch' } },
@@ -115,6 +134,18 @@ describe('projectBoard', () => {
     const extras = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, look, assets);
     expect(extras.props).toEqual([{ id: 'p1', asset: 'id:minis/barrel.glb', x: 100, y: 100, scale: 1, turn: 90 }]);
     expect(extras.materials).toEqual([{ id: 'id:mat/brick/c.jpg', scale: 2, maps: { color: 'id:mat/brick/c.jpg' } }]);
+  });
+
+  it('a solid prop goes as solid, so tokens stand on it on the players boards', () => {
+    const solid = { ...look, props: [{ ...look.props[0]!, solid: true }] };
+    const extras = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, solid, assets);
+    expect(extras.props).toEqual([{ id: 'p1', asset: 'id:minis/barrel.glb', x: 100, y: 100, scale: 1, turn: 90, solid: true }]);
+  });
+
+  it('a raised prop goes with its height', () => {
+    const raised = { ...look, props: [{ ...look.props[0]!, lift: 1.5 }] };
+    const extras = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, raised, assets);
+    expect(extras.props[0]).toMatchObject({ lift: 1.5 });
   });
 
   it('a material carries its tuning, and one as made carries none', () => {

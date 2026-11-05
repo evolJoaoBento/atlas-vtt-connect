@@ -27,10 +27,14 @@ export interface BoardWallRecord {
   /** A material of `BoardExtras.materials`, or null for the plain wall. */
   material: string | null;
   door?: BoardDoor;
-  /** Atlas's one-way side, a wall that stops only sight (a curtain) or only light (glass), and a limited one. */
+  /** Atlas's one-way side, a wall that stops only sight (a curtain), only light (glass) or only tokens (a window), and a limited one. */
   direction?: 'left' | 'right';
-  blocks?: 'sight' | 'light';
+  blocks?: 'sight' | 'light' | 'movement';
   limited?: boolean;
+  /** A window's opening on Tabletop's board (grid squares from the floor), where the GM set it. */
+  window?: { bottom: number; top: number };
+  /** The wall's own width (thickness) on Tabletop's board, in grid squares, where the GM set one. */
+  width?: number;
 }
 
 export interface BoardLightRecord {
@@ -69,7 +73,8 @@ export interface BoardMaterialRecord {
   tuning?: BoardMaterialTuning;
 }
 
-export interface BoardPropRecord { id: string; asset: string; x: number; y: number; scale: number; turn: number }
+/** `solid`: tokens set on it stand on its top. `lift`: how high it stands, in grid squares. */
+export interface BoardPropRecord { id: string; asset: string; x: number; y: number; scale: number; turn: number; solid?: true; lift?: number }
 
 export interface BoardLighting { enabled: boolean; ambient: number; ambientColor: string | null }
 

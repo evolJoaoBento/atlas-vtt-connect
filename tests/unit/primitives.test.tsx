@@ -22,6 +22,16 @@ describe('primitives', () => {
     expect(getByText('Kick')).toBeTruthy();
   });
 
+  it('LabelTooltip is rendered into the document body, so no panel (transformed or blurred) grows or scrolls by it', () => {
+    const { container, getByText } = render(<div className="panel" style={{ transform: 'translateY(0)' }}><LabelTooltip label="Copy link"><span>x</span></LabelTooltip></div>);
+    fireEvent.mouseEnter(getByText('x'));
+    const tip = getByText('Copy link');
+    expect(container.contains(tip)).toBe(false);
+    expect(tip.parentElement).toBe(document.body);
+    fireEvent.mouseLeave(getByText('x'));
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+  });
+
   it('LabelTooltip is fixed to the window and placed over its anchor, never in the flow of a scrolling panel', () => {
     const rects = new Map<string, DOMRect>();
     const box = (left: number, top: number, width: number, height: number): DOMRect => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
