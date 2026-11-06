@@ -16,6 +16,7 @@ import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
 import type { TemplateChange } from './view/tools/PlayerTools';
 import type { ArPose } from './tools/arViews';
+import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 
@@ -360,6 +361,14 @@ export class PlayerSession {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'ar-view', sceneId: scene.sceneId, pose }));
+    return true;
+  }
+
+  /** Sends the GM this phone's survey of the table's marker sheets, for the scene the player has; false when it cannot go. */
+  sendArSurvey(survey: ArSurvey): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'ar-survey', sceneId: scene.sceneId, survey }));
     return true;
   }
 

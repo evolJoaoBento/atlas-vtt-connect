@@ -81,7 +81,7 @@ describe("the GM's board hears of players in AR", () => {
     const arViews = new ArViewRelay({
       session: { use: (h: SessionHandler) => { handler = h; return () => undefined; }, send: (id: string, m: unknown) => { sent.push([id, m]); }, getPlayers: () => [ANA, BEN] } as never,
       projection: { slotOf: () => (where.slot ? { ...where.slot, lastSent: {} } : null) } as never,
-      board: { viewer },
+      board: { viewer, survey: vi.fn() },
     });
     arViews.start();
     const send = (message: Partial<ControlMessage> & Record<string, unknown>, from = ANA): void => handler!.onMessage?.(from, { v: 1, type: 'ar-view', sceneId: 's1', ...message } as ControlMessage);

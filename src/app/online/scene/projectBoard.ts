@@ -8,6 +8,7 @@
 import type { Shows } from './FogCoverage';
 import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardLayerLook, BoardLook } from './sceneContracts';
+import { isArTable, type ArTable } from '../tools/arTable';
 
 type Raw = Record<string, unknown>;
 
@@ -39,6 +40,8 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     fogHeight: look?.fogHeight ?? null,
     wallThickness: look?.wallThickness ?? null,
     ...(look?.layerLook === 'solid' || look?.layerLook === 'faded' || look?.layerLook === 'transparent' ? { layerLook: look.layerLook } : {}),
+    // Only where the players' table is: nothing of the map.
+    ...(isArTable(look?.arTable) ? { arTable: copyTable(look.arTable) } : {}),
   };
   if (!visible) return extras;
   const objects = state.objects ?? {};
@@ -90,6 +93,11 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) } satisfies BoardPropRecord);
   }
   return extras;
+}
+
+/** The AR table, copied field by field (nothing else the look carries goes). */
+function copyTable(table: ArTable): ArTable {
+  return { squareMm: table.squareMm, groups: table.groups.map(({ group, x, y, heading, w, h }) => ({ group, x, y, heading, w, h })) };
 }
 
 /** Painted water as the wire carries it; none when there is none, or when its mask is longer than `longest`. */

@@ -16,7 +16,10 @@ import { placeFor } from './fusion.mts';
 import type { Intrinsics, Point } from './sheetPose.mts';
 import { poseFrom, type Detected, type Tracked } from './sheetTracker.mts';
 
-interface Placement { x: number; y: number; heading: number; seen: number; misses: number }
+interface Placement { x: number; y: number; heading: number; seen: number; misses: number; fixed?: true }
+
+/** A sheet or card's place on the table, in the layout's frame (millimetres; heading in radians). */
+export interface GroupPlace { group: string; x: number; y: number; heading: number }
 
 /** Pictures a card must be placed from before it places the camera. */
 const TRUSTED_AFTER = 3;
@@ -28,10 +31,42 @@ const DOUBT_TURN = (8 * Math.PI) / 180;
 /** …unless this many in a row say so: the card was moved. */
 const MOVED_AFTER = 10;
 
+/** The origin of a fixed layout: no sheet's name, so no sheet is taken for it. */
+const FIXED_ORIGIN = '(table)';
+
 const wrap = (angle: number): number => Math.atan2(Math.sin(angle), Math.cos(angle));
 
 export class MarkerLayout {
   private readonly placed = new Map<string, Placement>();
+  /** Fixed sheets the sightings say lie elsewhere now (moved on the table since the survey). */
+  private readonly strayed = new Set<string>();
+
+  /**
+   * Fixes the sheets where a shared table has them (`groups`, in its frame): trusted from the first picture, never moved
+   * by what the camera sees (a sheet that seems moved is reported in `moved`), the origin the table's. Sheets not on it
+   * are still learnt from them. Null forgets them: the layout learns again from nothing.
+   */
+  fix(groups: readonly GroupPlace[] | null): void {
+    this.reset();
+    if (!groups) return;
+    this.origin = FIXED_ORIGIN;
+    for (const { group, x, y, heading } of groups) this.placed.set(group, { x, y, heading, seen: TRUSTED_AFTER, misses: 0, fixed: true });
+  }
+
+  /** Whether the sheets are fixed by a shared table. */
+  get isFixed(): boolean {
+    return this.origin === FIXED_ORIGIN;
+  }
+
+  /** Fixed sheets that seem to have moved on the table. */
+  get moved(): readonly string[] {
+    return [...this.strayed];
+  }
+
+  /** The sheets and cards placed and trusted, for a survey: in the layout's frame. */
+  survey(): GroupPlace[] {
+    return [...this.placed].filter(([group]) => this.knows(group)).map(([group, place]) => ({ group, x: place.x, y: place.y, heading: place.heading }));
+  }
 
   /** How many sheets and cards are placed. */
   get size(): number {
@@ -81,8 +116,9 @@ export class MarkerLayout {
       if (group) groups.set(group, [...(groups.get(group) ?? []), marker]);
     }
     if (groups.size > 1) {
+      if (this.isFixed) this.checkFixed(groups, camera, width, turn);
       for (const [group, own] of groups) {
-        if (group === this.origin) continue;
+        if (group === this.origin || this.placed.get(group)?.fixed) continue;
         const others = markers.filter((marker) => markerGroup(marker.id)?.group !== group);
         const from = this.cameraFrom(others, camera, width, turn);
         if (from) this.learn(group, own, from, camera);
@@ -107,8 +143,46 @@ export class MarkerLayout {
     return translation ? { rotation: [...turn], translation } : null;
   }
 
+  /**
+   * The fixed sheets in sight, each checked against the others one by one (the camera placed from that other alone):
+   * a sheet most others disagree with seems moved; one most agree with is where it was. Two in sight say nothing (either
+   * could be the one moved).
+   */
+  private checkFixed(groups: ReadonlyMap<string, Detected[]>, camera: Intrinsics, width: number, turn: readonly number[] | null): void {
+    const fixed = [...groups].filter(([group]) => this.placed.get(group)?.fixed);
+    if (fixed.length < 3) return;
+    const froms = new Map(fixed.map(([group, own]) => [group, this.cameraFrom(own, camera, width, turn)]));
+    for (const [group, own] of fixed) {
+      const placement = this.placed.get(group)!;
+      let agree = 0;
+      let disagree = 0;
+      for (const [other] of fixed) {
+        const from = other === group ? null : froms.get(other);
+        if (!from) continue;
+        const fit = this.sighting(own, from, camera);
+        if (!fit) continue;
+        if (Math.hypot(fit.x - placement.x, fit.y - placement.y) > DOUBT_MM || Math.abs(wrap(fit.heading - placement.heading)) > DOUBT_TURN) disagree++;
+        else agree++;
+      }
+      if (disagree > agree) {
+        placement.misses++;
+        if (placement.misses >= MOVED_AFTER) this.strayed.add(group);
+      } else if (agree > 0) {
+        placement.misses = 0;
+        this.strayed.delete(group);
+      }
+    }
+  }
+
   /** A sighting of `group` (its markers in the picture) from a camera at `from` (its pose over the origin). */
   private learn(group: string, own: readonly Detected[], from: { rotation: number[]; translation: number[] }, camera: Intrinsics): void {
+    const fit = this.sighting(own, from, camera);
+    if (!fit) return;
+    this.take(group, fit);
+  }
+
+  /** Where a sheet's markers (`own`) lie on the table, seen from a camera at `from`; null when they cannot be read there. */
+  private sighting(own: readonly Detected[], from: { rotation: number[]; translation: number[] }, camera: Intrinsics): { x: number; y: number; heading: number } | null {
     const local: Point[] = [];
     const onTable: Point[] = [];
     const r = from.rotation;
@@ -123,16 +197,19 @@ export class MarkerLayout {
         // Into the origin's frame: Rᵀ·ray.
         const d = [0, 1, 2].map((k) => r[k]! * ray[0]! + r[3 + k]! * ray[1]! + r[6 + k]! * ray[2]!);
         // The table is z = 0; the camera above it has z < 0, looking toward +z.
-        if (d[2]! <= 1e-6) return;
+        if (d[2]! <= 1e-6) return null;
         const s = -eye[2]! / d[2]!;
-        if (!(s > 0)) return;
+        if (!(s > 0)) return null;
         local.push(corners[i]!);
         onTable.push({ x: eye[0]! + d[0]! * s, y: eye[1]! + d[1]! * s });
       }
     }
     const fit = rigid2d(local, onTable);
-    if (!fit || fit.error > 6) return;
-    const { x, y, heading } = fit;
+    return fit && fit.error <= 6 ? fit : null;
+  }
+
+  /** A sighting of a learnt sheet: placed the first time, then refined (or, seen elsewhere often enough, moved). */
+  private take(group: string, { x, y, heading }: { x: number; y: number; heading: number }): void {
     const placement = this.placed.get(group);
     if (!placement) {
       this.placed.set(group, { x, y, heading, seen: 1, misses: 0 });
@@ -156,6 +233,7 @@ export class MarkerLayout {
   /** Forgets every place: the next sheet or card seen is the origin again. */
   reset(): void {
     this.placed.clear();
+    this.strayed.clear();
     this.origin = null;
   }
 }

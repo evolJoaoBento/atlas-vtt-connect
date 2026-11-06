@@ -34,9 +34,9 @@ export const BOARD_PART_BYTES = 180 * 1024;
  * first part carries the materials and the scene's light; walls, then lights, then props fill the parts in order.
  */
 export function boardParts(extras: BoardExtras): BoardExtras[] {
-  // The layers, the water and the materials ride on the first part.
-  const { layers: _layers, water: _water, ...whole } = extras;
-  const empty = (first: boolean): BoardExtras => ({ ...whole, ...(first && extras.layers ? { layers: extras.layers } : {}), ...(first && extras.water ? { water: extras.water } : {}), walls: [], lights: [], props: [], materials: first ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [] });
+  // The layers, the water, the AR table and the materials ride on the first part.
+  const { layers: _layers, water: _water, arTable: _arTable, ...whole } = extras;
+  const empty = (first: boolean): BoardExtras => ({ ...whole, ...(first && extras.layers ? { layers: extras.layers } : {}), ...(first && extras.water ? { water: extras.water } : {}), ...(first && extras.arTable ? { arTable: extras.arTable } : {}), walls: [], lights: [], props: [], materials: first ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [] });
   const size = (value: unknown): number => JSON.stringify(value).length + 1;
   const parts: BoardExtras[] = [empty(true)];
   let current = parts[0]!;

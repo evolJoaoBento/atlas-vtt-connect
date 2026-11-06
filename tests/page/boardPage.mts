@@ -100,7 +100,7 @@ function quietMap(): SceneViewport {
 async function main(): Promise<void> {
   const images = new Map<string, string>([[MAP, drawn(1400, 1000, '#9c8a6e')], [ART, drawn(64, 64, '#3a8a3a')], [UPSTAIRS, drawn(1400, 1000, '#6e7a9c')]]);
   const glb = await heroGlb();
-  const record = { requests: [] as boolean[], moves: [] as unknown[] };
+  const record = { requests: [] as boolean[], moves: [] as unknown[], surveys: [] as unknown[] };
   const el = (id: string): HTMLElement => document.getElementById(id)!;
   let board: BoardSceneView | null = null;
   const view = new SceneSwitch({
@@ -128,6 +128,7 @@ async function main(): Promise<void> {
     requestBoard: (on) => { record.requests.push(on); return true; },
     onViewChange: () => undefined,
     tokenName: (id) => (scene.tokens as Record<string, { name?: string }>)[id]?.name ?? 'Token',
+    sendArSurvey: (survey) => { record.surveys.push(survey); return true; },
     onError: (message, error) => { (window as unknown as { boardError: string }).boardError = `${message} ${String(error)}`; },
   });
   view.setPlayers(['me'], 'me');

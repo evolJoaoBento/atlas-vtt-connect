@@ -4,6 +4,7 @@
  */
 import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
+import { isArTable } from '../tools/arTable';
 
 type Fields = Record<string, unknown>;
 
@@ -92,6 +93,7 @@ export function isBoardExtras(value: unknown): value is BoardExtras {
     && (value.layers === undefined || isList(value.layers, BOARD_LAYER_LIMITS.layers, isLayer))
     && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.scene))
     && (value.layerLook === undefined || value.layerLook === 'solid' || value.layerLook === 'faded' || value.layerLook === 'transparent')
+    && (value.arTable === undefined || isArTable(value.arTable))
     && isFields(lighting) && typeof lighting.enabled === 'boolean' && isNumber(lighting.ambient) && isNullable(isText)(lighting.ambientColor);
 }
 

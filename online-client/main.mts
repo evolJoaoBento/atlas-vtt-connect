@@ -139,6 +139,7 @@ const map: SceneSwitch | null = surface
     },
     tokenName: (tokenId) => scene?.tokens[tokenId]?.name ?? 'Token',
     sendArView: (pose) => session?.sendArView(pose) ?? false,
+    sendArSurvey: (survey) => session?.sendArSurvey(survey) ?? false,
     onError: (message, error) => { console.warn(message, error); },
   })
   : null;

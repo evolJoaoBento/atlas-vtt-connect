@@ -13,6 +13,7 @@ import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
 import type { MapTemplate, TemplateShape } from './templates';
 import type { ArPose } from './arViews';
+import type { ArSurvey } from './arTable';
 
 type Point = { x: number; y: number };
 
@@ -32,6 +33,14 @@ export interface BoardViewer {
   pose: ArPose | null;
 }
 
+/** A player's survey of the table's marker sheets, for the GM to place on `mapPath` (Tabletop asks first). */
+export interface BoardSurvey {
+  mapPath: string;
+  from: string;
+  name: string;
+  survey: ArSurvey;
+}
+
 export interface BoardOverlay {
   templates: readonly MapTemplate[];
   /** Radians a cone opens by on this map. */
@@ -48,6 +57,8 @@ export interface BoardSession {
   onMark(listener: (mark: BoardMark) => void): () => void;
   /** Players' phones in augmented reality, as they move (a Tabletop that draws them listens). */
   onViewer(listener: (viewer: BoardViewer) => void): () => void;
+  /** Players' surveys of the table's marker sheets (a Tabletop that places them listens). */
+  onSurvey(listener: (survey: BoardSurvey) => void): () => void;
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
   eraseTemplate(mapPath: string, id: string): void;
   clearTemplates(mapPath: string): void;
@@ -87,6 +98,7 @@ export interface BoardSessionSink {
   ping(mapPath: string, x: number, y: number, color: string): void;
   laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void;
   viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void;
+  survey(mapPath: string, from: string, name: string, survey: ArSurvey): void;
 }
 
 export interface BoardSessionHubOptions {
@@ -100,6 +112,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   private readonly changes = new Set<() => void>();
   private readonly marks = new Set<(mark: BoardMark) => void>();
   private readonly viewers = new Set<(viewer: BoardViewer) => void>();
+  private readonly surveys = new Set<(survey: BoardSurvey) => void>();
   private readonly stops: Array<() => void> = [];
   /** The scene in use of each map, as the hub last told of it. */
   private readonly scenes = new Map<string, string>();
@@ -193,6 +206,11 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     return () => { this.viewers.delete(listener); };
   }
 
+  onSurvey(listener: (survey: BoardSurvey) => void): () => void {
+    this.surveys.add(listener);
+    return () => { this.surveys.delete(listener); };
+  }
+
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean {
     const sceneId = this.sceneOf(mapPath);
     return sceneId !== null && this.templates !== null && this.templates.addGm(sceneId, add);
@@ -231,6 +249,21 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
         listener(viewer);
       } catch (error) {
         console.error('[Atlas VTT Connect] The board could not show a player in AR:', error);
+      }
+    }
+  }
+
+  survey(mapPath: string, from: string, name: string, survey: ArSurvey): void {
+    if (!this.started) return;
+    const heard: BoardSurvey = {
+      mapPath, from, name,
+      survey: { squareMm: survey.squareMm, groups: survey.groups.map(({ group, x, y, heading, w, h }) => ({ group, x, y, heading, w, h })) },
+    };
+    for (const listener of [...this.surveys]) {
+      try {
+        listener(heard);
+      } catch (error) {
+        console.error('[Atlas VTT Connect] The board could not take a table survey:', error);
       }
     }
   }

@@ -4,6 +4,8 @@
  * Sent only to players who asked (`board-request`). Shared with the web player page, so this file imports nothing.
  * Heights are in grid squares, as Tabletop keeps them; null is the board's default (the fog's height).
  */
+import type { ArTable } from '../tools/arTable';
+
 export interface BoardPoint { x: number; y: number }
 
 export interface BoardDoor {
@@ -129,6 +131,8 @@ export interface BoardExtras {
   water?: BoardWater;
   /** How the GM draws the scenes stacked above (Tabletop's Upper layers), so players see them the same; absent from an older Tabletop. */
   layerLook?: 'solid' | 'faded' | 'transparent';
+  /** Where the marker sheets lie on the players' table, as the GM placed them on this map; absent for none. Sent with the first part only. */
+  arTable?: ArTable;
 }
 
 export interface BoardCamera {

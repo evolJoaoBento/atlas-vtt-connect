@@ -106,6 +106,8 @@ export interface BoardLook {
   readonly water?: BoardWater;
   /** How the GM draws the scenes stacked above (Upper layers); absent from an older Tabletop. */
   readonly layerLook?: 'solid' | 'faded' | 'transparent';
+  /** Where the marker sheets lie on the players' table, placed on this map (`tools/arTable.ts`); absent for none, or from an older Tabletop. */
+  readonly arTable?: unknown;
   readonly props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number; solid?: boolean; lift?: number }>;
   readonly materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
 }

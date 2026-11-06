@@ -14,6 +14,7 @@ import type { DecodedImage } from '../assets/AssetLoader';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { ArPose } from '../tools/arViews';
+import type { ArTable } from '../tools/arTable';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
@@ -109,7 +110,15 @@ export class BoardSceneView implements SceneViewport {
 
   /** Tabletop's board of the scene: walls, doors, lights, props and materials. */
   setExtras(extras: BoardExtras | null): void {
+    this.table = extras?.arTable ?? null;
     this.board.setExtras(extras);
+  }
+
+  private table: ArTable | null = null;
+
+  /** Where the marker sheets lie on the table, as the GM placed them on this map; null for none. */
+  arTable(): ArTable | null {
+    return this.table;
   }
 
   /** The GM's 3D view, for the GM view button. */

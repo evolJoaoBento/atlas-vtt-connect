@@ -137,6 +137,15 @@ export function markerGroup(id: number): { group: string; corners: Array<{ x: nu
   return { group: `card-${id}`, corners: [{ x: -half, y: -half }, { x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }] };
 }
 
+/** A sheet or card's outline on the table, about its middle (millimetres): an A4 page, or a card as cut out. */
+export function groupOutline(group: string): { w: number; h: number } {
+  if (group.startsWith('card-')) {
+    const rows = CARDS_PER_PAGE / 3;
+    return { w: Math.round(SHEET_WIDTH_MM / 3), h: Math.round((SHEET_HEIGHT_MM - 24) / rows) };
+  }
+  return { w: SHEET_WIDTH_MM, h: SHEET_HEIGHT_MM };
+}
+
 /** A page of marker cards to print (A4), `page` from 0: cut along the dashed lines. */
 export function markerCardsSvg(page: number): string {
   const parts: string[] = [];

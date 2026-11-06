@@ -21,6 +21,7 @@ import type { TokenSheet } from '../src/app/online/tools/sheets';
 import type { MapTemplate, TemplateShape } from '../src/app/online/tools/templates';
 import type { PlayerLaser } from '../src/app/online/tools/toolMessages';
 import type { ArPose } from '../src/app/online/tools/arViews';
+import type { ArSurvey } from '../src/app/online/tools/arTable';
 import type { MeasureChoice } from '../src/app/online/view/tools/MeasureTool';
 import type { PlayerTool } from '../src/app/online/view/tools/PlayerTools';
 import type { ToolState } from './mapView.mts';
@@ -59,6 +60,8 @@ export interface SceneSwitchOptions {
   tokenName(tokenId: string): string;
   /** Tells the GM where the phone's camera is in augmented reality (the eye on the GM's board). */
   sendArView?(pose: ArPose | null): boolean;
+  /** Sends the GM this phone's survey of the table's marker sheets. */
+  sendArSurvey?(survey: ArSurvey): boolean;
   /** Augmented reality: its button, the panel it fills, and the video the camera's picture plays in. */
   ar?: { button: HTMLButtonElement; panel: HTMLElement; video: HTMLVideoElement; overlay?: HTMLElement };
   onError?(message: string, error: unknown): void;
@@ -298,6 +301,7 @@ export class SceneSwitch implements SceneViewport {
         board: () => this.board,
         tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
         ...(this.options.sendArView ? { sendView: (pose: ArPose | null) => this.options.sendArView?.(pose) ?? false } : {}),
+        ...(this.options.sendArSurvey ? { sendSurvey: (survey: ArSurvey) => this.options.sendArSurvey?.(survey) ?? false } : {}),
         onEnd: () => { this.ar = null; this.showEyes(); },
         // The other tracking, chosen in the menu: this one ends and the other starts, inside the same tap.
         onSwitch: () => {

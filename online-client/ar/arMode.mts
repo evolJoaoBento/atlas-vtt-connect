@@ -18,6 +18,7 @@
  * the field of view (and calibrating again), the printouts, and the tracking's numbers for a look.
  */
 import type { ArPose } from '../../src/app/online/tools/arViews';
+import type { ArSurvey, ArTable } from '../../src/app/online/tools/arTable';
 import { VIEW_EVERY_MS, ViewSender } from './viewSender.mts';
 import type { AugmentedView, RoomPlace } from '../../src/app/online/obsidian/playerBoardContract';
 import { readArSettings, saveArSettings, SQUARES_MM, type ArSettings, type Tracking } from './arPrefs.mts';
@@ -25,7 +26,7 @@ import { keepFov, keptFov } from './calibrate.mts';
 import { CalibrationWizard } from './calibrationWizard.mts';
 import { CAMERA_LAG_MS, deviceRotation, SensorFusion } from './fusion.mts';
 import { MarkerLayout } from './markerLayout.mts';
-import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, MAT_MM, MAT_PAGES, markerCardsSvg, markerMatSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
+import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, groupOutline, MAT_MM, MAT_PAGES, markerCardsSvg, markerMatSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
 import { coverCrop, coverFrustum, intrinsicsFor, type Intrinsics } from './sheetPose.mts';
 import { PoseEaser, PoseSmoother, SheetTracker, type Detected, type Tracked } from './sheetTracker.mts';
 import type { TrackAnswer, TrackRequest } from './trackerWorker.mts';
@@ -39,6 +40,8 @@ export interface ArBoard {
   stopRoomAr?(): void;
   roomStats?(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null;
   arViewer?(): ArPose | null;
+  /** Where the marker sheets lie on the table, as the GM placed them on this map; null for none. */
+  arTable?(): ArTable | null;
 }
 
 export interface ArModeOptions {
@@ -66,6 +69,8 @@ export interface ArModeOptions {
   onSwitch?(tracking: Tracking): void;
   /** Tells the GM where the camera is (the eye on the GM's board); null when not tracking. False when it cannot go. */
   sendView?(pose: ArPose | null): boolean;
+  /** Sends the GM this phone's survey of the table's marker sheets. False when it cannot go. */
+  sendSurvey?(survey: ArSurvey): boolean;
 }
 
 /** The longest side of the picture searched for markers: big enough to read them at arm's length, small enough to be quick. */
@@ -168,6 +173,9 @@ export class ArMode {
   private readonly easer = new PoseEaser();
   private readonly fusion = new SensorFusion();
   private readonly layout = new MarkerLayout();
+  /** The table the GM placed for this map (its sheets fixed where it has them); null: the sheets are learnt. */
+  private table: ArTable | null = null;
+  private tableKey = '';
   private phase: Phase = 'starting';
   private fov: number;
   private cameraKey = '';
@@ -373,6 +381,7 @@ export class ArMode {
     this.countSearch(markers);
     if (this.phase === 'calibrating') { this.calibrate(markers, camera, g); return; }
     if (this.phase === 'starting') return;
+    this.syncTable();
     const tracked = this.layout.observe(markers, camera, g.searchWidth, this.fusion.turnAt(taken));
     if (tracked) {
       this.fusion.found(tracked.pose.rotation, tracked.sheet, tracked.seen, camera, taken);
@@ -396,7 +405,7 @@ export class ArMode {
         this.found = true;
         boardEl.classList.remove('is-ar-searching', 'is-ar-lost');
       }
-      if (tracked) this.say(now < this.sweepUntil ? `Now sweep slowly over your other mats and cards so they are placed (${this.layout.size} placed).` : '');
+      if (tracked) this.say(this.trackingHint(now));
     } else if (this.found) {
       // Out of sight: the board stays until markers are found again; faint over the live video, but not while it draws
       // the camera's picture itself (the whole view would dim).
@@ -414,7 +423,10 @@ export class ArMode {
     if (board && this.phase === 'tracking') {
       const now = performance.now();
       const frustum = coverFrustum(intrinsicsFor(g.videoWidth, g.videoHeight, this.fov), g.videoWidth, g.videoHeight, boardEl.clientWidth, boardEl.clientHeight);
-      const base = { frustum, squareMm: this.settings.squareMm, anchor: this.anchor() };
+      const table = this.table;
+      const base = table
+        ? { frustum, squareMm: table.squareMm, anchor: null, origin: { x: 0, y: 0 } }
+        : { frustum, squareMm: this.settings.squareMm, anchor: this.anchor() };
       const sensing = this.fusion.sensing(now);
       const fused = sensing ? this.fusion.pose(taken, dt) : null;
       if (fused) {
@@ -465,13 +477,15 @@ export class ArMode {
     this.wizard = null;
     this.phase = 'placing';
     this.resetPlaces();
-    this.say(`${before} Now point the camera at the mat, card or sheet the map's middle should stand on.`);
+    this.say(this.table
+      ? `${before} Now point the camera at any of the table's sheets: the GM placed them on the map.`
+      : `${before} Now point the camera at the mat, card or sheet the map's middle should stand on.`);
     this.showFov();
   }
 
   /** Forgets where the markers lie and where the camera was (a new field of view, or placing again). */
   private resetPlaces(): void {
-    this.layout.reset();
+    this.layout.fix(this.table?.groups ?? null);
     this.fusion.reset();
     this.smoother.reset();
     this.easer.aim(null);
@@ -514,6 +528,45 @@ export class ArMode {
         this.gmLine(),
       ].join('\n');
     }
+  }
+
+  /** The table the GM placed for this map, taken up when it changes: the sheets fixed where it has them. */
+  private syncTable(): void {
+    const table = this.options.board()?.arTable?.() ?? null;
+    const key = table ? JSON.stringify(table) : '';
+    if (key === this.tableKey) return;
+    this.tableKey = key;
+    this.table = table;
+    this.resetPlaces();
+    if (this.phase === 'tracking') this.phase = 'placing';
+    this.say(table ? `The GM placed the table (${table.groups.length} sheets): point at any of them.` : 'Point the camera at the mat, card or sheet the map\'s middle should stand on.');
+    this.buildPanel(false);
+  }
+
+  /** What to say while tracking: sweep to place the sheets (learning them), or a sheet of the GM's table that seems moved. */
+  private trackingHint(now: number): string {
+    if (this.table) {
+      const moved = this.layout.moved;
+      if (moved.length === 0) return '';
+      return `${moved.map(groupName).join(', ')} seem${moved.length === 1 ? 's' : ''} moved since the table was set: put ${moved.length === 1 ? 'it' : 'them'} back, or send the table to the GM again.`;
+    }
+    return now < this.sweepUntil ? `Now sweep slowly over your other mats and cards so they are placed (${this.layout.size} placed).` : '';
+  }
+
+  /** Sends the GM the sheets as this phone has them, for the GM to place on the map. */
+  private sendSurvey(): void {
+    const groups = this.layout.survey();
+    if (groups.length === 0) {
+      this.say('Point the camera at the sheets first, sweeping over each, so they are placed.');
+      return;
+    }
+    const survey: ArSurvey = {
+      squareMm: this.table?.squareMm ?? this.settings.squareMm,
+      groups: groups.map((place) => ({ ...place, ...groupOutline(place.group) })),
+    };
+    const sent = this.options.sendSurvey?.(survey) ?? false;
+    this.closeMenu();
+    this.say(sent ? `Sent ${groups.length} sheet${groups.length === 1 ? '' : 's'} to the GM: they place them on the map.` : 'The table could not be sent: not connected to the GM.');
   }
 
   /** The token on the first marker: the chosen one while it is still the player's. */
@@ -705,7 +758,17 @@ export class ArMode {
       }
       parts.push(heading('Tracking'), tracking);
     }
-    parts.push(heading('Board'), field('A square on the table', square), field(room ? 'On the point' : 'On the first marker seen', this.anchorSelect));
+    const table = room ? null : this.table;
+    if (table) {
+      // The GM placed the table: its square size and where the map lies are theirs.
+      square.disabled = true;
+      square.value = String(table.squareMm);
+      if (square.value !== String(table.squareMm)) square.append(make('option', { value: String(table.squareMm), textContent: `${table.squareMm} mm`, selected: true }));
+      parts.push(heading('Board'), make('div', { className: 'menu-hint', textContent: `Placed by the GM: ${table.groups.length} sheet${table.groups.length === 1 ? '' : 's'}, ${table.squareMm} mm squares.` }), field('A square on the table', square));
+    } else {
+      parts.push(heading('Board'), field('A square on the table', square), field(room ? 'On the point' : 'On the first marker seen', this.anchorSelect));
+    }
+    if (!room && this.options.sendSurvey) parts.push(button(table ? 'Send this table to the GM again' : 'Send this table to the GM', () => this.sendSurvey()));
     if (room) {
       parts.push(button('Move the board', () => { this.placed = false; this.closeMenu(); this.say('Point at the table, then tap to put the board down.'); }));
     } else {
@@ -797,4 +860,11 @@ export class ArMode {
     this.options.board()?.setAugmented(null);
     this.options.onEnd();
   }
+}
+
+/** A sheet or card's name for the player: "Mat 2", "Card 14", "The sheet". */
+function groupName(group: string): string {
+  if (group === 'sheet') return 'The sheet';
+  const [kind, number] = group.split('-');
+  return kind === 'mat' ? `Mat ${Number(number) + 1}` : `Card ${Number(number) - 9}`;
 }

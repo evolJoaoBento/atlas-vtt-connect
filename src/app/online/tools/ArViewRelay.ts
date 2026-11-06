@@ -10,17 +10,19 @@ import { RateLimit } from '../rateLimit';
 import type { SceneSession } from '../scene/sceneSources';
 import type { SlotProjection } from '../scene/slotViews';
 import { AR_VIEW_LIMITS, isArPose } from './arViews';
+import { AR_TABLE_LIMITS, isArTable } from './arTable';
 import type { BoardSessionSink } from './BoardSessionHub';
 import { laserColor } from './laserColors';
 
 export interface ArViewRelayOptions {
   session: SceneSession;
   projection: Pick<SlotProjection, 'slotOf'>;
-  board: Pick<BoardSessionSink, 'viewer'>;
+  board: Pick<BoardSessionSink, 'viewer' | 'survey'>;
 }
 
 export class ArViewRelay implements SessionHandler {
   private readonly limit = new RateLimit(AR_VIEW_LIMITS.perSecond);
+  private readonly surveyLimit = new RateLimit(AR_TABLE_LIMITS.surveysPerMinute, 60_000);
   /** The map each player's eye is on, and how it was shown. */
   private readonly shown = new Map<string, { mapPath: string; name: string; color: string }>();
   private unuse: (() => void) | null = null;
@@ -38,6 +40,7 @@ export class ArViewRelay implements SessionHandler {
   }
 
   onMessage(player: SessionPlayer, message: ControlMessage): void {
+    if (message.type === 'ar-survey') { this.surveyed(player, message); return; }
     if (message.type !== 'ar-view' || (message.pose !== null && !isArPose(message.pose))) return;
     const slot = this.options.projection.slotOf(player.playerId);
     if (!slot?.lastSent || message.sceneId !== slot.sceneId) return;
@@ -49,6 +52,14 @@ export class ArViewRelay implements SessionHandler {
     const color = laserColor(player.playerId, players.map((each) => each.playerId));
     this.shown.set(player.playerId, { mapPath: slot.mapPath, name: player.name, color });
     this.options.board.viewer(slot.mapPath, player.playerId, player.name, color, message.pose);
+  }
+
+  /** A player's survey of the table: to the board, for the map of the scene they have. */
+  private surveyed(player: SessionPlayer, message: Extract<ControlMessage, { type: 'ar-survey' }>): void {
+    if (!isArTable(message.survey)) return;
+    const slot = this.options.projection.slotOf(player.playerId);
+    if (!slot?.lastSent || message.sceneId !== slot.sceneId || !this.surveyLimit.allow(player.playerId, Date.now())) return;
+    this.options.board.survey(slot.mapPath, player.playerId, player.name, message.survey);
   }
 
   onGone(player: SessionPlayer): void {

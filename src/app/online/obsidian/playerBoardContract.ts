@@ -152,6 +152,8 @@ export interface AugmentedView {
   readonly frustum: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number };
   readonly squareMm: number;
   readonly anchor: string | null;
+  /** The map point (map units) the sheet's origin lies on, in place of `anchor` (a table the GM placed: its origin is the map's top left). */
+  readonly origin?: { readonly x: number; readonly y: number };
   /** The camera's picture the pose was found for, drawn behind the board (absent: the page shows the picture itself). */
   readonly background?: HTMLCanvasElement;
 }

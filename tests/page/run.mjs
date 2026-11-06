@@ -224,6 +224,25 @@ async function run(engine, label, device) {
   check(tag('with the markers out of sight the board holds and the camera picture does not dim'), lost.opacity === '1' && lost.behind && lost.augmented, JSON.stringify(lost));
   await page.evaluate(() => { window.sheetHidden = false; });
   await wait(800);
+  // The GM placed the table: the sheet lies at (250, 300) mm on the map. The same camera now stands over that spot.
+  const unplaced = await page.evaluate(() => { const b = window.pageTest.inner(); return { x: b.view.position.x - b.size.width / 2, z: b.view.position.z - b.size.height / 2 }; });
+  const squareMm = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('atlas-connect-ar') ?? '{}').squareMm ?? 25; } catch { return 25; } });
+  await page.evaluate((squareMm) => {
+    window.pageTest.view.boardExtras({ ...window.pageTest.extras, arTable: { squareMm, groups: [{ group: 'sheet', x: 250, y: 300, heading: 0, w: 210, h: 297 }] } });
+  }, squareMm);
+  await wait(1500);
+  const placedOn = await page.evaluate((squareMm) => { const b = window.pageTest.inner(); const k = 70 / squareMm; return { x: b.view.position.x - 250 * k, z: b.view.position.z - 300 * k }; }, squareMm);
+  check(tag('a table the GM placed puts the board where they put it (the camera over the sheet stands over its spot)'), Math.abs(placedOn.x - unplaced.x) < 3 && Math.abs(placedOn.z - unplaced.z) < 3, JSON.stringify({ unplaced, placedOn, squareMm }));
+  await page.click('#ar-button');
+  await wait(200);
+  const menu = await page.evaluate(() => ({ hint: [...document.querySelectorAll('#ar-panel .menu-hint')].map((e) => e.textContent).join(' | '), square: document.querySelector('#ar-panel select')?.disabled ?? null }));
+  check(tag('with a table placed the menu says so and the square size is set by the GM'), /Placed by the GM: 1 sheet/.test(menu.hint) && menu.square === true, JSON.stringify(menu));
+  await page.evaluate(() => [...document.querySelectorAll('#ar-panel button')].find((b) => /Send this table to the GM/.test(b.textContent)).click());
+  await wait(200);
+  const surveys = await page.evaluate(() => window.pageTest.record.surveys);
+  check(tag('Send this table to the GM sends the sheets as placed'), surveys.length === 1 && surveys[0].groups[0].group === 'sheet' && Math.abs(surveys[0].groups[0].x - 250) < 1e-6, JSON.stringify(surveys));
+  await page.evaluate(() => window.pageTest.view.boardExtras(window.pageTest.extras));
+  await wait(800);
   // The AR button, while AR is on, opens its menu: the settings, Calibrate, Leave AR.
   await page.click('#ar-button');
   await wait(200);
