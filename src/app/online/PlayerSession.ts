@@ -15,6 +15,7 @@ import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
 import type { TemplateChange } from './view/tools/PlayerTools';
+import type { ArPose } from './tools/arViews';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 
@@ -352,6 +353,14 @@ export class PlayerSession {
       default:
         break;
     }
+  }
+
+  /** Tells the GM where this phone's camera is in augmented reality over the scene the player has (null: not tracking); false when it cannot go. */
+  sendArView(pose: ArPose | null): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'ar-view', sceneId: scene.sceneId, pose }));
+    return true;
   }
 
   /** Asks the GM to send (or stop sending) the board extras of this player's scene; false while not admitted. */

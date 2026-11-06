@@ -9,6 +9,7 @@ import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
+import type { ArPose } from '../tools/arViews';
 import type { SheetRollRef } from '../tools/sheets';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
@@ -91,6 +92,8 @@ export interface PlayerBoardHandle {
   stopRoomAr?(): void;
   /** Room tracking's frame times (milliseconds) and errors, for a look; null when it is off. */
   roomStats?(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null;
+  /** In augmented reality: where the phone's camera is over the map (board units) and which way it looks; null otherwise. */
+  arViewer?(): ArPose | null;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;

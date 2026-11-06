@@ -17,6 +17,8 @@
  * The AR button leaves. The panel holds the settings: a square's size on the table, what stands on the first marker,
  * the field of view (and calibrating again), the printouts, and the tracking's numbers for a look.
  */
+import type { ArPose } from '../../src/app/online/tools/arViews';
+import { VIEW_EVERY_MS, ViewSender } from './viewSender.mts';
 import type { AugmentedView, RoomPlace } from '../../src/app/online/obsidian/playerBoardContract';
 import { readArSettings, saveArSettings, SQUARES_MM, type ArSettings, type Tracking } from './arPrefs.mts';
 import { keepFov, keptFov } from './calibrate.mts';
@@ -36,6 +38,7 @@ export interface ArBoard {
   placeRoomAr?(place: RoomPlace | null): void;
   stopRoomAr?(): void;
   roomStats?(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null;
+  arViewer?(): ArPose | null;
 }
 
 export interface ArModeOptions {
@@ -61,6 +64,8 @@ export interface ArModeOptions {
   onEnd(): void;
   /** The player chose the other tracking in the menu (a tap: AR starts again with it there and then). */
   onSwitch?(tracking: Tracking): void;
+  /** Tells the GM where the camera is (the eye on the GM's board); null when not tracking. False when it cannot go. */
+  sendView?(pose: ArPose | null): boolean;
 }
 
 /** The longest side of the picture searched for markers: big enough to read them at arm's length, small enough to be quick. */
@@ -184,6 +189,10 @@ export class ArMode {
   private stopUi: (() => void) | null = null;
   private roomTimer = 0;
 
+  // ── The GM's eye ──
+  private readonly viewSender: ViewSender | null;
+  private viewTimer = 0;
+
   constructor(private readonly options: ArModeOptions) {
     this.doc = options.video.ownerDocument;
     this.frame = this.doc.createElement('canvas');
@@ -196,6 +205,9 @@ export class ArMode {
     overlay.append(this.hint, this.debugBox);
     const room = options.session ?? null;
     this.buildPanel(room !== null);
+    // Where the camera is, for the GM's board, ten times a second at most.
+    this.viewSender = options.sendView ? new ViewSender((pose) => options.sendView?.(pose) ?? false) : null;
+    if (this.viewSender) this.viewTimer = window.setInterval(() => this.sendView(), VIEW_EVERY_MS);
     if (room) {
       this.say('Starting room tracking…');
       room.then((session) => this.beginRoom(session as XrSessionLike), (error: unknown) => {
@@ -205,6 +217,17 @@ export class ArMode {
       return;
     }
     this.beginMarkers(options.stream, options.motion);
+  }
+
+  private sendView(): void {
+    if (this.ended || !this.viewSender) return;
+    let pose: ArPose | null = null;
+    try {
+      pose = this.options.board()?.arViewer?.() ?? null;
+    } catch {
+      pose = null;
+    }
+    this.viewSender.update(pose, performance.now());
   }
 
   /** Whether augmented reality is still on. */
@@ -733,6 +756,8 @@ export class ArMode {
     if (this.videoFrameId) (video as HTMLVideoElement & { cancelVideoFrameCallback?: (id: number) => void }).cancelVideoFrameCallback?.(this.videoFrameId);
     if (this.animationId) window.cancelAnimationFrame(this.animationId);
     if (this.roomTimer) window.clearInterval(this.roomTimer);
+    if (this.viewTimer) window.clearInterval(this.viewTimer);
+    this.viewSender?.stop();
     this.searcher.dispose();
     this.stopMotion?.();
     this.stopMotion = null;

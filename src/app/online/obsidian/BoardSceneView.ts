@@ -13,6 +13,7 @@ import { StatblockPreviewView } from '../../../../online-client/statblockPreview
 import type { DecodedImage } from '../assets/AssetLoader';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { SceneCamera } from '../scene/sceneCamera';
+import type { ArPose } from '../tools/arViews';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
@@ -208,6 +209,11 @@ export class BoardSceneView implements SceneViewport {
   /** Room tracking's frame times and errors; null when it is off (or from an older Tabletop). */
   roomStats(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null {
     return this.board.roomStats?.() ?? null;
+  }
+
+  /** In augmented reality: where the phone's camera is over the map, for the GM's eye; null otherwise (or an older Tabletop). */
+  arViewer(): ArPose | null {
+    return this.board.arViewer?.() ?? null;
   }
 
   /** Whether the board throws dice (an older Tabletop's has none). */

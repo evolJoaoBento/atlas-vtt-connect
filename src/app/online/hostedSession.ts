@@ -39,6 +39,7 @@ import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
 import type { SheetRollExtras, SheetRollLabels } from './tools/DiceHost';
 import type { OfferedDiceRules } from './tools/toolMessages';
+import { ArViewRelay } from './tools/ArViewRelay';
 
 const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
@@ -222,6 +223,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
+  // Players in augmented reality, as eyes on Tabletop's board: only where there is one.
+  const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub }) : null;
   boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
   // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
   // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
@@ -248,7 +251,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSharing = null;
     stopErrors();
     assetServer.stop();
-    for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    for (const part of given([arViews, notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
     boardSender.stop();
     cameraSender.stop();
     stopLog?.();
@@ -268,7 +271,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     cameraSender.start();
     boardSender.start();
     assetServer.start();
-    for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
+    for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes, arViews])) {
       part.start();
       parts.push(part);
     }

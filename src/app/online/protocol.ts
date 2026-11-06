@@ -12,6 +12,7 @@ import type { BoardCamera, BoardExtras } from './scene/boardTypes';
 import { isBoardCamera, isBoardExtras, isBoardPart } from './scene/boardValidation';
 import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
+import { isArPose, type ArPose } from './tools/arViews';
 import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
@@ -137,11 +138,16 @@ export type ControlMessage =
   /** GM to a player who asked: one part of its scene's board extras (`parts` of one `seq` make the whole), or none. */
   | { v: 1; type: 'board-extras'; seq: number; part: number; parts: number; extras: BoardExtras | null }
   /** GM to a player who asked: the GM's 3D view of its scene, for the "GM view" button; null when there is none. */
-  | { v: 1; type: 'board-camera'; camera: BoardCamera | null };
+  | { v: 1; type: 'board-camera'; camera: BoardCamera | null }
+  /**
+   * Player to GM, about ten a second while it moves: where the player's phone camera is in augmented reality over the
+   * scene they have (`tools/arViews.ts`), for the eye on the GM's board; null when the tracking is lost or AR ends.
+   */
+  | { v: 1; type: 'ar-view'; sceneId: string; pose: ArPose | null };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
+  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view',
 ]);
 
 export type Decoded =
@@ -216,6 +222,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'board-request': (m) => typeof m.on === 'boolean',
   'board-extras': (m) => isBoardPart(m) && (m.extras === null || isBoardExtras(m.extras)),
   'board-camera': (m) => m.camera === null || isBoardCamera(m.camera),
+  'ar-view': (m) => isSceneId(m.sceneId) && (m.pose === null || isArPose(m.pose)),
 };
 
 export function encodeControl(message: ControlMessage): string {

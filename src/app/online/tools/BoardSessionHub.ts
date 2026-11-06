@@ -12,12 +12,25 @@ import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
 import type { MapTemplate, TemplateShape } from './templates';
+import type { ArPose } from './arViews';
 
 type Point = { x: number; y: number };
 
 export type BoardMark =
   | { kind: 'ping'; mapPath: string; x: number; y: number; color: string }
   | { kind: 'laser'; mapPath: string; from: string; points: Point[]; lifted: boolean; color: string };
+
+/**
+ * A player's phone in augmented reality over a map, for the GM's board (an eye where its camera is): its pose in board
+ * units, null when they left AR or lost the tracking. `from` is their session id.
+ */
+export interface BoardViewer {
+  mapPath: string;
+  from: string;
+  name: string;
+  color: string;
+  pose: ArPose | null;
+}
 
 export interface BoardOverlay {
   templates: readonly MapTemplate[];
@@ -33,6 +46,8 @@ export interface BoardSession {
   overlay(mapPath: string): BoardOverlay;
   onChange(listener: () => void): () => void;
   onMark(listener: (mark: BoardMark) => void): () => void;
+  /** Players' phones in augmented reality, as they move (a Tabletop that draws them listens). */
+  onViewer(listener: (viewer: BoardViewer) => void): () => void;
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
   eraseTemplate(mapPath: string, id: string): void;
   clearTemplates(mapPath: string): void;
@@ -71,6 +86,7 @@ export interface BoardSessionSink {
   templatesChanged(): void;
   ping(mapPath: string, x: number, y: number, color: string): void;
   laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void;
+  viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void;
 }
 
 export interface BoardSessionHubOptions {
@@ -83,6 +99,7 @@ export interface BoardSessionHubOptions {
 export class BoardSessionHub implements BoardSession, BoardSessionSink {
   private readonly changes = new Set<() => void>();
   private readonly marks = new Set<(mark: BoardMark) => void>();
+  private readonly viewers = new Set<(viewer: BoardViewer) => void>();
   private readonly stops: Array<() => void> = [];
   /** The scene in use of each map, as the hub last told of it. */
   private readonly scenes = new Map<string, string>();
@@ -171,6 +188,11 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     return () => { this.marks.delete(listener); };
   }
 
+  onViewer(listener: (viewer: BoardViewer) => void): () => void {
+    this.viewers.add(listener);
+    return () => { this.viewers.delete(listener); };
+  }
+
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean {
     const sceneId = this.sceneOf(mapPath);
     return sceneId !== null && this.templates !== null && this.templates.addGm(sceneId, add);
@@ -196,6 +218,21 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
 
   laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void {
     this.mark({ kind: 'laser', mapPath, from, points: points.map(({ x, y }) => ({ x, y })), lifted, color });
+  }
+
+  viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void {
+    if (!this.started) return;
+    const viewer: BoardViewer = {
+      mapPath, from, name, color,
+      pose: pose ? { position: [...pose.position], quaternion: [...pose.quaternion] } : null,
+    };
+    for (const listener of [...this.viewers]) {
+      try {
+        listener(viewer);
+      } catch (error) {
+        console.error('[Atlas VTT Connect] The board could not show a player in AR:', error);
+      }
+    }
   }
 
   private sceneOf(mapPath: string): string | null {

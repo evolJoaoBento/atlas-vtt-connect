@@ -138,6 +138,7 @@ const map: SceneSwitch | null = surface
       syncToolbar();
     },
     tokenName: (tokenId) => scene?.tokens[tokenId]?.name ?? 'Token',
+    sendArView: (pose) => session?.sendArView(pose) ?? false,
     onError: (message, error) => { console.warn(message, error); },
   })
   : null;
