@@ -6,6 +6,8 @@
  * view. The relays hand it what they accept (`PingRelay`, `LaserRelay`, `TemplateHost`), so the board shows exactly what
  * players see.
  */
+import type { TokenControl } from '../control/TokenControl';
+import type { SessionPlayer } from '../GmSession';
 import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
@@ -34,6 +36,34 @@ export interface BoardSession {
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
   eraseTemplate(mapPath: string, id: string): void;
   clearTemplates(mapPath: string): void;
+  /**
+   * Tabletop moves tokens from the map `from` to the stacked map `to` (each to `newId`, the same id unless `to` had
+   * one): told before it moves them. Their players keep them, and are shown `to`.
+   */
+  tokensMoved?(move: TokensMoved): void;
+  /**
+   * The players who may control `tokenId` (every admitted one) and whether each does, for the "Controlled by" menu;
+   * null while no session hands out tokens. Absent from an older Connect.
+   */
+  controllers?(tokenId: string): Array<{ playerId: string; name: string; controls: boolean }> | null;
+  /** Gives `tokenId` to a player or takes it away. */
+  setController?(tokenId: string, playerId: string, controls: boolean): void;
+}
+
+export interface TokensMoved {
+  from: string;
+  to: string;
+  tokens: ReadonlyArray<{ id: string; newId: string }>;
+}
+
+/** A move as Tabletop must send it: two map paths and the tokens, each with a string id and new id. */
+function isMove(value: unknown): value is TokensMoved {
+  const move = value as Partial<TokensMoved> | null;
+  return typeof move === 'object' && move !== null && typeof move.from === 'string' && typeof move.to === 'string' && Array.isArray(move.tokens)
+    && move.tokens.length <= 200 && (move.tokens as unknown[]).every((token) => {
+      const entry = token as { id?: unknown; newId?: unknown } | null;
+      return typeof entry === 'object' && entry !== null && typeof entry.id === 'string' && typeof entry.newId === 'string';
+    });
 }
 
 /** What relays tell the board. */
@@ -57,12 +87,43 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   /** The scene in use of each map, as the hub last told of it. */
   private readonly scenes = new Map<string, string>();
   private templates: TemplateHost | null = null;
+  private moves: ((move: TokensMoved) => void) | null = null;
+  private control: { control: TokenControl; players: () => readonly SessionPlayer[] } | null = null;
   private started = false;
 
   constructor(private readonly options: BoardSessionHubOptions) {}
 
   useTemplates(templates: TemplateHost | null): void {
     this.templates = templates;
+  }
+
+  /** Who controls which token (the session's `TokenControl`) and the session's players, for the "Controlled by" menu. */
+  useControl(source: { control: TokenControl; players: () => readonly SessionPlayer[] } | null): void {
+    this.control = source;
+  }
+
+  controllers(tokenId: string): Array<{ playerId: string; name: string; controls: boolean }> | null {
+    const source = this.control;
+    if (!this.started || !source || typeof tokenId !== 'string') return null;
+    return source.players().filter((player) => player.status === 'admitted')
+      .map((player) => ({ playerId: player.playerId, name: player.name, controls: source.control.controls(player.playerId, tokenId) }));
+  }
+
+  setController(tokenId: string, playerId: string, controls: boolean): void {
+    const source = this.control;
+    if (!this.started || !source || typeof tokenId !== 'string' || typeof playerId !== 'string') return;
+    if (!source.players().some((player) => player.playerId === playerId && player.status === 'admitted')) return;
+    source.control.set(tokenId, playerId, controls === true);
+  }
+
+  /** What hears of tokens Tabletop moves to another scene. */
+  useMoves(moves: ((move: TokensMoved) => void) | null): void {
+    this.moves = moves;
+  }
+
+  tokensMoved(move: TokensMoved): void {
+    if (!this.started || !this.moves || !isMove(move)) return;
+    this.moves(move);
   }
 
   start(): void {

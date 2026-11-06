@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { BoardSessionHub } from '../../../src/app/online/tools/BoardSessionHub';
+import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
 import type { SlotChange, SlotView } from '../../../src/app/online/scene/slotViews';
 
@@ -104,5 +105,48 @@ describe('BoardSessionHub', () => {
     for (const listener of [...w.listeners]) listener({ kind: 'projected', slot: w.slot });
     for (const listener of [...w.listeners]) listener({ kind: 'projected', slot: w.slot });
     expect(changed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BoardSessionHub: tokens Tabletop moves to another scene', () => {
+  it('hands a well-formed move to what hears of it while hosting, and nothing else', () => {
+    const w = world();
+    const heard = vi.fn();
+    w.hub.useMoves(heard);
+    const move = { from: 'maps/a.atlasmap', to: 'maps/up.atlasmap', tokens: [{ id: 'hero', newId: 'hero' }] };
+    w.hub.tokensMoved(move);
+    expect(heard).toHaveBeenCalledWith(move);
+    w.hub.tokensMoved({ from: 'maps/a.atlasmap', to: 5, tokens: [] } as never);
+    w.hub.tokensMoved({ from: 'maps/a.atlasmap', to: 'maps/up.atlasmap', tokens: [{ id: 3 }] } as never);
+    expect(heard).toHaveBeenCalledTimes(1);
+    w.hub.stop();
+    w.hub.tokensMoved(move);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BoardSessionHub: "Controlled by" on Tabletop\'s board', () => {
+  it('lists the admitted players with whether each controls the token, and ticks and unticks one', () => {
+    const w = world();
+    const control = new TokenControl();
+    const players: SessionPlayer[] = [who('anna'), who('ben'), { playerId: 'cara', name: 'Cara', status: 'pending' } as SessionPlayer];
+    w.hub.useControl({ control, players: () => players });
+    control.set('hero', 'anna', true);
+    expect(w.hub.controllers('hero')).toEqual([{ playerId: 'anna', name: 'anna', controls: true }, { playerId: 'ben', name: 'ben', controls: false }]);
+    w.hub.setController('hero', 'ben', true);
+    w.hub.setController('hero', 'anna', false);
+    expect(control.playersOf('hero')).toEqual(['ben']);
+    // A player not admitted (or unknown) is never given a token.
+    w.hub.setController('hero', 'cara', true);
+    w.hub.setController('hero', 'zed', true);
+    expect(control.playersOf('hero')).toEqual(['ben']);
+  });
+
+  it('offers nothing while not hosting, or where the session hands out no tokens', () => {
+    const w = world();
+    expect(w.hub.controllers('hero')).toBeNull();
+    w.hub.useControl({ control: new TokenControl(), players: () => [who('anna')] });
+    w.hub.stop();
+    expect(w.hub.controllers('hero')).toBeNull();
   });
 });

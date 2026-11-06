@@ -9,10 +9,15 @@ import { isSceneId } from '../scene/sceneValidation';
 
 export type ControlListener = (playerIds: readonly string[]) => void;
 
+/** How long a token moved to another scene is not taken for deleted when it leaves its scene. */
+export const MOVE_GRACE_MS = 15_000;
+
 export class TokenControl {
   /** Token id → its controllers; a token with none has no entry. Insertion order is assignment order. */
   private readonly byToken = new Map<string, Set<string>>();
   private readonly listeners = new Set<ControlListener>();
+  /** Tokens moved to another scene, by id, and until when their leaving the scene is not a deletion. */
+  private readonly moving = new Map<string, number>();
 
   controls(playerId: string, tokenId: string): boolean {
     return this.byToken.get(tokenId)?.has(playerId) ?? false;
@@ -49,6 +54,37 @@ export class TokenControl {
       if (players?.size === 0) this.byToken.delete(tokenId);
     }
     this.emit([playerId]);
+  }
+
+/** The players controlling `tokenId`, in the order they were given it. */
+  playersOf(tokenId: string): string[] {
+    return [...(this.byToken.get(tokenId) ?? [])];
+  }
+
+  /**
+   * `tokenId` is moving to another scene as `newId` (the same id unless that scene had one): its controllers keep it,
+   * and its leaving the scene it was in is not taken for a deletion for a while (`MOVE_GRACE_MS`).
+   */
+  move(tokenId: string, newId: string, now = Date.now()): void {
+    this.moving.set(newId, now + MOVE_GRACE_MS);
+    if (tokenId === newId) return;
+    this.moving.set(tokenId, now + MOVE_GRACE_MS);
+    const players = this.byToken.get(tokenId);
+    if (!players || !isSceneId(newId)) return;
+    this.byToken.delete(tokenId);
+    const kept = this.byToken.get(newId) ?? new Set<string>();
+    for (const playerId of players) kept.add(playerId);
+    this.byToken.set(newId, kept);
+    this.emit([...players]);
+  }
+
+  /** Whether `tokenId` was moved to another scene a moment ago (its leaving its scene is no deletion). */
+  isMoving(tokenId: string, now = Date.now()): boolean {
+    const until = this.moving.get(tokenId);
+    if (until === undefined) return false;
+    if (until >= now) return true;
+    this.moving.delete(tokenId);
+    return false;
   }
 
   /** Tokens deleted from the scene lose their controllers. */

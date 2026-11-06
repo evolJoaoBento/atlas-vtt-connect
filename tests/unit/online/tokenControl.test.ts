@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { TokenControl } from '../../../src/app/online/control/TokenControl';
+import { MOVE_GRACE_MS, TokenControl } from '../../../src/app/online/control/TokenControl';
+import { watchDeletedTokens } from '../../../src/app/online/control/deletedTokens';
 import { MAX_CONTROLLED_TOKENS } from '../../../src/app/online/protocol';
 
 function watched(): { control: TokenControl; changes: string[][] } {
@@ -84,5 +85,53 @@ describe('TokenControl', () => {
     stop();
     control.set('hero', 'p1', true);
     expect(changes).toEqual([]);
+  });
+});
+
+describe('TokenControl: a token moved to another scene', () => {
+  it('keeps its players under its new id, and is not taken for deleted while it moves', () => {
+    const { control, changes } = watched();
+    control.set('hero', 'anna', true);
+    control.set('hero', 'ben', true);
+    changes.length = 0;
+    control.move('hero', 'tok_2', 1000);
+    expect(control.playersOf('tok_2')).toEqual(['anna', 'ben']);
+    expect(control.playersOf('hero')).toEqual([]);
+    expect(changes).toEqual([['anna', 'ben']]);
+    expect(control.isMoving('hero', 2000)).toBe(true);
+    expect(control.isMoving('tok_2', 2000)).toBe(true);
+    expect(control.isMoving('hero', 1000 + MOVE_GRACE_MS + 1)).toBe(false);
+  });
+
+  it('a token that keeps its id keeps its players with no change to tell', () => {
+    const { control, changes } = watched();
+    control.set('hero', 'anna', true);
+    changes.length = 0;
+    control.move('hero', 'hero', 0);
+    expect(control.playersOf('hero')).toEqual(['anna']);
+    expect(changes).toEqual([]);
+    expect(control.isMoving('hero', 10)).toBe(true);
+  });
+});
+
+describe('watchDeletedTokens', () => {
+  it('drops a token deleted from the shown scene, but not one moved to another scene', () => {
+    const control = new TokenControl();
+    control.set('hero', 'anna', true);
+    control.set('orc', 'ben', true);
+    let live: ((sceneId: string, snapshot: unknown) => void) | null = null;
+    const slot = { sceneId: 's1' };
+    const projection = {
+      shownSlot: () => slot,
+      shownSnapshot: () => ({ objects: { tokens: { hero: {}, orc: {} } } }),
+      onSlotChange: () => () => undefined,
+      watchLive: (listener: (sceneId: string, snapshot: unknown) => void) => { live = listener; return () => undefined; },
+    };
+    const stop = watchDeletedTokens(projection as never, control);
+    control.move('hero', 'hero');
+    live!('s1', { loaded: true, objects: { tokens: {} } });
+    expect(control.playersOf('hero')).toEqual(['anna']);
+    expect(control.playersOf('orc')).toEqual([]);
+    stop();
   });
 });

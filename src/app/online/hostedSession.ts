@@ -17,6 +17,7 @@ import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
 import { BoardSender } from './scene/BoardSender';
 import { BoardSessionHub, type BoardSession } from './tools/BoardSessionHub';
+import { followMovedTokens } from './control/movedTokens';
 import type { HandoutSource } from './handouts';
 
 /** No handout source: nothing is ever shown. */
@@ -222,6 +223,11 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
   boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
+  // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
+  // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
+  boardHub?.useControl(tokenControl ? { control: tokenControl.control, players: () => session.getPlayers() } : null);
+  boardHub?.useMoves(followMovedTokens({ control: tokenControl?.control ?? null, tabs, assign: (playerId, tab) => hub.assign(playerId, tab) }));
+
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
