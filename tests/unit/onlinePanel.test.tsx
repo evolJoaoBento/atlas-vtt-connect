@@ -76,6 +76,18 @@ describe('online panel', () => {
     expect(harness.service.stop).toHaveBeenCalledOnce();
   });
 
+  it('shows the join link as a QR code to scan with a phone, and hides it again', async () => {
+    harness.host();
+    const panel = within(await harness.openPanel());
+    expect(panel.queryByRole('img', { name: 'QR code of the join link' })).toBeNull();
+    fireEvent.click(panel.getByRole('button', { name: 'Show QR code' }));
+    const code = panel.getByRole('img', { name: 'QR code of the join link' });
+    expect(code.querySelector('path')?.getAttribute('d')?.length).toBeGreaterThan(100);
+    expect(panel.getByRole('button', { name: 'Hide QR code' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(panel.getByRole('button', { name: 'Hide QR code' }));
+    expect(panel.queryByRole('img', { name: 'QR code of the join link' })).toBeNull();
+  });
+
   it('shows a hosting error under the status', async () => {
     harness.host();
     const panel = within(await harness.openPanel());

@@ -680,3 +680,21 @@ button:disabled { opacity: 0.5; cursor: default; }
 .eye-menu { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 10px; background: rgba(20, 20, 24, 0.92); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .eye-menu[hidden] { display: none; }
 .eye-menu button { text-align: left; }
+/* Augmented reality: the camera's picture under the board, the board see-through round the map. */
+.ar-video { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; object-fit: cover; background: #000; pointer-events: none; }
+.ar-video[hidden] { display: none; }
+.board-3d.is-ar canvas { transition: opacity 0.25s; }
+.board-3d.is-ar-searching canvas { opacity: 0; }
+.board-3d.is-ar-lost canvas { opacity: 0.35; }
+.ar-panel { display: flex; flex-direction: column; gap: 6px; max-width: min(300px, calc(100vw - 24px)); padding: 8px 10px; border-radius: 10px; color: #f2f2f2; background: rgba(20, 20, 24, 0.88); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+.ar-panel[hidden] { display: none; }
+.ar-status { margin: 0; font-size: 14px; }
+.ar-status[hidden] { display: none; }
+.ar-settings summary { cursor: pointer; font-size: 14px; }
+.ar-settings[open] { display: flex; flex-direction: column; gap: 8px; }
+.ar-field { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ar-range { display: flex; align-items: center; gap: 6px; }
+.ar-range input { flex: 1; }
+.ar-settings a { font-size: 14px; color: inherit; }
+/* Following the GM or fitting the map moves the usual camera: in AR the phone is the camera. */
+.table:has(.board-3d.is-ar) .view-buttons { display: none; }

@@ -77,6 +77,10 @@ export interface PlayerBoardHandle {
   seeFrom?(tokenId: string | null, gyro: boolean): boolean;
   /** The token the view is seen through, or null. */
   seeingFrom?(): string | null;
+  /** This board draws over a phone's camera picture (`setAugmented`); absent from an older Tabletop. */
+  readonly augmentedReality?: true;
+  /** Augmented reality: the phone camera's pose over the printed marker sheet for one frame; null: the usual camera. */
+  setAugmented?(view: AugmentedView | null): boolean;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;
@@ -121,4 +125,18 @@ export interface PlayerBoardFactory {
 export function asPlayerBoardFactory(value: unknown): PlayerBoardFactory | null {
   const factory = value as Partial<PlayerBoardFactory> | null;
   return typeof factory === 'object' && factory !== null && factory.version === 1 && typeof factory.create === 'function' ? factory as PlayerBoardFactory : null;
+}
+
+/**
+ * The phone camera over the printed marker sheet, for Tabletop's board (its `AugmentedView`): the turn (row by row) and
+ * place (millimetres) taking sheet points to the camera's (x right, y down the picture, z ahead); the picture's edges as
+ * tangents from the camera; how long a square of the map is on the table; the token standing on the sheet's middle
+ * (null: the map's middle).
+ */
+export interface AugmentedView {
+  readonly rotation: readonly number[];
+  readonly translation: readonly number[];
+  readonly frustum: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number };
+  readonly squareMm: number;
+  readonly anchor: string | null;
 }

@@ -23,7 +23,7 @@ import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool, TemplateChange } from '../view/tools/PlayerTools';
 import { nextTurnOf, turnNotice, turnOf } from '../view/turns';
-import type { PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest } from './playerBoardContract';
+import type { AugmentedView, PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 
 export interface BoardSceneViewOptions {
@@ -173,6 +173,16 @@ export class BoardSceneView implements SceneViewport {
   /** The token the view is seen through, or null. */
   seeingFrom(): string | null {
     return this.board.seeingFrom?.() ?? null;
+  }
+
+  /** Whether the board draws over a phone's camera picture (an older Tabletop's does not). */
+  get augmentedReality(): boolean {
+    return this.board.augmentedReality === true && typeof this.board.setAugmented === 'function';
+  }
+
+  /** Draws the board from the phone camera's pose over the marker sheet (null: the usual camera); false where it cannot. */
+  setAugmented(view: AugmentedView | null): boolean {
+    return this.augmentedReality && this.board.setAugmented?.(view) === true;
   }
 
   /** Whether the board throws dice (an older Tabletop's has none). */

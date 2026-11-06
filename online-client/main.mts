@@ -125,6 +125,7 @@ const map: SceneSwitch | null = surface
     dimensionButton: element('dimension-button'),
     eyeButton: element('eye-button'),
     eyeMenu: element('eye-menu'),
+    ar: { button: element('ar-button'), panel: element('ar-panel'), video: element('ar-video') },
     viewButtons: element('view-buttons'),
     requestBoard: (on) => {
       // Back to 2D: the board's materials and models are let go.

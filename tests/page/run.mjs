@@ -13,16 +13,18 @@ const shots = resolve(process.argv[2] ?? join(out, 'shots'));
 rmSync(out, { recursive: true, force: true });
 mkdirSync(shots, { recursive: true });
 await build({
-  entryPoints: { boardPage: 'tests/page/boardPage.mts' },
+  entryPoints: { boardPage: 'tests/page/boardPage.mts', trackerWorker: 'online-client/ar/trackerWorker.mts' },
   bundle: true, splitting: true, format: 'esm', platform: 'browser', outdir: out,
   target: ['es2020', 'safari15'], loader: { '.css': 'css', '.webp': 'file', '.png': 'file', '.woff2': 'file' },
   alias: Object.fromEntries(['grid', 'draw', 'rules', 'dice3d', 'diceDisplay'].map((entry) => [`@atlas-vtt/shared/${entry}`, resolve(`vendor/atlas/shared/${entry}.js`)])),
   logLevel: 'warning',
 });
 copyFileSync('tests/page/boardPage.html', join(out, 'index.html'));
+// The AR worker, where the page's chunk asks for it (vite names it so in the real build).
+copyFileSync(join(out, 'trackerWorker.js'), join(out, 'trackerWorker.mts'));
 copyFileSync('online-client/style.css', join(out, 'style.css'));
 
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.mts': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png' };
 const server = createServer((request, response) => {
   const path = join(out, decodeURIComponent(new URL(request.url, 'http://x').pathname).replace(/^\/$/, '/index.html'));
   try {
@@ -180,6 +182,36 @@ async function run(engine, label, device) {
   await page.click('#eye-button');
   await wait(300);
   check(tag('Leave eyes goes back to the usual camera'), await page.evaluate(() => document.getElementById('eye-button').getAttribute('aria-pressed') === 'false'));
+  // AR: the camera films the marker sheet; the board stands on it, seen from straight above, see-through round the map.
+  check(tag('the AR button shows on the board'), await page.evaluate(() => !document.getElementById('ar-button').hidden));
+  await page.evaluate(() => window.pageTest.fakeCamera());
+  await page.click('#ar-button');
+  const found = await page.waitForFunction(() => {
+    const el = document.getElementById('board-3d');
+    return el.classList.contains('is-ar') && !el.classList.contains('is-ar-searching');
+  }, null, { timeout: 20000 }).then(() => true, () => false);
+  check(tag('AR starts the camera and finds the marker sheet'), found, await page.evaluate(() => document.querySelector('.ar-status')?.textContent ?? ''));
+  await wait(800);
+  const arView = await page.evaluate(() => {
+    const board = window.pageTest.inner();
+    const forward = board.view.getWorldDirection(board.view.position.clone());
+    return { augmented: board.isAugmented, classes: document.getElementById('board-3d').className, down: forward.y, height: board.view.position.y, video: !document.getElementById('ar-video').hidden, eyes: document.getElementById('eye-button').hidden };
+  });
+  check(tag('in AR the board is drawn from above the sheet, looking down, over the camera'), arView.augmented && arView.down < -0.9 && arView.height > 0 && arView.video, JSON.stringify(arView));
+  check(tag('in AR the Eyes button steps aside'), arView.eyes);
+  const clear = await page.evaluate(() => {
+    const board = window.pageTest.inner();
+    board.redraw();
+    const gl = board.renderer.getContext();
+    const pixel = new Uint8Array(4);
+    gl.readPixels(4, 4, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    return { background: board.scene.background === null, alpha: board.renderer.getClearAlpha(), corner: pixel[3] };
+  });
+    check(tag('in AR the board is see-through round the map (no sky, no floor: the camera shows there)'), clear.background && clear.alpha === 0 && clear.corner === 0, JSON.stringify(clear));
+  await shoot('ar');
+  await page.click('#ar-button');
+  await wait(300);
+  check(tag('Leave AR stops the camera and gives the board its usual camera'), await page.evaluate(() => !window.pageTest.inner().isAugmented && document.getElementById('ar-video').hidden && document.getElementById('ar-panel').hidden && !document.getElementById('board-3d').classList.contains('is-ar')));
   // 2D again.
   await page.click('#dimension-button');
   await wait(300);

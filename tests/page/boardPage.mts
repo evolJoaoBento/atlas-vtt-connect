@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { SceneSwitch } from '../../online-client/sceneSwitch.mts';
+import { markerSheetSvg } from '../../online-client/ar/markerSheet.mts';
 import { BoardSceneView } from '../../src/app/online/obsidian/BoardSceneView';
 import type { SceneViewport } from '../../src/app/online/obsidian/sceneViewport';
 import type { BoardExtras } from '../../src/app/online/scene/boardTypes';
@@ -123,6 +124,7 @@ async function main(): Promise<void> {
     loadBoard: () => import('../../online-client/tabletopBoard.mts').then((chunk) => chunk.webPlayerBoard()),
     canvas: el('map'), boardEl: el('board-3d'),
     dimensionButton: el('dimension-button') as HTMLButtonElement, eyeButton: el('eye-button') as HTMLButtonElement, eyeMenu: el('eye-menu'), viewButtons: el('view-buttons'),
+    ar: { button: el('ar-button') as HTMLButtonElement, panel: el('ar-panel'), video: el('ar-video') as HTMLVideoElement },
     requestBoard: (on) => { record.requests.push(on); return true; },
     onViewChange: () => undefined,
     tokenName: (id) => (scene.tokens as Record<string, { name?: string }>)[id]?.name ?? 'Token',
@@ -137,7 +139,47 @@ async function main(): Promise<void> {
     const handle = (board as unknown as { board?: { board?: unknown } } | null)?.board?.board as { view: THREE.PerspectiveCamera; camera: { pose: { distance: number } }; canvas: HTMLCanvasElement } | undefined;
     return handle ?? null;
   };
-  Object.assign(window, { pageTest: { view, record, inner, extras, scene, ready: true, offer: () => { view.boardOffer(true); }, extrasNow: () => view.boardExtras(extras) } });
+  /** A phone camera filming the marker sheet from straight above, a little turned: a canvas's stream. */
+  const fakeCamera = async (): Promise<void> => {
+    // Small squares: the whole map stands on the sheet, the camera's picture round it.
+    localStorage.setItem('atlas-connect-ar', JSON.stringify({ squareMm: 10, fov: 65, anchor: null }));
+    const sheet = new Image();
+    sheet.src = URL.createObjectURL(new Blob([markerSheetSvg()], { type: 'image/svg+xml' }));
+    await sheet.decode();
+    const film = Object.assign(document.createElement('canvas'), { width: 1280, height: 720 });
+    const context = film.getContext('2d')!;
+    const paint = (): void => {
+      context.fillStyle = '#7a7466';
+      context.fillRect(0, 0, film.width, film.height);
+      context.save();
+      context.translate(film.width / 2, film.height / 2);
+      context.rotate(0.12);
+      const height = film.height * 0.9;
+      context.drawImage(sheet, (-height * 210) / 297 / 2, -height / 2, (height * 210) / 297, height);
+      context.restore();
+    };
+    paint();
+    setInterval(paint, 100);
+    const capture = (film as HTMLCanvasElement & { captureStream?(rate: number): MediaStream }).captureStream;
+    let stream: MediaStream;
+    if (typeof capture === 'function') stream = capture.call(film, 30);
+    else {
+      // WebKit here has no canvas stream: the video plays nothing, and its picture is the film's.
+      stream = { getTracks: () => [], getVideoTracks: () => [] } as unknown as MediaStream;
+      const video = document.getElementById('ar-video') as HTMLVideoElement;
+      Object.defineProperty(video, 'srcObject', { configurable: true, get: () => null, set: () => undefined });
+      Object.defineProperty(video, 'videoWidth', { configurable: true, get: () => film.width });
+      Object.defineProperty(video, 'videoHeight', { configurable: true, get: () => film.height });
+      Object.defineProperty(video, 'readyState', { configurable: true, get: () => 4 });
+      video.play = () => Promise.resolve();
+      const draw = CanvasRenderingContext2D.prototype.drawImage as (...args: unknown[]) => void;
+      CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, source: unknown, ...rest: unknown[]) {
+        draw.call(this, source === video ? film : source, ...rest);
+      } as typeof CanvasRenderingContext2D.prototype.drawImage;
+    }
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => Promise.resolve(stream) } });
+  };
+  Object.assign(window, { pageTest: { view, record, inner, extras, scene, ready: true, fakeCamera, offer: () => { view.boardOffer(true); }, extrasNow: () => view.boardExtras(extras) } });
 }
 
 main().catch((error: unknown) => { (window as unknown as { boardError: string }).boardError = String(error); console.error(error); });

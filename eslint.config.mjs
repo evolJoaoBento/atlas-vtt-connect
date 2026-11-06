@@ -56,8 +56,8 @@ export default defineConfig([
   },
   {
     // The page's own entry, its saved-images panel and the shim that gives a plain page Obsidian's globals run only in
-    // a browser, where `localStorage` and `globalThis` are the right names.
-    files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts"],
+    // a browser, where `localStorage` and `globalThis` are the right names; so does augmented reality (the page only).
+    files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts", "online-client/ar/**"],
     rules: { "no-restricted-globals": "off", "obsidianmd/no-global-this": "off" },
   },
   {

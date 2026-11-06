@@ -6,7 +6,8 @@
  * keeps all the session gave the page and asks the GM for the board (or stops asking).
  *
  * On the board, the Eyes button sees through one of the player's tokens: the camera at its eye height, turned by the
- * phone's gyroscope (iOS asks the player first) and by a drag.
+ * phone's gyroscope (iOS asks the player first) and by a drag. The AR button shows the board through the phone's back
+ * camera, standing on the printed marker sheet (`ar/arMode.mts`, a chunk of its own).
  */
 import type { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { PlayerBoardFactory } from '../src/app/online/obsidian/playerBoardContract';
@@ -22,6 +23,7 @@ import type { PlayerLaser } from '../src/app/online/tools/toolMessages';
 import type { MeasureChoice } from '../src/app/online/view/tools/MeasureTool';
 import type { PlayerTool } from '../src/app/online/view/tools/PlayerTools';
 import type { ToolState } from './mapView.mts';
+import type { ArMode } from './ar/arMode.mts';
 
 export interface SceneSwitchOptions {
   /** The 2D map, made anew each time it shows. */
@@ -43,6 +45,8 @@ export interface SceneSwitchOptions {
   onViewChange(): void;
   /** A token's name, for the Eyes menu. */
   tokenName(tokenId: string): string;
+  /** Augmented reality: its button, the panel it fills, and the video the camera's picture plays in. */
+  ar?: { button: HTMLButtonElement; panel: HTMLElement; video: HTMLVideoElement };
   onError?(message: string, error: unknown): void;
 }
 
@@ -68,6 +72,8 @@ export class SceneSwitch implements SceneViewport {
   private extras: BoardExtras | null = null;
   private boardCamera: BoardCamera | null = null;
   private readonly stops: Array<() => void> = [];
+  private ar: ArMode | null = null;
+  private arStarting = false;
 
   constructor(private readonly options: SceneSwitchOptions) {
     this.view = options.makeMap();
@@ -80,6 +86,7 @@ export class SceneSwitch implements SceneViewport {
       this.choose();
     });
     listen(options.eyeButton, 'click', () => this.eyeClicked());
+    if (options.ar) listen(options.ar.button, 'click', () => this.arClicked());
     // A tap anywhere else closes the Eyes menu.
     listen(options.eyeMenu.ownerDocument, 'pointerdown', (event) => {
       const target = event.target as Node | null;
@@ -152,6 +159,7 @@ export class SceneSwitch implements SceneViewport {
         dimensionButton.hidden = true;
       }
     }
+    this.ar?.end();
     this.view.dispose();
     if (!next) {
       if (this.asked && this.offered) this.options.requestBoard(false);
@@ -192,12 +200,50 @@ export class SceneSwitch implements SceneViewport {
   /** The Eyes button: on the board, with a token of the player's to see through. */
   private showEyes(): void {
     const { eyeButton, eyeMenu } = this.options;
-    const can = this.board?.firstPerson === true && this.controlled.length > 0;
+    const inAr = this.ar?.active === true;
+    const ar = this.options.ar;
+    if (ar) {
+      ar.button.hidden = this.board?.augmentedReality !== true;
+      ar.button.textContent = inAr ? 'Leave AR' : 'AR';
+      ar.button.setAttribute('aria-pressed', String(inAr));
+    }
+    const can = this.board?.firstPerson === true && this.controlled.length > 0 && !inAr;
     eyeButton.hidden = !can;
     const seeing = this.board?.seeingFrom() ?? null;
     eyeButton.textContent = seeing ? 'Leave eyes' : 'Eyes';
     eyeButton.setAttribute('aria-pressed', String(seeing !== null));
     if (!can) eyeMenu.hidden = true;
+  }
+
+  /**
+   * AR: the board over the phone's back camera. The camera is asked for at once, inside the tap (iOS wants it so); the
+   * code that tracks the sheet loads meanwhile.
+   */
+  private arClicked(): void {
+    const ar = this.options.ar;
+    if (!ar) return;
+    if (this.ar?.active) { this.ar.end(); return; }
+    const board = this.board;
+    if (!board?.augmentedReality || this.arStarting) return;
+    const media = (navigator as Navigator & { mediaDevices?: MediaDevices }).mediaDevices;
+    const stream = typeof media?.getUserMedia === 'function'
+      ? media.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+      : Promise.reject(new Error('This browser gives the page no camera.'));
+    stream.catch(() => undefined);
+    this.arStarting = true;
+    import('./ar/arMode.mts').then(({ ArMode }) => {
+      if (this.disposed || this.board !== board) { stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined); return; }
+      this.ar = new ArMode({
+        stream, video: ar.video, boardEl: this.options.boardEl, panel: ar.panel,
+        board: () => this.board,
+        tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
+        onEnd: () => { this.ar = null; this.showEyes(); },
+      });
+      this.showEyes();
+    }, (error: unknown) => {
+      stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined);
+      this.options.onError?.('Augmented reality could not load.', error);
+    }).finally(() => { this.arStarting = false; });
   }
 
   private eyeClicked(): void {
@@ -252,6 +298,7 @@ export class SceneSwitch implements SceneViewport {
     // A token no longer the player's is not seen through.
     const seeing = this.board?.seeingFrom() ?? null;
     if (seeing !== null && !tokenIds.includes(seeing)) this.board?.seeFrom(null, false);
+    this.ar?.fillAnchors();
     this.showEyes();
   }
 
@@ -284,6 +331,7 @@ export class SceneSwitch implements SceneViewport {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.ar?.end();
     for (const stop of this.stops) stop();
     this.view.dispose();
   }
