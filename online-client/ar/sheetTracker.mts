@@ -1,44 +1,76 @@
 // online-client/ar/sheetTracker.mts
 /**
- * Finds the printed sheet in a camera picture: its markers (js-aruco2), then the camera's pose over it from all their
- * corners; and steadies that pose from frame to frame, so a hand's shake does not shake the board while a real move
+ * Finds our markers in a camera picture (js-aruco2: the A4 sheet's and the cards'), and the camera's pose from all the
+ * corners of those placed; and steadies that pose from frame to frame, so a hand's shake does not shake the board while a real move
  * still follows at once.
  */
 import { AR } from 'js-aruco2';
-import { DICTIONARY, markerCorners } from './markerSheet.mts';
+import { DICTIONARY, markerCorners, markerGroup } from './markerSheet.mts';
 import { sheetPose, type Intrinsics, type Point, type SheetPose } from './sheetPose.mts';
 
 export interface PictureData { width: number; height: number; data: Uint8ClampedArray }
 
 export interface Tracked {
   pose: SheetPose;
-  /** The sheet's markers seen. */
+  /** The markers seen and used. */
   markers: number[];
+  /** The marker corners used: where each is (in the frame the board stands in), and where it showed in the picture. */
+  sheet: Point[];
+  seen: Point[];
+}
+
+/** A marker of ours found in a picture: where its corners showed, and the camera's pose over it alone (its own frame). */
+export interface Detected {
+  id: number;
+  seen: Point[];
+  /** The camera's pose over the marker's sheet or card, from this marker's corners only; null when they do not fit. */
+  pose: SheetPose | null;
+}
+
+/** Where marker corners are, by marker id, in the frame the board stands in. */
+export type CornerLayout = (id: number) => Point[] | null;
+
+/** The camera's pose from markers found, placed by `layout`; null when none is placed (or the fit is poor). */
+export function poseFrom(markers: readonly Detected[], layout: CornerLayout, camera: Intrinsics, width: number): Tracked | null {
+  const sheet: Point[] = [];
+  const seen: Point[] = [];
+  const used: number[] = [];
+  for (const marker of markers) {
+    const corners = layout(marker.id);
+    if (!corners || used.includes(marker.id)) continue;
+    used.push(marker.id);
+    for (let i = 0; i < 4; i++) {
+      sheet.push(corners[i]!);
+      seen.push(marker.seen[i]!);
+    }
+  }
+  if (used.length === 0) return null;
+  const pose = sheetPose(sheet, seen, camera);
+  // A fit whose corners land well off where they were seen is a misread marker, or a card placed wrong.
+  if (!pose || pose.error > Math.max(4, width * 0.012)) return null;
+  return { pose, markers: used.sort((a, b) => a - b), sheet, seen };
 }
 
 export class SheetTracker {
   private readonly detector = new AR.Detector({ dictionaryName: DICTIONARY });
 
-  /** The camera's pose over the sheet in `picture`; null when no marker of the sheet shows (or the fit is poor). */
-  track(picture: PictureData, camera: Intrinsics): Tracked | null {
+  /** Our markers (the sheet's and the cards') in `picture`, each with the camera's pose over it alone. */
+  detect(picture: PictureData, camera: Intrinsics): Detected[] {
     const found = this.detector.detectImage(picture.width, picture.height, picture.data);
-    const sheet: Point[] = [];
-    const seen: Point[] = [];
-    const markers: number[] = [];
+    const out: Detected[] = [];
     for (const marker of found) {
-      const corners = markerCorners(marker.id);
-      if (!corners || markers.includes(marker.id) || marker.corners.length !== 4) continue;
-      markers.push(marker.id);
-      for (let i = 0; i < 4; i++) {
-        sheet.push(corners[i]!);
-        seen.push({ x: marker.corners[i]!.x, y: marker.corners[i]!.y });
-      }
+      const group = markerGroup(marker.id);
+      if (!group || marker.corners.length !== 4 || out.some((entry) => entry.id === marker.id)) continue;
+      const seen = marker.corners.map((corner) => ({ x: corner.x, y: corner.y }));
+      const pose = sheetPose(group.corners, seen, camera);
+      out.push({ id: marker.id, seen, pose: pose && pose.error <= Math.max(3, picture.width * 0.008) ? pose : null });
     }
-    if (markers.length === 0) return null;
-    const pose = sheetPose(sheet, seen, camera);
-    // A fit whose corners land well off where they were seen is a misread marker, not the sheet.
-    if (!pose || pose.error > Math.max(4, picture.width * 0.012)) return null;
-    return { pose, markers: markers.sort((a, b) => a - b) };
+    return out;
+  }
+
+  /** The camera's pose over the A4 sheet in `picture`; null when no marker of the sheet shows (or the fit is poor). */
+  track(picture: PictureData, camera: Intrinsics): Tracked | null {
+    return poseFrom(this.detect(picture, camera), markerCorners, camera, picture.width);
   }
 }
 

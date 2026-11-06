@@ -99,3 +99,72 @@ export function markerSheetSvg(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_WIDTH_MM}mm" height="${SHEET_HEIGHT_MM}mm" viewBox="0 0 ${SHEET_WIDTH_MM} ${SHEET_HEIGHT_MM}">`
     + `<rect width="${SHEET_WIDTH_MM}" height="${SHEET_HEIGHT_MM}" fill="#fff"/>${parts.join('')}</svg>`;
 }
+
+// ── Marker cards ──────────────────────────────────────────────────────────────
+// Small markers to cut out and lay anywhere round the map, each its own: seen together with one already placed, a card
+// is placed too (`markerLayout.mts`). Leaning in, one card in sight is enough.
+
+/** The width of a card's black square. */
+export const CARD_MM = 40;
+/** The first card's marker id: the sheet's are below it. */
+export const FIRST_CARD = 10;
+/** Cards on a printed page: three across, four down. */
+export const CARDS_PER_PAGE = 12;
+/** Pages of cards offered. */
+export const CARD_PAGES = 2;
+
+/** Whether `id` is one of the cards'. */
+export function isCard(id: number): boolean {
+  return Number.isInteger(id) && id >= FIRST_CARD && id < FIRST_CARD + CARDS_PER_PAGE * CARD_PAGES;
+}
+
+/** A card's number as printed on it (1 for the first). */
+export const cardNumber = (id: number): number => id - FIRST_CARD + 1;
+
+/**
+ * What a marker id belongs to, and its corners in that thing's own frame (millimetres; the detector's corner order):
+ * the A4 sheet (its markers fixed on it), or a card of its own (its middle the origin). Null for an id of neither.
+ */
+export function markerGroup(id: number): { group: string; corners: Array<{ x: number; y: number }> } | null {
+  const onSheet = markerCorners(id);
+  if (onSheet) return { group: 'sheet', corners: onSheet };
+  if (!isCard(id)) return null;
+  const half = CARD_MM / 2;
+  return { group: `card-${id}`, corners: [{ x: -half, y: -half }, { x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }] };
+}
+
+/** A page of marker cards to print (A4), `page` from 0: cut along the dashed lines. */
+export function markerCardsSvg(page: number): string {
+  const parts: string[] = [];
+  const columns = 3;
+  const rows = CARDS_PER_PAGE / columns;
+  const cellWidth = SHEET_WIDTH_MM / columns;
+  const top = 16;
+  const cellHeight = (SHEET_HEIGHT_MM - top - 8) / rows;
+  for (let i = 0; i < CARDS_PER_PAGE; i++) {
+    const id = FIRST_CARD + page * CARDS_PER_PAGE + i;
+    const cx = (i % columns + 0.5) * cellWidth;
+    const cy = top + (Math.floor(i / columns) + 0.5) * cellHeight;
+    const { size, white } = markerCells(id);
+    const cell = CARD_MM / size;
+    const x0 = cx - CARD_MM / 2;
+    const y0 = cy - CARD_MM / 2 - 4;
+    parts.push(`<rect x="${mm(x0)}" y="${mm(y0)}" width="${CARD_MM}" height="${CARD_MM}" fill="#000"/>`);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (white[y * size + x]) parts.push(`<rect x="${mm(x0 + x * cell)}" y="${mm(y0 + y * cell)}" width="${mm(cell + 0.02)}" height="${mm(cell + 0.02)}" fill="#fff"/>`);
+      }
+    }
+    // The card's number under its marker, and a mark for its top.
+    parts.push(`<text x="${mm(cx)}" y="${mm(y0 + CARD_MM + 9)}" font-family="sans-serif" font-size="5" text-anchor="middle" fill="#444">${cardNumber(id)}</text>`);
+    parts.push(`<text x="${mm(cx)}" y="${mm(y0 - 6)}" font-family="sans-serif" font-size="2.6" text-anchor="middle" fill="#888">▲ top</text>`);
+  }
+  // Cut lines between the cards.
+  const dash = 'stroke="#bbb" stroke-width="0.3" stroke-dasharray="2 2"';
+  for (let c = 1; c < columns; c++) parts.push(`<line x1="${mm(c * cellWidth)}" y1="${top}" x2="${mm(c * cellWidth)}" y2="${mm(SHEET_HEIGHT_MM - 8)}" ${dash}/>`);
+  for (let r = 0; r <= rows; r++) parts.push(`<line x1="0" y1="${mm(top + r * cellHeight)}" x2="${SHEET_WIDTH_MM}" y2="${mm(top + r * cellHeight)}" ${dash}/>`);
+  const first = FIRST_CARD + page * CARDS_PER_PAGE;
+  parts.push(`<text x="${SHEET_WIDTH_MM / 2}" y="9" font-family="sans-serif" font-size="3.6" text-anchor="middle" fill="#444">Atlas VTT AR cards ${cardNumber(first)}–${cardNumber(first + CARDS_PER_PAGE - 1)} · print at 100%: each black square ${CARD_MM} mm · cut out, lay flat round the map</text>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_WIDTH_MM}mm" height="${SHEET_HEIGHT_MM}mm" viewBox="0 0 ${SHEET_WIDTH_MM} ${SHEET_HEIGHT_MM}">`
+    + `<rect width="${SHEET_WIDTH_MM}" height="${SHEET_HEIGHT_MM}" fill="#fff"/>${parts.join('')}</svg>`;
+}

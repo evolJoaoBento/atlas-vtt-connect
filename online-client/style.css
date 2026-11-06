@@ -696,5 +696,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .ar-range { display: flex; align-items: center; gap: 6px; }
 .ar-range input { flex: 1; }
 .ar-settings a { font-size: 14px; color: inherit; }
+.ar-prints { display: flex; flex-direction: column; gap: 4px; }
 /* Following the GM or fitting the map moves the usual camera: in AR the phone is the camera. */
 .table:has(.board-3d.is-ar) .view-buttons { display: none; }

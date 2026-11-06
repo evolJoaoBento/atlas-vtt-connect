@@ -199,6 +199,7 @@ async function run(engine, label, device) {
   });
   check(tag('in AR the board is drawn from above the sheet, looking down, over the camera'), arView.augmented && arView.down < -0.9 && arView.height > 0 && arView.video, JSON.stringify(arView));
   check(tag('in AR the Eyes button steps aside'), arView.eyes);
+  check(tag('in AR the gyroscope turns the board, the markers place it'), await page.evaluate(() => document.getElementById('board-3d').dataset.arSteadiedBy === 'gyroscope'), await page.evaluate(() => document.getElementById('board-3d').dataset.arSteadiedBy ?? 'none'));
   const clear = await page.evaluate(() => {
     const board = window.pageTest.inner();
     board.redraw();

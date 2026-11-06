@@ -225,6 +225,11 @@ export class SceneSwitch implements SceneViewport {
     if (this.ar?.active) { this.ar.end(); return; }
     const board = this.board;
     if (!board?.augmentedReality || this.arStarting) return;
+    // The gyroscope steadies the board: iOS asks for it, from inside the tap, before anything is awaited.
+    const sensor = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+    const motion = typeof sensor?.requestPermission === 'function'
+      ? sensor.requestPermission().then((answer) => answer === 'granted', () => false)
+      : Promise.resolve(sensor !== undefined);
     const media = (navigator as Navigator & { mediaDevices?: MediaDevices }).mediaDevices;
     const stream = typeof media?.getUserMedia === 'function'
       ? media.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
@@ -234,7 +239,7 @@ export class SceneSwitch implements SceneViewport {
     import('./ar/arMode.mts').then(({ ArMode }) => {
       if (this.disposed || this.board !== board) { stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined); return; }
       this.ar = new ArMode({
-        stream, video: ar.video, boardEl: this.options.boardEl, panel: ar.panel,
+        stream, motion, video: ar.video, boardEl: this.options.boardEl, panel: ar.panel,
         board: () => this.board,
         tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
         onEnd: () => { this.ar = null; this.showEyes(); },

@@ -2,15 +2,19 @@
 /**
  * Augmented reality on the page: the phone's back camera fills the screen and the 3D board stands on the printed
  * marker sheet in it, tracked as the phone moves. The camera's pictures are searched for the sheet off the page's thread
- * (a worker), a dozen or so times a second; the board's pose glides between findings at the screen's rate.
+ * (a worker), a dozen or so times a second. With the phone's gyroscope (iOS asks first) the markers only place the
+ * board and the gyroscope turns it, every frame (`fusion.mts`): far steadier, and it stays put while the markers are
+ * briefly out of sight. Without one, the markers' own pose glides between findings at the screen's rate.
  *
  * The AR button again leaves it. Its panel sets how big a square of the map is on the table, the camera's field of view (browsers do not tell it), and
  * what stands on the sheet's middle: the map's middle or one of the player's tokens. It also offers the sheet to print.
  */
 import type { AugmentedView } from '../../src/app/online/obsidian/playerBoardContract';
-import { markerSheetSvg, MARKER_MM } from './markerSheet.mts';
+import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, markerCardsSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
+import { MarkerLayout } from './markerLayout.mts';
 import { coverFrustum, intrinsicsFor } from './sheetPose.mts';
-import { PoseEaser, PoseSmoother, SheetTracker, type Tracked } from './sheetTracker.mts';
+import { deviceRotation, SensorFusion } from './fusion.mts';
+import { PoseEaser, PoseSmoother, SheetTracker, type Detected, type Tracked } from './sheetTracker.mts';
 import type { TrackAnswer, TrackRequest } from './trackerWorker.mts';
 
 /** The board as augmented reality needs it. */
@@ -21,6 +25,8 @@ export interface ArBoard {
 export interface ArModeOptions {
   /** The camera, asked for inside the player's tap (as iOS wants). */
   stream: Promise<MediaStream>;
+  /** Whether the phone's motion sensors may be read (asked for inside the tap too, as iOS wants). */
+  motion?: Promise<boolean>;
   video: HTMLVideoElement;
   /** The board's element: the camera's picture covers it. */
   boardEl: HTMLElement;
@@ -65,13 +71,13 @@ function saveSettings(settings: ArSettings): void {
 class Searcher {
   private worker: Worker | null = null;
   private local: SheetTracker | null = null;
-  private waiting: ((answer: Tracked | null) => void) | null = null;
+  private waiting: ((answer: Detected[]) => void) | null = null;
 
   constructor() {
     try {
       this.worker = new Worker(new URL('./trackerWorker.mts', import.meta.url), { type: 'module' });
-      this.worker.onmessage = (event: MessageEvent<TrackAnswer>) => this.answer(event.data.tracked);
-      this.worker.onerror = () => { this.worker?.terminate(); this.worker = null; this.answer(null); };
+      this.worker.onmessage = (event: MessageEvent<TrackAnswer>) => this.answer(event.data.markers);
+      this.worker.onerror = () => { this.worker?.terminate(); this.worker = null; this.answer([]); };
     } catch {
       this.worker = null;
     }
@@ -81,27 +87,27 @@ class Searcher {
     return this.waiting !== null;
   }
 
-  search(request: TrackRequest): Promise<Tracked | null> {
+  search(request: TrackRequest): Promise<Detected[]> {
     return new Promise((resolve) => {
       this.waiting = resolve;
       if (this.worker) { this.worker.postMessage(request, [request.picture.data.buffer]); return; }
       this.local ??= new SheetTracker();
-      let tracked: Tracked | null = null;
-      try { tracked = this.local.track(request.picture, request.camera); } catch { tracked = null; }
-      this.answer(tracked);
+      let markers: Detected[] = [];
+      try { markers = this.local.detect(request.picture, request.camera); } catch { markers = []; }
+      this.answer(markers);
     });
   }
 
-  private answer(tracked: Tracked | null): void {
+  private answer(markers: Detected[]): void {
     const waiting = this.waiting;
     this.waiting = null;
-    waiting?.(tracked);
+    waiting?.(markers);
   }
 
   dispose(): void {
     this.worker?.terminate();
     this.worker = null;
-    this.answer(null);
+    this.answer([]);
   }
 }
 
@@ -111,12 +117,15 @@ export class ArMode {
   private readonly searcher = new Searcher();
   private readonly smoother = new PoseSmoother();
   private readonly easer = new PoseEaser();
+  private readonly fusion = new SensorFusion();
+  private readonly layout = new MarkerLayout();
+  private stopMotion: (() => void) | null = null;
   private readonly grab: HTMLCanvasElement;
   private frameId = 0;
   private last = 0;
   private found = false;
   private ended = false;
-  private sheetUrl: string | null = null;
+  private readonly urls: string[] = [];
   private status!: HTMLElement;
   private anchorSelect!: HTMLSelectElement;
 
@@ -124,6 +133,7 @@ export class ArMode {
     this.grab = options.video.ownerDocument.createElement('canvas');
     this.buildPanel();
     this.say('Starting the camera…');
+    void options.motion?.then((allowed) => { if (allowed && !this.ended) this.listenToMotion(); }, () => undefined);
     options.stream.then((stream) => this.begin(stream), (error: unknown) => {
       const name = (error as { name?: string } | null)?.name;
       this.say(name === 'NotAllowedError'
@@ -145,13 +155,33 @@ export class ArMode {
     this.frameId = window.requestAnimationFrame((time) => this.frame(time));
   }
 
+  /** The gyroscope's readings, into the fusion. */
+  private listenToMotion(): void {
+    const win = this.options.video.ownerDocument.defaultView ?? window;
+    const read = (event: DeviceOrientationEvent): void => {
+      if (event.alpha === null || event.beta === null || event.gamma === null) return;
+      const screen = win.screen?.orientation?.angle ?? (win as unknown as { orientation?: number }).orientation ?? 0;
+      this.fusion.orient(deviceRotation(event.alpha, event.beta, event.gamma, screen), performance.now());
+    };
+    win.addEventListener('deviceorientation', read);
+    this.stopMotion = () => win.removeEventListener('deviceorientation', read);
+  }
+
+  /** While the gyroscope turns the view, how long the board stays put without the markers: the turn is still the phone's. */
+  private static readonly FUSED_HOLD_MS = 2500;
+
   private frame(time: number): void {
     this.frameId = 0;
     if (this.ended) return;
     const dt = this.last === 0 ? 0 : Math.min(0.1, (time - this.last) / 1000);
     this.last = time;
     this.search();
-    const { pose } = this.easer.step(dt);
+    const now = performance.now();
+    const eased = this.easer.step(dt).pose;
+    const fused = this.fusion.sensing(now) && this.fusion.tracking(now, ArMode.FUSED_HOLD_MS) ? this.fusion.pose(now, dt) : null;
+    const pose = fused ?? eased;
+    // What steadies the board, for a look in the page's inspector (and the tests): the gyroscope, or the markers alone.
+    this.options.boardEl.dataset.arSteadiedBy = fused ? 'gyroscope' : 'markers';
     const board = this.options.board();
     if (pose && board) {
       const frustum = this.frustum();
@@ -189,15 +219,23 @@ export class ArMode {
     context.drawImage(video, 0, 0, width, height);
     const image = context.getImageData(0, 0, width, height);
     const camera = intrinsicsFor(width, height, this.settings.fov);
-    void this.searcher.search({ picture: { width, height, data: image.data }, camera }).then((tracked) => this.tracked(tracked));
+    const taken = performance.now();
+    void this.searcher.search({ picture: { width, height, data: image.data }, camera }).then((markers) => {
+      if (this.ended) return;
+      const tracked = this.layout.observe(markers, camera, width);
+      if (tracked) this.fusion.found(tracked.pose.rotation, tracked.sheet, tracked.seen, camera, taken);
+      this.tracked(tracked);
+    });
   }
 
   private tracked(tracked: Tracked | null): void {
     if (this.ended) return;
-    const pose = this.smoother.next(tracked?.pose ?? null, performance.now());
+    const now = performance.now();
+    const pose = this.smoother.next(tracked?.pose ?? null, now);
     const { boardEl } = this.options;
-    if (pose) {
-      this.easer.aim(pose);
+    const fused = this.fusion.sensing(now) && this.fusion.tracking(now, ArMode.FUSED_HOLD_MS);
+    if (pose || fused) {
+      if (pose) this.easer.aim(pose);
       if (!this.found) {
         this.found = true;
         boardEl.classList.remove('is-ar-searching', 'is-ar-lost');
@@ -209,6 +247,17 @@ export class ArMode {
       boardEl.classList.add('is-ar-lost');
       this.say('Point the camera at the marker sheet again.');
     }
+  }
+
+  /** Forgets where the markers lie: the next sheet or card seen holds the map's middle. */
+  private placeAgain(): void {
+    this.layout.reset();
+    this.fusion.reset();
+    this.smoother.reset();
+    this.easer.aim(null);
+    this.found = false;
+    this.options.boardEl.classList.add('is-ar-searching');
+    this.say('Point the camera at the sheet or card the map\'s middle should stand on.');
   }
 
   private say(words: string): void {
@@ -244,12 +293,25 @@ export class ArMode {
     this.anchorSelect.addEventListener('change', () => this.change({ anchor: this.anchorSelect.value === '' ? null : this.anchorSelect.value }));
     this.fillAnchors();
 
-    this.sheetUrl = URL.createObjectURL(new Blob([markerSheetSvg()], { type: 'image/svg+xml' }));
-    const sheet = make('a', { href: this.sheetUrl, download: 'atlas-ar-marker-sheet.svg', target: '_blank', rel: 'noopener', textContent: 'Marker sheet to print' });
-    sheet.setAttribute('aria-label', `Marker sheet to print on A4 at 100%: each black square is ${MARKER_MM} mm`);
+    const link = (svg: string, file: string, words: string, label: string): HTMLAnchorElement => {
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      this.urls.push(url);
+      const anchor = make('a', { href: url, download: file, target: '_blank', rel: 'noopener', textContent: words });
+      anchor.setAttribute('aria-label', label);
+      return anchor;
+    };
+    const prints = make('div', { className: 'ar-prints' });
+    prints.append(link(markerSheetSvg(), 'atlas-ar-marker-sheet.svg', 'Marker sheet (A4)', `Marker sheet to print on A4 at 100%: each black square is ${MARKER_MM} mm`));
+    for (let page = 0; page < CARD_PAGES; page++) {
+      const first = page * CARDS_PER_PAGE + 1;
+      prints.append(link(markerCardsSvg(page), `atlas-ar-cards-${first}-${first + CARDS_PER_PAGE - 1}.svg`, `Marker cards ${first}–${first + CARDS_PER_PAGE - 1}`, `Marker cards to print on A4 at 100% and cut out: each black square is ${CARD_MM} mm`));
+    }
+    const restart = make('button', { type: 'button', className: 'secondary', textContent: 'Place again' });
+    restart.setAttribute('aria-label', 'Forget where the sheet and cards lie: the next one seen holds the map\'s middle');
+    restart.addEventListener('click', () => this.placeAgain());
 
     const settings = make('details', { className: 'ar-settings' });
-    settings.append(make('summary', { textContent: 'AR settings' }), field('A square on the table', square), field('Camera view', fovRow), field('On the sheet\'s middle', this.anchorSelect), sheet);
+    settings.append(make('summary', { textContent: 'AR settings' }), field('A square on the table', square), field('Camera view', fovRow), field('On the first marker seen', this.anchorSelect), prints, restart);
 
     panel.replaceChildren(this.status, settings);
     panel.hidden = false;
@@ -281,6 +343,8 @@ export class ArMode {
     if (this.frameId) window.cancelAnimationFrame(this.frameId);
     this.frameId = 0;
     this.searcher.dispose();
+    this.stopMotion?.();
+    this.stopMotion = null;
     for (const track of this.stream?.getTracks() ?? []) track.stop();
     this.stream = null;
     const { video, boardEl, panel } = this.options;
@@ -288,10 +352,10 @@ export class ArMode {
     video.srcObject = null;
     video.hidden = true;
     boardEl.classList.remove('is-ar', 'is-ar-searching', 'is-ar-lost');
+    delete boardEl.dataset.arSteadiedBy;
     panel.hidden = true;
     panel.replaceChildren();
-    if (this.sheetUrl) URL.revokeObjectURL(this.sheetUrl);
-    this.sheetUrl = null;
+    for (const url of this.urls.splice(0)) URL.revokeObjectURL(url);
     this.options.board()?.setAugmented(null);
     this.options.onEnd();
   }

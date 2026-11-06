@@ -160,6 +160,12 @@ async function main(): Promise<void> {
     };
     paint();
     setInterval(paint, 100);
+    // The phone lies flat, as over the sheet: its gyroscope says so, many times a second.
+    setInterval(() => {
+      const event = new Event('deviceorientation');
+      Object.assign(event, { alpha: 0, beta: 0, gamma: 0 });
+      window.dispatchEvent(event);
+    }, 16);
     const capture = (film as HTMLCanvasElement & { captureStream?(rate: number): MediaStream }).captureStream;
     let stream: MediaStream;
     if (typeof capture === 'function') stream = capture.call(film, 30);
