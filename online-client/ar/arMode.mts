@@ -34,6 +34,7 @@ export interface ArBoard {
   startRoomAr?(session: unknown, onFrame: ((frame: unknown, space: unknown) => void) | null): Promise<boolean>;
   placeRoomAr?(place: RoomPlace | null): void;
   stopRoomAr?(): void;
+  roomStats?(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null;
 }
 
 export interface ArModeOptions {
@@ -178,6 +179,7 @@ export class ArMode {
   private preview: { position: number[]; yaw: number } | null = null;
   private placed = false;
   private stopUi: (() => void) | null = null;
+  private roomTimer = 0;
 
   constructor(private readonly options: ArModeOptions) {
     this.doc = options.video.ownerDocument;
@@ -539,6 +541,8 @@ export class ArMode {
     ui.addEventListener('beforexrselect', keep);
     this.stopUi = () => ui.removeEventListener('beforexrselect', keep);
     this.options.overlay?.classList.add('is-room-ar-overlay');
+    // The frame times, for a look (Show tracking numbers).
+    this.roomTimer = window.setInterval(() => this.showRoomStats(), 500);
     session.addEventListener('select', () => {
       if (!this.placed && this.preview) {
         this.placed = true;
@@ -575,6 +579,19 @@ export class ArMode {
     }
     const at = this.preview;
     board.placeRoomAr(at ? { position: at.position, yaw: at.yaw, squareMm: this.settings.squareMm, anchor: this.anchor() } : null);
+  }
+
+  private showRoomStats(): void {
+    if (!this.settings.debug) return;
+    const stats = this.options.board()?.roomStats?.();
+    if (!stats) return;
+    const fps = stats.intervalMs > 0 ? 1000 / stats.intervalMs : 0;
+    this.debugBox.textContent = [
+      `room tracking · ${this.placed ? 'placed' : this.preview ? 'table found' : 'looking for the table'}`,
+      `${fps.toFixed(1)} frames/s · ${stats.intervalMs.toFixed(0)} ms apart`,
+      `drawing a frame ${stats.workMs.toFixed(1)} ms · ${stats.frames} frames`,
+      `errors ${stats.errors}${stats.lastError ? `: ${stats.lastError.slice(0, 120)}` : ''}`,
+    ].join('\n');
   }
 
   // ── The panel ───────────────────────────────────────────────────────────────
@@ -622,7 +639,7 @@ export class ArMode {
     if (room) {
       const move = button('Move the board', () => { this.placed = false; this.say('Point at the table, then tap to put the board down.'); });
       const markers = button('Use printed markers instead', () => { this.change({ tracking: 'markers' }); this.end(); });
-      settings.append(summary, field('A square on the table', square), field('On the point', this.anchorSelect), move, markers);
+      settings.append(summary, field('A square on the table', square), field('On the point', this.anchorSelect), move, markers, this.debugSwitch(make));
     } else {
       this.fovInput = make('input', { type: 'range', min: '35', max: '110', step: '1', value: String(Math.round(this.fov)) });
       this.fovInput.setAttribute('aria-label', 'Camera field of view');
@@ -647,10 +664,7 @@ export class ArMode {
         const first = page * CARDS_PER_PAGE + 1;
         prints.append(link(markerCardsSvg(page), `atlas-ar-cards-${first}-${first + CARDS_PER_PAGE - 1}.svg`, `Marker cards ${first}–${first + CARDS_PER_PAGE - 1}`, `Marker cards to print on A4 at 100% and cut out: each black square is ${CARD_MM} mm`));
       }
-      const debug = make('input', { type: 'checkbox', checked: this.settings.debug });
-      debug.addEventListener('change', () => { this.change({ debug: debug.checked }); this.debugBox.hidden = !debug.checked; });
-      const debugRow = make('label', { className: 'ar-check' });
-      debugRow.append(debug, make('span', { textContent: 'Show tracking numbers' }));
+      const debugRow = this.debugSwitch(make);
       settings.append(
         summary,
         field('A square on the table', square),
@@ -658,7 +672,7 @@ export class ArMode {
         field('Camera view', fovRow),
         button('Calibrate again', () => { keepFov(this.cameraKey, null); this.startCalibrating(); }),
         button('Place again', () => this.startPlacing('Placing again.')),
-        ...(this.options.roomCapable ? [button('Use room tracking (no printouts)', () => { this.change({ tracking: 'room' }); this.end(); })] : []),
+        ...(this.options.roomCapable ? [button('Try room tracking (Android, no printouts)', () => { this.change({ tracking: 'room' }); this.end(); this.say(''); })] : []),
         debugRow,
         make('span', { className: 'ar-prints-title', textContent: 'To print (A4, at 100%)' }),
         prints,
@@ -666,6 +680,15 @@ export class ArMode {
     }
     panel.replaceChildren(this.status, this.progress, this.skip, settings, this.debugBox);
     panel.hidden = false;
+  }
+
+  /** The Show tracking numbers switch. */
+  private debugSwitch(make: <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Partial<HTMLElementTagNameMap[K]>) => HTMLElementTagNameMap[K]): HTMLElement {
+    const debug = make('input', { type: 'checkbox', checked: this.settings.debug });
+    debug.addEventListener('change', () => { this.change({ debug: debug.checked }); this.debugBox.hidden = !debug.checked; });
+    const row = make('label', { className: 'ar-check' });
+    row.append(debug, make('span', { textContent: 'Show tracking numbers' }));
+    return row;
   }
 
   /** Keeps the panel's calibration bits in step with the phase. */
@@ -695,6 +718,7 @@ export class ArMode {
     const { video, boardEl, panel } = this.options;
     if (this.videoFrameId) (video as HTMLVideoElement & { cancelVideoFrameCallback?: (id: number) => void }).cancelVideoFrameCallback?.(this.videoFrameId);
     if (this.animationId) window.cancelAnimationFrame(this.animationId);
+    if (this.roomTimer) window.clearInterval(this.roomTimer);
     this.searcher.dispose();
     this.stopMotion?.();
     this.stopMotion = null;

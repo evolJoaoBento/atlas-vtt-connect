@@ -205,6 +205,11 @@ export class BoardSceneView implements SceneViewport {
     this.board.stopRoomAr?.();
   }
 
+  /** Room tracking's frame times and errors; null when it is off (or from an older Tabletop). */
+  roomStats(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null {
+    return this.board.roomStats?.() ?? null;
+  }
+
   /** Whether the board throws dice (an older Tabletop's has none). */
   get throwsDice(): boolean {
     return this.board.diceAvailable === true && typeof this.board.throwDice === 'function';

@@ -13,7 +13,7 @@ export interface ArSettings {
   fov: number;
   /** The token standing on the first marker seen (or the placed point); null: the map's middle. */
   anchor: string | null;
-  /** Room tracking (Android's ARCore) where the phone has it, or the printed markers. */
+  /** The printed markers, or room tracking (Android's ARCore, where the phone has it) when chosen. */
   tracking: Tracking;
   /** The numbers behind the tracking, shown over the picture. */
   debug: boolean;
@@ -21,7 +21,7 @@ export interface ArSettings {
 
 const KEY = 'atlas-connect-ar';
 export const SQUARES_MM = [10, 15, 20, 25, 30, 40, 50];
-const DEFAULTS: ArSettings = { squareMm: 25, fov: 65, anchor: null, tracking: 'room', debug: false };
+const DEFAULTS: ArSettings = { squareMm: 25, fov: 65, anchor: null, tracking: 'markers', debug: false };
 
 export function readArSettings(): ArSettings {
   try {
@@ -30,7 +30,8 @@ export function readArSettings(): ArSettings {
       squareMm: typeof saved?.squareMm === 'number' && SQUARES_MM.includes(saved.squareMm) ? saved.squareMm : DEFAULTS.squareMm,
       fov: typeof saved?.fov === 'number' && saved.fov >= 35 && saved.fov <= 110 ? saved.fov : DEFAULTS.fov,
       anchor: typeof saved?.anchor === 'string' ? saved.anchor : null,
-      tracking: saved?.tracking === 'markers' ? 'markers' : 'room',
+      // Kept as `roomTracking`: an older page saved `tracking: 'room'` as its default, not as the player's choice.
+      tracking: (saved as { roomTracking?: unknown } | null)?.roomTracking === true ? 'room' : 'markers',
       debug: saved?.debug === true,
     };
   } catch {
@@ -40,7 +41,8 @@ export function readArSettings(): ArSettings {
 
 export function saveArSettings(settings: ArSettings): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
+    const { tracking, ...rest } = settings;
+    localStorage.setItem(KEY, JSON.stringify({ ...rest, roomTracking: tracking === 'room' }));
   } catch {
     // A private window: the settings last as long as the page.
   }

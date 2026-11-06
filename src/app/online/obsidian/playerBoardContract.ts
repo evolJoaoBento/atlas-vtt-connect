@@ -89,6 +89,8 @@ export interface PlayerBoardHandle {
   placeRoomAr?(place: RoomPlace | null): void;
   /** Ends room tracking. */
   stopRoomAr?(): void;
+  /** Room tracking's frame times (milliseconds) and errors, for a look; null when it is off. */
+  roomStats?(): { frames: number; intervalMs: number; workMs: number; errors: number; lastError: string } | null;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;
