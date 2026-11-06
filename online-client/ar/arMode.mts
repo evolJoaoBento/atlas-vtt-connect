@@ -511,6 +511,7 @@ export class ArMode {
         `fit error ${stats.error.toFixed(2)} px · field of view ${this.fov.toFixed(1)}°`,
         `placed ${this.layout.size} · camera at ${place} mm`,
         `gyroscope ${this.fusion.sensing(now) ? 'on' : 'off'} · camera ${this.cameraKey}`,
+        this.gmLine(),
       ].join('\n');
     }
   }
@@ -617,7 +618,16 @@ export class ArMode {
       `${fps.toFixed(1)} frames/s · ${stats.intervalMs.toFixed(0)} ms apart`,
       `drawing a frame ${stats.workMs.toFixed(1)} ms · ${stats.frames} frames`,
       `errors ${stats.errors}${stats.lastError ? `: ${stats.lastError.slice(0, 120)}` : ''}`,
+      this.gmLine(),
     ].join('\n');
+  }
+
+  /** What the GM's board is told of this phone (its eye there). */
+  private gmLine(): string {
+    const counts = this.viewSender?.counts;
+    if (!counts) return 'GM eye: off';
+    const at = counts.last ? counts.last.position.map((v) => Math.round(v)).join(', ') : '—';
+    return `GM eye: sent ${counts.sent} · not sent ${counts.refused} · no pose ${counts.noPose} · at ${at}`;
   }
 
   // ── The panel ───────────────────────────────────────────────────────────────

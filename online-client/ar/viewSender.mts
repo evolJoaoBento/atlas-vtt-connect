@@ -33,12 +33,15 @@ export class ViewSender {
   private lastAt = -Infinity;
   /** Whether the GM was last told of a pose (so a null is owed when it goes). */
   private told = false;
+  /** For the tracking numbers: messages that went, ones the session would not send, and the last pose sent. */
+  readonly counts = { sent: 0, refused: 0, noPose: 0, last: null as ArPose | null };
 
   constructor(private readonly send: (pose: ArPose | null) => boolean) {}
 
   /** The camera's pose now (null: not tracking); `now` in milliseconds. */
   update(pose: ArPose | null, now: number): void {
     if (!pose) {
+      this.counts.noPose++;
       if (this.told && this.send(null)) this.told = false;
       this.last = null;
       return;
@@ -50,7 +53,9 @@ export class ViewSender {
       && turned(pose.quaternion, last.quaternion) < STILL_TURN;
     if (still && now - this.lastAt < VIEW_HEARTBEAT_MS) return;
     const wire = rounded(pose);
-    if (!this.send(wire)) return;
+    if (!this.send(wire)) { this.counts.refused++; return; }
+    this.counts.sent++;
+    this.counts.last = wire;
     this.last = wire;
     this.lastAt = now;
     this.told = true;
