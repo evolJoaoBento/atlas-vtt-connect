@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fovOf } from '../../../online-client/ar/calibrate.mts';
-import { CalibrationWizard, pageView, PER_SIDE, type Side } from '../../../online-client/ar/calibrationWizard.mts';
+import { ABOVE_PATIENCE_MS, aboveChecks, CalibrationWizard, pageView, PER_SIDE, type Side } from '../../../online-client/ar/calibrationWizard.mts';
 import { FIRST_MAT, MATS_PER_PAGE, markerGroup } from '../../../online-client/ar/markerSheet.mts';
 import { intrinsicsFor, project, type Intrinsics } from '../../../online-client/ar/sheetPose.mts';
 import type { Detected } from '../../../online-client/ar/sheetTracker.mts';
@@ -46,6 +46,13 @@ describe('how the page shows', () => {
       expect(view.markers).toBeGreaterThanOrEqual(view.needed);
     });
   }
+
+  it('reads sharp from above even when the field of view guessed is far off (as on a phone not yet calibrated)', () => {
+    const wrong = intrinsicsFor(640, 480, 45);
+    const view = pageView(seen(cameraOver(null, 0, 480), camera), wrong)!;
+    expect(view.fitError).toBeLessThan(0.1);
+    expect(aboveChecks(view, true).every((check) => check.ok)).toBe(true);
+  });
 
   it('is straight above when looked at from above', () => {
     const view = pageView(seen(cameraOver(null, 0, 480), camera), camera)!;
@@ -100,5 +107,31 @@ describe('calibrating step by step', () => {
     expect(saved).not.toBeNull();
     expect(Math.abs(saved! - fovOf(camera.f, 640))).toBeLessThan(1);
     wizard.dispose();
+  });
+
+  it('lets the player on from above after a while with the page in sight, ticked or not', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    roots.push(root);
+    const wizard = new CalibrationWizard(root, { done: () => undefined, skip: () => undefined, currentFov: () => 65 });
+    const next = (): HTMLButtonElement | undefined => [...root.querySelectorAll('button')].find((b) => b.textContent === 'Next' || b.textContent === 'Next anyway');
+    let now = 1000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      press(root, 'Start');
+      // Slanted, so "straight above" is not ticked.
+      const slanted = seen(cameraOver('bottom', 30, 480), camera);
+      wizard.observe(slanted, camera, 640, 640);
+      expect(next()!.disabled).toBe(true);
+      now += ABOVE_PATIENCE_MS + 10;
+      wizard.observe(slanted, camera, 640, 640);
+      expect(next()!.textContent).toBe('Next anyway');
+      expect(next()!.disabled).toBe(false);
+      press(root, 'Next anyway');
+      expect(root.querySelector('.ar-wizard__title')?.textContent).toMatch(/bottom/);
+    } finally {
+      clock.mockRestore();
+      wizard.dispose();
+    }
   });
 });

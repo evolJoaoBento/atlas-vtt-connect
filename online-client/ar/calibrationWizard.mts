@@ -69,11 +69,25 @@ export function pageView(markers: readonly Detected[], camera: Intrinsics): Page
   return {
     markers: count,
     needed: name === 'sheet' ? 4 : 6,
-    slant, side, fitError: pose.error,
+    slant, side, fitError: homographyError(h, local, seen),
     center: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
     size: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)),
     homography: h,
   };
+}
+
+/**
+ * How far the markers' corners sit from where one flat page puts them (mean, pixels): how cleanly they read. From the
+ * homography alone, so it does not hang on the field of view (which the calibration is there to find).
+ */
+export function homographyError(h: readonly number[], local: readonly Point[], seen: readonly Point[]): number {
+  let sum = 0;
+  for (let i = 0; i < local.length; i++) {
+    const { x, y } = local[i]!;
+    const w = h[6]! * x + h[7]! * y + h[8]!;
+    sum += Math.hypot((h[0]! * x + h[1]! * y + h[2]!) / w - seen[i]!.x, (h[3]! * x + h[4]! * y + h[5]!) / w - seen[i]!.y);
+  }
+  return local.length > 0 ? sum / local.length : Infinity;
 }
 
 /** What a step checks, each right or not, with words for the player. */
@@ -81,13 +95,15 @@ export interface Check { ok: boolean; words: string }
 
 /** Slant wanted from the sides. */
 export const SLANT = { min: 30, max: 60 } as const;
+/** How long the page must be in sight from above before Next lets the player on without every tick. */
+export const ABOVE_PATIENCE_MS = 6000;
 /** Pictures a side's Capture takes. */
 export const PER_SIDE = 6;
 
 /** Whether the phone is held still: the page barely moved since the last picture (`width` the picture's). */
 export function steady(view: PageView, before: PageView | null, width: number): boolean {
   if (!before) return false;
-  return Math.hypot(view.center.x - before.center.x, view.center.y - before.center.y) < width * 0.015 && Math.abs(view.size - before.size) < view.size * 0.03;
+  return Math.hypot(view.center.x - before.center.x, view.center.y - before.center.y) < width * 0.025 && Math.abs(view.size - before.size) < view.size * 0.05;
 }
 
 /** The checks for the step from above. */
@@ -132,6 +148,8 @@ export class CalibrationWizard {
   private readonly calibration = new FovCalibration();
   private before: PageView | null = null;
   private capturing = 0;
+  /** When the page was first seen in this step (ms): the step from above lets the player on after a while regardless. */
+  private seenSince = 0;
   /** Pictures counted for each side step, so a side taken again drops its own. */
   private readonly perStep = new Map<number, number>();
   private readonly card: HTMLElement;
@@ -153,6 +171,7 @@ export class CalibrationWizard {
     if (kind === 'intro' || kind === 'result') return;
     const view = pageView(markers, camera);
     const still = view !== null && steady(view, this.before, width);
+    if (view && this.seenSince === 0) this.seenSince = performance.now();
     this.before = view;
     const current = STEPS[this.step]!;
     if (current.kind === 'side' && this.capturing > 0 && view && sideChecks(current.side, view, still).every((check) => check.ok)) {
@@ -169,6 +188,7 @@ export class CalibrationWizard {
     this.step = Math.max(0, Math.min(STEPS.length - 1, step));
     this.capturing = 0;
     this.before = null;
+    this.seenSince = 0;
     const current = STEPS[this.step]!;
     // A side taken again: its pictures go.
     if (current.kind === 'side') {
@@ -217,7 +237,10 @@ export class CalibrationWizard {
       text.textContent = 'Hold the phone flat over the page, about 30–40 cm up, with the whole page in the picture. Hold it still.';
       const checks = aboveChecks(view, still);
       parts.push(text, this.diagram(null), this.checklist(checks));
-      actions.append(button('Back', () => this.go(0)), button('Next', () => this.go(2), true, !checks.every((check) => check.ok)));
+      // Only a check of the setup (nothing is measured here): once the page has been in sight a while, on regardless.
+      const ready = checks.every((check) => check.ok);
+      const patient = this.seenSince > 0 && performance.now() - this.seenSince > ABOVE_PATIENCE_MS;
+      actions.append(button('Back', () => this.go(0)), button(ready || !patient ? 'Next' : 'Next anyway', () => this.go(2), true, !ready && !patient));
     } else if (current.kind === 'side') {
       const sideIndex = this.step - 1;
       title.textContent = `From ${SIDE_NAMES[current.side]} (${sideIndex} of 4)`;
