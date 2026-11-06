@@ -123,8 +123,14 @@ describe('calibrating step by step', () => {
       const slanted = seen(cameraOver('bottom', 30, 480), camera);
       wizard.observe(slanted, camera, 640, 640);
       expect(next()!.disabled).toBe(true);
+      // A tap lands on the button it started on: new pictures change it in place, never swap it.
+      const button = next()!;
+      const card = root.querySelector('.ar-wizard')!;
       now += ABOVE_PATIENCE_MS + 10;
       wizard.observe(slanted, camera, 640, 640);
+      wizard.observe(seen(cameraOver('bottom', 31, 470), camera), camera, 640, 640);
+      expect(next()).toBe(button);
+      expect(root.querySelector('.ar-wizard')).toBe(card);
       expect(next()!.textContent).toBe('Next anyway');
       expect(next()!.disabled).toBe(false);
       press(root, 'Next anyway');

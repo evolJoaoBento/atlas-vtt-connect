@@ -130,6 +130,31 @@ export function sideChecks(side: Side, view: PageView | null, still: boolean): C
   ];
 }
 
+/**
+ * Makes `target` read as `source` (attributes, text and children), keeping `target`'s own nodes, and their listeners,
+ * wherever the two have the same shape; where they do not, `source`'s nodes are taken.
+ */
+export function morph(target: Element, source: Element): void {
+  for (const { name } of [...target.attributes]) if (!source.hasAttribute(name)) target.removeAttribute(name);
+  for (const { name, value } of [...source.attributes]) if (target.getAttribute(name) !== value) target.setAttribute(name, value);
+  const had = [...target.childNodes];
+  const wanted = [...source.childNodes];
+  if (had.length !== wanted.length || had.some((node, index) => node.nodeName !== wanted[index]!.nodeName)) {
+    target.replaceChildren(...wanted);
+    return;
+  }
+  had.forEach((node, index) => {
+    const other = wanted[index]!;
+    if (node.nodeType === TEXT_NODE) {
+      if (node.nodeValue !== other.nodeValue) node.nodeValue = other.nodeValue;
+    } else if (node.nodeType === ELEMENT_NODE) {
+      morph(node as Element, other as Element);
+    }
+  });
+}
+const TEXT_NODE = 3;
+const ELEMENT_NODE = 1;
+
 export interface WizardHost {
   /** The calibration was saved: its field of view (long side of the video, degrees). */
   done(fov: number): void;
@@ -150,6 +175,8 @@ export class CalibrationWizard {
   private capturing = 0;
   /** When the page was first seen in this step (ms): the step from above lets the player on after a while regardless. */
   private seenSince = 0;
+  /** The step (and whether it was capturing) the card was last built for. */
+  private drawn = '';
   /** Pictures counted for each side step, so a side taken again drops its own. */
   private readonly perStep = new Map<number, number>();
   private readonly card: HTMLElement;
@@ -279,7 +306,15 @@ export class CalibrationWizard {
       actions.append(button('Redo', () => { this.calibration.drop(this.calibration.count); this.perStep.clear(); this.go(1); }), button('Save', () => this.host.done(this.estimate()), true, count < 4));
     }
     parts.push(actions);
-    this.card.replaceChildren(...parts);
+    // The same step as last drawn: what changed is put in place, so a button the player is tapping stays the same
+    // button (iOS drops a tap whose button is swapped under the finger, and pictures come a dozen times a second).
+    const shape = `${this.step}|${this.capturing > 0}`;
+    if (shape === this.drawn && this.card.childElementCount === parts.length) {
+      parts.forEach((part, index) => morph(this.card.children[index]!, part));
+    } else {
+      this.card.replaceChildren(...parts);
+      this.drawn = shape;
+    }
   }
 
   private checklist(checks: readonly Check[]): HTMLElement {
