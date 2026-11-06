@@ -81,6 +81,14 @@ export interface PlayerBoardHandle {
   readonly augmentedReality?: true;
   /** Augmented reality: the phone camera's pose over the printed marker sheet for one frame; null: the usual camera. */
   setAugmented?(view: AugmentedView | null): boolean;
+  /** This board draws into a WebXR immersive AR session (room tracking); absent from an older Tabletop. */
+  readonly roomAr?: true;
+  /** Room tracking: draws into the session; `onFrame` hears each XRFrame (and the local reference space) first. */
+  startRoomAr?(session: unknown, onFrame: ((frame: unknown, space: unknown) => void) | null): Promise<boolean>;
+  /** Room tracking: stands the board at a point of the room (`RoomPlace`); null hides it. */
+  placeRoomAr?(place: RoomPlace | null): void;
+  /** Ends room tracking. */
+  stopRoomAr?(): void;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;
@@ -137,6 +145,17 @@ export interface AugmentedView {
   readonly rotation: readonly number[];
   readonly translation: readonly number[];
   readonly frustum: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number };
+  readonly squareMm: number;
+  readonly anchor: string | null;
+  /** The camera's picture the pose was found for, drawn behind the board (absent: the page shows the picture itself). */
+  readonly background?: HTMLCanvasElement;
+}
+
+/** Room tracking: where the board stands, in the room's metres (WebXR's local space, y up); see Tabletop's `RoomPlace`. */
+export interface RoomPlace {
+  readonly position: readonly number[];
+  /** Which way the map's up faces, as a turn about the room's up from its −z (radians). */
+  readonly yaw: number;
   readonly squareMm: number;
   readonly anchor: string | null;
 }

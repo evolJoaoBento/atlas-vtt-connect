@@ -697,5 +697,17 @@ button:disabled { opacity: 0.5; cursor: default; }
 .ar-range input { flex: 1; }
 .ar-settings a { font-size: 14px; color: inherit; }
 .ar-prints { display: flex; flex-direction: column; gap: 4px; }
+.ar-prints-title { font-size: 12px; opacity: 0.75; }
+.ar-progress { width: 100%; }
+.ar-progress[hidden], .ar-debug[hidden] { display: none; }
+.ar-debug { margin: 0; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; opacity: 0.9; }
+.ar-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+/* The board draws the camera's picture itself (each with its own pose): the live video steps back, still playing. */
+.ar-video.is-behind { opacity: 0; }
+/* Room tracking: the session shows the board; the page's canvas would cover it. */
+.board-3d.is-room-ar canvas { visibility: hidden; }
+/* Room tracking's overlay is laid over the camera: see-through but for the page's buttons and panels. */
+.table.is-room-ar-overlay { background: transparent; }
+.ar-panel { max-height: calc(100vh - 160px); overflow-y: auto; }
 /* Following the GM or fitting the map moves the usual camera: in AR the phone is the camera. */
 .table:has(.board-3d.is-ar) .view-buttons { display: none; }

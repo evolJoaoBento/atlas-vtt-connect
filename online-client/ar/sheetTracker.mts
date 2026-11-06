@@ -52,7 +52,9 @@ export function poseFrom(markers: readonly Detected[], layout: CornerLayout, cam
 }
 
 export class SheetTracker {
-  private readonly detector = new AR.Detector({ dictionaryName: DICTIONARY });
+  // At most two of a marker's 36 bits misread (the dictionary would take eleven): with many markers about, a looser
+  // match reads a pattern on the paper, or a mini, as a marker, and the board jumps.
+  private readonly detector = new AR.Detector({ dictionaryName: DICTIONARY, maxHammingDistance: 3 });
 
   /** Our markers (the sheet's and the cards') in `picture`, each with the camera's pose over it alone. */
   detect(picture: PictureData, camera: Intrinsics): Detected[] {
@@ -61,7 +63,7 @@ export class SheetTracker {
     for (const marker of found) {
       const group = markerGroup(marker.id);
       if (!group || marker.corners.length !== 4 || out.some((entry) => entry.id === marker.id)) continue;
-      const seen = marker.corners.map((corner) => ({ x: corner.x, y: corner.y }));
+      const seen = refineCorners(this.detector.grey, marker.corners.map((corner) => ({ x: corner.x, y: corner.y })));
       const pose = sheetPose(group.corners, seen, camera);
       out.push({ id: marker.id, seen, pose: pose && pose.error <= Math.max(3, picture.width * 0.008) ? pose : null });
     }
@@ -72,6 +74,95 @@ export class SheetTracker {
   track(picture: PictureData, camera: Intrinsics): Tracked | null {
     return poseFrom(this.detect(picture, camera), markerCorners, camera, picture.width);
   }
+}
+
+/**
+ * Sharper corners: the detector's corners are where its outline's polygon bends, to the pixel. Each side of the marker
+ * is found along its length instead (the strongest change of light across it, to a fraction of a pixel), a line fitted
+ * through it, and each corner put where two sides' lines meet. A corner that would move far is left as it was. The
+ * corners come back in the camera's terms (a pixel's middle at k + ½), the detector's being in the picture's (at k).
+ */
+export function refineCorners(grey: { width: number; height: number; data: ArrayLike<number> }, corners: readonly Point[]): Point[] {
+  const { width, height, data } = grey;
+  const at = (x: number, y: number): number => {
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    if (x0 < 0 || y0 < 0 || x0 + 1 >= width || y0 + 1 >= height) return NaN;
+    const fx = x - x0;
+    const fy = y - y0;
+    const i = y0 * width + x0;
+    return (data[i]! * (1 - fx) + data[i + 1]! * fx) * (1 - fy) + (data[i + width]! * (1 - fx) + data[i + width + 1]! * fx) * fy;
+  };
+  const lines: Array<{ px: number; py: number; dx: number; dy: number } | null> = [];
+  for (let side = 0; side < 4; side++) {
+    const a = corners[side]!;
+    const b = corners[(side + 1) % 4]!;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 8) { lines.push(null); continue; }
+    const ux = (b.x - a.x) / length;
+    const uy = (b.y - a.y) / length;
+    const nx = -uy;
+    const ny = ux;
+    const reach = Math.max(1, Math.min(3, Math.floor((length / 8) * 0.6 * 2) / 2));
+    const points: Point[] = [];
+    const samples = Math.max(6, Math.min(24, Math.floor(length / 3)));
+    for (let k = 0; k < samples; k++) {
+      // Clear of the corners, where the sides bend into each other.
+      const t = 0.12 + (0.76 * k) / (samples - 1);
+      const cx = a.x + (b.x - a.x) * t;
+      const cy = a.y + (b.y - a.y) * t;
+      // The change of light across the side, half a pixel at a time, a little either way: less than a marker cell, so the
+      // black border's inner edge is not taken for its outer one.
+      let best = 0;
+      let bestAt = NaN;
+      const steps: number[] = [];
+      for (let o = -reach; o <= reach + 1e-9; o += 0.5) steps.push(Math.abs(at(cx + nx * (o + 0.5), cy + ny * (o + 0.5)) - at(cx + nx * (o - 0.5), cy + ny * (o - 0.5))));
+      for (let i = 1; i < steps.length - 1; i++) {
+        if (steps[i]! > best && steps[i]! >= steps[i - 1]! && steps[i]! >= steps[i + 1]!) {
+          // The peak between samples (a parabola through three).
+          const left = steps[i - 1]!;
+          const right = steps[i + 1]!;
+          const bend = left - 2 * steps[i]! + right;
+          best = steps[i]!;
+          bestAt = -reach + i * 0.5 + (bend < 0 ? (0.5 * 0.5 * (left - right)) / bend : 0);
+        }
+      }
+      if (best >= 12 && Number.isFinite(bestAt)) points.push({ x: cx + nx * bestAt, y: cy + ny * bestAt });
+    }
+    lines.push(points.length >= 4 ? fitLine(points) : null);
+  }
+  // The grey picture's pixel k covers k to k + 1: its middle, where its light is, is at k + ½ in the camera's terms.
+  return corners.map((corner, i) => {
+    const before = lines[(i + 3) % 4];
+    const after = lines[i];
+    const meet = before && after ? intersect(before, after) : null;
+    const best = meet && Math.hypot(meet.x - corner.x, meet.y - corner.y) < 3 ? meet : corner;
+    return { x: best.x + 0.5, y: best.y + 0.5 };
+  });
+}
+
+/** The line through points (least squares, either way): a point on it and its direction. */
+function fitLine(points: readonly Point[]): { px: number; py: number; dx: number; dy: number } | null {
+  const n = points.length;
+  const mx = points.reduce((sum, p) => sum + p.x, 0) / n;
+  const my = points.reduce((sum, p) => sum + p.y, 0) / n;
+  let xx = 0;
+  let xy = 0;
+  let yy = 0;
+  for (const p of points) {
+    xx += (p.x - mx) ** 2;
+    xy += (p.x - mx) * (p.y - my);
+    yy += (p.y - my) ** 2;
+  }
+  const angle = 0.5 * Math.atan2(2 * xy, xx - yy);
+  return { px: mx, py: my, dx: Math.cos(angle), dy: Math.sin(angle) };
+}
+
+function intersect(a: { px: number; py: number; dx: number; dy: number }, b: { px: number; py: number; dx: number; dy: number }): Point | null {
+  const det = a.dx * b.dy - a.dy * b.dx;
+  if (Math.abs(det) < 1e-6) return null;
+  const t = ((b.px - a.px) * b.dy - (b.py - a.py) * b.dx) / det;
+  return { x: a.px + a.dx * t, y: a.py + a.dy * t };
 }
 
 type Quaternion = [number, number, number, number];

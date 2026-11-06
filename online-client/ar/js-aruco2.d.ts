@@ -11,6 +11,8 @@ declare module 'js-aruco2' {
     class Detector {
       constructor(config?: { dictionaryName?: string; maxHammingDistance?: number });
       detectImage(width: number, height: number, data: Uint8ClampedArray | Uint8Array): Marker[];
+      /** The last picture searched, in grey (one byte a pixel, row by row). */
+      grey: { width: number; height: number; data: ArrayLike<number> };
     }
     class Dictionary {
       constructor(name: string);

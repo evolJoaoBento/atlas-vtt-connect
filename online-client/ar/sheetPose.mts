@@ -225,20 +225,24 @@ export function sheetPose(sheet: readonly Point[], seen: readonly Point[], camer
   return { rotation: refined.rotation, translation: refined.translation, error: sum / (residual.length / 2) };
 }
 
-/**
- * What the screen shows of a camera picture `width` × `height` made to cover it (CSS `object-fit: cover`), as the
- * tangents of the screen's edges from the camera: what Tabletop's board takes as its frustum.
- */
-export function coverFrustum(camera: Intrinsics, width: number, height: number, screenWidth: number, screenHeight: number): { left: number; right: number; top: number; bottom: number } {
+/** What a screen `screenWidth` × `screenHeight` shows of a picture `width` × `height` made to cover it (CSS `object-fit: cover`). */
+export function coverCrop(width: number, height: number, screenWidth: number, screenHeight: number): { x: number; y: number; width: number; height: number } {
   const scale = Math.max(screenWidth / width, screenHeight / height);
   const shownWidth = screenWidth / scale;
   const shownHeight = screenHeight / scale;
-  const x0 = (width - shownWidth) / 2;
-  const y0 = (height - shownHeight) / 2;
+  return { x: (width - shownWidth) / 2, y: (height - shownHeight) / 2, width: shownWidth, height: shownHeight };
+}
+
+/**
+ * What the screen shows of a camera picture `width` × `height` made to cover it, as the tangents of the screen's edges
+ * from the camera: what Tabletop's board takes as its frustum.
+ */
+export function coverFrustum(camera: Intrinsics, width: number, height: number, screenWidth: number, screenHeight: number): { left: number; right: number; top: number; bottom: number } {
+  const crop = coverCrop(width, height, screenWidth, screenHeight);
   return {
-    left: (x0 - camera.cx) / camera.f,
-    right: (x0 + shownWidth - camera.cx) / camera.f,
-    top: (y0 - camera.cy) / camera.f,
-    bottom: (y0 + shownHeight - camera.cy) / camera.f,
+    left: (crop.x - camera.cx) / camera.f,
+    right: (crop.x + crop.width - camera.cx) / camera.f,
+    top: (crop.y - camera.cy) / camera.f,
+    bottom: (crop.y + crop.height - camera.cy) / camera.f,
   };
 }

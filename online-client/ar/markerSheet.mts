@@ -128,6 +128,8 @@ export const cardNumber = (id: number): number => id - FIRST_CARD + 1;
 export function markerGroup(id: number): { group: string; corners: Array<{ x: number; y: number }> } | null {
   const onSheet = markerCorners(id);
   if (onSheet) return { group: 'sheet', corners: onSheet };
+  const onMat = matCorners(id);
+  if (onMat) return onMat;
   if (!isCard(id)) return null;
   const half = CARD_MM / 2;
   return { group: `card-${id}`, corners: [{ x: -half, y: -half }, { x: half, y: -half }, { x: half, y: half }, { x: -half, y: half }] };
@@ -165,6 +167,67 @@ export function markerCardsSvg(page: number): string {
   for (let r = 0; r <= rows; r++) parts.push(`<line x1="0" y1="${mm(top + r * cellHeight)}" x2="${SHEET_WIDTH_MM}" y2="${mm(top + r * cellHeight)}" ${dash}/>`);
   const first = FIRST_CARD + page * CARDS_PER_PAGE;
   parts.push(`<text x="${SHEET_WIDTH_MM / 2}" y="9" font-family="sans-serif" font-size="3.6" text-anchor="middle" fill="#444">Atlas VTT AR cards ${cardNumber(first)}–${cardNumber(first + CARDS_PER_PAGE - 1)} · print at 100%: each black square ${CARD_MM} mm · cut out, lay flat round the map</text>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_WIDTH_MM}mm" height="${SHEET_HEIGHT_MM}mm" viewBox="0 0 ${SHEET_WIDTH_MM} ${SHEET_HEIGHT_MM}">`
+    + `<rect width="${SHEET_WIDTH_MM}" height="${SHEET_HEIGHT_MM}" fill="#fff"/>${parts.join('')}</svg>`;
+}
+
+// ── Mat pages ─────────────────────────────────────────────────────────────────
+// A4 pages tiled with small markers, laid edge to edge under and round the map: each page is one thing (its markers
+// fixed on it), placed from the pages beside it. Close in, a few small markers are always whole in the picture; from
+// arm's length they are still big enough to read.
+
+/** The width of a mat marker's black square. */
+export const MAT_MM = 30;
+/** From one mat marker's middle to the next's. */
+export const MAT_PITCH_MM = 45;
+const MAT_COLUMNS = 4;
+const MAT_ROWS = 6;
+export const MATS_PER_PAGE = MAT_COLUMNS * MAT_ROWS;
+/** The first mat marker's id. */
+export const FIRST_MAT = 40;
+/** Mat pages offered. */
+export const MAT_PAGES = 6;
+
+/** A mat marker's page (from 0) and its middle on that page (from the page's middle); null for an id of no mat. */
+function matSpot(id: number): { page: number; x: number; y: number } | null {
+  if (!Number.isInteger(id) || id < FIRST_MAT || id >= FIRST_MAT + MATS_PER_PAGE * MAT_PAGES) return null;
+  const index = id - FIRST_MAT;
+  const page = Math.floor(index / MATS_PER_PAGE);
+  const cell = index % MATS_PER_PAGE;
+  const column = cell % MAT_COLUMNS;
+  const row = Math.floor(cell / MAT_COLUMNS);
+  return { page, x: (column - (MAT_COLUMNS - 1) / 2) * MAT_PITCH_MM, y: (row - (MAT_ROWS - 1) / 2) * MAT_PITCH_MM };
+}
+
+/** A mat marker's page and corners on it (the page's middle the origin); null for an id of no mat. */
+export function matCorners(id: number): { group: string; corners: Array<{ x: number; y: number }> } | null {
+  const spot = matSpot(id);
+  if (!spot) return null;
+  const half = MAT_MM / 2;
+  return {
+    group: `mat-${spot.page}`,
+    corners: [{ x: spot.x - half, y: spot.y - half }, { x: spot.x + half, y: spot.y - half }, { x: spot.x + half, y: spot.y + half }, { x: spot.x - half, y: spot.y + half }],
+  };
+}
+
+/** A mat page to print (A4), `page` from 0. */
+export function markerMatSvg(page: number): string {
+  const parts: string[] = [];
+  for (let cell = 0; cell < MATS_PER_PAGE; cell++) {
+    const id = FIRST_MAT + page * MATS_PER_PAGE + cell;
+    const spot = matSpot(id)!;
+    const { size, white } = markerCells(id);
+    const unit = MAT_MM / size;
+    const x0 = SHEET_WIDTH_MM / 2 + spot.x - MAT_MM / 2;
+    const y0 = SHEET_HEIGHT_MM / 2 + spot.y - MAT_MM / 2;
+    parts.push(`<rect x="${mm(x0)}" y="${mm(y0)}" width="${MAT_MM}" height="${MAT_MM}" fill="#000"/>`);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (white[y * size + x]) parts.push(`<rect x="${mm(x0 + x * unit)}" y="${mm(y0 + y * unit)}" width="${mm(unit + 0.02)}" height="${mm(unit + 0.02)}" fill="#fff"/>`);
+      }
+    }
+  }
+  parts.push(`<text x="${SHEET_WIDTH_MM / 2}" y="7" font-family="sans-serif" font-size="3.4" text-anchor="middle" fill="#666">▲ TOP · Atlas VTT AR mat ${page + 1} · print at 100%: each black square ${MAT_MM} mm · lay pages flat, edge to edge</text>`);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SHEET_WIDTH_MM}mm" height="${SHEET_HEIGHT_MM}mm" viewBox="0 0 ${SHEET_WIDTH_MM} ${SHEET_HEIGHT_MM}">`
     + `<rect width="${SHEET_WIDTH_MM}" height="${SHEET_HEIGHT_MM}" fill="#fff"/>${parts.join('')}</svg>`;
 }

@@ -24,6 +24,7 @@ import type { MeasureChoice } from '../src/app/online/view/tools/MeasureTool';
 import type { PlayerTool } from '../src/app/online/view/tools/PlayerTools';
 import type { ToolState } from './mapView.mts';
 import type { ArMode } from './ar/arMode.mts';
+import { readArSettings } from './ar/arPrefs.mts';
 
 export interface SceneSwitchOptions {
   /** The 2D map, made anew each time it shows. */
@@ -46,7 +47,7 @@ export interface SceneSwitchOptions {
   /** A token's name, for the Eyes menu. */
   tokenName(tokenId: string): string;
   /** Augmented reality: its button, the panel it fills, and the video the camera's picture plays in. */
-  ar?: { button: HTMLButtonElement; panel: HTMLElement; video: HTMLVideoElement };
+  ar?: { button: HTMLButtonElement; panel: HTMLElement; video: HTMLVideoElement; overlay?: HTMLElement };
   onError?(message: string, error: unknown): void;
 }
 
@@ -74,6 +75,9 @@ export class SceneSwitch implements SceneViewport {
   private readonly stops: Array<() => void> = [];
   private ar: ArMode | null = null;
   private arStarting = false;
+  /** Whether this phone tracks the room in the browser (WebXR immersive AR: Android's ARCore); asked once, before any tap. */
+  private roomSupported = false;
+  private roomAsked = false;
 
   constructor(private readonly options: SceneSwitchOptions) {
     this.view = options.makeMap();
@@ -202,6 +206,7 @@ export class SceneSwitch implements SceneViewport {
     const { eyeButton, eyeMenu } = this.options;
     const inAr = this.ar?.active === true;
     const ar = this.options.ar;
+    if (ar && this.board?.augmentedReality === true && !this.roomAsked) this.askRoom();
     if (ar) {
       ar.button.hidden = this.board?.augmentedReality !== true;
       ar.button.textContent = inAr ? 'Leave AR' : 'AR';
@@ -219,12 +224,29 @@ export class SceneSwitch implements SceneViewport {
    * AR: the board over the phone's back camera. The camera is asked for at once, inside the tap (iOS wants it so); the
    * code that tracks the sheet loads meanwhile.
    */
+  /** Asks the browser, ahead of any tap, whether it tracks the room: the tap itself must ask for the session at once. */
+  private askRoom(): void {
+    this.roomAsked = true;
+    const xr = (navigator as Navigator & { xr?: { isSessionSupported?: (mode: string) => Promise<boolean> } }).xr;
+    xr?.isSessionSupported?.('immersive-ar').then((supported) => { this.roomSupported = supported === true; }, () => undefined);
+  }
+
   private arClicked(): void {
     const ar = this.options.ar;
     if (!ar) return;
     if (this.ar?.active) { this.ar.end(); return; }
     const board = this.board;
     if (!board?.augmentedReality || this.arStarting) return;
+    const roomCapable = this.roomSupported && board.roomAr;
+    if (roomCapable && readArSettings().tracking === 'room') {
+      // Room tracking: the session asked for inside the tap; ARCore has the camera (no getUserMedia here).
+      const xr = (navigator as Navigator & { xr?: { requestSession: (mode: string, init: unknown) => Promise<unknown> } }).xr!;
+      const overlay = ar.overlay;
+      const session = xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], ...(overlay ? { domOverlay: { root: overlay } } : {}) });
+      session.catch(() => undefined);
+      this.loadAr(board, { stream: null, session, roomCapable: true }, () => { session.then((s) => (s as { end(): Promise<void> }).end(), () => undefined).catch(() => undefined); });
+      return;
+    }
     // The gyroscope steadies the board: iOS asks for it, from inside the tap, before anything is awaited.
     const sensor = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
     const motion = typeof sensor?.requestPermission === 'function'
@@ -235,18 +257,26 @@ export class SceneSwitch implements SceneViewport {
       ? media.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
       : Promise.reject(new Error('This browser gives the page no camera.'));
     stream.catch(() => undefined);
+    const release = (): void => { stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined); };
+    this.loadAr(board, { stream, motion, roomCapable }, release);
+  }
+
+  /** Loads the AR code (a chunk of its own) and starts it; `release` lets go of what the tap asked for if it cannot. */
+  private loadAr(board: BoardSceneView, start: Pick<import('./ar/arMode.mts').ArModeOptions, 'stream' | 'motion' | 'session' | 'roomCapable'>, release: () => void): void {
+    const ar = this.options.ar;
+    if (!ar) return;
     this.arStarting = true;
     import('./ar/arMode.mts').then(({ ArMode }) => {
-      if (this.disposed || this.board !== board) { stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined); return; }
+      if (this.disposed || this.board !== board) { release(); return; }
       this.ar = new ArMode({
-        stream, motion, video: ar.video, boardEl: this.options.boardEl, panel: ar.panel,
+        ...start, video: ar.video, boardEl: this.options.boardEl, panel: ar.panel, ...(ar.overlay ? { overlay: ar.overlay } : {}),
         board: () => this.board,
         tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
         onEnd: () => { this.ar = null; this.showEyes(); },
       });
       this.showEyes();
     }, (error: unknown) => {
-      stream.then((s) => { for (const track of s.getTracks()) track.stop(); }, () => undefined);
+      release();
       this.options.onError?.('Augmented reality could not load.', error);
     }).finally(() => { this.arStarting = false; });
   }

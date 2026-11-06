@@ -142,7 +142,9 @@ async function main(): Promise<void> {
   /** A phone camera filming the marker sheet from straight above, a little turned: a canvas's stream. */
   const fakeCamera = async (): Promise<void> => {
     // Small squares: the whole map stands on the sheet, the camera's picture round it.
-    localStorage.setItem('atlas-connect-ar', JSON.stringify({ squareMm: 10, fov: 65, anchor: null }));
+    localStorage.setItem('atlas-connect-ar', JSON.stringify({ squareMm: 10, fov: 65, anchor: null, tracking: 'markers', debug: true }));
+    // Calibrated before (a flat picture of the sheet cannot calibrate): this test camera's field of view, kept.
+    localStorage.setItem('atlas-connect-ar-cameras', JSON.stringify({ 'Test camera|1280x720': 65, 'camera|1280x720': 65 }));
     const sheet = new Image();
     sheet.src = URL.createObjectURL(new Blob([markerSheetSvg()], { type: 'image/svg+xml' }));
     await sheet.decode();
@@ -151,6 +153,7 @@ async function main(): Promise<void> {
     const paint = (): void => {
       context.fillStyle = '#7a7466';
       context.fillRect(0, 0, film.width, film.height);
+      if ((window as unknown as { sheetHidden?: boolean }).sheetHidden) return;
       context.save();
       context.translate(film.width / 2, film.height / 2);
       context.rotate(0.12);
@@ -168,7 +171,11 @@ async function main(): Promise<void> {
     }, 16);
     const capture = (film as HTMLCanvasElement & { captureStream?(rate: number): MediaStream }).captureStream;
     let stream: MediaStream;
-    if (typeof capture === 'function') stream = capture.call(film, 30);
+    if (typeof capture === 'function') {
+      stream = capture.call(film, 30);
+      // A canvas stream's track has a made-up name: this one is called as the kept calibration has it.
+      for (const track of stream.getVideoTracks()) Object.defineProperty(track, 'label', { configurable: true, get: () => 'Test camera' });
+    }
     else {
       // WebKit here has no canvas stream: the video plays nothing, and its picture is the film's.
       stream = { getTracks: () => [], getVideoTracks: () => [] } as unknown as MediaStream;

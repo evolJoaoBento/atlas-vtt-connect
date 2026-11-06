@@ -101,8 +101,13 @@ const MOVED_MS = 500;
 const MAX_TILT = 20 * DEG;
 /** How fast the drawn place closes on the found one, per second. */
 const PLACE_EASE = 14;
-/** The phone's camera picture shows a moment late: the gyroscope's turn is taken from this long ago, so the board turns with the picture. */
+/**
+ * A camera picture is taken a moment before the page has it: the gyroscope's turn for a picture is read from this long
+ * before it came, unless the browser tells when it was taken.
+ */
 export const CAMERA_LAG_MS = 45;
+/** How far ahead the camera's place is carried on its way between findings (it moves on with the hand), in milliseconds. */
+const CARRY_MS = 150;
 
 interface Sample { time: number; world: Matrix }
 
@@ -116,6 +121,8 @@ export class SensorFusion {
   /** The camera's place in the sheet's frame (millimetres): where it is aimed, and where it is drawn. */
   private place: number[] | null = null;
   private shown: number[] | null = null;
+  /** How fast the camera's place moves (millimetres a millisecond), from finding to finding, steadied. */
+  private velocity = [0, 0, 0];
   private lastFound = -Infinity;
 
   /** A gyroscope reading at `time` (ms): the camera's turn in the world. */
@@ -131,11 +138,25 @@ export class SensorFusion {
     return last !== undefined && now - last.time < 500;
   }
 
-  /** The camera's turn in the world at `time`: the reading nearest it. */
+  /** The camera's turn in the world at `time`: between the readings either side of it. */
   private worldAt(time: number): Matrix | null {
-    let best: Sample | null = null;
-    for (const sample of this.samples) if (!best || Math.abs(sample.time - time) < Math.abs(best.time - time)) best = sample;
-    return best?.world ?? null;
+    const samples = this.samples;
+    if (samples.length === 0) return null;
+    if (time <= samples[0]!.time) return samples[0]!.world;
+    for (let i = 1; i < samples.length; i++) {
+      const after = samples[i]!;
+      if (after.time < time) continue;
+      const before = samples[i - 1]!;
+      const t = after.time === before.time ? 1 : (time - before.time) / (after.time - before.time);
+      return orthonormal(before.world.map((value, k) => value + (after.world[k]! - value) * t));
+    }
+    return samples.at(-1)!.world;
+  }
+
+  /** The camera's turn over the sheet at `time` (picture time), from the gyroscope and the heading kept; null before both. */
+  turnAt(time: number): Matrix | null {
+    const world = this.worldAt(time);
+    return world && this.heading !== null ? mul(transpose(world), flatSheet(this.heading)) : null;
   }
 
   /**
@@ -170,8 +191,11 @@ export class SensorFusion {
     if (!t) return false;
     // The camera in the sheet's frame: −Rᵀt.
     const place = apply(transpose(turn), t).map((value) => -value);
-    if (!this.place || time - this.lastFound > 1500) this.place = place;
+    if (!this.place || time - this.lastFound > 1500) { this.place = place; this.velocity = [0, 0, 0]; }
     else {
+      const gap = Math.max(1, time - this.lastFound);
+      // The hand's speed, steadied over a few findings.
+      this.velocity = this.velocity.map((value, k) => value + ((place[k]! - this.place![k]!) / gap - value) * 0.35);
       // Small differences are a pixel's noise, eased out; bigger ones, the phone moving, taken at once.
       const distance = Math.hypot(...place.map((value, k) => value - this.place![k]!));
       const depth = Math.max(50, Math.hypot(...place));
@@ -187,12 +211,19 @@ export class SensorFusion {
     return this.heading !== null && this.place !== null && now - this.lastFound <= holdMs;
   }
 
-  /** The camera's pose over the sheet to draw at `now`, `dt` seconds after the last: the turn (gyroscope) and place. */
-  pose(now: number, dt: number): { rotation: Matrix; translation: number[] } | null {
+  /**
+   * The camera's pose over the sheet for a picture taken at `time`, `dt` seconds after the last drawn: the turn
+   * (gyroscope, at that moment) and the place (the last found, carried on a little at the hand's speed).
+   */
+  pose(time: number, dt: number): { rotation: Matrix; translation: number[] } | null {
     if (this.heading === null || !this.place) return null;
-    const world = this.worldAt(now - CAMERA_LAG_MS);
+    const world = this.worldAt(time);
     if (!world) return null;
-    const target = this.place;
+    const ahead = Math.max(0, Math.min(CARRY_MS, time - this.lastFound));
+    // A phone at rest still shows a little speed (a finding's noise): under a few centimetres a second it is carried no further.
+    const speed = Math.hypot(...this.velocity);
+    const carry = speed * 1000 > 30 ? ahead : 0;
+    const target = this.place.map((value, k) => value + this.velocity[k]! * carry);
     if (!this.shown) this.shown = [...target];
     else {
       const t = 1 - Math.exp(-PLACE_EASE * Math.max(0, dt));
@@ -209,7 +240,20 @@ export class SensorFusion {
     this.headings = 0;
     this.place = null;
     this.shown = null;
+    this.velocity = [0, 0, 0];
     this.doubtedSince = null;
     this.lastFound = -Infinity;
   }
+}
+
+/** The nearest turn to a nearly-turn matrix (Gram-Schmidt on its columns). */
+function orthonormal(m: readonly number[]): Matrix {
+  const col = (k: number): number[] => [m[k]!, m[3 + k]!, m[6 + k]!];
+  const norm = (v: number[]): number[] => { const n = Math.hypot(v[0]!, v[1]!, v[2]!) || 1; return v.map((x) => x / n); };
+  const x = norm(col(0));
+  const yRaw = col(1);
+  const d = x[0]! * yRaw[0]! + x[1]! * yRaw[1]! + x[2]! * yRaw[2]!;
+  const y = norm(yRaw.map((v, k) => v - d * x[k]!));
+  const z = [x[1]! * y[2]! - x[2]! * y[1]!, x[2]! * y[0]! - x[0]! * y[2]!, x[0]! * y[1]! - x[1]! * y[0]!];
+  return [x[0]!, y[0]!, z[0]!, x[1]!, y[1]!, z[1]!, x[2]!, y[2]!, z[2]!];
 }

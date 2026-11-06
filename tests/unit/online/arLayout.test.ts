@@ -79,6 +79,26 @@ describe('marker cards laid round the map', () => {
     tracked.pose.translation.forEach((value, k) => expect(Math.abs(value - translation[k]!)).toBeLessThan(8));
   });
 
+  it('with the gyroscope turn, learns cards on the table to a couple of millimetres, even from shaky corners', () => {
+    const layout = new MarkerLayout();
+    layout.observe(picture(tilt(-0.5), [0, 0, 500], [FIRST_CARD], 0.2, 0), camera, 640, tilt(-0.5));
+    for (let i = 0; i < 30; i++) {
+      const rotation = mul(spin(0.1 + i * 0.01), tilt(-0.6));
+      layout.observe(picture(rotation, [-90 + i, -20, 520], [FIRST_CARD, FIRST_CARD + 1], 0.6, i), camera, 640, rotation);
+    }
+    for (let i = 0; i < 30; i++) {
+      const rotation = mul(spin(-0.2 + i * 0.01), tilt(-0.5));
+      layout.observe(picture(rotation, [-250 + i, 0, 520], [FIRST_CARD + 1, FIRST_CARD + 2], 0.6, i + 50), camera, 640, rotation);
+    }
+    for (const id of [FIRST_CARD + 1, FIRST_CARD + 2]) {
+      const learnt = layout.corners(id)!;
+      cornersOf(id).forEach((point, k) => {
+        expect(Math.abs(learnt[k]!.x - point.x)).toBeLessThan(2.5);
+        expect(Math.abs(learnt[k]!.y - point.y)).toBeLessThan(2.5);
+      });
+    }
+  });
+
   it('makes the first card seen the origin, and starts over when asked', () => {
     const layout = new MarkerLayout();
     const rotation = tilt(-0.5);

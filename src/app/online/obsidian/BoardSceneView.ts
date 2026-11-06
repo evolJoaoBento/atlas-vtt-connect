@@ -23,7 +23,7 @@ import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool, TemplateChange } from '../view/tools/PlayerTools';
 import { nextTurnOf, turnNotice, turnOf } from '../view/turns';
-import type { AugmentedView, PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest } from './playerBoardContract';
+import type { AugmentedView, PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest, RoomPlace } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 
 export interface BoardSceneViewOptions {
@@ -183,6 +183,26 @@ export class BoardSceneView implements SceneViewport {
   /** Draws the board from the phone camera's pose over the marker sheet (null: the usual camera); false where it cannot. */
   setAugmented(view: AugmentedView | null): boolean {
     return this.augmentedReality && this.board.setAugmented?.(view) === true;
+  }
+
+  /** Whether the board draws into a WebXR immersive AR session (an older Tabletop's does not). */
+  get roomAr(): boolean {
+    return this.board.roomAr === true && typeof this.board.startRoomAr === 'function';
+  }
+
+  /** Room tracking: draws the board into `session`; false where the board cannot. */
+  async startRoomAr(session: unknown, onFrame: ((frame: unknown, space: unknown) => void) | null): Promise<boolean> {
+    return this.roomAr && (await this.board.startRoomAr?.(session, onFrame)) === true;
+  }
+
+  /** Room tracking: stands the board at a point of the room; null hides it. */
+  placeRoomAr(place: RoomPlace | null): void {
+    this.board.placeRoomAr?.(place);
+  }
+
+  /** Ends room tracking. */
+  stopRoomAr(): void {
+    this.board.stopRoomAr?.();
   }
 
   /** Whether the board throws dice (an older Tabletop's has none). */

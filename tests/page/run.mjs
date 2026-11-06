@@ -199,6 +199,9 @@ async function run(engine, label, device) {
   });
   check(tag('in AR the board is drawn from above the sheet, looking down, over the camera'), arView.augmented && arView.down < -0.9 && arView.height > 0 && arView.video, JSON.stringify(arView));
   check(tag('in AR the Eyes button steps aside'), arView.eyes);
+  const synced = await page.evaluate(() => ({ behind: document.getElementById('ar-video').classList.contains('is-behind'), texture: window.pageTest.inner().scene.background?.isTexture === true, debug: document.querySelector('.ar-debug')?.textContent ?? '' }));
+  check(tag('in AR the camera picture is drawn behind the board with its own pose (the live video steps back)'), synced.behind && synced.texture, JSON.stringify(synced));
+  check(tag('in AR the tracking numbers show when asked'), /tracking gyroscope/.test(synced.debug) && /markers \d/.test(synced.debug), synced.debug);
   check(tag('in AR the gyroscope turns the board, the markers place it'), await page.evaluate(() => document.getElementById('board-3d').dataset.arSteadiedBy === 'gyroscope'), await page.evaluate(() => document.getElementById('board-3d').dataset.arSteadiedBy ?? 'none'));
   const clear = await page.evaluate(() => {
     const board = window.pageTest.inner();
@@ -206,10 +209,21 @@ async function run(engine, label, device) {
     const gl = board.renderer.getContext();
     const pixel = new Uint8Array(4);
     gl.readPixels(4, 4, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-    return { background: board.scene.background === null, alpha: board.renderer.getClearAlpha(), corner: pixel[3] };
+    const background = board.scene.background;
+    return { background: background === null || background === board.arTexture, floor: board.surface?.floor?.visible ?? null, alpha: board.renderer.getClearAlpha(), corner: pixel[3], synced: background !== null };
   });
-    check(tag('in AR the board is see-through round the map (no sky, no floor: the camera shows there)'), clear.background && clear.alpha === 0 && clear.corner === 0, JSON.stringify(clear));
+    check(tag('in AR the board is see-through round the map (no sky, no floor: the camera shows there)'), clear.background && clear.floor === false && clear.alpha === 0 && (clear.synced || clear.corner === 0), JSON.stringify(clear));
   await shoot('ar');
+  // Leaning in too close: no marker in sight. The board holds, and the camera picture does not dim.
+  await page.evaluate(() => { window.sheetHidden = true; });
+  await wait(1500);
+  const lost = await page.evaluate(() => {
+    const canvas = document.querySelector('#board-3d canvas');
+    return { opacity: getComputedStyle(canvas).opacity, behind: document.getElementById('ar-video').classList.contains('is-behind'), augmented: window.pageTest.inner().isAugmented };
+  });
+  check(tag('with the markers out of sight the board holds and the camera picture does not dim'), lost.opacity === '1' && lost.behind && lost.augmented, JSON.stringify(lost));
+  await page.evaluate(() => { window.sheetHidden = false; });
+  await wait(800);
   await page.click('#ar-button');
   await wait(300);
   check(tag('Leave AR stops the camera and gives the board its usual camera'), await page.evaluate(() => !window.pageTest.inner().isAugmented && document.getElementById('ar-video').hidden && document.getElementById('ar-panel').hidden && !document.getElementById('board-3d').classList.contains('is-ar')));
