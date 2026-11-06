@@ -17,13 +17,15 @@
       <button id="follow-gm" type="button">Follow GM</button>
       <button id="fit-map" class="secondary" type="button">Fit map</button>
     </div>
-    <div class="board-buttons">
-      <button id="dimension-button" class="secondary" type="button" hidden>3D</button>
-      <button id="eye-button" class="secondary" type="button" aria-haspopup="menu" aria-pressed="false" hidden>Eyes</button>
-      <div id="eye-menu" class="eye-menu" role="menu" aria-label="See through" hidden></div>
-      <button id="ar-button" class="secondary" type="button" aria-pressed="false" hidden>AR</button>
-      <div id="ar-panel" class="ar-panel" hidden></div>
-    </div>
+    <nav class="toolbar" aria-label="Tools">
+      <div id="board-buttons" class="board-buttons toolbar-group">
+        <button id="dimension-button" class="tool-button" type="button" hidden></button>
+        <button id="eye-button" class="tool-button" type="button" aria-haspopup="menu" aria-pressed="false" hidden></button>
+        <div id="eye-menu" class="eye-menu toolbar-menu" role="menu" aria-label="See through" hidden></div>
+        <button id="ar-button" class="tool-button" type="button" aria-haspopup="menu" aria-pressed="false" hidden></button>
+        <div id="ar-panel" class="ar-panel toolbar-menu" role="menu" aria-label="AR settings" hidden></div>
+      </div>
+    </nav>
     <p id="turn-notice" class="turn-notice" role="status" hidden></p>
     <div id="hover-card" class="hover-card" hidden></div>
     <div id="initiative-panel" class="initiative-panel" hidden></div>

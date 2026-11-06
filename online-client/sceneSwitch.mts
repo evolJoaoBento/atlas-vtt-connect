@@ -25,6 +25,16 @@ import type { PlayerTool } from '../src/app/online/view/tools/PlayerTools';
 import type { ToolState } from './mapView.mts';
 import type { ArMode } from './ar/arMode.mts';
 import { readArSettings } from './ar/arPrefs.mts';
+import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
+import { iconElement, setIcon } from './icons.mts';
+
+/** A toolbar button's words (its tooltip and label) and icon. */
+function label(button: HTMLButtonElement, words: string, icon: ToolIconName): void {
+  button.setAttribute('aria-label', words);
+  button.dataset.label = words;
+  if (!button.querySelector('.tool-icon')) button.replaceChildren(iconElement(toolIconUrl(icon)));
+  else setIcon(button, toolIconUrl(icon));
+}
 
 export interface SceneSwitchOptions {
   /** The 2D map, made anew each time it shows. */
@@ -95,6 +105,9 @@ export class SceneSwitch implements SceneViewport {
     listen(options.eyeMenu.ownerDocument, 'pointerdown', (event) => {
       const target = event.target as Node | null;
       if (!options.eyeMenu.hidden && target && !options.eyeMenu.contains(target) && !options.eyeButton.contains(target)) options.eyeMenu.hidden = true;
+      // And the AR menu.
+      const ar = options.ar;
+      if (ar && !ar.panel.hidden && target && !ar.panel.contains(target) && !ar.button.contains(target)) ar.panel.hidden = true;
     });
     this.choose();
   }
@@ -145,8 +158,7 @@ export class SceneSwitch implements SceneViewport {
     const wanted = possible && this.wantsBoard;
     const { dimensionButton, canvas, boardEl } = this.options;
     dimensionButton.hidden = !possible;
-    dimensionButton.textContent = wanted ? '2D' : '3D';
-    dimensionButton.setAttribute('aria-label', wanted ? 'Show the 2D map' : 'Show the 3D board');
+    label(dimensionButton, wanted ? 'Show the 2D map' : 'Show the 3D board', wanted ? 'map' : 'box');
     if (wanted && !this.asked) this.asked = this.options.requestBoard(true);
     if (wanted === (this.board !== null)) { this.showEyes(); return; }
     let next: SceneViewport | null = null;
@@ -209,14 +221,16 @@ export class SceneSwitch implements SceneViewport {
     if (ar && this.board?.augmentedReality === true && !this.roomAsked) this.askRoom();
     if (ar) {
       ar.button.hidden = this.board?.augmentedReality !== true;
-      ar.button.textContent = inAr ? 'Leave AR' : 'AR';
+      label(ar.button, inAr ? 'AR settings' : 'AR: the board on your table', 'scan');
       ar.button.setAttribute('aria-pressed', String(inAr));
+      ar.button.classList.toggle('is-active', inAr);
     }
     const can = this.board?.firstPerson === true && this.controlled.length > 0 && !inAr;
     eyeButton.hidden = !can;
     const seeing = this.board?.seeingFrom() ?? null;
-    eyeButton.textContent = seeing ? 'Leave eyes' : 'Eyes';
+    label(eyeButton, seeing ? 'Leave the token\'s eyes' : 'See through a token\'s eyes', 'eye');
     eyeButton.setAttribute('aria-pressed', String(seeing !== null));
+    eyeButton.classList.toggle('is-active', seeing !== null);
     if (!can) eyeMenu.hidden = true;
   }
 
@@ -234,7 +248,15 @@ export class SceneSwitch implements SceneViewport {
   private arClicked(): void {
     const ar = this.options.ar;
     if (!ar) return;
-    if (this.ar?.active) { this.ar.end(); return; }
+    // While AR is on, its button opens its menu (Leave AR is in there).
+    if (this.ar?.active) { this.ar.toggleMenu(); return; }
+    this.startAr();
+  }
+
+  /** Starts AR with the tracking chosen; inside a tap (the camera, the gyroscope or the room session are asked for at once). */
+  private startAr(): void {
+    const ar = this.options.ar;
+    if (!ar) return;
     const board = this.board;
     if (!board?.augmentedReality || this.arStarting) return;
     const roomCapable = this.roomSupported && board.roomAr;
@@ -273,6 +295,11 @@ export class SceneSwitch implements SceneViewport {
         board: () => this.board,
         tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
         onEnd: () => { this.ar = null; this.showEyes(); },
+        // The other tracking, chosen in the menu: this one ends and the other starts, inside the same tap.
+        onSwitch: () => {
+          this.ar?.end();
+          this.startAr();
+        },
       });
       this.showEyes();
     }, (error: unknown) => {
@@ -295,6 +322,7 @@ export class SceneSwitch implements SceneViewport {
     eyeMenu.replaceChildren(...this.controlled.map((tokenId) => {
       const item = eyeMenu.ownerDocument.createElement('button');
       item.type = 'button';
+      item.className = 'menu-entry';
       item.setAttribute('role', 'menuitem');
       item.textContent = this.options.tokenName(tokenId);
       item.addEventListener('click', () => { eyeMenu.hidden = true; this.seeFrom(tokenId); });

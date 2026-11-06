@@ -70,14 +70,41 @@ export class FovCalibration {
     return Math.min(1, this.fovs.length / CALIBRATION_SAMPLES);
   }
 
+  /** How many pictures counted. */
+  get count(): number {
+    return this.fovs.length;
+  }
+
   /** The field of view (long side, degrees) once enough pictures counted; else null. */
   get fov(): number | null {
-    if (this.fovs.length < CALIBRATION_SAMPLES) return null;
+    return this.fovs.length < CALIBRATION_SAMPLES ? null : this.estimate();
+  }
+
+  /** How far the pictures' fields of view spread about their middle (degrees): small when they agree. */
+  get spread(): number {
+    const middle = this.middle();
+    if (middle.length < 2) return Infinity;
+    const mean = middle.reduce((sum, value) => sum + value, 0) / middle.length;
+    return Math.sqrt(middle.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (middle.length - 1));
+  }
+
+  /** The field of view from the pictures so far (at least four); else null. */
+  estimate(): number | null {
+    const middle = this.middle();
+    return this.fovs.length < 4 ? null : middle.reduce((sum, value) => sum + value, 0) / middle.length;
+  }
+
+  /** Forgets the last `count` pictures (a step taken again). */
+  drop(count: number): void {
+    this.fovs.splice(Math.max(0, this.fovs.length - count), count);
+  }
+
+  /** The middle half of the pictures' fields of view. */
+  private middle(): number[] {
     const sorted = [...this.fovs].sort((a, b) => a - b);
-    // The middle half's mean: steadier than the median alone, deaf to the odd misread.
+    // The middle half: steadier than the median alone, deaf to the odd misread.
     const quarter = Math.floor(sorted.length / 4);
-    const middle = sorted.slice(quarter, sorted.length - quarter);
-    return middle.reduce((sum, value) => sum + value, 0) / middle.length;
+    return sorted.slice(quarter, sorted.length - quarter);
   }
 }
 

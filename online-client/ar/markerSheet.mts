@@ -9,6 +9,8 @@
 import { AR } from 'js-aruco2';
 
 export const DICTIONARY = 'ARUCO_MIP_36h12';
+/** The mark printed on a page's top edge (the calibration's drawing shows it too). */
+export const TOP_MARK = '▲ TOP';
 export const SHEET_WIDTH_MM = 210;
 export const SHEET_HEIGHT_MM = 297;
 /** The width of a marker's black square. */

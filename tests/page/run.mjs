@@ -224,7 +224,26 @@ async function run(engine, label, device) {
   check(tag('with the markers out of sight the board holds and the camera picture does not dim'), lost.opacity === '1' && lost.behind && lost.augmented, JSON.stringify(lost));
   await page.evaluate(() => { window.sheetHidden = false; });
   await wait(800);
+  // The AR button, while AR is on, opens its menu: the settings, Calibrate, Leave AR.
   await page.click('#ar-button');
+  await wait(200);
+  check(tag('while AR is on its button opens the AR menu (in the toolbar)'), await page.evaluate(() => !document.getElementById('ar-panel').hidden && document.getElementById('ar-leave') !== null && document.querySelector('.toolbar #ar-panel') !== null));
+  // Calibration, step by step: a card in the middle; Skip leaves it.
+  await page.evaluate(() => [...document.querySelectorAll('#ar-panel button')].find((b) => /Calibrate the camera/.test(b.textContent)).click());
+  await wait(300);
+  const wizard = await page.evaluate(() => ({ shown: document.querySelector('.ar-wizard') !== null, title: document.querySelector('.ar-wizard__title')?.textContent ?? '', menu: document.getElementById('ar-panel').hidden }));
+  check(tag('Calibrate the camera opens the step-by-step card (the menu closes)'), wizard.shown && /Calibrate the camera/.test(wizard.title) && wizard.menu, JSON.stringify(wizard));
+  await page.evaluate(() => [...document.querySelectorAll('.ar-wizard button')].find((b) => b.textContent === 'Start').click());
+  await wait(500);
+  const above = await page.evaluate(() => ({ title: document.querySelector('.ar-wizard__title')?.textContent ?? '', checks: [...document.querySelectorAll('.ar-wizard__checks li')].map((li) => li.className + ':' + li.textContent) }));
+  check(tag('its first step checks the page from above, live (page in sight, straight, still, sharp)'), above.title === 'From above' && above.checks.length === 4 && /Page in sight/.test(above.checks[0]) && /is-ok:Sharp/.test(above.checks[3]), JSON.stringify(above));
+  await page.evaluate(() => [...document.querySelectorAll('.ar-wizard button')].find((b) => b.textContent === 'Back').click());
+  await page.evaluate(() => [...document.querySelectorAll('.ar-wizard button')].find((b) => b.textContent === 'Skip for now').click());
+  await wait(1500);
+  check(tag('Skip leaves calibrating and places the board again'), await page.evaluate(() => document.querySelector('.ar-wizard') === null && window.pageTest.inner().isAugmented));
+  await page.click('#ar-button');
+  await wait(200);
+  await page.click('#ar-leave');
   await wait(300);
   check(tag('Leave AR stops the camera and gives the board its usual camera'), await page.evaluate(() => !window.pageTest.inner().isAugmented && document.getElementById('ar-video').hidden && document.getElementById('ar-panel').hidden && !document.getElementById('board-3d').classList.contains('is-ar')));
   // 2D again.

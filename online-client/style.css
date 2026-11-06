@@ -672,42 +672,81 @@ button:disabled { opacity: 0.5; cursor: default; }
 #map[hidden] { display: none; }
 .board-3d { grid-row: 1 / -1; grid-column: 1; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; touch-action: none; }
 .board-3d[hidden] { display: none; }
-.board-buttons {
-  position: absolute; z-index: 6; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 56px);
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-}
-.board-buttons button { min-width: 64px; min-height: 40px; }
-.eye-menu { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 10px; background: rgba(20, 20, 24, 0.92); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
-.eye-menu[hidden] { display: none; }
-.eye-menu button { text-align: left; }
+.board-buttons { display: flex; align-items: center; gap: var(--inset); }
+/* In the toolbar: a rule before them, and nothing while none shows (the 2D map). */
+.toolbar-group { position: relative; padding-left: var(--inset); border-left: 1px solid var(--border); }
+.toolbar-group:not(:has(> button:not([hidden]))) { display: none; }
+.toolbar-group .toolbar-menu[hidden] { display: none; }
+.eye-menu { min-width: 160px; }
 /* Augmented reality: the camera's picture under the board, the board see-through round the map. */
 .ar-video { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; object-fit: cover; background: #000; pointer-events: none; }
 .ar-video[hidden] { display: none; }
 .board-3d.is-ar canvas { transition: opacity 0.25s; }
 .board-3d.is-ar-searching canvas { opacity: 0; }
 .board-3d.is-ar-lost canvas { opacity: 0.35; }
-.ar-panel { display: flex; flex-direction: column; gap: 6px; max-width: min(300px, calc(100vw - 24px)); padding: 8px 10px; border-radius: 10px; color: #f2f2f2; background: rgba(20, 20, 24, 0.88); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
-.ar-panel[hidden] { display: none; }
-.ar-status { margin: 0; font-size: 14px; }
-.ar-status[hidden] { display: none; }
-.ar-settings summary { cursor: pointer; font-size: 14px; }
-.ar-settings[open] { display: flex; flex-direction: column; gap: 8px; }
-.ar-field { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+/* AR's menu, above its button: the settings, Leave AR at the bottom. */
+.ar-panel { width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 180px); overflow-y: auto; padding: 8px; gap: 6px; border-radius: var(--panel-radius); }
+.ar-panel .menu-label { font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 8px 0; }
+.ar-panel .menu-hint { padding: 0 8px; }
+.ar-field { display: flex; flex-direction: column; gap: 4px; padding: 0 8px; font-size: 13px; }
+.ar-field select { width: 100%; }
 .ar-range { display: flex; align-items: center; gap: 6px; }
 .ar-range input { flex: 1; }
-.ar-settings a { font-size: 14px; color: inherit; }
-.ar-prints { display: flex; flex-direction: column; gap: 4px; }
-.ar-prints-title { font-size: 12px; opacity: 0.75; }
-.ar-progress { width: 100%; }
-.ar-progress[hidden], .ar-debug[hidden] { display: none; }
-.ar-debug { margin: 0; font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; opacity: 0.9; }
-.ar-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ar-check { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; }
+.ar-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 0 4px; padding: 2px; border-radius: 12px; background: var(--hover); }
+.ar-segmented button { min-height: 32px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font-size: 13px; }
+.ar-segmented button.is-selected { background: var(--card); box-shadow: var(--shadow); font-weight: 600; }
+.ar-prints { padding: 0 8px; font-size: 13px; }
+.ar-prints summary { cursor: pointer; padding: 6px 0; }
+.ar-prints .ar-print { display: block; padding: 4px 0; color: var(--accent); }
+.ar-leave { color: #d9534f; }
+/* What to do now: over the top of the picture, never in the way of taps. */
+.ar-hint {
+  position: absolute; z-index: 7; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 60px); transform: translateX(-50%);
+  width: max-content; max-width: min(420px, calc(100% - 32px)); margin: 0; padding: 10px 14px; border-radius: 14px;
+  background: rgba(20, 20, 24, 0.86); color: #f4f4f6; font-size: 14px; line-height: 1.4; text-align: center; pointer-events: none;
+}
+.ar-hint[hidden] { display: none; }
+/* The tracking numbers, in the top left corner. */
+.ar-debug {
+  position: absolute; z-index: 7; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 120px);
+  margin: 0; padding: 8px 10px; border-radius: 10px; background: rgba(20, 20, 24, 0.8); color: #f4f4f6;
+  font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; max-width: calc(100% - 24px); pointer-events: none;
+}
+.ar-debug[hidden] { display: none; }
+/* Calibrating: a card in the middle, step by step. */
+.ar-wizard {
+  position: absolute; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(380px, calc(100% - 32px)); max-height: calc(100% - 140px); overflow-y: auto;
+  display: grid; gap: 10px; padding: 16px; border-radius: var(--panel-radius);
+  background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); box-shadow: var(--shadow);
+}
+.ar-wizard__dots { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; justify-content: center; }
+.ar-wizard__dots li { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.ar-wizard__dots li.is-done { background: var(--accent); opacity: 0.5; }
+.ar-wizard__dots li.is-current { background: var(--accent); }
+.ar-wizard__title { margin: 0; font-size: 17px; }
+.ar-wizard__text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.ar-wizard__diagram { width: 100%; max-height: 120px; }
+.ar-wizard__page { fill: #fff; stroke: var(--border); stroke-width: 1; }
+.ar-wizard__marker { fill: #222; }
+.ar-wizard__label { font: 600 8px sans-serif; fill: var(--muted); }
+.ar-wizard__phone { fill: var(--accent); }
+.ar-wizard__phone.is-above { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 3 2; }
+.ar-wizard__arrow { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
+.ar-wizard__checks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.ar-wizard__checks li { display: flex; gap: 8px; align-items: baseline; }
+.ar-wizard__checks li::before { content: '○'; color: var(--muted); }
+.ar-wizard__checks li.is-ok::before { content: '✓'; color: #2e9d58; font-weight: 700; }
+.ar-wizard__checks li.is-off { color: var(--muted); }
+.ar-wizard__progress { width: 100%; }
+.ar-wizard__actions { display: flex; justify-content: space-between; gap: 8px; }
+.ar-wizard__actions button { flex: 1; min-height: 40px; }
 /* The board draws the camera's picture itself (each with its own pose): the live video steps back, still playing. */
 .ar-video.is-behind { opacity: 0; }
 /* Room tracking: the session shows the board; the page's canvas would cover it. */
 .board-3d.is-room-ar canvas { visibility: hidden; }
 /* Room tracking's overlay is laid over the camera: see-through but for the page's buttons and panels. */
 .table.is-room-ar-overlay { background: transparent; }
-.ar-panel { max-height: calc(100vh - 160px); overflow-y: auto; }
 /* Following the GM or fitting the map moves the usual camera: in AR the phone is the camera. */
 .table:has(.board-3d.is-ar) .view-buttons { display: none; }

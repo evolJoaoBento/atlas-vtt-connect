@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     loadBoard: () => import('../../online-client/tabletopBoard.mts').then((chunk) => chunk.webPlayerBoard()),
     canvas: el('map'), boardEl: el('board-3d'),
     dimensionButton: el('dimension-button') as HTMLButtonElement, eyeButton: el('eye-button') as HTMLButtonElement, eyeMenu: el('eye-menu'), viewButtons: el('view-buttons'),
-    ar: { button: el('ar-button') as HTMLButtonElement, panel: el('ar-panel'), video: el('ar-video') as HTMLVideoElement },
+    ar: { button: el('ar-button') as HTMLButtonElement, panel: el('ar-panel'), video: el('ar-video') as HTMLVideoElement, overlay: el('table') },
     requestBoard: (on) => { record.requests.push(on); return true; },
     onViewChange: () => undefined,
     tokenName: (id) => (scene.tokens as Record<string, { name?: string }>)[id]?.name ?? 'Token',

@@ -185,6 +185,8 @@ const toolbar = new PageToolbar({
   onLaserSize: (size) => map?.selectLaserSize(size),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
+// The board's own buttons (2D/3D, Eyes, AR) at the toolbar's end.
+toolbar.addGroup(element('board-buttons'));
 let assetsFrame: number | null = null;
 /** The page's images, each with a URL of its bytes too (Tabletop's board loads textures by URL). */
 async function decodeWithUrl(bytes: ArrayBuffer, mime: AssetMime): Promise<DecodedImage | null> {

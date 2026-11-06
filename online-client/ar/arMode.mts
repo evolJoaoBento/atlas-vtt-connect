@@ -18,12 +18,13 @@
  * the field of view (and calibrating again), the printouts, and the tracking's numbers for a look.
  */
 import type { AugmentedView, RoomPlace } from '../../src/app/online/obsidian/playerBoardContract';
-import { readArSettings, saveArSettings, SQUARES_MM, type ArSettings } from './arPrefs.mts';
-import { FovCalibration, keepFov, keptFov } from './calibrate.mts';
+import { readArSettings, saveArSettings, SQUARES_MM, type ArSettings, type Tracking } from './arPrefs.mts';
+import { keepFov, keptFov } from './calibrate.mts';
+import { CalibrationWizard } from './calibrationWizard.mts';
 import { CAMERA_LAG_MS, deviceRotation, SensorFusion } from './fusion.mts';
 import { MarkerLayout } from './markerLayout.mts';
-import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, MAT_MM, MAT_PAGES, markerCardsSvg, markerGroup, markerMatSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
-import { coverCrop, coverFrustum, homography, intrinsicsFor, type Intrinsics, type Point } from './sheetPose.mts';
+import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, MAT_MM, MAT_PAGES, markerCardsSvg, markerMatSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
+import { coverCrop, coverFrustum, intrinsicsFor, type Intrinsics } from './sheetPose.mts';
 import { PoseEaser, PoseSmoother, SheetTracker, type Detected, type Tracked } from './sheetTracker.mts';
 import type { TrackAnswer, TrackRequest } from './trackerWorker.mts';
 
@@ -51,12 +52,15 @@ export interface ArModeOptions {
   overlay?: HTMLElement;
   /** The board's element: the camera's picture covers it. */
   boardEl: HTMLElement;
+  /** The AR button's menu: the settings, opened by the button while AR is on. */
   panel: HTMLElement;
   board(): ArBoard | null;
   /** The player's tokens, to stand one on the first marker (or the placed point). */
   tokens(): Array<{ id: string; name: string }>;
   /** Augmented reality ended (Leave, or the camera or session stopped). */
   onEnd(): void;
+  /** The player chose the other tracking in the menu (a tap: AR starts again with it there and then). */
+  onSwitch?(tracking: Tracking): void;
 }
 
 /** The longest side of the picture searched for markers: big enough to read them at arm's length, small enough to be quick. */
@@ -136,20 +140,20 @@ interface XrSessionLike extends EventTarget {
 }
 interface XrFrameLike {
   getHitTestResults(source: unknown): Array<{ getPose(space: unknown): { transform: { position: { x: number; y: number; z: number } } } | null }>;
-  getViewerPose(space: unknown): { transform: { position: { x: number; y: number; z: number } } } | null;
+  getViewerPose(space: unknown): { transform: { position: { x: number; y: number; z: number } }; emulatedPosition?: boolean } | null;
 }
 
 export class ArMode {
   private settings: ArSettings = readArSettings();
   private ended = false;
   private readonly urls: string[] = [];
-  private status!: HTMLElement;
-  private progress!: HTMLProgressElement;
-  private skip!: HTMLButtonElement;
-  private debugBox!: HTMLPreElement;
+  /** What to do now, over the top of the picture. */
+  private readonly hint: HTMLElement;
+  /** The tracking's numbers, in a corner. */
+  private readonly debugBox: HTMLPreElement;
   private anchorSelect!: HTMLSelectElement;
-  private fovInput!: HTMLInputElement;
-  private fovValue!: HTMLOutputElement;
+  private fovLabel: HTMLElement | null = null;
+  private wizard: CalibrationWizard | null = null;
   private readonly doc: Document;
 
   // ── Printed markers ──
@@ -159,7 +163,6 @@ export class ArMode {
   private readonly easer = new PoseEaser();
   private readonly fusion = new SensorFusion();
   private readonly layout = new MarkerLayout();
-  private calibration: FovCalibration | null = null;
   private phase: Phase = 'starting';
   private fov: number;
   private cameraKey = '';
@@ -186,6 +189,11 @@ export class ArMode {
     this.frame = this.doc.createElement('canvas');
     this.grab = this.doc.createElement('canvas');
     this.fov = this.settings.fov;
+    const overlay = this.overlay();
+    this.hint = Object.assign(this.doc.createElement('p'), { className: 'ar-hint', hidden: true });
+    this.hint.setAttribute('role', 'status');
+    this.debugBox = Object.assign(this.doc.createElement('pre'), { className: 'ar-debug', hidden: !this.settings.debug });
+    overlay.append(this.hint, this.debugBox);
     const room = options.session ?? null;
     this.buildPanel(room !== null);
     if (room) {
@@ -409,54 +417,33 @@ export class ArMode {
 
   private startCalibrating(): void {
     this.phase = 'calibrating';
-    this.calibration = new FovCalibration();
+    this.closeMenu();
     this.options.boardEl.classList.add('is-ar-searching');
-    this.progress.value = 0;
-    this.progress.hidden = false;
-    this.skip.hidden = false;
-    this.say('Calibrating the camera, once: lay a mat page (or the A4 sheet) flat. Hold the phone about 40 cm away and look at the page from each side in turn, slowly, tilted well over (30–60°).');
-    this.refreshPanel();
+    this.say('');
+    this.wizard?.dispose();
+    this.wizard = new CalibrationWizard(this.overlay(), {
+      done: (fov) => {
+        keepFov(this.cameraKey, fov);
+        this.setFov(fov, false);
+        this.startPlacing(`Camera calibrated: ${fov.toFixed(1)}°.`);
+      },
+      skip: () => this.startPlacing(`Calibration skipped (field of view ${Math.round(this.fov)}°).`),
+      currentFov: () => this.fov,
+    });
   }
 
   private calibrate(markers: readonly Detected[], camera: Intrinsics, g: Geometry): void {
-    const calibration = this.calibration;
-    if (!calibration) return;
-    // Pages whose markers are fixed on them, two or more in sight: a homography from them.
-    const groups = new Map<string, { local: Point[]; seen: Point[] }>();
-    for (const marker of markers) {
-      const group = markerGroup(marker.id);
-      if (!group || group.group.startsWith('card-')) continue;
-      const entry = groups.get(group.group) ?? { local: [], seen: [] };
-      entry.local.push(...group.corners);
-      entry.seen.push(...marker.seen);
-      groups.set(group.group, entry);
-    }
     const long = Math.max(g.videoWidth, g.videoHeight) * g.frameScale * g.searchScale;
-    for (const { local, seen } of groups.values()) {
-      if (local.length < 8) continue;
-      const h = homography(local, seen);
-      if (h) calibration.add(h, camera.cx, camera.cy, long);
-    }
-    this.progress.value = calibration.progress;
-    if (markers.length === 0) this.say('Calibrating: point the camera at a mat page or the A4 sheet.');
-    else if (groups.size === 0) this.say('Calibrating: a mat page or the A4 sheet is needed for this (cards are too small).');
-    else this.say('Calibrating: keep looking at the page from each side, tilted well over (30–60°), slowly.');
-    const fov = calibration.fov;
-    if (fov !== null) {
-      keepFov(this.cameraKey, fov);
-      this.setFov(fov, false);
-      this.startPlacing(`Camera calibrated: ${Math.round(fov)}°.`);
-    }
+    this.wizard?.observe(markers, camera, long, g.searchWidth);
   }
 
   private startPlacing(before: string): void {
-    this.calibration = null;
-    this.progress.hidden = true;
-    this.skip.hidden = true;
+    this.wizard?.dispose();
+    this.wizard = null;
     this.phase = 'placing';
     this.resetPlaces();
     this.say(`${before} Now point the camera at the mat, card or sheet the map's middle should stand on.`);
-    this.refreshPanel();
+    this.showFov();
   }
 
   /** Forgets where the markers lie and where the camera was (a new field of view, or placing again). */
@@ -473,10 +460,7 @@ export class ArMode {
   private setFov(fov: number, keep: boolean): void {
     const changed = Math.abs(fov - this.fov) > 1e-6;
     this.fov = fov;
-    if (this.fovInput) {
-      this.fovInput.value = String(Math.round(fov));
-      this.fovValue.textContent = `${Math.round(fov)}°`;
-    }
+    this.showFov();
     if (keep && this.cameraKey) keepFov(this.cameraKey, fov);
     // Places found with another field of view are off: found again.
     if (changed && this.phase === 'tracking') {
@@ -496,7 +480,7 @@ export class ArMode {
       stats.searches = 0;
       stats.since = now;
     }
-    if (this.settings.debug) {
+    if (this.settings.debug && !this.debugBox.hidden) {
       const place = stats.place.map((v) => Math.round(v)).join(', ');
       this.debugBox.textContent = [
         `tracking ${stats.mode} · ${this.phase}`,
@@ -547,7 +531,6 @@ export class ArMode {
       if (!this.placed && this.preview) {
         this.placed = true;
         this.say('');
-        this.refreshPanel();
       }
     });
     this.options.boardEl.classList.add('is-room-ar');
@@ -579,7 +562,27 @@ export class ArMode {
     }
     const at = this.preview;
     board.placeRoomAr(at ? { position: at.position, yaw: at.yaw, squareMm: this.settings.squareMm, anchor: this.anchor() } : null);
+    if (this.placed && at) this.roomHint(frame.getViewerPose(space), at.position[1]!);
   }
+
+  /**
+   * Room tracking close in: the phone tracks the room by what its camera sees, and a hand's breadth over a plain table it
+   * sees too little; it says so (its position only guessed), and the player is told why the board slips.
+   */
+  private roomHint(viewer: { transform: { position: { y: number } }; emulatedPosition?: boolean } | null, table: number): void {
+    const now = performance.now();
+    if (now - this.roomHintAt < 300) return;
+    this.roomHintAt = now;
+    const height = viewer ? viewer.transform.position.y - table : null;
+    const words = !viewer || viewer.emulatedPosition
+      ? 'The phone lost track of the room: move back a little so it sees more of the table (printed markers track closer in).'
+      : height !== null && height < 0.15
+        ? 'Very close: the phone may lose track. A mat page under the map helps it see the table.'
+        : '';
+    if (words !== this.hint.textContent) this.say(words);
+  }
+
+  private roomHintAt = 0;
 
   private showRoomStats(): void {
     if (!this.settings.debug) return;
@@ -597,11 +600,34 @@ export class ArMode {
   // ── The panel ───────────────────────────────────────────────────────────────
 
   private say(words: string): void {
-    this.status.textContent = words;
-    this.status.hidden = words === '';
+    this.hint.textContent = words;
+    this.hint.hidden = words === '';
+  }
+
+  /** Where the hint, the calibration card and the numbers go: the scene, over the picture. */
+  private overlay(): HTMLElement {
+    return this.options.overlay ?? this.options.boardEl.parentElement ?? this.options.boardEl;
   }
 
   private room = false;
+
+  /** Opens or closes the AR menu (the AR button, while AR is on). */
+  toggleMenu(): void {
+    this.options.panel.hidden = !this.options.panel.hidden;
+  }
+
+  private closeMenu(): void {
+    this.options.panel.hidden = true;
+  }
+
+  /** Whether the AR menu is open. */
+  get menuOpen(): boolean {
+    return !this.options.panel.hidden;
+  }
+
+  private showFov(): void {
+    if (this.fovLabel) this.fovLabel.textContent = `Camera: ${this.fov.toFixed(1)}° field of view${this.cameraKey && keptFov(this.cameraKey) !== null ? ', calibrated' : ''}`;
+  }
 
   private buildPanel(room: boolean): void {
     this.room = room;
@@ -612,90 +638,78 @@ export class ArMode {
       wrap.append(make('span', { textContent: label }), control);
       return wrap;
     };
-    const button = (words: string, act: () => void): HTMLButtonElement => {
-      const element = make('button', { type: 'button', className: 'secondary', textContent: words });
+    const button = (words: string, act: () => void, className = 'menu-entry'): HTMLButtonElement => {
+      const element = make('button', { type: 'button', className, textContent: words });
+      element.setAttribute('role', 'menuitem');
       element.addEventListener('click', act);
       return element;
     };
-
-    this.status = make('p', { className: 'ar-status' });
-    this.status.setAttribute('role', 'status');
-    this.progress = make('progress', { className: 'ar-progress', max: 1, value: 0, hidden: true });
-    this.progress.setAttribute('aria-label', 'Calibration');
-    this.skip = button('Skip calibrating', () => this.startPlacing(`Calibration skipped (field of view ${Math.round(this.fov)}°).`));
-    this.skip.hidden = true;
-    this.debugBox = make('pre', { className: 'ar-debug', hidden: !this.settings.debug });
+    const heading = (words: string): HTMLElement => make('div', { className: 'menu-label', textContent: words });
 
     const square = make('select');
     for (const size of SQUARES_MM) square.append(make('option', { value: String(size), textContent: `${size} mm`, selected: size === this.settings.squareMm }));
     square.addEventListener('change', () => this.change({ squareMm: Number(square.value) }));
-
     this.anchorSelect = make('select');
     this.anchorSelect.addEventListener('change', () => this.change({ anchor: this.anchorSelect.value === '' ? null : this.anchorSelect.value }));
     this.fillAnchors();
 
-    const settings = make('details', { className: 'ar-settings' });
-    const summary = make('summary', { textContent: 'AR settings' });
+    const parts: HTMLElement[] = [];
+    if (this.options.roomCapable) {
+      // Markers or the room: a tap here starts AR again with the other there and then.
+      const tracking = make('div', { className: 'ar-segmented' });
+      tracking.setAttribute('role', 'radiogroup');
+      tracking.setAttribute('aria-label', 'Tracking');
+      for (const [value, words] of [['markers', 'Printed markers'], ['room', 'Room (no printouts)']] as const) {
+        const option = make('button', { type: 'button', textContent: words, className: room === (value === 'room') ? 'is-selected' : '' });
+        option.setAttribute('role', 'radio');
+        option.setAttribute('aria-checked', String(room === (value === 'room')));
+        option.addEventListener('click', () => {
+          if (room === (value === 'room')) return;
+          this.change({ tracking: value });
+          this.options.onSwitch?.(value);
+        });
+        tracking.append(option);
+      }
+      parts.push(heading('Tracking'), tracking);
+    }
+    parts.push(heading('Board'), field('A square on the table', square), field(room ? 'On the point' : 'On the first marker seen', this.anchorSelect));
     if (room) {
-      const move = button('Move the board', () => { this.placed = false; this.say('Point at the table, then tap to put the board down.'); });
-      const markers = button('Use printed markers instead', () => { this.change({ tracking: 'markers' }); this.end(); });
-      settings.append(summary, field('A square on the table', square), field('On the point', this.anchorSelect), move, markers, this.debugSwitch(make));
+      parts.push(button('Move the board', () => { this.placed = false; this.closeMenu(); this.say('Point at the table, then tap to put the board down.'); }));
     } else {
-      this.fovInput = make('input', { type: 'range', min: '35', max: '110', step: '1', value: String(Math.round(this.fov)) });
-      this.fovInput.setAttribute('aria-label', 'Camera field of view');
-      this.fovValue = make('output', { textContent: `${Math.round(this.fov)}°` });
-      this.fovInput.addEventListener('input', () => { this.fovValue.textContent = `${this.fovInput.value}°`; this.setFov(Number(this.fovInput.value), true); });
-      const fovRow = make('span', { className: 'ar-range' });
-      fovRow.append(this.fovInput, this.fovValue);
-
+      this.fovLabel = make('div', { className: 'menu-hint' });
+      this.showFov();
+      parts.push(
+        heading('Camera'),
+        this.fovLabel,
+        button('Calibrate the camera…', () => this.startCalibrating()),
+        button('Place again', () => { this.closeMenu(); this.startPlacing('Placing again.'); }),
+      );
       const link = (svg: string, file: string, words: string, label: string): HTMLAnchorElement => {
         const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
         this.urls.push(url);
-        const anchor = make('a', { href: url, download: file, target: '_blank', rel: 'noopener', textContent: words });
+        const anchor = make('a', { href: url, download: file, target: '_blank', rel: 'noopener', textContent: words, className: 'ar-print' });
         anchor.setAttribute('aria-label', label);
         return anchor;
       };
-      const prints = make('div', { className: 'ar-prints' });
-      for (let page = 0; page < MAT_PAGES; page++) {
-        prints.append(link(markerMatSvg(page), `atlas-ar-mat-${page + 1}.svg`, `Mat page ${page + 1}`, `Mat page ${page + 1} to print on A4 at 100%: each black square is ${MAT_MM} mm`));
-      }
-      prints.append(link(markerSheetSvg(), 'atlas-ar-marker-sheet.svg', 'Marker sheet (A4)', `Marker sheet to print on A4 at 100%: each black square is ${MARKER_MM} mm`));
+      const prints = make('details', { className: 'ar-prints' });
+      prints.append(make('summary', { textContent: 'Print markers (A4, at 100%)' }));
+      for (let page = 0; page < MAT_PAGES; page++) prints.append(link(markerMatSvg(page), `atlas-ar-mat-${page + 1}.svg`, `Mat page ${page + 1}`, `Mat page ${page + 1} to print on A4 at 100%: each black square is ${MAT_MM} mm`));
+      prints.append(link(markerSheetSvg(), 'atlas-ar-marker-sheet.svg', 'Marker sheet', `Marker sheet to print on A4 at 100%: each black square is ${MARKER_MM} mm`));
       for (let page = 0; page < CARD_PAGES; page++) {
         const first = page * CARDS_PER_PAGE + 1;
         prints.append(link(markerCardsSvg(page), `atlas-ar-cards-${first}-${first + CARDS_PER_PAGE - 1}.svg`, `Marker cards ${first}–${first + CARDS_PER_PAGE - 1}`, `Marker cards to print on A4 at 100% and cut out: each black square is ${CARD_MM} mm`));
       }
-      const debugRow = this.debugSwitch(make);
-      settings.append(
-        summary,
-        field('A square on the table', square),
-        field('On the first marker seen', this.anchorSelect),
-        field('Camera view', fovRow),
-        button('Calibrate again', () => { keepFov(this.cameraKey, null); this.startCalibrating(); }),
-        button('Place again', () => this.startPlacing('Placing again.')),
-        ...(this.options.roomCapable ? [button('Try room tracking (Android, no printouts)', () => { this.change({ tracking: 'room' }); this.end(); this.say(''); })] : []),
-        debugRow,
-        make('span', { className: 'ar-prints-title', textContent: 'To print (A4, at 100%)' }),
-        prints,
-      );
+      parts.push(prints);
     }
-    panel.replaceChildren(this.status, this.progress, this.skip, settings, this.debugBox);
-    panel.hidden = false;
-  }
-
-  /** The Show tracking numbers switch. */
-  private debugSwitch(make: <K extends keyof HTMLElementTagNameMap>(tag: K, props?: Partial<HTMLElementTagNameMap[K]>) => HTMLElementTagNameMap[K]): HTMLElement {
     const debug = make('input', { type: 'checkbox', checked: this.settings.debug });
     debug.addEventListener('change', () => { this.change({ debug: debug.checked }); this.debugBox.hidden = !debug.checked; });
-    const row = make('label', { className: 'ar-check' });
-    row.append(debug, make('span', { textContent: 'Show tracking numbers' }));
-    return row;
-  }
-
-  /** Keeps the panel's calibration bits in step with the phase. */
-  private refreshPanel(): void {
-    const calibrating = this.phase === 'calibrating' && !this.room;
-    this.progress.hidden = !calibrating;
-    this.skip.hidden = !calibrating;
+    const debugRow = make('label', { className: 'ar-check' });
+    debugRow.append(debug, make('span', { textContent: 'Show tracking numbers' }));
+    const leave = button('Leave AR', () => this.end(), 'menu-entry ar-leave');
+    leave.id = 'ar-leave';
+    parts.push(debugRow, leave);
+    panel.replaceChildren(...parts);
+    panel.hidden = true;
   }
 
   /** The anchor's choices: the map's middle, and the player's tokens. */
@@ -740,6 +754,10 @@ export class ArMode {
     delete boardEl.dataset.arSteadiedBy;
     panel.hidden = true;
     panel.replaceChildren();
+    this.wizard?.dispose();
+    this.wizard = null;
+    this.hint.remove();
+    this.debugBox.remove();
     for (const url of this.urls.splice(0)) URL.revokeObjectURL(url);
     this.options.board()?.setAugmented(null);
     this.options.onEnd();
