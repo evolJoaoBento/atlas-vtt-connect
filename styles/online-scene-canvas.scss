@@ -630,3 +630,6 @@
   &[hidden] { display: none; }
 }
 .atlas-connect-scene__eye.is-active { color: var(--interactive-accent); }
+
+// Through a token's eyes Tabletop's spell toolbar takes the toolbar's place (CanvasScene's showEyes).
+.atlas-connect-scene .toolbar[hidden] { display: none; }

@@ -104,6 +104,8 @@ async function main(): Promise<void> {
   const el = (id: string): HTMLElement => document.getElementById(id)!;
   let board: BoardSceneView | null = null;
   const view = new SceneSwitch({
+    // As the page does: through a token's eyes, the spell toolbar stands in for the page's.
+    onSeeing: (seeing) => { el('toolbar').hidden = seeing; },
     makeMap: quietMap,
     makeBoard: (factory, parent) => {
       board = new BoardSceneView({
@@ -113,6 +115,7 @@ async function main(): Promise<void> {
         model: (id) => (id === GLB ? glb : null),
         sendMove: (tokenId, x, y) => { record.moves.push([tokenId, x, y]); return true; },
         sendLaser: () => true, sendPing: () => true, sendTemplate: () => true,
+        onEyeChange: () => view.eyesChanged(),
         onToolsChange: () => undefined,
         hoverCard: el('hover-card'), statblockPreview: el('statblock-preview'), initiative: el('initiative-panel'), turnNotice: el('turn-notice'),
         handout: { panel: el('handout'), title: el('handout-title'), canvas: el('handout-canvas') as HTMLCanvasElement, status: el('handout-status'), closeButton: el('handout-close') as HTMLButtonElement, openButton: el('handout-button') as HTMLButtonElement },

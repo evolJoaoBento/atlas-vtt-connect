@@ -40,6 +40,8 @@ function label(button: HTMLButtonElement, words: string, icon: ToolIconName): vo
 }
 
 export interface SceneSwitchOptions {
+  /** The board went into a token's eyes or came out: Tabletop's spell toolbar stands in for the page's meanwhile. */
+  onSeeing?(seeing: boolean): void;
   /** The 2D map, made anew each time it shows. */
   makeMap(): SceneViewport;
   /** Tabletop's board, drawing in `boardEl`. */
@@ -244,6 +246,7 @@ export class SceneSwitch implements SceneViewport {
     eyeButton.setAttribute('aria-pressed', String(seeing !== null));
     eyeButton.classList.toggle('is-active', seeing !== null);
     if (!can) eyeMenu.hidden = true;
+    this.options.onSeeing?.(seeing !== null && this.board !== null);
   }
 
   /**

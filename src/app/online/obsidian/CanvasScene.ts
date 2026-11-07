@@ -242,6 +242,8 @@ export class CanvasScene implements OnlineSceneSink {
     this.eyeButton.setAttribute('aria-pressed', String(seeing !== null));
     this.eyeButton.classList.toggle('is-active', seeing !== null);
     if (!can) this.eyeMenu.hidden = true;
+    // Through a token's eyes, Tabletop's spell toolbar takes the place of this one.
+    this.options.dom.toolbar.hidden = seeing !== null;
   }
 
   private eyeClicked(): void {

@@ -178,10 +178,14 @@ async function run(engine, label, device) {
   check(tag('turning the phone a quarter turns the view a quarter'), Math.abs(turn - Math.PI / 2) < 0.25, JSON.stringify({ upright, turned, turn }));
   const tiltedDown = await tilt(90, 45, 0);
   check(tag('tipping the phone forward looks down'), tiltedDown.up < -0.4, JSON.stringify(tiltedDown));
+  check(tag('through the eyes, the spell toolbar stands in for the page toolbar'), await page.evaluate(() => {
+    const bar = document.querySelector('.atlas-tabletop-spellbar');
+    return document.getElementById('toolbar').hidden && !!bar && !bar.hidden && bar.getBoundingClientRect().bottom <= window.innerHeight;
+  }));
   await shoot('eyes');
-  await page.click('#eye-button');
+  await page.click('.atlas-tabletop-spellbar button[aria-label="Leave"]');
   await wait(300);
-  check(tag('Leave eyes goes back to the usual camera'), await page.evaluate(() => document.getElementById('eye-button').getAttribute('aria-pressed') === 'false'));
+  check(tag('Leave (on the spell toolbar) goes back to the usual camera and the page toolbar'), await page.evaluate(() => document.getElementById('eye-button').getAttribute('aria-pressed') === 'false' && !document.getElementById('toolbar').hidden));
   // AR: the camera films the marker sheet; the board stands on it, seen from straight above, see-through round the map.
   check(tag('the AR button shows on the board'), await page.evaluate(() => !document.getElementById('ar-button').hidden));
   await page.evaluate(() => window.pageTest.fakeCamera());

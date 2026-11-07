@@ -97,6 +97,12 @@ const urlOf = (image: (DecodedImage & { url?: string }) | null): string | null =
 // The 2D map, or Tabletop's 3D board while the GM offers it (its code loads with the first offer).
 const map: SceneSwitch | null = surface
   ? new SceneSwitch({
+    // Through a token's eyes, Tabletop's spell toolbar takes the place of the page's.
+    onSeeing: (seeing) => {
+      element('toolbar').hidden = seeing;
+      // Follow GM and Fit map move a camera the eyes do not use.
+      element('view-buttons').style.display = seeing ? 'none' : '';
+    },
     makeMap: () => new MapView(mapOptions()),
     makeBoard: (factory, parent) => new BoardSceneView({
       parent, factory,
