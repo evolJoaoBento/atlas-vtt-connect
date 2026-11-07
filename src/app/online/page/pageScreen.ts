@@ -8,9 +8,13 @@ import type { PlayerSessionState } from '../PlayerSession';
 
 export type PageScreen =
   | { kind: 'form' }
-  /** `loading`: the page is waiting on something (the GM, the connection) and shows a loader beside the text. */
-  | { kind: 'message'; text: string; loading?: true }
-  | { kind: 'table'; title: string; connection: string };
+  /**
+   * `loading`: the page is waiting on something (the GM, the connection) and shows a loader beside the text. `rejoin`:
+   * the connection was lost, and a Reconnect button joins again.
+   */
+  | { kind: 'message'; text: string; loading?: true; rejoin?: true }
+  /** `reconnect`: the connection dropped and is being tried again; a Reconnect button tries at once. */
+  | { kind: 'table'; title: string; connection: string; reconnect?: true };
 
 export const INCOMPLETE_LINK_TEXT = 'This link is incomplete. Ask your GM for the join link again.';
 export const NAME_PROBLEM_TEXT = 'Enter a name of up to 40 characters.';
@@ -26,7 +30,7 @@ const REASONS: Record<string, string> = {
   ended: 'The session ended.',
   replaced: 'You joined from another tab.',
   unreachable: UNREACHABLE_TEXT,
-  'connection-lost': 'Lost the connection to your GM. Reload the page to try again.',
+  'connection-lost': 'Lost the connection to your GM.',
 };
 /** Why a session ended, as the join page says it. Own keys only: a reason from the network such as `constructor` must not reach the prototype. */
 export function sessionReasonText(reason: string | null | undefined, fallback: 'denied' | 'unreachable'): string {
@@ -42,11 +46,14 @@ export function pageScreen(state: PlayerSessionState | null, hasScene: boolean):
     case 'denied':
       return { kind: 'message', text: sessionReasonText(state.reason, 'denied') };
     case 'lost':
-      return { kind: 'message', text: sessionReasonText(state.reason, 'unreachable') };
+      // Lost after being let in: joining again is one tap.
+      return state.reason === 'connection-lost'
+        ? { kind: 'message', text: sessionReasonText(state.reason, 'unreachable'), rejoin: true }
+        : { kind: 'message', text: sessionReasonText(state.reason, 'unreachable') };
     case 'waiting':
       return { kind: 'message', text: 'Waiting for the GM to let you in…', loading: true };
     case 'connecting':
-      return hasScene ? { kind: 'table', title, connection: 'Reconnecting…' } : { kind: 'message', text: 'Connecting…', loading: true };
+      return hasScene ? { kind: 'table', title, connection: 'Reconnecting…', reconnect: true } : { kind: 'message', text: 'Connecting…', loading: true };
     case 'admitted':
       return hasScene
         ? { kind: 'table', title, connection: 'Connected' }

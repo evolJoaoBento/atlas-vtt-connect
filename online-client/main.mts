@@ -53,6 +53,10 @@ const waitingLoader = element<HTMLElement>('loader');
 const table = element<HTMLElement>('table');
 const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
+const reconnectButton = element<HTMLButtonElement>('reconnect-button');
+/** The name to join under again after Reconnect reloaded the page (this tab only). */
+const REJOIN_KEY = 'atlas-vtt-connect:rejoin';
+const rejoinButton = element<HTMLButtonElement>('rejoin-button');
 const playerList = element<HTMLUListElement>('players');
 const widgetList = element<HTMLUListElement>('widgets');
 const canvas = element<HTMLCanvasElement>('map');
@@ -285,6 +289,8 @@ function show(view: PageScreen): void {
   if (view.kind === 'message') status.textContent = view.text;
   // A spinner while the page waits on the GM or the connection, so it does not look stuck.
   waitingLoader.hidden = !(view.kind === 'message' && view.loading === true);
+  rejoinButton.hidden = !(view.kind === 'message' && view.rejoin === true);
+  reconnectButton.hidden = !(view.kind === 'table' && view.reconnect === true);
   if (view.kind === 'table') {
     sessionName.textContent = view.title;
     connection.textContent = view.connection;
@@ -408,7 +414,7 @@ if (!target) {
       onLaser: (laser) => map.receiveLaser(laser),
       onPing: (ping) => map.receivePing(ping),
       onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
-      onSpells: (sceneId, spells) => map.receiveSpells(sceneId, spells),
+      onSpells: (sceneId, spells, asks) => map.receiveSpells(sceneId, spells, asks),
       onSheets: (entries) => {
         sheets.receive(entries);
         map.setSheets(entries);
@@ -426,4 +432,20 @@ if (!target) {
     });
     session.start();
   });
+  // Reconnecting: try again at once, without waiting for the next retry.
+  reconnectButton.addEventListener('click', () => { session?.reconnect(); });
+  // Lost for good: the page starts afresh and joins again under the same name (the GM knows the player by their key).
+  rejoinButton.addEventListener('click', () => {
+    try { sessionStorage.setItem(REJOIN_KEY, normalizePlayerName(nameInput.value) ?? ''); } catch { /* private window */ }
+    location.reload();
+  });
+  let rejoin: string | null = null;
+  try {
+    rejoin = sessionStorage.getItem(REJOIN_KEY);
+    sessionStorage.removeItem(REJOIN_KEY);
+  } catch { /* private window */ }
+  if (rejoin) {
+    nameInput.value = rejoin;
+    form.requestSubmit();
+  }
 }

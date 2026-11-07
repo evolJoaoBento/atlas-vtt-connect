@@ -14,7 +14,7 @@ import type { AdvantageSide, SheetRollRef, TokenSheet } from './tools/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
-import type { MapSpell, SpellChange } from './tools/spells';
+import type { MapSpell, SpellChange, SpellRequest } from './tools/spells';
 import type { TemplateChange } from './view/tools/PlayerTools';
 import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
@@ -84,8 +84,8 @@ export interface PlayerSessionOptions {
   onPing?(ping: PlayerPing): void;
   /** Every lasting template on the scene `sceneId`, whenever they change. */
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
-  /** Every spell on the scene `sceneId`, whenever they change. */
-  onSpells?(sceneId: string, spells: readonly MapSpell[]): void;
+  /** Every spell on the scene `sceneId`, whenever they change, and the spells the GM asks of the player's tokens there. */
+  onSpells?(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[]): void;
   /** The player's own colour, sent on each admission (null: the one their place gives). */
   color?(): string | null;
   /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
@@ -203,7 +203,7 @@ export class PlayerSession {
   sendSpell(change: SpellChange): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'map-spell', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : 'remove' in change ? { remove: change.remove } : { clear: true as const }) }));
+    this.link.send('control', encodeControl({ v: 1, type: 'map-spell', sceneId: scene.sceneId, ...spellParts(change) }));
     return true;
   }
 
@@ -255,6 +255,26 @@ export class PlayerSession {
     this.leaveAssets();
     this.link?.send('control', encodeControl({ v: 1, type: 'bye', reason: 'left' }));
     this.link?.close();
+  }
+
+  /**
+   * The player asks to connect again at once (the page's Reconnect): the link in use, which may look open while carrying
+   * nothing, is let go and a new one made now, without waiting for the next retry. False once the session has ended or
+   * before the player was ever let in.
+   */
+  reconnect(): boolean {
+    if (this.finished || !this.started || !this.wasAdmitted) return false;
+    if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    const old = this.link;
+    this.link = null;
+    if (old && this.assetLink === old) this.leaveAssets();
+    old?.close();
+    this.attempt = 0;
+    this.droppedAt = Date.now();
+    this.update({ status: 'connecting' });
+    void this.connect();
+    return true;
   }
 
   private async connect(): Promise<void> {
@@ -343,7 +363,7 @@ export class PlayerSession {
         this.options.onSheets?.(message.entries);
         break;
       case 'map-spells':
-        this.options.onSpells?.(message.sceneId, message.spells);
+        this.options.onSpells?.(message.sceneId, message.spells, message.asks ?? []);
         break;
       case 'map-templates':
         this.options.onTemplates?.(message.sceneId, message.templates);
@@ -468,4 +488,12 @@ export class PlayerSession {
     this.state = { ...this.state, ...partial };
     this.options.onChange(this.state);
   }
+}
+
+/** A spell change as `map-spell` carries it. */
+function spellParts(change: SpellChange): { add: MapSpell['spell']; request?: string } | { remove: string } | { clear: true } | { decline: string } {
+  if ('add' in change) return { add: change.add, ...(change.request !== undefined ? { request: change.request } : {}) };
+  if ('remove' in change) return { remove: change.remove };
+  if ('decline' in change) return { decline: change.decline };
+  return { clear: true };
 }

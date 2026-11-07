@@ -2,7 +2,7 @@
  * What happens inside one join: the state it keeps, the player session it runs against the GM, and
  * what a scene tab gets when it attaches. `OnlineJoinService` owns the join and calls these.
  */
-import type { MapSpell } from '../tools/spells';
+import type { MapSpell, SpellRequest } from '../tools/spells';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate } from '../tools/templates';
@@ -39,7 +39,7 @@ export interface Joined {
   /** The scene's lasting templates, as the GM last sent them; null before any. */
   templates: { sceneId: string; list: readonly MapTemplate[] } | null;
   /** The scene's spells, cast through tokens' eyes on the 3D board. */
-  spells?: { sceneId: string; list: readonly MapSpell[] };
+  spells?: { sceneId: string; list: readonly MapSpell[]; asks: readonly SpellRequest[] };
   /** Whether the GM can send Tabletop's 3D board, its board of the scene, and its 3D camera. */
   boardOffer?: boolean;
   /** The latest offer took thrown dice (`diceResults`), with the rules of the player's map; absent when it did not. */
@@ -130,10 +130,10 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.templates = { sceneId, list };
       host.sink()?.templates?.(sceneId, list);
     },
-    onSpells: (sceneId, list) => {
+    onSpells: (sceneId, list, asks) => {
       if (!current()) return;
-      joined.spells = { sceneId, list };
-      host.sink()?.spells?.(sceneId, list);
+      joined.spells = { sceneId, list, asks };
+      host.sink()?.spells?.(sceneId, list, asks);
     },
     onSheets: (entries) => {
       if (!current()) return;
@@ -181,7 +181,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.diceLook?.(joined.diceLook),
     () => sink.sheets?.(joined.sheets),
     () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
-    () => { if (joined.spells) sink.spells?.(joined.spells.sceneId, joined.spells.list); },
+    () => { if (joined.spells) sink.spells?.(joined.spells.sceneId, joined.spells.list, joined.spells.asks); },
     () => { if (joined.camera) sink.camera(joined.camera); },
     () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer, joined.boardDice); },
     () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },

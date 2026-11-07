@@ -60,6 +60,24 @@ describe('PlayerSession', () => {
     expect(requests).toHaveLength(1);
   });
 
+  it('reconnect() drops the link in use and joins again at once, as the same player', async () => {
+    const { gm, requests, player } = setup();
+    expect(player.reconnect()).toBe(false);
+    player.start();
+    await flush();
+    expect(player.reconnect()).toBe(false);
+    gm.allow(requests[0]!.playerId);
+    const before = player.state.playerId;
+    expect(player.reconnect()).toBe(true);
+    expect(player.state.status).toBe('connecting');
+    await flush();
+    expect(player.state.status).toBe('admitted');
+    expect(player.state.playerId).toBe(before);
+    expect(requests).toHaveLength(1);
+    player.stop();
+    expect(player.reconnect()).toBe(false);
+  });
+
   it('stops when the GM ends the session', async () => {
     const { gm, requests, player } = setup();
     player.start();

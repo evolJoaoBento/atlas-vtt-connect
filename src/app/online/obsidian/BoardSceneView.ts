@@ -20,7 +20,7 @@ import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate, TemplateShape } from '../tools/templates';
-import type { MapSpell, SpellChange } from '../tools/spells';
+import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
@@ -169,7 +169,7 @@ export class BoardSceneView implements SceneViewport {
   setPlayers(order: readonly string[], self: string | null): void { this.board.setPlayers(order, self); }
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.board.receiveTemplates(sceneId, templates); }
   /** The scene's spells (a Tabletop without spells draws none). */
-  receiveSpells(sceneId: string, spells: readonly MapSpell[]): void { this.board.receiveSpells?.(sceneId, spells); }
+  receiveSpells(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[] = []): void { this.board.receiveSpells?.(sceneId, spells, asks); }
   receivePing(ping: PlayerPing): void { this.board.receivePing(ping); }
   receiveLaser(laser: PlayerLaser): void { this.board.receiveLaser(laser); }
   measure(): void { this.board.measure(); }

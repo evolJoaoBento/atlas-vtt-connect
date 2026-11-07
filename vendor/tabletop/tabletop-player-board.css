@@ -1963,3 +1963,7 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-spellbar__unit { color: var(--text-muted, #a8a8b0); font-size: 11px; }
 .atlas-tabletop-spellbar__text { padding: 0 8px; color: var(--text-muted, #c8c8d0); max-width: 520px; }
 .atlas-tabletop-spellbar__text[data-hits]:not([data-hits="0"]) { color: #ff8a8a; }
+/* A spell the GM asks, offered out of the eyes: at the top, clear of the toolbar below. */
+.atlas-tabletop-spellbar.is-ask { bottom: auto; top: max(12px, env(safe-area-inset-top)); border-color: var(--interactive-accent, #7c5cff); }
+.atlas-tabletop-spellbar__ask { padding: 0 8px; font-weight: 500; max-width: 520px; }
+.atlas-tabletop-spellbar__more { padding: 0 6px; color: var(--text-muted, #a8a8b0); font-size: 11px; }

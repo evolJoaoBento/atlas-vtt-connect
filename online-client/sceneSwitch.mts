@@ -9,7 +9,7 @@
  * phone's gyroscope (iOS asks the player first) and by a drag. The AR button shows the board through the phone's back
  * camera, standing on the printed marker sheet (`ar/arMode.mts`, a chunk of its own).
  */
-import type { MapSpell } from '../src/app/online/tools/spells';
+import type { MapSpell, SpellRequest } from '../src/app/online/tools/spells';
 import type { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { PlayerBoardFactory } from '../src/app/online/obsidian/playerBoardContract';
 import type { SceneViewport } from '../src/app/online/obsidian/sceneViewport';
@@ -85,7 +85,7 @@ export class SceneSwitch implements SceneViewport {
   private sheets: readonly TokenSheet[] = [];
   private gmCamera: SceneCamera | null = null;
   private controlled: readonly string[] = [];
-  private spells: { sceneId: string; list: readonly MapSpell[] } | null = null;
+  private spells: { sceneId: string; list: readonly MapSpell[]; asks: readonly SpellRequest[] } | null = null;
   /** The player's colour, for a view made anew. */
   private laserColor: string | null = null;
   private connected = false;
@@ -218,7 +218,7 @@ export class SceneSwitch implements SceneViewport {
     view.setScene(this.scene);
     view.setGmCamera(this.gmCamera);
     if (this.templates) view.receiveTemplates(this.templates.sceneId, this.templates.list);
-    if (this.board && this.spells) this.board.receiveSpells(this.spells.sceneId, this.spells.list);
+    if (this.board && this.spells) this.board.receiveSpells(this.spells.sceneId, this.spells.list, this.spells.asks);
     if (this.laserColor) view.selectLaserColor(this.laserColor);
     if (this.board) {
       this.board.setExtras(this.extras);
@@ -404,7 +404,7 @@ export class SceneSwitch implements SceneViewport {
   receiveNote(answer: PinNoteAnswer): void { this.view.receiveNote(answer); }
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.templates = { sceneId, list: templates }; this.view.receiveTemplates(sceneId, templates); }
   /** The scene's spells: the 3D board draws them (the 2D map has none). */
-  receiveSpells(sceneId: string, spells: readonly MapSpell[]): void { this.spells = { sceneId, list: spells }; this.board?.receiveSpells(sceneId, spells); }
+  receiveSpells(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[] = []): void { this.spells = { sceneId, list: spells, asks }; this.board?.receiveSpells(sceneId, spells, asks); }
   /** The board left a token's eyes by itself (Escape, Leave): the Eyes button follows. */
   eyesChanged(): void { this.showEyes(); }
   receivePing(ping: PlayerPing): void { this.view.receivePing(ping); }

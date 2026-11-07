@@ -94,5 +94,82 @@ export function isMapSpells(value: unknown): value is MapSpell[] {
     && typeof (entry as MapSpell).color === 'string' && HEX.test((entry as MapSpell).color) && isSpell((entry as MapSpell).spell));
 }
 
-/** What a player asks: cast one, take one of theirs off, or clear theirs. */
-export type SpellChange = { add: Spell } | { remove: string } | { clear: true };
+/** What a player asks: cast one (for the GM's ask `request`), take one of theirs off, clear theirs, or turn down an ask. */
+export type SpellChange = { add: Spell; request?: string } | { remove: string } | { clear: true } | { decline: string };
+
+/**
+ * A spell the GM asks of a token, as the GM sets it: its shape, where it starts and its sizes (map pixels), with a
+ * name. The player only aims it (and, at a point, moves and turns it); the GM takes the cast as asked. Shaped so a
+ * prepared spell (one kept with its sizes) can fill it later.
+ */
+export interface SpellAsk {
+  /** What it is called, e.g. "Fireball". */
+  name?: string;
+  shape: SpellShape;
+  /** Where it starts; a wall is always at points. */
+  from: 'self' | 'point';
+  /** As `Spell.size`. */
+  size: number;
+  /** As `Spell.length`: a cylinder's length, a wall's height; 0 for the rest. */
+  length: number;
+  /** A cone's opening, radians; the scene's own without it. */
+  angle?: number;
+  /** A wall's longest run, map pixels. */
+  longest?: number;
+}
+
+/** An ask sent to a token's players: its id and the token it is asked of. */
+export interface SpellRequest {
+  id: string;
+  tokenId: string;
+  ask: SpellAsk;
+}
+
+export const SPELL_NAME_LENGTH = 60;
+/** Asks one player may have waiting at once. */
+export const SPELL_ASKS_PER_PLAYER = 8;
+
+export function isSpellAsk(value: unknown): value is SpellAsk {
+  if (typeof value !== 'object' || value === null) return false;
+  const ask = value as Partial<Record<keyof SpellAsk, unknown>>;
+  if (typeof ask.shape !== 'string' || !(SPELL_SHAPES as readonly string[]).includes(ask.shape)) return false;
+  if (ask.from !== 'self' && ask.from !== 'point') return false;
+  if (!isSize(ask.size) || ask.size <= 0 || !isSize(ask.length)) return false;
+  if ((ask.shape === 'wall' || ask.shape === 'cylinder') && ask.length <= 0) return false;
+  if (ask.angle !== undefined && (!isNumber(ask.angle) || ask.angle <= 0 || ask.angle >= Math.PI)) return false;
+  if (ask.longest !== undefined && (!isSize(ask.longest) || ask.longest <= 0)) return false;
+  if (ask.name !== undefined && (typeof ask.name !== 'string' || ask.name.length > SPELL_NAME_LENGTH)) return false;
+  const known = new Set(['name', 'shape', 'from', 'size', 'length', 'angle', 'longest']);
+  return Object.keys(ask).every((key) => known.has(key));
+}
+
+export function isSpellRequests(value: unknown): value is SpellRequest[] {
+  return Array.isArray(value) && value.length <= SPELL_ASKS_PER_PLAYER && value.every((entry) => typeof entry === 'object' && entry !== null
+    && isSpellId((entry as SpellRequest).id) && typeof (entry as SpellRequest).tokenId === 'string' && (entry as SpellRequest).tokenId.length > 0
+    && (entry as SpellRequest).tokenId.length <= 200 && isSpellAsk((entry as SpellRequest).ask));
+}
+
+/** A copy of an ask with only its own fields. */
+export function cleanAsk(ask: SpellAsk): SpellAsk {
+  return {
+    ...(ask.name !== undefined && ask.name.trim() !== '' ? { name: ask.name.trim() } : {}),
+    shape: ask.shape, from: ask.shape === 'wall' ? 'point' : ask.from, size: ask.size, length: ask.shape === 'wall' || ask.shape === 'cylinder' ? ask.length : 0,
+    ...(ask.angle !== undefined ? { angle: ask.angle } : {}),
+    ...(ask.shape === 'wall' && ask.longest !== undefined ? { longest: ask.longest } : {}),
+  };
+}
+
+/**
+ * A spell cast for an ask, made to be what the GM asked: its shape, start and sizes the ask's (the cone's opening too,
+ * when the ask has one), a wall no longer than its longest run. Where it is and how it is turned stay the player's.
+ */
+export function askedSpell(spell: Spell, ask: SpellAsk): Spell {
+  const made: Spell = { ...cleanSpell(spell), shape: ask.shape, from: ask.shape === 'wall' ? 'point' : ask.from, size: ask.size, length: ask.shape === 'wall' || ask.shape === 'cylinder' ? ask.length : 0 };
+  if (ask.angle !== undefined) made.angle = ask.angle;
+  if (ask.shape !== 'wall') { delete made.to; return made; }
+  const to = spell.to ?? { x: spell.at.x + 1e-3, y: spell.at.y };
+  const run = Math.hypot(to.x - spell.at.x, to.y - spell.at.y);
+  const longest = ask.longest ?? Infinity;
+  made.to = run <= longest || run === 0 ? { x: to.x, y: to.y } : { x: spell.at.x + ((to.x - spell.at.x) * longest) / run, y: spell.at.y + ((to.y - spell.at.y) * longest) / run };
+  return made;
+}

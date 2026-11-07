@@ -6,7 +6,7 @@
  * remote view; it needs nothing of Atlas's map.
  */
 import { setIcon } from 'obsidian';
-import type { MapSpell, SpellChange } from '../tools/spells';
+import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';
 import { SheetView } from '../../../../online-client/sheetView.mts';
 import type { AdvantageSide, SheetRollRef, TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
@@ -68,7 +68,7 @@ export class CanvasScene implements OnlineSceneSink {
   /** See through a token's eyes on the 3D board (Tabletop's first person); a menu picks the token when there are several. */
   private readonly eyeButton: HTMLButtonElement;
   private readonly eyeMenu: HTMLElement;
-  private sceneSpells: { sceneId: string; list: readonly MapSpell[] } | null = null;
+  private sceneSpells: { sceneId: string; list: readonly MapSpell[]; asks: readonly SpellRequest[] } | null = null;
   /** The player's colour (Your colour in the Move menu), remembered between sessions. */
   private pickedColor: string | null = null;
   /** The player wants the board when it can be shown (the 2D/3D button). */
@@ -226,9 +226,9 @@ export class CanvasScene implements OnlineSceneSink {
   }
 
   /** Every spell on the scene `sceneId`: the 3D board draws them. */
-  spells(sceneId: string, spells: readonly MapSpell[]): void {
-    this.sceneSpells = { sceneId, list: spells };
-    if (this.view instanceof BoardSceneView) this.view.receiveSpells(sceneId, spells);
+  spells(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[] = []): void {
+    this.sceneSpells = { sceneId, list: spells, asks };
+    if (this.view instanceof BoardSceneView) this.view.receiveSpells(sceneId, spells, asks);
   }
 
   /** The eye button: on the 3D board, with a token of the player's to see through. */
@@ -481,7 +481,7 @@ export class CanvasScene implements OnlineSceneSink {
     if (view instanceof BoardSceneView) {
       view.setExtras(this.board);
       view.setBoardCamera(this.gmBoardCamera);
-      if (this.sceneSpells) view.receiveSpells(this.sceneSpells.sceneId, this.sceneSpells.list);
+      if (this.sceneSpells) view.receiveSpells(this.sceneSpells.sceneId, this.sceneSpells.list, this.sceneSpells.asks);
     }
     view.measure();
     this.syncToolbar();

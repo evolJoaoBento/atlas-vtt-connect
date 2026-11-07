@@ -13,7 +13,7 @@ import type { ArPose } from '../tools/arViews';
 import type { SheetRollRef } from '../tools/sheets';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
-import type { MapSpell, SpellChange } from '../tools/spells';
+import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';
 
 export interface PlayerBoardHost {
   /** An image of the scene (map, token, material map) as a URL the board can load; null while it is not here. */
@@ -102,7 +102,8 @@ export interface PlayerBoardHandle {
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
   /** This board casts and draws spells (an older Tabletop's does not). */
   readonly spells?: true;
-  receiveSpells?(sceneId: string, spells: readonly MapSpell[]): void;
+  /** The scene's spells, and the spells the GM asks of the player's tokens there (each to aim, cast or turn down). */
+  receiveSpells?(sceneId: string, spells: readonly MapSpell[], asks?: readonly SpellRequest[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;
   /** Images or models arrived or went. */

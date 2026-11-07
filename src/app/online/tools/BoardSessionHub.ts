@@ -12,7 +12,7 @@ import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
 import type { MapTemplate, TemplateShape } from './templates';
-import type { MapSpell } from './spells';
+import { isSpellAsk, type MapSpell, type SpellAsk } from './spells';
 import type { ArPose } from './arViews';
 import type { ArSurvey } from './arTable';
 
@@ -65,6 +65,14 @@ export interface BoardSession {
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
   eraseTemplate(mapPath: string, id: string): void;
   clearTemplates(mapPath: string): void;
+  /**
+   * Asks the players of `tokenId` to cast `ask` from it (they aim it; the rest is the GM's). The number of its players
+   * on the map's scene now; null when no session hands out tokens. Absent from an older Connect.
+   */
+  requestSpell?(mapPath: string, tokenId: string, ask: SpellAsk): number | null;
+  /** The ask waiting for `tokenId` on the map's scene, or null. */
+  spellRequest?(mapPath: string, tokenId: string): SpellAsk | null;
+  cancelSpellRequest?(mapPath: string, tokenId: string): void;
   /** Takes a player's spell off the map's scene, or all of them. */
   eraseSpell(mapPath: string, id: string): void;
   clearSpells(mapPath: string): void;
@@ -241,6 +249,22 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   clearSpells(mapPath: string): void {
     const sceneId = this.sceneOf(mapPath);
     if (sceneId) this.templates?.clearSpells(sceneId);
+  }
+
+  requestSpell(mapPath: string, tokenId: string, ask: SpellAsk): number | null {
+    const sceneId = this.sceneOf(mapPath);
+    if (!sceneId || !this.templates || !this.control || typeof tokenId !== 'string' || !isSpellAsk(ask)) return null;
+    return this.templates.requestSpell(sceneId, tokenId, ask);
+  }
+
+  spellRequest(mapPath: string, tokenId: string): SpellAsk | null {
+    const sceneId = this.sceneOf(mapPath);
+    return sceneId && this.templates ? this.templates.requestOf(sceneId, tokenId) : null;
+  }
+
+  cancelSpellRequest(mapPath: string, tokenId: string): void {
+    const sceneId = this.sceneOf(mapPath);
+    if (sceneId) this.templates?.cancelSpellRequest(sceneId, tokenId);
   }
 
   templatesChanged(): void {

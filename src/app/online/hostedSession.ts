@@ -232,6 +232,10 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   // Players in augmented reality, as eyes on Tabletop's board: only where there is one.
   const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub, colorOf: (playerId) => colors.colorOf(playerId) }) : null;
   boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
+  // The GM asks a token's players for a spell: they are its controllers, and the GM hears how they answer.
+  if (templates instanceof TemplateHost) {
+    templates.useAsks(tokenControl ? { controls: (playerId, tokenId) => tokenControl.control.controls(playerId, tokenId), notify } : null);
+  }
   // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
   // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
   boardHub?.useControl(tokenControl ? { control: tokenControl.control, players: () => session.getPlayers() } : null);
