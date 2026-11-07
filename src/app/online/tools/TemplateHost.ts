@@ -16,7 +16,7 @@ import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { GM_LASER_ID, laserColor } from './laserColors';
 import type { BoardSessionSink } from './BoardSessionHub';
 import { TEMPLATE_LIMITS, type MapTemplate } from './templates';
-import { askedSpell, cleanAsk, cleanSpell, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type SpellAsk, type SpellRequest } from './spells';
+import { askedSpell, cleanAsk, cleanSpell, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type Spell, type SpellAsk, type SpellRequest } from './spells';
 
 export interface TemplateHostOptions {
   session: SceneSession;
@@ -169,6 +169,17 @@ export class TemplateHost implements SessionHandler {
     return true;
   }
 
+  /** The GM casts a spell on a scene (through a token's eyes on Tabletop's board), in the GM's colour; false over the limit. */
+  castGm(sceneId: string, spell: Spell): boolean {
+    const list = this.spellsByScene.get(sceneId) ?? [];
+    if (list.length >= SPELL_LIMITS.perScene) return false;
+    const order = this.options.session.getPlayers().map((each) => each.playerId);
+    list.push({ id: `s${this.nextSpell++}`, owner: GM_LASER_ID, color: laserColor(GM_LASER_ID, order), spell: cleanSpell(spell) });
+    this.spellsByScene.set(sceneId, list);
+    this.broadcastSpells(sceneId);
+    return true;
+  }
+
   /** The GM takes every template off one scene. */
   clearScene(sceneId: string): void {
     if (!this.byScene.has(sceneId)) return;
@@ -282,13 +293,13 @@ export class TemplateHost implements SessionHandler {
     this.limit.retain(known);
     this.spellLimit.retain(known);
     for (const [sceneId, list] of this.spellsByScene) {
-      const kept = list.filter((spell) => known.has(spell.owner));
+      const kept = list.filter((spell) => spell.owner === GM_LASER_ID || known.has(spell.owner));
       if (kept.length === list.length) continue;
       this.spellsByScene.set(sceneId, kept);
       this.broadcastSpells(sceneId);
     }
     for (const [sceneId, list] of this.byScene) {
-      const kept = list.filter((template) => known.has(template.owner));
+      const kept = list.filter((template) => template.owner === GM_LASER_ID || known.has(template.owner));
       if (kept.length === list.length) continue;
       this.byScene.set(sceneId, kept);
       this.broadcast(sceneId);

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
-import { isSpell, SPELL_LIMITS, type MapSpell, type Spell } from '../../../src/app/online/tools/spells';
+import { cleanSpell, isSpell, SPELL_LIMITS, type MapSpell, type Spell } from '../../../src/app/online/tools/spells';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
@@ -70,6 +70,16 @@ describe('spells cast through a token\'s eyes', () => {
     expect(w.last('p2').every((spell) => spell.owner === 'p2')).toBe(true);
   });
 
+  it('the GM casts in its own colour, to everyone on the scene, and its spells stay when players come and go', () => {
+    const w = world();
+    expect(w.host.castGm('s1', { ...cone, effect: 'fire' })).toBe(true);
+    expect(w.last('p1')).toEqual([{ id: 's1', owner: 'gm', color: expect.stringMatching(/^#[0-9a-f]{6}$/i), spell: { ...cone, effect: 'fire' } }]);
+    w.host.playersChanged([BEN]);
+    expect(w.host.spellsFor('s1')).toHaveLength(1);
+    w.host.eraseSpell('s1', 's1');
+    expect(w.last('p2')).toEqual([]);
+  });
+
   it('the GM\'s clear takes spells off with the templates', () => {
     const w = world();
     w.send(ANA, cast());
@@ -88,6 +98,12 @@ describe('spells cast through a token\'s eyes', () => {
 });
 
 describe('spell messages', () => {
+  it('a spell may carry one of the damage types, kept as cast; an unknown one does not decode', () => {
+    expect(isSpell({ ...cone, effect: 'fire' })).toBe(true);
+    expect(isSpell({ ...cone, effect: 'glitter' })).toBe(false);
+    expect(cleanSpell({ ...cone, effect: 'necrotic' }).effect).toBe('necrotic');
+  });
+
   it('a well formed spell decodes; an unknown shape, a bad size or a stray field does not', () => {
     expect(decodeControl(encodeControl(cast()))).toEqual({ kind: 'message', message: cast() });
     const wall: Spell = { ...cone, shape: 'wall', from: 'point', to: { x: 455, y: 385 }, size: 14, length: 140 };

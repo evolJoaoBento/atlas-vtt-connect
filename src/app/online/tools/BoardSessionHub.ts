@@ -12,7 +12,7 @@ import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
 import type { MapTemplate, TemplateShape } from './templates';
-import { isSpellAsk, type MapSpell, type SpellAsk } from './spells';
+import { isSpell, isSpellAsk, type MapSpell, type Spell, type SpellAsk } from './spells';
 import type { ArPose } from './arViews';
 import type { ArSurvey } from './arTable';
 
@@ -73,6 +73,8 @@ export interface BoardSession {
   /** The ask waiting for `tokenId` on the map's scene, or null. */
   spellRequest?(mapPath: string, tokenId: string): SpellAsk | null;
   cancelSpellRequest?(mapPath: string, tokenId: string): void;
+  /** The GM casts a spell on the map's scene (through a token's eyes), in the GM's colour; false when it cannot. */
+  castSpell?(mapPath: string, spell: Spell): boolean;
   /** Takes a player's spell off the map's scene, or all of them. */
   eraseSpell(mapPath: string, id: string): void;
   clearSpells(mapPath: string): void;
@@ -249,6 +251,12 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   clearSpells(mapPath: string): void {
     const sceneId = this.sceneOf(mapPath);
     if (sceneId) this.templates?.clearSpells(sceneId);
+  }
+
+  castSpell(mapPath: string, spell: Spell): boolean {
+    const sceneId = this.sceneOf(mapPath);
+    if (!sceneId || !this.templates || !isSpell(spell)) return false;
+    return this.templates.castGm(sceneId, spell);
   }
 
   requestSpell(mapPath: string, tokenId: string, ask: SpellAsk): number | null {

@@ -21,6 +21,9 @@ export const SPELL_LIMITS = {
 
 export const SPELL_SHAPES = ['sphere', 'cube', 'cylinder', 'cone', 'wall'] as const;
 export type SpellShape = typeof SPELL_SHAPES[number];
+/** D&D's damage types: a spell's look on Tabletop's board (its `spellEffects.ts`); the list must stay the same. */
+export const DAMAGE_TYPES = ['acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'] as const;
+export type DamageType = typeof DAMAGE_TYPES[number];
 
 export interface Spell {
   shape: SpellShape;
@@ -40,6 +43,8 @@ export interface Spell {
   angle: number;
   /** The token it was cast from. */
   caster?: string;
+  /** Its damage, for its look. */
+  effect?: DamageType;
 }
 
 export interface MapSpell {
@@ -74,7 +79,8 @@ export function isSpell(value: unknown): value is Spell {
   if (spell.shape !== 'wall' && spell.to !== undefined) return false;
   if (spell.shape === 'cylinder' && spell.length <= 0) return false;
   if (spell.caster !== undefined && (typeof spell.caster !== 'string' || spell.caster.length === 0 || spell.caster.length > 200)) return false;
-  const known = new Set(['shape', 'from', 'at', 'to', 'yaw', 'pitch', 'roll', 'size', 'length', 'angle', 'caster']);
+  if (spell.effect !== undefined && (typeof spell.effect !== 'string' || !(DAMAGE_TYPES as readonly string[]).includes(spell.effect))) return false;
+  const known = new Set(['shape', 'from', 'at', 'to', 'yaw', 'pitch', 'roll', 'size', 'length', 'angle', 'caster', 'effect']);
   return Object.keys(spell).every((key) => known.has(key)) && Object.keys(spell.at as object).every((key) => key === 'x' || key === 'y' || key === 'h');
 }
 
@@ -85,6 +91,7 @@ export function cleanSpell(spell: Spell): Spell {
     ...(spell.to ? { to: { x: spell.to.x, y: spell.to.y } } : {}),
     yaw: spell.yaw, pitch: spell.pitch, roll: spell.roll, size: spell.size, length: spell.length, angle: spell.angle,
     ...(spell.caster !== undefined ? { caster: spell.caster } : {}),
+    ...(spell.effect !== undefined ? { effect: spell.effect } : {}),
   };
 }
 

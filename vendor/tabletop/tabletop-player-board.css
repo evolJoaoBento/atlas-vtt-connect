@@ -1961,6 +1961,10 @@ body.atlas-tabletop-player-window .view-header {
 }
 .atlas-tabletop-spellbar__size input::-webkit-inner-spin-button, .atlas-tabletop-spellbar__size input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .atlas-tabletop-spellbar__unit { color: var(--text-muted, #a8a8b0); font-size: 11px; }
+.atlas-tabletop-spellbar__damage select {
+  height: 28px; padding: 0 6px; border-radius: 8px; font: inherit; color: inherit;
+  border: 1px solid var(--background-modifier-border, #3a3a3f); background: var(--background-primary, #1f1f22);
+}
 .atlas-tabletop-spellbar__text { padding: 0 8px; color: var(--text-muted, #c8c8d0); max-width: 520px; }
 .atlas-tabletop-spellbar__text[data-hits]:not([data-hits="0"]) { color: #ff8a8a; }
 /* A spell the GM asks, offered out of the eyes: at the top, clear of the toolbar below. */
