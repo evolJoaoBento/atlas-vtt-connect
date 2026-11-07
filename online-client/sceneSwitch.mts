@@ -9,6 +9,7 @@
  * phone's gyroscope (iOS asks the player first) and by a drag. The AR button shows the board through the phone's back
  * camera, standing on the printed marker sheet (`ar/arMode.mts`, a chunk of its own).
  */
+import type { MapSpell } from '../src/app/online/tools/spells';
 import type { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { PlayerBoardFactory } from '../src/app/online/obsidian/playerBoardContract';
 import type { SceneViewport } from '../src/app/online/obsidian/sceneViewport';
@@ -82,6 +83,9 @@ export class SceneSwitch implements SceneViewport {
   private sheets: readonly TokenSheet[] = [];
   private gmCamera: SceneCamera | null = null;
   private controlled: readonly string[] = [];
+  private spells: { sceneId: string; list: readonly MapSpell[] } | null = null;
+  /** The player's colour, for a view made anew. */
+  private laserColor: string | null = null;
   private connected = false;
   private paused = false;
   private players: { order: readonly string[]; self: string | null } = { order: [], self: null };
@@ -212,6 +216,8 @@ export class SceneSwitch implements SceneViewport {
     view.setScene(this.scene);
     view.setGmCamera(this.gmCamera);
     if (this.templates) view.receiveTemplates(this.templates.sceneId, this.templates.list);
+    if (this.board && this.spells) this.board.receiveSpells(this.spells.sceneId, this.spells.list);
+    if (this.laserColor) view.selectLaserColor(this.laserColor);
     if (this.board) {
       this.board.setExtras(this.extras);
       this.board.setBoardCamera(this.boardCamera);
@@ -388,12 +394,16 @@ export class SceneSwitch implements SceneViewport {
   selectTemplateShape(shape: TemplateShape): void { this.view.selectTemplateShape(shape); }
   clearOwnTemplates(): void { this.view.clearOwnTemplates(); }
   selectShape(shape: MeasureChoice): void { this.view.selectShape(shape); }
-  selectLaserColor(color: string): void { this.view.selectLaserColor(color); }
+  selectLaserColor(color: string): void { this.laserColor = color; this.view.selectLaserColor(color); }
   selectLaserSize(size: number): void { this.view.selectLaserSize(size); }
   toolState(): ToolState { return this.view.toolState(); }
   setPlayers(order: readonly string[], self: string | null): void { this.players = { order, self }; this.view.setPlayers(order, self); }
   receiveNote(answer: PinNoteAnswer): void { this.view.receiveNote(answer); }
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.templates = { sceneId, list: templates }; this.view.receiveTemplates(sceneId, templates); }
+  /** The scene's spells: the 3D board draws them (the 2D map has none). */
+  receiveSpells(sceneId: string, spells: readonly MapSpell[]): void { this.spells = { sceneId, list: spells }; this.board?.receiveSpells(sceneId, spells); }
+  /** The board left a token's eyes by itself (Escape, Leave): the Eyes button follows. */
+  eyesChanged(): void { this.showEyes(); }
   receivePing(ping: PlayerPing): void { this.view.receivePing(ping); }
   receiveLaser(laser: PlayerLaser): void { this.view.receiveLaser(laser); }
   refresh(): void { this.view.refresh(); }

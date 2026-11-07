@@ -13,6 +13,7 @@ import type { ArPose } from '../tools/arViews';
 import type { SheetRollRef } from '../tools/sheets';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
+import type { MapSpell, SpellChange } from '../tools/spells';
 
 export interface PlayerBoardHost {
   /** An image of the scene (map, token, material map) as a URL the board can load; null while it is not here. */
@@ -23,6 +24,10 @@ export interface PlayerBoardHost {
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
   sendPing(x: number, y: number): boolean;
   sendTemplate(change: TemplateChange): boolean;
+  /** Casts a spell through a token's eyes, takes one of the player's off, or all of theirs (a Tabletop with spells asks). */
+  sendSpell?(change: SpellChange): boolean;
+  /** The board left a token's eyes by itself (Escape, its Leave button): the eye button follows. */
+  eyeChanged?(): void;
   /** The player clicked a readable pin: its note is asked for and shown. */
   openPin(pinId: string): void;
   /** The token under the pointer (null for none), where the pointer is in client pixels, and whether Ctrl or Cmd is down. */
@@ -95,6 +100,9 @@ export interface PlayerBoardHandle {
   /** In augmented reality: where the phone's camera is over the map (board units) and which way it looks; null otherwise. */
   arViewer?(): ArPose | null;
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void;
+  /** This board casts and draws spells (an older Tabletop's does not). */
+  readonly spells?: true;
+  receiveSpells?(sceneId: string, spells: readonly MapSpell[]): void;
   receivePing(ping: PlayerPing): void;
   receiveLaser(laser: PlayerLaser): void;
   /** Images or models arrived or went. */

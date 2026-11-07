@@ -21,6 +21,8 @@ import { isLaserColor, LASER_LIMITS } from './toolMessages';
 
 export interface LaserRelayOptions {
   session: SceneSession;
+  /** A player's colour (their pick); their place's without it. */
+  colorOf?(playerId: string): string;
   /** Each player's scene, and the one the GM's view shows: lasers of any other are dropped. */
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSlot' | 'shownSnapshot' | 'onSlotChange'>;
   /** The GM's laser in a view, and other people's lasers shown in it (`lasers.onLocal`, `lasers.show`). */
@@ -150,7 +152,7 @@ export class LaserRelay implements SessionHandler {
       const own = this.options.gmColor?.();
       return isLaserColor(own) ? own : laserColor(from, order);
     }
-    return picked ?? laserColor(from, order);
+    return picked ?? this.options.colorOf?.(from) ?? laserColor(from, order);
   }
 
   private letGo(playerId: string): void {

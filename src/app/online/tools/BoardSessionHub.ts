@@ -12,6 +12,7 @@ import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import type { TemplateHost } from './TemplateHost';
 import type { MapTemplate, TemplateShape } from './templates';
+import type { MapSpell } from './spells';
 import type { ArPose } from './arViews';
 import type { ArSurvey } from './arTable';
 
@@ -43,6 +44,8 @@ export interface BoardSurvey {
 
 export interface BoardOverlay {
   templates: readonly MapTemplate[];
+  /** Spells players cast through their tokens' eyes on the map's scene (`spells.ts`). */
+  spells: readonly MapSpell[];
   /** Radians a cone opens by on this map. */
   coneAngle: number;
   handout: { path: string; title: string } | null;
@@ -62,6 +65,9 @@ export interface BoardSession {
   addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
   eraseTemplate(mapPath: string, id: string): void;
   clearTemplates(mapPath: string): void;
+  /** Takes a player's spell off the map's scene, or all of them. */
+  eraseSpell(mapPath: string, id: string): void;
+  clearSpells(mapPath: string): void;
   /**
    * Tabletop moves tokens from the map `from` to the stacked map `to` (each to `newId`, the same id unless `to` had
    * one): told before it moves them. Their players keep them, and are shown `to`.
@@ -186,6 +192,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     const sceneId = this.sceneOf(mapPath);
     return {
       templates: sceneId && this.templates ? this.templates.listFor(sceneId) : [],
+      spells: sceneId && this.templates ? this.templates.spellsFor(sceneId) : [],
       coneAngle: (this.options.coneAngle(mapPath) * Math.PI) / 180,
       handout: this.started ? this.options.handouts.current() : null,
     };
@@ -224,6 +231,16 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   clearTemplates(mapPath: string): void {
     const sceneId = this.sceneOf(mapPath);
     if (sceneId) this.templates?.clearScene(sceneId);
+  }
+
+  eraseSpell(mapPath: string, id: string): void {
+    const sceneId = this.sceneOf(mapPath);
+    if (sceneId) this.templates?.eraseSpell(sceneId, id);
+  }
+
+  clearSpells(mapPath: string): void {
+    const sceneId = this.sceneOf(mapPath);
+    if (sceneId) this.templates?.clearSpells(sceneId);
   }
 
   templatesChanged(): void {

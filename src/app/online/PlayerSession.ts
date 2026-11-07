@@ -14,6 +14,7 @@ import type { AdvantageSide, SheetRollRef, TokenSheet } from './tools/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
+import type { MapSpell, SpellChange } from './tools/spells';
 import type { TemplateChange } from './view/tools/PlayerTools';
 import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
@@ -83,6 +84,10 @@ export interface PlayerSessionOptions {
   onPing?(ping: PlayerPing): void;
   /** Every lasting template on the scene `sceneId`, whenever they change. */
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
+  /** Every spell on the scene `sceneId`, whenever they change. */
+  onSpells?(sceneId: string, spells: readonly MapSpell[]): void;
+  /** The player's own colour, sent on each admission (null: the one their place gives). */
+  color?(): string | null;
   /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
   onPinNote?(answer: PinNoteAnswer): void;
   /** Whether the GM can send the scene for Tabletop's 3D board (`board-offer`); `dice` when it also takes thrown dice (`diceResults`), with its rules (null for the default). */
@@ -187,6 +192,21 @@ export class PlayerSession {
     return true;
   }
 
+  /** The player picked their colour: the GM is told (it colours their laser, pings, templates and spells). */
+  sendColor(color: string): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'player-color', color }));
+    return true;
+  }
+
+  /** Asks the GM to cast a spell on the scene the player has, take one of theirs off or clear theirs; false when it cannot go. */
+  sendSpell(change: SpellChange): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'map-spell', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : 'remove' in change ? { remove: change.remove } : { clear: true as const }) }));
+    return true;
+  }
+
   /** Sends a ping at a world point of the scene the player has; false when it cannot go. */
   sendPing(x: number, y: number): boolean {
     const scene = this.inbox.scene;
@@ -284,6 +304,10 @@ export class PlayerSession {
         this.takesDiceResults = false;
         this.tableProof = message.table ?? null;
         this.update({ status: 'admitted', playerId: message.playerId, title: message.session.title, reason: null });
+        {
+          const color = this.options.color?.() ?? null;
+          if (color) link.send('control', encodeControl({ v: 1, type: 'player-color', color }));
+        }
         if (this.assetLink !== link) {
           // A repeated admission on the same link must not start the handler over.
           this.assetLink = link;
@@ -317,6 +341,9 @@ export class PlayerSession {
         break;
       case 'token-sheets':
         this.options.onSheets?.(message.entries);
+        break;
+      case 'map-spells':
+        this.options.onSpells?.(message.sceneId, message.spells);
         break;
       case 'map-templates':
         this.options.onTemplates?.(message.sceneId, message.templates);

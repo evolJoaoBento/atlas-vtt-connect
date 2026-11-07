@@ -1,4 +1,5 @@
 /** What the scene tab takes from a joined session, what it asks of it, and why a join may not start. */
+import type { MapSpell } from '../tools/spells';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { TokenSheet } from '../tools/sheets';
@@ -31,6 +32,8 @@ export interface OnlineSceneSink {
   sheets?(entries: readonly TokenSheet[]): void;
   /** Every lasting template on the scene `sceneId`; a view that shows none leaves it out. */
   templates?(sceneId: string, templates: readonly MapTemplate[]): void;
+  /** Every spell on the scene `sceneId` (the 3D board draws them); a view that shows none leaves it out. */
+  spells?(sceneId: string, spells: readonly MapSpell[]): void;
   /** Someone else's ping; a view that shows none leaves it out. */
   ping?(ping: PlayerPing): void;
   /** The GM's answer to a pin this player opened; a view that opens none leaves it out. */

@@ -19,6 +19,8 @@ export interface PingRelayOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'audience' | 'shownSnapshot'>;
   /** Shows a ping in the GM's view of a scene; without it the GM sees none (an Atlas whose map Connect cannot draw on). */
   show?(viewId: ViewId, ping: { x: number; y: number; color: string }): void;
+  /** A player's colour (their pick); their place's without it. */
+  colorOf?(playerId: string): string;
   /** Tabletop's 3D board on the GM's side, wherever it shows the map. */
   board?: Pick<BoardSessionSink, 'ping'>;
 }
@@ -43,7 +45,7 @@ export class PingRelay implements SessionHandler {
     const slot = this.options.projection.slotOf(player.playerId);
     if (!slot?.lastSent || message.sceneId !== slot.sceneId || !this.limit.allow(player.playerId, Date.now())) return;
     const players = this.options.session.getPlayers();
-    const color = laserColor(player.playerId, players.map((each) => each.playerId));
+    const color = this.options.colorOf?.(player.playerId) ?? laserColor(player.playerId, players.map((each) => each.playerId));
     const ping = { v: 1 as const, type: 'map-ping' as const, sceneId: slot.sceneId, x: message.x, y: message.y, from: player.playerId, color };
     for (const playerId of this.options.projection.audience(slot.sceneId)) {
       if (playerId !== player.playerId) this.options.session.send(playerId, ping);

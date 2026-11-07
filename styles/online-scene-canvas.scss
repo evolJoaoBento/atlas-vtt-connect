@@ -621,3 +621,12 @@
 .atlas-connect-scene .menu-slider-head .menu-label { padding: 0; }
 .atlas-connect-scene .menu-slider-value { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .atlas-connect-scene .menu-slider input[type="range"] { width: 100%; accent-color: var(--interactive-accent); margin: 0; }
+
+// The token picked to see through (CanvasScene's eye button, several tokens).
+.atlas-connect-scene__eye-menu {
+  position: absolute;
+  z-index: 30;
+  min-width: 140px;
+  &[hidden] { display: none; }
+}
+.atlas-connect-scene__eye.is-active { color: var(--interactive-accent); }

@@ -20,6 +20,7 @@ import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate, TemplateShape } from '../tools/templates';
+import type { MapSpell, SpellChange } from '../tools/spells';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
@@ -40,6 +41,10 @@ export interface BoardSceneViewOptions {
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   sendPing(x: number, y: number): boolean;
   sendTemplate(change: TemplateChange): boolean;
+  /** Casts spells through a token's eyes; without it the board offers none. */
+  sendSpell?(change: SpellChange): boolean;
+  /** The board left a token's eyes by itself (Escape, Leave). */
+  onEyeChange?(): void;
   requestNote?(pinId: string): boolean;
   /** Sends dice thrown on the board to the GM; without it the board has no dice. */
   sendDiceResult?(result: PhysicalRoll): boolean;
@@ -84,6 +89,8 @@ export class BoardSceneView implements SceneViewport {
       sendLaser: (points, lifted, dt, color) => options.sendLaser(points, lifted, dt, color, this.laserSize),
       sendPing: (x, y) => options.sendPing(x, y),
       sendTemplate: (change) => options.sendTemplate(change),
+      ...(options.sendSpell ? { sendSpell: (change: SpellChange) => options.sendSpell?.(change) ?? false } : {}),
+      eyeChanged: () => options.onEyeChange?.(),
       openPin: (pinId) => this.openPin(pinId),
       hover: (tokenId, client, modifier) => this.hover(tokenId, client, modifier),
       toolsChanged: () => options.onToolsChange(),
@@ -161,6 +168,8 @@ export class BoardSceneView implements SceneViewport {
   }
   setPlayers(order: readonly string[], self: string | null): void { this.board.setPlayers(order, self); }
   receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.board.receiveTemplates(sceneId, templates); }
+  /** The scene's spells (a Tabletop without spells draws none). */
+  receiveSpells(sceneId: string, spells: readonly MapSpell[]): void { this.board.receiveSpells?.(sceneId, spells); }
   receivePing(ping: PlayerPing): void { this.board.receivePing(ping); }
   receiveLaser(laser: PlayerLaser): void { this.board.receiveLaser(laser); }
   measure(): void { this.board.measure(); }

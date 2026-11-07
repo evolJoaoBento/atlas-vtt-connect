@@ -5,6 +5,8 @@
  * Images stay until the session is left, so the tab keeps the last scene after the session ends and
  * Reconnect still has them. Nothing here reads or writes the vault.
  */
+import { swatchLaserColor } from '../tools/laserColors';
+import type { SpellChange } from '../tools/spells';
 import type { AdvantageSide, SheetRollRef } from '../tools/sheets';
 import type { PhysicalRoll } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
@@ -34,6 +36,9 @@ import { openOnlineSceneTab } from './onlineSceneTab';
 import type { MiniPainter } from '../view/minis/miniLayer';
 import type { PlayerBoardFactory } from './playerBoardContract';
 
+
+/** Where the vault keeps the player's colour. */
+const PLAYER_COLOR_KEY = 'atlas-connect-player-color';
 export type { SessionIdentity };
 
 export { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink } from './onlineJoinTypes';
@@ -121,6 +126,7 @@ export class OnlineJoinService {
       createClient: (server) => this.createClient(server),
       clientVersion,
       shareHandler: () => this.shareHandler,
+      playerColor: () => this.playerColor(),
       boardOffered: (joined) => this.askBoard(joined),
     };
     // Switching keeping off deletes the stored images at once, joined or not.
@@ -286,6 +292,32 @@ export class OnlineJoinService {
   /** Asks the GM to add a template or remove one of the player's own. */
   sendTemplate(change: TemplateChange): boolean {
     return this.joined?.session?.sendTemplate(change) ?? false;
+  }
+
+  /** The colour the player picked last (kept in the vault's local storage), or null. */
+  playerColor(): string | null {
+    try {
+      return swatchLaserColor(this.app.loadLocalStorage(PLAYER_COLOR_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  /** The player picked their colour: it is kept, and the GM is told. */
+  sendColor(color: string): boolean {
+    const swatch = swatchLaserColor(color);
+    if (!swatch) return false;
+    try {
+      this.app.saveLocalStorage(PLAYER_COLOR_KEY, swatch);
+    } catch {
+      // It still applies to this session.
+    }
+    return this.joined?.session?.sendColor(swatch) ?? false;
+  }
+
+  /** Asks the GM to cast a spell through a token's eyes, or take the player's off. */
+  sendSpell(change: SpellChange): boolean {
+    return this.joined?.session?.sendSpell(change) ?? false;
   }
 
   /** Sends a ping at a world point of the scene shown. */

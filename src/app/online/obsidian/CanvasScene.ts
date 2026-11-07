@@ -5,6 +5,8 @@
  * session's status and offers Follow GM, Fit map and Reconnect. It is Connect's player view on an Atlas without the
  * remote view; it needs nothing of Atlas's map.
  */
+import { setIcon } from 'obsidian';
+import type { MapSpell, SpellChange } from '../tools/spells';
 import { SheetView } from '../../../../online-client/sheetView.mts';
 import type { AdvantageSide, SheetRollRef, TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
@@ -35,7 +37,7 @@ import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult' | 'sendSpell' | 'sendColor' | 'playerColor'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -63,6 +65,12 @@ export class CanvasScene implements OnlineSceneSink {
   private readonly boardEl: HTMLElement;
   /** The 2D/3D button, shown only while the board can be shown. */
   private readonly dimensionButton: HTMLButtonElement;
+  /** See through a token's eyes on the 3D board (Tabletop's first person); a menu picks the token when there are several. */
+  private readonly eyeButton: HTMLButtonElement;
+  private readonly eyeMenu: HTMLElement;
+  private sceneSpells: { sceneId: string; list: readonly MapSpell[] } | null = null;
+  /** The player's colour (Your colour in the Move menu), remembered between sessions. */
+  private pickedColor: string | null = null;
   /** The player wants the board when it can be shown (the 2D/3D button). */
   private wantsBoard = true;
   private offered = false;
@@ -92,10 +100,12 @@ export class CanvasScene implements OnlineSceneSink {
     const { dom, service } = options;
     // The keys of the window this tab is in, which may be a popout.
     const doc = dom.root.ownerDocument;
+    this.pickedColor = service.playerColor?.() ?? null;
     this.boardEl = dom.root.createDiv({ cls: 'atlas-connect-scene__board' });
     this.boardEl.hidden = true;
     dom.canvas.after(this.boardEl);
     this.view = this.makeMap();
+    if (this.pickedColor) this.view?.selectLaserColor(this.pickedColor);
     this.tray = new DiceTrayView({
       root: dom.diceTray,
       roll: (dice, modifier, advantage) => this.rollDice(dice, modifier, advantage),
@@ -120,7 +130,11 @@ export class CanvasScene implements OnlineSceneSink {
       onShape: (shape) => this.map?.selectShape(shape),
       onTemplateShape: (shape) => this.map?.selectTemplateShape(shape),
       onClearTemplates: () => this.map?.clearOwnTemplates(),
-      onLaserColor: (color) => this.map?.selectLaserColor(color),
+      onLaserColor: (color) => {
+        this.pickedColor = color;
+        this.map?.selectLaserColor(color);
+        service.sendColor?.(color);
+      },
       onLaserSize: (size) => this.map?.selectLaserSize(size),
       onDice: () => this.setDiceOpen(!this.tray.isOpen),
       ...(options.active ? { active: options.active } : {}),
@@ -131,6 +145,12 @@ export class CanvasScene implements OnlineSceneSink {
     this.dimensionButton = dom.toolbar.createEl('button', { cls: 'clickable-icon atlas-connect-scene__dimension' });
     this.dimensionButton.hidden = true;
     dom.toolbar.append(this.dimensionButton);
+    this.eyeButton = dom.toolbar.createEl('button', { cls: 'clickable-icon atlas-connect-scene__eye' });
+    setIcon(this.eyeButton, 'eye');
+    this.eyeButton.hidden = true;
+    this.eyeMenu = dom.root.createDiv({ cls: 'atlas-connect-scene__eye-menu menu' });
+    this.eyeMenu.hidden = true;
+    dom.toolbar.append(this.eyeButton);
     dom.toolbar.append(dom.viewButtons);
     this.controls = {
       followGm: () => this.map?.followGm(),
@@ -140,6 +160,11 @@ export class CanvasScene implements OnlineSceneSink {
     };
     const { signal } = this.listeners;
     dom.reconnect.addEventListener('click', () => this.controls.reconnect(), { signal });
+    this.eyeButton.addEventListener('click', () => this.eyeClicked(), { signal });
+    doc.addEventListener('pointerdown', (event) => {
+      const target = event.target as Node | null;
+      if (!this.eyeMenu.hidden && target && !this.eyeMenu.contains(target) && !this.eyeButton.contains(target)) this.eyeMenu.hidden = true;
+    }, { capture: true, signal });
     this.dimensionButton.addEventListener('click', () => {
       this.wantsBoard = !this.wantsBoard;
       this.chooseView();
@@ -181,6 +206,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.map?.setScene(scene);
     this.showStatus();
     if (this.view instanceof BoardSceneView) this.syncToolbar();
+    this.showEyes();
   }
 
   camera(camera: SceneCamera): void {
@@ -191,6 +217,54 @@ export class CanvasScene implements OnlineSceneSink {
   control(tokenIds: readonly string[]): void {
     this.controlIds = tokenIds;
     this.map?.setControlled(tokenIds);
+    // A token no longer the player's is not seen through.
+    if (this.view instanceof BoardSceneView) {
+      const seeing = this.view.seeingFrom();
+      if (seeing !== null && !tokenIds.includes(seeing)) this.view.seeFrom(null, false);
+    }
+    this.showEyes();
+  }
+
+  /** Every spell on the scene `sceneId`: the 3D board draws them. */
+  spells(sceneId: string, spells: readonly MapSpell[]): void {
+    this.sceneSpells = { sceneId, list: spells };
+    if (this.view instanceof BoardSceneView) this.view.receiveSpells(sceneId, spells);
+  }
+
+  /** The eye button: on the 3D board, with a token of the player's to see through. */
+  private showEyes(): void {
+    const view = this.view instanceof BoardSceneView ? this.view : null;
+    const can = view !== null && view.firstPerson && this.controlIds.length > 0 && this.shown !== null;
+    this.eyeButton.hidden = !can;
+    const seeing = view?.seeingFrom() ?? null;
+    const label = seeing ? 'Leave the token\'s eyes (Esc)' : 'See through a token\'s eyes';
+    this.eyeButton.setAttribute('aria-label', label);
+    this.eyeButton.setAttribute('aria-pressed', String(seeing !== null));
+    this.eyeButton.classList.toggle('is-active', seeing !== null);
+    if (!can) this.eyeMenu.hidden = true;
+  }
+
+  private eyeClicked(): void {
+    const view = this.view instanceof BoardSceneView ? this.view : null;
+    if (!view) return;
+    if (view.seeingFrom() !== null) { view.seeFrom(null, false); this.showEyes(); return; }
+    if (this.controlIds.length === 1) { this.seeFrom(this.controlIds[0]!); return; }
+    this.eyeMenu.empty();
+    for (const tokenId of this.controlIds) {
+      const item = this.eyeMenu.createDiv({ cls: 'menu-item', text: this.shown?.tokens[tokenId]?.name ?? tokenId });
+      item.addEventListener('click', () => { this.eyeMenu.hidden = true; this.seeFrom(tokenId); });
+    }
+    const button = this.eyeButton.getBoundingClientRect();
+    const root = this.options.dom.root.getBoundingClientRect();
+    this.eyeMenu.style.left = `${button.left - root.left}px`;
+    this.eyeMenu.style.top = `${button.bottom - root.top + 4}px`;
+    this.eyeMenu.hidden = !this.eyeMenu.hidden;
+  }
+
+  private seeFrom(tokenId: string): void {
+    const view = this.view instanceof BoardSceneView ? this.view : null;
+    if (!view?.seeFrom(tokenId, false)) return;
+    this.showEyes();
   }
 
   moveRefused(tokenId: string): void {
@@ -339,6 +413,8 @@ export class CanvasScene implements OnlineSceneSink {
       sendLaser: (points, lifted, dt, color, size) => service.sendLaser(points, lifted, dt, color, size),
       sendPing: (x, y) => service.sendPing(x, y),
       sendTemplate: (change) => service.sendTemplate(change),
+      ...(service.sendSpell ? { sendSpell: (change: SpellChange) => service.sendSpell?.(change) ?? false } : {}),
+      onEyeChange: () => this.showEyes(),
       ...(service.sendNoteRequest ? { requestNote: (pinId: string) => service.sendNoteRequest?.(pinId) ?? false } : {}),
       ...(service.sendDiceResult ? {
         sendDiceResult: (result: PhysicalRoll) => service.sendDiceResult?.(result) ?? false,
@@ -395,6 +471,7 @@ export class CanvasScene implements OnlineSceneSink {
     }
     view.setControlled(this.controlIds);
     view.setSheets(this.sheetEntries);
+    if (this.pickedColor) view.selectLaserColor(this.pickedColor);
     view.setScene(this.shown);
     view.setPaused(this.isPaused);
     if (this.mapCamera) view.setGmCamera(this.mapCamera);
@@ -402,9 +479,11 @@ export class CanvasScene implements OnlineSceneSink {
     if (view instanceof BoardSceneView) {
       view.setExtras(this.board);
       view.setBoardCamera(this.gmBoardCamera);
+      if (this.sceneSpells) view.receiveSpells(this.sceneSpells.sceneId, this.sceneSpells.list);
     }
     view.measure();
     this.syncToolbar();
+    this.showEyes();
   }
 
   /**

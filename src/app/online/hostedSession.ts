@@ -4,6 +4,7 @@
  * players' dice and lasers (B7) are optional parts: each starts only when its dep is given, and without
  * it the session runs without that feature (no token assignments, no dice, no lasers relayed).
  */
+import { PlayerColors } from './tools/playerColors';
 import type { ViewsApi } from '@atlas-vtt/api-types';
 import { Notice } from 'obsidian';
 import { AssetServer } from './assets/AssetServer';
@@ -56,6 +57,8 @@ export interface HostedContext {
   projection: SceneHub;
   /** Tabletop's 3D board on the GM's side: what the relays accept reaches it too. */
   board?: BoardSessionHub;
+  /** The colour each player picked (else their place's). */
+  colors?: PlayerColors;
 }
 
 export interface HostedPart {
@@ -207,7 +210,10 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     handouts: env.scene.handout ?? NO_HANDOUT,
     coneAngle: (mapPath) => env.scene.coneAngle?.(mapPath) ?? 90,
   }) : null;
-  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}) };
+  // Each player's colour: started first, so the relays colour a player's first ping or template with it.
+  const colors = new PlayerColors(scenes);
+  colors.start();
+  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}), colors };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
   // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
@@ -224,7 +230,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
   // Players in augmented reality, as eyes on Tabletop's board: only where there is one.
-  const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub }) : null;
+  const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub, colorOf: (playerId) => colors.colorOf(playerId) }) : null;
   boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
   // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
   // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
@@ -252,6 +258,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopErrors();
     assetServer.stop();
     for (const part of given([arViews, notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    colors.stop();
     boardSender.stop();
     cameraSender.stop();
     stopLog?.();

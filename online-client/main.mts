@@ -107,6 +107,8 @@ const map: SceneSwitch | null = surface
       sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
       sendPing: (x, y) => session?.sendPing(x, y) ?? false,
       sendTemplate: (change) => session?.sendTemplate(change) ?? false,
+      sendSpell: (change) => session?.sendSpell(change) ?? false,
+      onEyeChange: () => map?.eyesChanged(),
       requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
       onToolsChange: () => syncToolbar(),
       hoverCard: element('hover-card'),
@@ -183,7 +185,11 @@ const toolbar = new PageToolbar({
   onShape: (shape) => map?.selectShape(shape),
   onTemplateShape: (shape) => map?.selectTemplateShape(shape),
   onClearTemplates: () => map?.clearOwnTemplates(),
-  onLaserColor: (color) => map?.selectLaserColor(color),
+  onLaserColor: (color) => {
+    map?.selectLaserColor(color);
+    saveLaserColor(color, () => localStorage);
+    session?.sendColor(color);
+  },
   onLaserSize: (size) => map?.selectLaserSize(size),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
@@ -358,6 +364,8 @@ if (!target) {
     form.hidden = true;
     session = createJoinSession({
       loader,
+      // The colour the player picked last time goes to the GM on each admission.
+      color: () => loadLaserColor(() => localStorage),
       hostId: target.hostId,
       name,
       // One key per GM session, so different GMs cannot recognise or pose as the same player.
@@ -394,6 +402,7 @@ if (!target) {
       onLaser: (laser) => map.receiveLaser(laser),
       onPing: (ping) => map.receivePing(ping),
       onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
+      onSpells: (sceneId, spells) => map.receiveSpells(sceneId, spells),
       onSheets: (entries) => {
         sheets.receive(entries);
         map.setSheets(entries);

@@ -16,6 +16,8 @@ import { laserColor } from './laserColors';
 
 export interface ArViewRelayOptions {
   session: SceneSession;
+  /** A player's colour (their pick); their place's without it. */
+  colorOf?(playerId: string): string;
   projection: Pick<SlotProjection, 'slotOf'>;
   board: Pick<BoardSessionSink, 'viewer' | 'survey'>;
 }
@@ -49,7 +51,7 @@ export class ArViewRelay implements SessionHandler {
     const before = this.shown.get(player.playerId);
     if (before && before.mapPath !== slot.mapPath) this.hide(player.playerId);
     const players = this.options.session.getPlayers();
-    const color = laserColor(player.playerId, players.map((each) => each.playerId));
+    const color = this.options.colorOf?.(player.playerId) ?? laserColor(player.playerId, players.map((each) => each.playerId));
     this.shown.set(player.playerId, { mapPath: slot.mapPath, name: player.name, color });
     this.options.board.viewer(slot.mapPath, player.playerId, player.name, color, message.pose);
   }

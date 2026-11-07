@@ -37,6 +37,9 @@ export interface PageToolbarOptions {
   layout?: () => ToolbarFitLayout;
 }
 
+/** What the player's colour is for: everything of theirs others see, not the laser alone. */
+export const PLAYER_COLOR_HINT = 'Everyone sees your laser, pings, templates and spells in it.';
+
 /** The page's side gutter, on each side of the bar. */
 const GUTTER = 16;
 
@@ -268,7 +271,7 @@ export class PageToolbar {
     flyout.classList.add('swatch-menu');
     const colourLabel = document.createElement('span');
     colourLabel.className = 'menu-label';
-    colourLabel.textContent = 'Laser colour';
+    colourLabel.textContent = 'Your colour';
     const grid = document.createElement('div');
     grid.className = 'swatch-grid';
     for (const swatch of laserSwatches('')) {
@@ -291,7 +294,7 @@ export class PageToolbar {
     }
     const hint = document.createElement('p');
     hint.className = 'menu-hint';
-    hint.textContent = LASER_COLOR_HINT;
+    hint.textContent = `${PLAYER_COLOR_HINT} ${LASER_COLOR_HINT}`;
     flyout.append(colourLabel, grid, hint);
     if (this.options.onLaserSize) {
       const row = document.createElement('div');

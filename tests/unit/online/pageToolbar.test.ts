@@ -65,11 +65,12 @@ describe('the join page toolbar', () => {
     const items = [...menu.querySelectorAll<HTMLButtonElement>('.menu-entry')];
     expect(items.map((entry) => entry.textContent)).toEqual(['Move/Select', 'Laser Pointer', 'Ping']);
     expect(items.map((entry) => entry.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
-    expect(menu.querySelector('.menu-label')?.textContent).toBe('Laser colour');
+    expect(menu.querySelector('.menu-label')?.textContent).toBe('Your colour');
     const picked = menu.querySelector<HTMLButtonElement>('.swatch.is-selected')!;
     expect(picked.getAttribute('aria-label')).toBe('Sky blue');
     expect(picked.querySelector('.swatch-check')).not.toBeNull();
     expect(menu.querySelector('.menu-hint')?.textContent).toMatch(/colour-blind/);
+    expect(menu.querySelector('.menu-hint')?.textContent).toMatch(/pings, templates and spells/);
     const size = menu.querySelector<HTMLInputElement>('input[type="range"][aria-label="Laser size"]')!;
     expect([size.min, size.max, size.value]).toEqual(['8', '100', '24']);
     expect(menu.querySelector('.menu-slider-value')?.textContent).toBe('24px');

@@ -16,6 +16,7 @@ import { isArPose, type ArPose } from './tools/arViews';
 import { isArTable, type ArSurvey } from './tools/arTable';
 import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
+import { isMapSpells, isSpell, isSpellId, type MapSpell, type Spell } from './tools/spells';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -128,6 +129,12 @@ export type ControlMessage =
   | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
   /** GM to players: every template on the scene, whenever they change. */
   | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] }
+  /** Player to GM: cast a spell through a token's eyes on the scene they have, take one of theirs off, or clear theirs (`tools/spells.ts`). */
+  | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; remove?: string; clear?: true }
+  /** Player to GM, on admission and when they pick another: their own colour (`tools/playerColors.ts`), one of the laser swatches. */
+  | { v: 1; type: 'player-color'; color: string }
+  /** GM to players: every spell on the scene, whenever they change. */
+  | { v: 1; type: 'map-spells'; sceneId: string; spells: MapSpell[] }
   /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
@@ -150,7 +157,7 @@ export type ControlMessage =
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view', 'ar-survey',
+  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view', 'ar-survey', 'map-spell', 'player-color',
 ]);
 
 export type Decoded =
@@ -217,6 +224,10 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
     && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
   'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
+  'map-spell': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1
+    && (m.add === undefined || isSpell(m.add)) && (m.remove === undefined || isSpellId(m.remove)) && (m.clear === undefined || m.clear === true),
+  'map-spells': (m) => isSceneId(m.sceneId) && isMapSpells(m.spells),
+  'player-color': (m) => isLaserColor(m.color),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
   'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),

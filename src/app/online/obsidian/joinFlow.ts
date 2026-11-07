@@ -2,6 +2,7 @@
  * What happens inside one join: the state it keeps, the player session it runs against the GM, and
  * what a scene tab gets when it attaches. `OnlineJoinService` owns the join and calls these.
  */
+import type { MapSpell } from '../tools/spells';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import type { TokenSheet } from '../tools/sheets';
 import type { MapTemplate } from '../tools/templates';
@@ -37,6 +38,8 @@ export interface Joined {
   sheets: readonly TokenSheet[];
   /** The scene's lasting templates, as the GM last sent them; null before any. */
   templates: { sceneId: string; list: readonly MapTemplate[] } | null;
+  /** The scene's spells, cast through tokens' eyes on the 3D board. */
+  spells?: { sceneId: string; list: readonly MapSpell[] };
   /** Whether the GM can send Tabletop's 3D board, its board of the scene, and its 3D camera. */
   boardOffer?: boolean;
   /** The latest offer took thrown dice (`diceResults`), with the rules of the player's map; absent when it did not. */
@@ -57,6 +60,8 @@ export interface FlowHost {
   createClient(server: JoinTarget['server']): ClientTransport;
   clientVersion: string;
   shareHandler(): PlayerShareHandler | null;
+  /** The colour the player picked (kept by the vault), sent on each admission. */
+  playerColor?(): string | null;
   /** The GM offered the board (or took it away): a tab that wants it asks now. */
   boardOffered?(joined: Joined): void;
 }
@@ -72,6 +77,8 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
     playerKey: joined.playerKey,
     clientVersion: host.clientVersion,
     clientKind: 'obsidian',
+    // The colour the player picked last time goes to the GM on each admission.
+    color: () => host.playerColor?.() ?? null,
     ...(share ? { share } : {}),
     ...(joined.ids.device ? { device: joined.ids.device } : {}),
     transport: host.createClient(joined.target.server),
@@ -123,6 +130,11 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.templates = { sceneId, list };
       host.sink()?.templates?.(sceneId, list);
     },
+    onSpells: (sceneId, list) => {
+      if (!current()) return;
+      joined.spells = { sceneId, list };
+      host.sink()?.spells?.(sceneId, list);
+    },
     onSheets: (entries) => {
       if (!current()) return;
       joined.sheets = entries;
@@ -169,6 +181,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.diceLook?.(joined.diceLook),
     () => sink.sheets?.(joined.sheets),
     () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
+    () => { if (joined.spells) sink.spells?.(joined.spells.sceneId, joined.spells.list); },
     () => { if (joined.camera) sink.camera(joined.camera); },
     () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer, joined.boardDice); },
     () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },
