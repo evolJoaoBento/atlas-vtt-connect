@@ -22,7 +22,7 @@ export const SPELL_LIMITS = {
 export const SPELL_SHAPES = ['sphere', 'cube', 'cylinder', 'cone', 'wall'] as const;
 export type SpellShape = typeof SPELL_SHAPES[number];
 /** D&D's damage types: a spell's look on Tabletop's board (its `spellEffects.ts`); the list must stay the same. */
-export const DAMAGE_TYPES = ['acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'] as const;
+export const DAMAGE_TYPES = ['acid', 'bludgeoning', 'cold', 'explosion', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'psychic', 'radiant', 'slashing', 'thunder'] as const;
 export type DamageType = typeof DAMAGE_TYPES[number];
 
 export interface Spell {
