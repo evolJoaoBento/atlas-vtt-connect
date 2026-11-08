@@ -273,6 +273,24 @@ async function run(engine, label, device) {
   await page.click('#dimension-button');
   await wait(300);
   check(tag('the 2D/3D button goes back to the map and stops asking for the board'), await page.evaluate(() => !document.getElementById('map').hidden && document.getElementById('board-3d').hidden && window.pageTest.record.requests.at(-1) === false));
+  // Memory: the board closed cleanly leaves no mark of a death; a page that died with it up (a mark left running) has
+  // the next board drawn leaner: smaller textures, below the screen's resolution, no layers.
+  const KEY = 'atlas-tabletop-board-memory';
+  const cleanMark = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? 'null'), KEY);
+  check(tag('a board closed cleanly leaves its mark cleared'), cleanMark && cleanMark.running === false, JSON.stringify(cleanMark));
+  await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ running: true, crashes: 1, last: Date.now() })), KEY);
+  await page.click('#dimension-button');
+  await page.waitForFunction(() => !document.getElementById('board-3d').hidden && window.pageTest.inner(), null, { timeout: 60000 });
+  await page.evaluate(() => window.pageTest.extrasNow());
+  await wait(2000);
+  const lean = await page.evaluate((key) => {
+    const board = window.pageTest.inner();
+    return { side: board.quality.textureSide, noLayers: board.quality.noLayers, ratio: board.quality.maxPixelRatio, layers: board.layerViews?.size ?? 0, mark: JSON.parse(localStorage.getItem(key) ?? 'null') };
+  }, KEY);
+  check(tag('after a death with the board up, the board comes back leaner: small textures, lower resolution, no layers'), lean.side === 2048 && lean.noLayers === true && lean.ratio < 1 && lean.layers === 0 && lean.mark?.running === true && lean.mark?.crashes === 2, JSON.stringify(lean));
+  await page.click('#dimension-button');
+  await wait(300);
+  await page.evaluate((key) => localStorage.removeItem(key), KEY);
   check(tag('no errors on the page'), errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close();
 }

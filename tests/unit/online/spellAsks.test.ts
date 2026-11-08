@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
-import { askedSpell, isSpellAsk, type Spell, type SpellAsk, type SpellRequest } from '../../../src/app/online/tools/spells';
+import { askedSpell, cleanAsk, isSpellAsk, joinAsks, type Spell, type SpellAsk, type SpellRequest } from '../../../src/app/online/tools/spells';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
@@ -31,7 +31,7 @@ function world() {
   const lastOf = (playerId: string) => sent.filter(([to, m]) => to === playerId && m.type === 'map-spells').at(-1)?.[1] as Extract<ControlMessage, { type: 'map-spells' }> | undefined;
   const asks = (playerId: string): SpellRequest[] => lastOf(playerId)?.asks ?? [];
   return {
-    host, sent, notify, control, asks,
+    host, sent, notify, control, asks, lastOf,
     send: (player: SessionPlayer, message: ControlMessage) => handler!.onMessage?.(player, message),
     admit: (player: SessionPlayer) => handler!.onAdmitted?.(player),
   };
@@ -120,5 +120,36 @@ describe('spell ask messages', () => {
     expect(round({ v: 1, type: 'map-spell', sceneId: 's1', decline: 'a1' })).not.toBeNull();
     expect(round({ v: 1, type: 'map-spell', sceneId: 's1', remove: 's1', request: 'a1' })).toBeNull();
     expect(round({ v: 1, type: 'map-spell', sceneId: 's1', decline: 'a1', clear: true })).toBeNull();
+  });
+
+  it("carries the spell's damage and its words to the player; the cast takes the ask's damage", () => {
+    const about = { line: 'Level 3 Evocation', properties: [['Range', '150 feet'], ['Damage', '8d6 fire']] as Array<[string, string]>, text: 'A bright streak flashes.' };
+    const full: SpellAsk = { ...fireball, effect: 'fire', about };
+    expect(isSpellAsk(full)).toBe(true);
+    expect(cleanAsk(full)).toEqual(full);
+    expect(isSpellAsk({ ...fireball, effect: 'glitter' })).toBe(false);
+    expect(isSpellAsk({ ...fireball, about: { ...about, text: 'x'.repeat(4001) } })).toBe(false);
+    expect(isSpellAsk({ ...fireball, about: { ...about, properties: [['Range', 3]] } })).toBe(false);
+    expect(isSpellAsk({ ...fireball, about: { ...about, extra: 1 } })).toBe(false);
+    expect(askedSpell({ ...aimed, effect: 'cold' }, full).effect).toBe('fire');
+    expect(askedSpell({ ...aimed, effect: 'cold' }, fireball).effect).toBe('cold');
+    const round = (message: ControlMessage) => (decodeControl(encodeControl(message)).kind === 'message' ? true : null);
+    expect(round({ v: 1, type: 'map-spells', sceneId: 's1', spells: [], asks: [{ id: 'a1', tokenId: 'wizard', ask: full }] })).not.toBeNull();
+  });
+
+  it("sends a spell's damage and words beside the asks, where a page from before them passes them by; the player joins them again", () => {
+    const w = world();
+    const about = { line: 'Level 3 Evocation', properties: [['Range', '150 feet']] as Array<[string, string]>, text: 'A bright streak.' };
+    w.host.requestSpell('s1', 'wizard', { ...fireball, effect: 'fire', about });
+    const message = w.lastOf('p1')!;
+    expect(message.asks).toEqual([{ id: 'a1', tokenId: 'wizard', ask: fireball }]);
+    expect(message.askWords).toEqual([{ id: 'a1', effect: 'fire', about }]);
+    expect(joinAsks(message.asks ?? [], message.askWords)).toEqual([{ id: 'a1', tokenId: 'wizard', ask: { ...fireball, effect: 'fire', about } }]);
+    expect(decodeControl(encodeControl(message)).kind).toBe('message');
+    expect(decodeControl(encodeControl({ ...message, askWords: [{ id: 'a1', effect: 'glitter' }] } as never)).kind).not.toBe('message');
+    // A plain ask sends no words.
+    const plain = world();
+    plain.host.requestSpell('s1', 'wizard', fireball);
+    expect(plain.lastOf('p1')!.askWords).toBeUndefined();
   });
 });

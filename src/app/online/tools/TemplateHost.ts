@@ -16,7 +16,7 @@ import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { GM_LASER_ID, laserColor } from './laserColors';
 import type { BoardSessionSink } from './BoardSessionHub';
 import { TEMPLATE_LIMITS, type MapTemplate } from './templates';
-import { askedSpell, cleanAsk, cleanSpell, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type Spell, type SpellAsk, type SpellRequest } from './spells';
+import { askedSpell, cleanAsk, cleanSpell, splitAsks, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type Spell, type SpellAsk, type SpellRequest } from './spells';
 
 export interface TemplateHostOptions {
   session: SceneSession;
@@ -326,8 +326,8 @@ export class TemplateHost implements SessionHandler {
 
   /** A scene's spells to one of its players, with what the GM asks of their tokens there. */
   private sendSpells(playerId: string, sceneId: string): void {
-    const asks = this.asksFor(playerId, sceneId);
-    this.options.session.send(playerId, { v: 1, type: 'map-spells', sceneId, spells: this.spellsByScene.get(sceneId) ?? [], ...(asks.length > 0 ? { asks } : {}) });
+    const { asks, words } = splitAsks(this.asksFor(playerId, sceneId));
+    this.options.session.send(playerId, { v: 1, type: 'map-spells', sceneId, spells: this.spellsByScene.get(sceneId) ?? [], ...(asks.length > 0 ? { asks } : {}), ...(words.length > 0 ? { askWords: words } : {}) });
   }
 
   private broadcast(sceneId: string): void {

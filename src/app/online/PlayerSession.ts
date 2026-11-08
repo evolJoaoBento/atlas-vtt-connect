@@ -15,6 +15,7 @@ import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
 import type { MapSpell, SpellChange, SpellRequest } from './tools/spells';
+import { joinAsks } from './tools/spells';
 import type { TemplateChange } from './view/tools/PlayerTools';
 import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
@@ -363,7 +364,7 @@ export class PlayerSession {
         this.options.onSheets?.(message.entries);
         break;
       case 'map-spells':
-        this.options.onSpells?.(message.sceneId, message.spells, message.asks ?? []);
+        this.options.onSpells?.(message.sceneId, message.spells, joinAsks(message.asks ?? [], message.askWords));
         break;
       case 'map-templates':
         this.options.onTemplates?.(message.sceneId, message.templates);

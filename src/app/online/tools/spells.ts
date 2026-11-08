@@ -123,7 +123,33 @@ export interface SpellAsk {
   angle?: number;
   /** A wall's longest run, map pixels. */
   longest?: number;
+  /** Its damage, for its look: the cast takes it. */
+  effect?: DamageType;
+  /** The spell's words, from the GM's spell note, shown to the player first. */
+  about?: SpellAbout;
 }
+
+/** A spell's words as an ask carries them: its level line, its properties (label, value) and its description (Markdown). */
+export interface SpellAbout {
+  line: string;
+  properties: Array<[string, string]>;
+  text: string;
+}
+
+export const SPELL_ABOUT_LIMITS = { line: 120, properties: 10, label: 30, value: 200, text: 4000 } as const;
+
+export function isSpellAbout(value: unknown): value is SpellAbout {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const about = value as Partial<Record<keyof SpellAbout, unknown>>;
+  if (typeof about.line !== 'string' || about.line.length > SPELL_ABOUT_LIMITS.line) return false;
+  if (typeof about.text !== 'string' || about.text.length > SPELL_ABOUT_LIMITS.text) return false;
+  if (!Array.isArray(about.properties) || about.properties.length > SPELL_ABOUT_LIMITS.properties) return false;
+  const pairs = about.properties.every((pair) => Array.isArray(pair) && pair.length === 2 && typeof pair[0] === 'string' && pair[0].length <= SPELL_ABOUT_LIMITS.label
+    && typeof pair[1] === 'string' && pair[1].length <= SPELL_ABOUT_LIMITS.value);
+  return pairs && Object.keys(about).every((key) => key === 'line' || key === 'properties' || key === 'text');
+}
+
+export const isDamageType = (value: unknown): value is DamageType => typeof value === 'string' && (DAMAGE_TYPES as readonly string[]).includes(value);
 
 /** An ask sent to a token's players: its id and the token it is asked of. */
 export interface SpellRequest {
@@ -146,8 +172,53 @@ export function isSpellAsk(value: unknown): value is SpellAsk {
   if (ask.angle !== undefined && (!isNumber(ask.angle) || ask.angle <= 0 || ask.angle >= Math.PI)) return false;
   if (ask.longest !== undefined && (!isSize(ask.longest) || ask.longest <= 0)) return false;
   if (ask.name !== undefined && (typeof ask.name !== 'string' || ask.name.length > SPELL_NAME_LENGTH)) return false;
-  const known = new Set(['name', 'shape', 'from', 'size', 'length', 'angle', 'longest']);
+  if (ask.effect !== undefined && !isDamageType(ask.effect)) return false;
+  if (ask.about !== undefined && !isSpellAbout(ask.about)) return false;
+  const known = new Set(['name', 'shape', 'from', 'size', 'length', 'angle', 'longest', 'effect', 'about']);
   return Object.keys(ask).every((key) => known.has(key));
+}
+
+/**
+ * An ask's damage and words, sent beside the asks (`map-spells`' `askWords`) rather than in them: a page from before
+ * they existed checks each ask's keys and would turn the whole message down; beside them, it passes them by.
+ */
+export interface SpellWords {
+  id: string;
+  effect?: DamageType;
+  about?: SpellAbout;
+}
+
+export function isSpellWordsList(value: unknown): value is SpellWords[] {
+  return Array.isArray(value) && value.length <= SPELL_ASKS_PER_PLAYER && (value as unknown[]).every((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null || !isSpellId((entry as SpellWords).id)) return false;
+    const words = entry as Partial<Record<keyof SpellWords, unknown>>;
+    if (words.effect !== undefined && !isDamageType(words.effect)) return false;
+    if (words.about !== undefined && !isSpellAbout(words.about)) return false;
+    return Object.keys(entry).every((key) => key === 'id' || key === 'effect' || key === 'about');
+  });
+}
+
+/** Asks as sent to players: each its shape and sizes, and their damage and words beside them. */
+export function splitAsks(requests: readonly SpellRequest[]): { asks: SpellRequest[]; words: SpellWords[] } {
+  const asks: SpellRequest[] = [];
+  const words: SpellWords[] = [];
+  for (const request of requests) {
+    const { effect, about, ...shape } = request.ask;
+    asks.push({ ...request, ask: shape });
+    if (effect !== undefined || about !== undefined) words.push({ id: request.id, ...(effect !== undefined ? { effect } : {}), ...(about !== undefined ? { about } : {}) });
+  }
+  return { asks, words };
+}
+
+/** The asks a player gets, each with its damage and words again. */
+export function joinAsks(asks: readonly SpellRequest[], words: readonly SpellWords[] | undefined): SpellRequest[] {
+  if (!words || words.length === 0) return [...asks];
+  const byId = new Map(words.map((entry) => [entry.id, entry]));
+  return asks.map((request) => {
+    const extra = byId.get(request.id);
+    if (!extra) return request;
+    return { ...request, ask: { ...request.ask, ...(extra.effect !== undefined ? { effect: extra.effect } : {}), ...(extra.about !== undefined ? { about: extra.about } : {}) } };
+  });
 }
 
 export function isSpellRequests(value: unknown): value is SpellRequest[] {
@@ -163,6 +234,8 @@ export function cleanAsk(ask: SpellAsk): SpellAsk {
     shape: ask.shape, from: ask.shape === 'wall' ? 'point' : ask.from, size: ask.size, length: ask.shape === 'wall' || ask.shape === 'cylinder' ? ask.length : 0,
     ...(ask.angle !== undefined ? { angle: ask.angle } : {}),
     ...(ask.shape === 'wall' && ask.longest !== undefined ? { longest: ask.longest } : {}),
+    ...(ask.effect !== undefined ? { effect: ask.effect } : {}),
+    ...(ask.about !== undefined ? { about: { line: ask.about.line, properties: ask.about.properties.map(([label, value]) => [label, value] as [string, string]), text: ask.about.text } } : {}),
   };
 }
 
@@ -173,6 +246,7 @@ export function cleanAsk(ask: SpellAsk): SpellAsk {
 export function askedSpell(spell: Spell, ask: SpellAsk): Spell {
   const made: Spell = { ...cleanSpell(spell), shape: ask.shape, from: ask.shape === 'wall' ? 'point' : ask.from, size: ask.size, length: ask.shape === 'wall' || ask.shape === 'cylinder' ? ask.length : 0 };
   if (ask.angle !== undefined) made.angle = ask.angle;
+  if (ask.effect !== undefined) made.effect = ask.effect;
   if (ask.shape !== 'wall') { delete made.to; return made; }
   const to = spell.to ?? { x: spell.at.x + 1e-3, y: spell.at.y };
   const run = Math.hypot(to.x - spell.at.x, to.y - spell.at.y);

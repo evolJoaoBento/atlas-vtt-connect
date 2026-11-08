@@ -1971,3 +1971,76 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-spellbar.is-ask { bottom: auto; top: max(12px, env(safe-area-inset-top)); border-color: var(--interactive-accent, #7c5cff); }
 .atlas-tabletop-spellbar__ask { padding: 0 8px; font-weight: 500; max-width: 520px; }
 .atlas-tabletop-spellbar__more { padding: 0 6px; color: var(--text-muted, #a8a8b0); font-size: 11px; }
+
+/* The spell search over the board (spellPicker.ts): the spells found, the one picked in full, its area, the caller's buttons. */
+.atlas-tabletop-spellpicker {
+  /* A column at the side: the board (the token, the spell drawn) stays in sight beside it. */
+  position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); z-index: 8;
+  width: min(400px, calc(100% - 32px)); max-height: calc(100% - 96px); box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px;
+  background: var(--background-primary, #1f1f22); color: var(--text-normal, #e6e6e6);
+  border: 1px solid var(--background-modifier-border, #3a3a3f); border-radius: 14px; box-shadow: 0 10px 32px #000a;
+  font-size: 13px;
+}
+.atlas-tabletop-spellpicker__head { display: flex; align-items: center; gap: 8px; }
+.atlas-tabletop-spellpicker__title { flex: 1; font-weight: 600; font-size: 14px; }
+.atlas-tabletop-spellpicker__close, .atlas-tabletop-spellcard__toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 28px; height: 28px; padding: 0 6px;
+  border: 0; border-radius: 8px; background: transparent; color: inherit; box-shadow: none; cursor: pointer; font: inherit;
+}
+.atlas-tabletop-spellpicker__close:hover, .atlas-tabletop-spellcard__toggle:hover { background: var(--background-modifier-hover, #ffffff14); }
+.atlas-tabletop-spellpicker svg, .atlas-tabletop-spellcard svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.atlas-tabletop-spellpicker__note { color: var(--text-muted, #a8a8b0); font-size: 12px; }
+.atlas-tabletop-spellpicker__search {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 34px; border-radius: 9px;
+  border: 1px solid var(--background-modifier-border, #3a3a3f); background: var(--background-secondary, #2a2a2e);
+}
+.atlas-tabletop-spellpicker__search input { flex: 1; min-width: 0; height: 30px; border: 0; background: transparent; color: inherit; font: inherit; box-shadow: none; outline: none; }
+.atlas-tabletop-spellpicker__body { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+.atlas-tabletop-spellpicker__list { overflow-y: auto; max-height: min(24vh, 220px); flex: none; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+.atlas-tabletop-spellpicker__row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 5px 8px; height: auto; border: 0; border-radius: 8px;
+  background: transparent; color: inherit; box-shadow: none; cursor: pointer; font: inherit; text-align: left;
+}
+.atlas-tabletop-spellpicker__row:hover { background: var(--background-modifier-hover, #ffffff14); }
+.atlas-tabletop-spellpicker__row.is-picked { background: var(--interactive-accent, #7c5cff); color: var(--text-on-accent, #fff); }
+.atlas-tabletop-spellpicker__name { font-weight: 500; }
+.atlas-tabletop-spellpicker__meta { font-size: 11px; opacity: 0.75; }
+.atlas-tabletop-spellpicker__empty { color: var(--text-muted, #a8a8b0); padding: 8px; }
+.atlas-tabletop-spellpicker__preview { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+.atlas-tabletop-spellpicker__words { overflow-y: auto; max-height: min(34vh, 320px); padding-right: 4px; border-top: 1px solid var(--background-modifier-border, #3a3a3f); padding-top: 6px; }
+.atlas-tabletop-spellpicker__area { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding-top: 6px; border-top: 1px solid var(--background-modifier-border, #3a3a3f); }
+.atlas-tabletop-spellpicker__area label { display: inline-flex; align-items: center; gap: 4px; }
+.atlas-tabletop-spellpicker__area label > span:first-child { color: var(--text-muted, #a8a8b0); }
+.atlas-tabletop-spellpicker__area input { width: 56px; height: 28px; }
+.atlas-tabletop-spellpicker__area select { height: 28px; }
+.atlas-tabletop-spellpicker__unit { color: var(--text-muted, #a8a8b0); font-size: 11px; }
+.atlas-tabletop-spellpicker__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.atlas-tabletop-spellpicker__heading { font-weight: 600; }
+/* The toolbar waits under the search. */
+.atlas-tabletop-spellbar.is-under { opacity: 0.4; pointer-events: none; }
+@media (max-width: 620px) {
+  .atlas-tabletop-spellpicker { left: 16px; right: 16px; width: auto; }
+  .atlas-tabletop-spellpicker__list { max-height: 20vh; }
+  .atlas-tabletop-spellpicker__words { max-height: 24vh; }
+}
+
+/* A spell's words (spellPicker.ts): in the search, and over the board's top left while it is asked or cast. */
+.atlas-tabletop-spellabout { display: flex; flex-direction: column; gap: 4px; line-height: 1.4; }
+.atlas-tabletop-spellabout__name { font-weight: 700; font-size: 15px; }
+.atlas-tabletop-spellabout__line { font-style: italic; color: var(--text-muted, #a8a8b0); }
+.atlas-tabletop-spellabout__props { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; margin: 4px 0; }
+.atlas-tabletop-spellabout__props dt { color: var(--text-muted, #a8a8b0); }
+.atlas-tabletop-spellabout__props dd { margin: 0; }
+.atlas-tabletop-spellabout__text p { margin: 0 0 6px; }
+.atlas-tabletop-spellcard {
+  position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(104px, calc(env(safe-area-inset-top) + 92px)); z-index: 7;
+  width: min(340px, calc(100% - 32px)); max-height: min(55%, 460px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px;
+  background: color-mix(in srgb, var(--background-primary, #1f1f22) 94%, transparent); color: var(--text-normal, #e6e6e6);
+  border: 1px solid var(--interactive-accent, #7c5cff); border-radius: 12px; box-shadow: 0 6px 24px #0009; font-size: 12.5px;
+}
+.atlas-tabletop-spellcard[hidden] { display: none; }
+.atlas-tabletop-spellcard .atlas-tabletop-spellabout > .atlas-tabletop-spellcard__toggle { position: absolute; top: 6px; right: 6px; }
+.atlas-tabletop-spellcard .atlas-tabletop-spellabout__name { padding-right: 30px; }
+.atlas-tabletop-spellcard.is-folded { width: auto; max-height: none; overflow: visible; padding: 2px; border-radius: 10px; }
+.atlas-tabletop-spellcard.is-folded .atlas-tabletop-spellcard__toggle { float: none; margin: 0; height: 32px; padding: 0 10px; font-weight: 500; }
