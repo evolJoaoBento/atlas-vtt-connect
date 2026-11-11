@@ -25,13 +25,13 @@ function stockHosting() {
   });
   const connect = hostPlugin(stock.app);
   const network = new MemoryNetwork();
-  const memoryHost = network.host('gm-id');
   const requests: Array<(allow: boolean) => void> = [];
   const link = new AtlasLink(connect.plugin, (extension, api) => startConnect(connect.plugin, extension, api, {
     settings: memorySettings(),
     lifetime: sharingLifetime(connect.plugin),
     hosting: {
-      createHost: async () => memoryHost,
+      // A fresh host for each session, as a stop and a new start make.
+      createHost: async () => network.host('gm-id'),
       table: async () => null,
       showRequest: (_player, answer) => { requests.push(answer); return { hide: () => {} }; },
     },
@@ -69,6 +69,41 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     await vi.advanceTimersByTimeAsync(80);
     const snapshot = received.find((message) => message.type === 'scene-snapshot');
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
+  });
+
+  it('sends a scene presented before the session to a player who joins after it starts, and after a stop and a new start', async () => {
+    const { connect, join, a, presented } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    for (const name of ['Ana', 'Bea']) {
+      expect(connect.run('start-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      const received = await join(name);
+      await vi.advanceTimersByTimeAsync(80);
+      const snapshot = received.find((message) => message.type === 'scene-snapshot');
+      expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
+      expect(connect.run('stop-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    }
+  });
+
+  it('sends a scene presented while the GM was on another tab once the GM goes back to it, without presenting again', async () => {
+    const { connect, join, a, presented } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    a.tabMeta.set({ activeTabId: 't2' });
+    a.scene.set({ mapPath: 'maps/two.atlasmap' } as never);
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(0);
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(80);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(false);
+    a.tabMeta.set({ activeTabId: 't1' });
+    a.scene.set({ mapPath: 'maps/one.atlasmap' } as never);
+    await vi.advanceTimersByTimeAsync(80);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(true);
   });
 
   it('shows players nothing of a scene saved lit whose lighting Atlas does not give (fails closed)', async () => {
