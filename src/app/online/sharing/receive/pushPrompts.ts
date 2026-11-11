@@ -12,6 +12,8 @@ export interface PushPromptDeps {
   show(push: PushRequest, personName: string, answer: (pull: boolean) => void): { hide(): void };
   service(): Pick<SharedWithMe, 'pullPushed'> | null;
   notify(text: string): void;
+  /** Opens the note the receiver let in (`openPulledNote`); never for a map. */
+  open?(path: string): void;
 }
 
 /** Pulls a push the receiver accepted, telling them where it landed or why it did not. */
@@ -34,7 +36,14 @@ export type PushPromptListener = ((state: ShareSessionState) => void) & { dispos
 /** A listener for `shareSessionStore`: prompts for new pushes, takes the prompt of a dismissed one down. */
 export function pushPromptListener(deps: PushPromptDeps): PushPromptListener {
   const prompts = new Map<string, { hide(): void }>();
-  const report = { pulled: (path: string): void => deps.notify(`Pulled into ${path}`), failed: (text: string): void => deps.notify(text) };
+  const report = (push: PushRequest): { pulled(path: string): void; failed(text: string): void } => ({
+    pulled: (path) => {
+      deps.notify(`Pulled into ${path}`);
+      // The receiver let this one note in: it opens. A map goes to Atlas as a scene.
+      if (push.kind === 'note') deps.open?.(path);
+    },
+    failed: (text) => deps.notify(text),
+  });
   const listener = (state: ShareSessionState): void => {
     for (const push of state.pushes) {
       const key = keyOf(push);
@@ -42,7 +51,7 @@ export function pushPromptListener(deps: PushPromptDeps): PushPromptListener {
       const name = state.people.find((person) => person.personId === push.from)?.name ?? 'Someone';
       prompts.set(key, deps.show(push, name, (pull) => {
         dismissPush(push.from, push.item);
-        if (pull) pullAcceptedPush(deps.service(), push, report);
+        if (pull) pullAcceptedPush(deps.service(), push, report(push));
       }));
     }
     for (const [key, prompt] of [...prompts]) {

@@ -17,7 +17,8 @@ interface ListProps {
   people: readonly SessionPerson[];
   pushes: readonly PushRequest[];
   dismissPush: (push: PushRequest) => void;
-  onPulled: (path: string) => void;
+  /** A pull the user asked for landed at `path`; `kind` says whether it was a note or a map. */
+  onPulled: (path: string, kind: 'note' | 'map') => void;
   onProblem: (text: string) => void;
 }
 
@@ -55,7 +56,7 @@ function ItemRow({ item, onPull, titles }: { item: ListedItem; onPull: (linked: 
   );
 }
 
-function PersonSection({ person, service, onPulled }: { person: SessionPerson; service: Service; onPulled: (path: string) => void }): React.ReactElement {
+function PersonSection({ person, service, onPulled }: { person: SessionPerson; service: Service; onPulled: ListProps['onPulled'] }): React.ReactElement {
   const [items, setItems] = useState<ListedItem[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const load = useCallback((): void => {
@@ -73,7 +74,7 @@ function PersonSection({ person, service, onPulled }: { person: SessionPerson; s
         {items?.map((item) => (
           <ItemRow key={item.item} item={item} titles={titles} onPull={async (linked) => {
             const outcome = await service.pull(person.personId, item, linked);
-            if ('path' in outcome) onPulled(outcome.path);
+            if ('path' in outcome) onPulled(outcome.path, item.kind);
             load();
           }} />
         ))}
@@ -96,7 +97,7 @@ export function SharedWithMeList({ service, people, pushes, dismissPush, onPulle
                 <span className="atlas-shared__title">{pushPromptText(push, nameOf(push.from))}</span>
                 <Button variant="cta" size="sm" onClick={() => {
                   dismissPush(push);
-                  pullAcceptedPush(service, push, { pulled: onPulled, failed: onProblem });
+                  pullAcceptedPush(service, push, { pulled: (path) => onPulled(path, push.kind), failed: onProblem });
                 }}>Allow</Button>
                 <Button variant="default" size="sm" onClick={() => dismissPush(push)}>Decline</Button>
               </li>
