@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditTokenSectionSpec } from '../../../src/app/online/gm-ui/editTokenSection';
 import { awaitEditTokenDialog } from '../../../src/connect/stockUi/editTokenDialog';
+import { pickOption } from '../pickOption';
 
 /** Atlas's Edit Token dialog as `EditTokenModal` draws it: a left column, and Cancel then Save in the footer. */
 function atlasDialog(): { container: HTMLElement; modal: HTMLElement; cancel: HTMLButtonElement; save: HTMLButtonElement } {
@@ -34,7 +35,9 @@ describe("Connect's section in Atlas's Edit Token dialog", () => {
     await flush();
     const section = modal.querySelector('.atlas-edit-token__column > .atlas-connect-edit-section')!;
     expect(section.querySelector('.atlas-edit-token__section-label')?.textContent).toBe('Players see');
-    expect(section.querySelector('select')?.getAttribute('aria-label')).toBe('HP, this token');
+    // An in-page dropdown, not a native select: its list shows in screen recordings.
+    expect(section.querySelector('select')).toBeNull();
+    expect(section.querySelector('button.dropdown')?.getAttribute('aria-label')).toBe('HP, this token');
   });
 
   it('applies the choices when the dialog closes by Save, and not by Cancel', async () => {
@@ -42,9 +45,7 @@ describe("Connect's section in Atlas's Edit Token dialog", () => {
     awaitEditTokenDialog(document, () => [spec(saved)]);
     let dialog = atlasDialog();
     await flush();
-    const select = dialog.modal.querySelector('select')!;
-    select.value = 'bar';
-    select.dispatchEvent(new Event('change'));
+    pickOption(dialog.modal.querySelector<HTMLElement>('button.dropdown')!, 'Bar only');
     dialog.cancel.click();
     dialog.container.remove();
     await flush();
@@ -53,28 +54,31 @@ describe("Connect's section in Atlas's Edit Token dialog", () => {
     awaitEditTokenDialog(document, () => [spec(saved)]);
     dialog = atlasDialog();
     await flush();
-    const again = dialog.modal.querySelector('select')!;
-    again.value = 'bar';
-    again.dispatchEvent(new Event('change'));
+    const again = dialog.modal.querySelector<HTMLElement>('button.dropdown')!;
+    pickOption(again, 'Bar only');
+    // Its list is inside the dialog, so choosing in it is no click beside the dialog.
+    expect(again.textContent).toBe('Bar only');
     dialog.save.click();
     dialog.container.remove();
     await flush();
     expect(saved.map((values) => values.get('token:hp'))).toEqual(['bar']);
   });
 
-  it('applies them on Enter, as Atlas saves on it, but not on Escape', async () => {
+  it('applies them on Enter, as Atlas saves on it, but not on Escape, nor on Enter in its dropdown', async () => {
     const saved: Array<ReadonlyMap<string, string>> = [];
     awaitEditTokenDialog(document, () => [spec(saved)]);
     let dialog = atlasDialog();
     await flush();
-    dialog.modal.querySelector('select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    dialog.modal.querySelector('button.dropdown')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    dialog.modal.querySelector('button.dropdown')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    dialog.modal.querySelector('.atlas-edit-token__section')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     dialog.container.remove();
     await flush();
     expect(saved).toEqual([]);
     awaitEditTokenDialog(document, () => [spec(saved)]);
     dialog = atlasDialog();
     await flush();
-    dialog.modal.querySelector('select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    dialog.modal.querySelector('.atlas-edit-token__section')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     dialog.container.remove();
     await flush();
     expect(saved).toHaveLength(1);

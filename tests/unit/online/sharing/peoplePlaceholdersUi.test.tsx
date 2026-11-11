@@ -17,6 +17,7 @@ import { PATHS } from './sharingPathsFixture';
 const NOTHING_PRESENTED = { tabId: null, name: null, characters: [] };
 const NO_SCENE: PresentedSceneSummaries = { read: () => NOTHING_PRESENTED, subscribe: () => () => undefined };
 import { testPeople, testPerson } from './sharingFixtures';
+import { optionLabels, pickOption } from '../../pickOption';
 
 const T = 'T'.repeat(43);
 
@@ -70,7 +71,7 @@ describe('People dialog: add people by name', () => {
     const met = people.seen(T, 'dave1', 'Dave');
     expect(met.name).toBe('Dave (2)');
     render(<PeopleList people={people} ownTableId={T} confirmRemove={async () => true} />);
-    fireEvent.change(screen.getByLabelText('Link Dave (2) to'), { target: { value: `placeholder:${people.placeholderByName('Dave')!.id}` } });
+    act(() => { pickOption(screen.getByLabelText('Link Dave (2) to'), 'Dave'); });
     expect(people.placeholders()).toEqual([]);
     expect(people.get(T, 'dave1')?.name).toBe('Dave');
     expect(people.byKey(personKey(T, 'dave1'))?.formerNames).toContain('Dave (2)');
@@ -105,7 +106,8 @@ describe('pickers list people not met yet', () => {
       />,
     );
     expect(screen.getByText('Not met yet')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Preview as'), { target: { value: `placeholder:${'d'.repeat(22)}` } });
+    expect(optionLabels(screen.getByLabelText('Preview as'))).toEqual(['Ana', 'Dave (not met yet)']);
+    act(() => { pickOption(screen.getByLabelText('Preview as'), 'Dave (not met yet)'); });
     expect(preview).toHaveBeenCalledWith(`placeholder:${'d'.repeat(22)}`);
     expect(await screen.findByText('as Dave')).toBeTruthy();
   });
