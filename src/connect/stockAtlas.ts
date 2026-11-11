@@ -579,7 +579,12 @@ function viewsApi(app: App, presented: StockPresentedScene | null, disposers: Se
     },
     // The GM's view does show the tab while it loads, as it does on any switch; the presented scene holds meanwhile.
     showTab: (viewId: string, tabId: string): Promise<boolean> => showTab(app, viewId, tabId, disposers),
-  });
+    // Whether the GM works elsewhere than this map view (Tabletop's board): a tab shown only to be read goes back then.
+    workingElsewhere: (viewId: string): boolean => {
+      const recent = app.workspace.getMostRecentLeaf?.()?.view;
+      return !(isStockView(recent) && recent.viewId === viewId);
+    },
+  } as AtlasExtension['views']);
 }
 
 /** How long a tab may take to load before `showTab` gives up. */

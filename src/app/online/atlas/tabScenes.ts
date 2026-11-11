@@ -40,6 +40,12 @@ export interface TabScenes {
   subscribeTabs(listener: (closed: TabKey[]) => void): Disposer;
   /** Makes `key` its view's active tab without presenting it (`views.showTab`); true once its map is loaded. */
   show(key: TabKey): Promise<boolean>;
+  /**
+   * Before showing `key` only to read it: the tab to go back to afterwards, its view's active one, when the GM works
+   * elsewhere than that view (Tabletop's board, said by the views' `workingElsewhere`); null when the GM is in the view
+   * and follows the switch (D4), or `key` is already the active tab.
+   */
+  returnTab?(key: TabKey): TabKey | null;
   dispose(): void;
 }
 
@@ -148,6 +154,12 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
       return snapshot && liveTabIn(snapshot) === key.tabId ? snapshot : null;
     },
     isActive: (key) => watched.has(key.viewId) && activeTabOf(views, key.viewId) === key.tabId,
+    returnTab: (key) => {
+      const elsewhere = (views as { workingElsewhere?: (viewId: ViewId) => boolean }).workingElsewhere;
+      if (typeof elsewhere !== 'function' || !watched.has(key.viewId) || elsewhere.call(views, key.viewId) !== true) return null;
+      const tabId = activeTabOf(views, key.viewId);
+      return tabId === null || tabId === key.tabId ? null : { viewId: key.viewId, tabId };
+    },
     watch: (viewId, listener) => views.subscribe(viewId, listener),
     camera: (viewId) => views.camera(viewId),
     watchCamera: (viewId, listener) => views.watchCamera(viewId, () => listener()),

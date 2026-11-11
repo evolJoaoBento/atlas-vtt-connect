@@ -148,4 +148,19 @@ describe('TabScenes', () => {
     await atlas.presentation.present('v1', 'a');
     expect(presentedTab(source)).toEqual({ viewId: 'v1', tabId: 'a' });
   });
+
+  it('names the tab to go back to after reading another only while the views say the GM works elsewhere', async () => {
+    const { ext, tabs } = await setup();
+    const b = { viewId: 'v1', tabId: 'b' };
+    // An Atlas that cannot say where the GM works: never.
+    expect(tabs.returnTab?.(b)).toBeNull();
+    let elsewhere = true;
+    const views = Object.assign(Object.create(ext.views) as typeof ext.views, { workingElsewhere: () => elsewhere });
+    const told = createTabScenes({ views, on: ext.on.bind(ext) });
+    expect(told.returnTab?.(b)).toEqual({ viewId: 'v1', tabId: 'a' });
+    expect(told.returnTab?.({ viewId: 'v1', tabId: 'a' })).toBeNull();
+    elsewhere = false;
+    expect(told.returnTab?.(b)).toBeNull();
+    told.dispose();
+  });
 });

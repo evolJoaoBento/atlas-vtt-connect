@@ -20,10 +20,15 @@ export interface SplitActionDeps {
   notify(message: string): void;
 }
 
+/** How long a tab switched to only to be read is kept on, at most, before Atlas goes back to the GM's tab. */
+export const READ_TAB_MS = 5_000;
+
 /**
  * Pins a player to a tab. A tab never projected in this session is switched to first (D4), its players waiting until
  * it loads; if Atlas cannot show it, the assignment is undone and the GM told (`'couldnt-open'`). A switch overtaken
- * while the tab was projected anyway undoes nothing.
+ * while the tab was projected anyway undoes nothing. When the GM works elsewhere than Atlas's view (Tabletop's board),
+ * the switch is only to read the tab: once its first picture is sent, Atlas goes back to the tab it was on, so that
+ * scene (the presented one, most often) keeps reaching its players and the GM's board keeps its map.
  */
 export async function assignToTab(deps: SplitActionDeps, playerId: string, tab: TabKey): Promise<AssignResult | 'couldnt-open'> {
   const { tabs, assignments } = deps;
@@ -31,12 +36,25 @@ export async function assignToTab(deps: SplitActionDeps, playerId: string, tab: 
   const result = assignments.assign(playerId, tab, deps.presented());
   const slot = deps.slotAt(tab);
   if (result !== 'ok' || !slot || slot.lastSent || tabs.isActive(tab)) return result;
+  const back = tabs.returnTab?.(tab) ?? null;
   const shown = await tabs.show(tab);
+  if (shown && back) await returnAfterRead(tabs, slot, tab, back);
   if (shown || slot.lastSent || !sameTab(assignments.tabOf(playerId), tab)) return 'ok';
   if (before) assignments.assign(playerId, before, deps.presented());
   else assignments.unassign(playerId);
   deps.notify(couldntOpen(tabs.tab(tab)?.name ?? slot.name));
   return 'couldnt-open';
+}
+
+/** Waits for `slot`'s first picture (at most `READ_TAB_MS`), then shows `back` again, unless the GM moved on meanwhile. */
+async function returnAfterRead(tabs: TabScenes, slot: SceneSlot, tab: TabKey, back: TabKey): Promise<void> {
+  const deadline = Date.now() + READ_TAB_MS;
+  while (!slot.lastSent && !slot.disposed && tabs.isActive(tab) && Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+  }
+  // The GM chose another tab meanwhile, or the tab went: theirs to keep.
+  if (!tabs.isActive(tab) || !tabs.tab(back)) return;
+  await tabs.show(back);
 }
 
 /** Closed tabs: their players follow the presented scene again, and the GM hears who went back from where. */
