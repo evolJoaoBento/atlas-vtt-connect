@@ -1,4 +1,4 @@
-// Copied from Atlas VTT src/app/ui/confirmDialog.ts at c1d4d15 (AGPL-3.0-only).
+// Copied from Atlas VTT src/app/ui/confirmDialog.ts at c1d4d15 (AGPL-3.0-only); its ways out are the shell's (`dialogShell.ts`).
 import { createDialogShell } from './dialogShell';
 
 export interface ConfirmDialogOptions {
@@ -31,16 +31,19 @@ export interface ChoiceDialogOptions<T> {
  */
 export function chooseAction<T>(options: ChoiceDialogOptions<T>): Promise<T | null> {
   return new Promise((resolve) => {
-    const { root, dialog } = createDialogShell(options.title);
+    const shell = createDialogShell(options.title);
+    const { dialog } = shell;
     dialog.addClass('atlas-text-dialog--confirm');
     for (const paragraph of options.message) {
       dialog.createEl('p', { cls: 'atlas-text-dialog__message', text: paragraph });
     }
 
     const close = (value: T | null): void => {
-      root.remove();
+      shell.close();
       resolve(value);
     };
+    // Escape, a press beside it, or Connect unloading: cancelled.
+    shell.onDismiss = () => resolve(null);
 
     const actions = dialog.createDiv({ cls: 'atlas-text-dialog__actions' });
     actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => close(null));
@@ -51,17 +54,10 @@ export function chooseAction<T>(options: ChoiceDialogOptions<T>): Promise<T | nu
       return button;
     });
 
-    root.addEventListener('click', (event) => {
-      if (event.target === root) close(null);
-    });
-    root.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation();
-        close(null);
-      }
-    });
-
-    buttons[buttons.length - 1]?.focus();
+    const last = buttons[buttons.length - 1];
+    last?.focus();
+    // A menu that opened this hands focus back as it closes, after this: focus the choice again once it has.
+    window.setTimeout(() => { if (last?.isConnected && !dialog.contains(document.activeElement)) last.focus(); }, 0);
   });
 }
 

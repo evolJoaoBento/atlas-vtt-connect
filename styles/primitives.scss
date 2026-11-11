@@ -107,3 +107,40 @@
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
 }
+
+// Connect's own dialog (dialogShell.ts), styled here too so it never depends on Atlas's stylesheet being loaded:
+// an unstyled backdrop would be invisible, and the dialog lost under the workspace.
+.atlas-connect-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-modifier-cover);
+}
+
+.atlas-connect-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 300px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 12px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l);
+
+  .atlas-text-dialog__title,
+  .atlas-text-dialog__message {
+    margin: 0;
+  }
+
+  .atlas-text-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+}

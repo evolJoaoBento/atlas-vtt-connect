@@ -11,6 +11,7 @@ import { UPDATE_ATLAS_TO_SHARE } from './src/connect/connectSharing';
 import { ConnectSettingTab } from './src/connect/settingTab';
 import { sharingLifetime } from './src/app/online/sharing/sharingLifetime';
 import { startConnect } from './src/connect/startConnect';
+import { dismissOpenDialog } from './src/app/ui/dialogShell';
 
 export default class AtlasVttConnectPlugin extends Plugin {
   /** Connect's own settings; narrows the base class's `settings?: unknown`. */
@@ -40,6 +41,8 @@ export default class AtlasVttConnectPlugin extends Plugin {
    * runs once those are done, so a setting written during teardown is saved too, not left to the debounce timer.
    */
   onunload(): void {
+    // No dialog of Connect's outlives it, its backdrop over the workspace.
+    dismissOpenDialog();
     void this.settings.flush();
     queueMicrotask(() => { void this.settings.flush(); });
   }
