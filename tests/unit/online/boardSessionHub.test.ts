@@ -150,3 +150,83 @@ describe('BoardSessionHub: "Controlled by" on Tabletop\'s board', () => {
     expect(w.hub.controllers('hero')).toBeNull();
   });
 });
+
+describe('BoardSessionHub split party and resource shows (Tabletop\'s scene tabs and token menu)', () => {
+  const tab = (tabId: string) => ({ viewId: 'v', tabId });
+  function split() {
+    const assigned: Record<string, { viewId: string; tabId: string }> = {};
+    const calls: string[] = [];
+    const scenes = {
+      splitSupported: () => true,
+      assign: async (playerId: string, to: { viewId: string; tabId: string }) => { calls.push(`assign ${playerId} ${to.tabId}`); assigned[playerId] = to; return 'ok' as const; },
+      unassign: (playerId: string) => { calls.push(`unassign ${playerId}`); delete assigned[playerId]; },
+      everyoneBack: () => { calls.push('everyone back'); },
+      wouldExceedCap: () => false,
+      assignedTabs: () => ({ ...assigned }),
+      presented: () => tab('hall'),
+    };
+    const names: Record<string, string> = { hall: 'Hall', cellar: 'Cellar' };
+    return { scenes, calls, assigned, source: { scenes, players: () => [who('anna'), who('ben')], nameOf: (key: { tabId: string }) => names[key.tabId] ?? null } };
+  }
+
+  it('offers a scene tab\'s Present to rows and carries out a row and Everyone back', async () => {
+    const w = world();
+    const s = split();
+    w.hub.useSplit(s.source);
+    const menu = w.hub.presentTo('v', 'cellar');
+    expect(menu?.heading).toBe('Present to');
+    expect(menu?.rows).toEqual([
+      { playerId: 'anna', label: 'anna · on Hall', checked: false, disabled: false },
+      { playerId: 'ben', label: 'ben · on Hall', checked: false, disabled: false },
+    ]);
+    expect(menu?.everyoneBack).toEqual({ label: 'Everyone back to the presented scene', disabled: true });
+    w.hub.choosePresentTo('v', 'cellar', 'anna');
+    await Promise.resolve();
+    expect(s.calls).toEqual(['assign anna cellar']);
+    const after = w.hub.presentTo('v', 'cellar');
+    expect(after?.rows[0]).toEqual({ playerId: 'anna', label: 'anna', checked: true, disabled: false });
+    expect(after?.everyoneBack.disabled).toBe(false);
+    // On the presented tab a follower is ticked and fixed.
+    expect(w.hub.presentTo('v', 'hall')?.rows[1]).toEqual({ playerId: 'ben', label: 'ben', checked: true, disabled: true });
+    w.hub.choosePresentTo('v', 'cellar', 'anna');
+    w.hub.everyoneBack();
+    expect(s.calls).toEqual(['assign anna cellar', 'unassign anna', 'everyone back']);
+  });
+
+  it('has no Present to for an unknown tab, without a split party, or while not hosting', () => {
+    const w = world();
+    expect(w.hub.presentTo('v', 'cellar')).toBeNull();
+    const s = split();
+    w.hub.useSplit(s.source);
+    expect(w.hub.presentTo('v', 'nowhere')).toBeNull();
+    w.hub.useSplit({ ...s.source, scenes: { ...s.scenes, splitSupported: () => false } });
+    expect(w.hub.presentTo('v', 'cellar')).toBeNull();
+    w.hub.useSplit(s.source);
+    w.hub.stop();
+    expect(w.hub.presentTo('v', 'cellar')).toBeNull();
+    w.hub.everyoneBack();
+    expect(s.calls).toEqual([]);
+  });
+
+  it('hands out a token\'s Players see choices and saves one choice at a time', () => {
+    const w = world();
+    const saved: Array<Array<[string, string]>> = [];
+    const options = [{ value: '', label: 'Same as every Goblin' }, { value: 'bar', label: 'Bar only' }, { value: 'hidden', label: 'Hidden' }];
+    w.hub.useResourceShows((mapPath, tokenId) => (mapPath === 'maps/a.atlasmap' && tokenId === 'gob' ? {
+      title: 'Players see', columns: ['This token', 'Every Goblin'],
+      rows: [{ label: 'HP', choices: [{ id: 'token:hp', label: 'HP, this token', value: '', options }, { id: 'statblock:hp', label: 'HP, every goblin', value: 'bar', options }] }],
+      save: (values) => { saved.push([...values]); },
+    } : null));
+    const shows = w.hub.resourceShows('maps/a.atlasmap', 'gob');
+    expect(shows?.columns).toEqual(['This token', 'Every Goblin']);
+    expect(shows?.rows[0]?.choices.map((choice) => [choice.id, choice.value])).toEqual([['token:hp', ''], ['statblock:hp', 'bar']]);
+    expect(w.hub.resourceShows('maps/a.atlasmap', 'nobody')).toBeNull();
+    w.hub.setResourceShow('maps/a.atlasmap', 'gob', 'token:hp', 'hidden');
+    // Not an option, or not a choice: nothing saved.
+    w.hub.setResourceShow('maps/a.atlasmap', 'gob', 'token:hp', 'sideways');
+    w.hub.setResourceShow('maps/a.atlasmap', 'gob', 'token:ac', 'hidden');
+    expect(saved).toEqual([[['token:hp', 'hidden']]]);
+    w.hub.stop();
+    expect(w.hub.resourceShows('maps/a.atlasmap', 'gob')).toBeNull();
+  });
+});

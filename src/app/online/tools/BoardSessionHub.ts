@@ -15,6 +15,11 @@ import type { MapTemplate, TemplateShape } from './templates';
 import { type CastWords, isSpellRules, type SpellRules, isSpell, isSpellAsk, type MapSpell, type Spell, type SpellAsk } from './spells';
 import type { ArPose } from './arViews';
 import type { ArSurvey } from './arTable';
+import type { EditTokenSectionSpec } from '../gm-ui/editTokenSection';
+import { presentToMenu, type PresentToMenu, type SplitActions, type SplitView } from '../gm-ui/presentToRows';
+import { NO_PLAYERS_ROW } from '../split/splitCopy';
+import type { AssignResult } from '../split/SceneAssignments';
+import type { TabKey } from '../split/tabKey';
 
 type Point = { x: number; y: number };
 
@@ -90,6 +95,57 @@ export interface BoardSession {
   controllers?(tokenId: string): Array<{ playerId: string; name: string; controls: boolean }> | null;
   /** Gives `tokenId` to a player or takes it away. */
   setController?(tokenId: string, playerId: string, controls: boolean): void;
+  /**
+   * The split party for a scene tab of the GM's Atlas view (`viewId`, `tabId` as Atlas has them), as the eye's "Present
+   * to" menu offers it: a row per player (ticked where they see it), the cap note and "Everyone back"; null while no
+   * session runs, on an Atlas without scene tabs, or for a tab Connect does not know. Absent from an older Connect.
+   */
+  presentTo?(viewId: string, tabId: string): BoardPresentTo | null;
+  /** Chooses `playerId`'s row of that menu: shows them the tab, or (ticked) sends them back to the presented scene. */
+  choosePresentTo?(viewId: string, tabId: string, playerId: string): void;
+  /** Everyone follows the presented scene again. */
+  everyoneBack?(): void;
+  /**
+   * What players see of each resource of a character token (Atlas's Edit Token "Players see"): a row per resource, one
+   * choice per column (this token, every token of its statblock), each with its options; null while no session runs,
+   * no Atlas view holds the map, or the token has none. Absent from an older Connect.
+   */
+  resourceShows?(mapPath: string, tokenId: string): BoardResourceShows | null;
+  /** Sets one choice of `resourceShows` (its `id`) to one of its options' values. */
+  setResourceShow?(mapPath: string, tokenId: string, choiceId: string, value: string): void;
+}
+
+/** The "Present to" menu of a scene tab, as plain data (`presentTo`). */
+export interface BoardPresentTo {
+  heading: string;
+  rows: Array<{ playerId: string; label: string; checked: boolean; disabled: boolean }>;
+  /** Shown in place of the rows when there are none. */
+  noPlayers: string;
+  capNote: string | null;
+  everyoneBack: { label: string; disabled: boolean };
+}
+
+/** The "Players see" choices of a token, as plain data (`resourceShows`). */
+export interface BoardResourceShows {
+  title: string;
+  columns: string[];
+  rows: Array<{ label: string; choices: Array<{ id: string; label: string; value: string; options: Array<{ value: string; label: string }> }> }>;
+}
+
+/** What the hub reads of the split party: the scene hub's actions and assignments, the players and each tab's name. */
+export interface BoardSplitSource {
+  scenes: {
+    splitSupported(): boolean;
+    assign(playerId: string, tab: TabKey): Promise<AssignResult | 'couldnt-open'>;
+    unassign(playerId: string): void;
+    everyoneBack(): void;
+    wouldExceedCap(playerId: string, tab: TabKey): boolean;
+    assignedTabs(): Record<string, TabKey>;
+    presented(): TabKey | null;
+  };
+  players(): readonly SessionPlayer[];
+  /** A tab's name; null for a tab of no open view. */
+  nameOf(tab: TabKey): string | null;
 }
 
 export interface TokensMoved {
@@ -135,6 +191,8 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   private templates: TemplateHost | null = null;
   private moves: ((move: TokensMoved) => void) | null = null;
   private control: { control: TokenControl; players: () => readonly SessionPlayer[] } | null = null;
+  private split: BoardSplitSource | null = null;
+  private shows: ((mapPath: string, tokenId: string) => EditTokenSectionSpec | null) | null = null;
   private started = false;
 
   constructor(private readonly options: BoardSessionHubOptions) {}
@@ -160,6 +218,87 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     if (!this.started || !source || typeof tokenId !== 'string' || typeof playerId !== 'string') return;
     if (!source.players().some((player) => player.playerId === playerId && player.status === 'admitted')) return;
     source.control.set(tokenId, playerId, controls === true);
+  }
+
+  /** The split party, for the "Present to" menu of Tabletop's scene tabs. */
+  useSplit(source: BoardSplitSource | null): void {
+    this.split = source;
+  }
+
+  /** What players see of a token's resources (the Edit Token section's choices), for Tabletop's token menu. */
+  useResourceShows(source: ((mapPath: string, tokenId: string) => EditTokenSectionSpec | null) | null): void {
+    this.shows = source;
+  }
+
+  presentTo(viewId: string, tabId: string): BoardPresentTo | null {
+    const menu = this.presentMenu(viewId, tabId);
+    if (!menu) return null;
+    return {
+      heading: menu.heading,
+      rows: menu.rows.map(({ playerId, label, checked, disabled }) => ({ playerId, label, checked, disabled })),
+      noPlayers: NO_PLAYERS_ROW,
+      capNote: menu.capNote,
+      everyoneBack: { label: menu.everyoneBack.label, disabled: menu.everyoneBack.disabled },
+    };
+  }
+
+  choosePresentTo(viewId: string, tabId: string, playerId: string): void {
+    const row = this.presentMenu(viewId, tabId)?.rows.find((each) => each.playerId === playerId);
+    if (row && !row.disabled) row.choose();
+  }
+
+  everyoneBack(): void {
+    if (!this.started || !this.split?.scenes.splitSupported()) return;
+    this.split.scenes.everyoneBack();
+  }
+
+  resourceShows(mapPath: string, tokenId: string): BoardResourceShows | null {
+    const spec = this.showsSpec(mapPath, tokenId);
+    if (!spec) return null;
+    return {
+      title: spec.title,
+      columns: [...spec.columns],
+      rows: spec.rows.map((row) => ({
+        label: row.label,
+        choices: row.choices.map((choice) => ({ id: choice.id, label: choice.label, value: choice.value, options: choice.options.map(({ value, label }) => ({ value, label })) })),
+      })),
+    };
+  }
+
+  setResourceShow(mapPath: string, tokenId: string, choiceId: string, value: string): void {
+    const spec = this.showsSpec(mapPath, tokenId);
+    const choice = spec?.rows.flatMap((row) => row.choices).find((each) => each.id === choiceId);
+    if (!spec || !choice || typeof value !== 'string' || !choice.options.some((option) => option.value === value)) return;
+    // The section applies only the choices it is given, those changed.
+    spec.save(new Map([[choiceId, value]]));
+  }
+
+  private showsSpec(mapPath: string, tokenId: string): EditTokenSectionSpec | null {
+    if (!this.started || !this.shows || typeof mapPath !== 'string' || typeof tokenId !== 'string') return null;
+    return this.shows(mapPath, tokenId);
+  }
+
+  /** The eye's "Present to" menu for a tab, with its actions; null where there is none. */
+  private presentMenu(viewId: string, tabId: string): PresentToMenu | null {
+    const source = this.split;
+    if (!this.started || !source || typeof viewId !== 'string' || typeof tabId !== 'string' || !source.scenes.splitSupported()) return null;
+    const tab: TabKey = { viewId, tabId };
+    const name = source.nameOf(tab);
+    if (name === null) return null;
+    const assignments = source.scenes.assignedTabs();
+    const view: SplitView = {
+      players: source.players(), assignments, assignedCount: Object.keys(assignments).length,
+      presented: source.scenes.presented(), nameOf: (each) => source.nameOf(each) ?? '',
+    };
+    const actions: SplitActions = {
+      assign: (playerId, to) => {
+        source.scenes.assign(playerId, to).catch((error: unknown) => console.error('[Atlas VTT Connect] Could not assign the player to the scene:', error));
+      },
+      unassign: (playerId) => source.scenes.unassign(playerId),
+      everyoneBack: () => source.scenes.everyoneBack(),
+      wouldExceedCap: (playerId, to) => source.scenes.wouldExceedCap(playerId, to),
+    };
+    return presentToMenu({ ...tab, name }, view, actions);
   }
 
   /** What hears of tokens Tabletop moves to another scene. */

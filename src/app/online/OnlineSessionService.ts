@@ -23,6 +23,7 @@ import type { TabKey } from './split/tabKey';
 import { createPeerHost, type PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
+import type { EditTokenSectionSpec } from './gm-ui/editTokenSection';
 
 export type { HostedSharingHooks } from './hostedSession';
 
@@ -70,6 +71,8 @@ export interface Deps extends OptionalParts {
   board?: BoardSource;
   /** Hands the session to Tabletop's 3D board on the GM's side; without it the board knows no session. */
   attachBoard?: (session: BoardSession) => () => void;
+  /** What players see of a token's resources (the Edit Token section), offered on Tabletop's board too. */
+  resourceShows?: (mapPath: string, tokenId: string) => EditTokenSectionSpec | null;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -141,6 +144,7 @@ export class OnlineSessionService {
         notes: deps.notes ?? (({ session, projection }) => new NoteHost({ session, projection, read: (notePath, mapPath) => readPinNote(this.app, notePath, mapPath) })),
         ...(deps.laser ? { laser: deps.laser } : {}),
         ...(deps.attachBoard ? { attachBoard: deps.attachBoard } : {}),
+        ...(deps.resourceShows ? { resourceShows: deps.resourceShows } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
         vaultName: this.app.vault.getName(),

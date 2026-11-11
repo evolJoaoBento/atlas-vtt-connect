@@ -38,6 +38,7 @@ import type { PeopleBook } from './sharing/people/PeopleBook';
 import type { PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
+import type { EditTokenSectionSpec } from './gm-ui/editTokenSection';
 import type { SheetRollExtras, SheetRollLabels } from './tools/DiceHost';
 import type { OfferedDiceRules } from './tools/toolMessages';
 import { ArViewRelay } from './tools/ArViewRelay';
@@ -114,6 +115,8 @@ export interface HostEnvironment extends OptionalParts {
   isCurrent(): boolean;
   /** Hands the session to Tabletop's 3D board on the GM's side; returns the release. Without it the board knows no session. */
   attachBoard?(session: BoardSession): () => void;
+  /** What players see of a token's resources (Atlas's Edit Token "Players see"), for Tabletop's token menu. */
+  resourceShows?(mapPath: string, tokenId: string): EditTokenSectionSpec | null;
 }
 
 /** A running session; `stop` releases everything it holds, the store is left to the caller. */
@@ -239,6 +242,10 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
   // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
   boardHub?.useControl(tokenControl ? { control: tokenControl.control, players: () => session.getPlayers() } : null);
+  // The "Present to" menu of Tabletop's scene tabs, as the eye's on Atlas's own (a split party needs Atlas's scene tabs).
+  boardHub?.useSplit(tabs ? { scenes: hub, players: () => session.getPlayers(), nameOf: (tab) => tabs.tab(tab)?.name ?? null } : null);
+  // And "Players see" in Tabletop's token menu, as in Atlas's Edit Token dialog.
+  boardHub?.useResourceShows(env.resourceShows ? (mapPath, tokenId) => env.resourceShows?.(mapPath, tokenId) ?? null : null);
   boardHub?.useMoves(followMovedTokens({ control: tokenControl?.control ?? null, tabs, assign: (playerId, tab) => hub.assign(playerId, tab) }));
 
   const notes = env.notes?.(context) ?? null;

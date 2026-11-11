@@ -19,6 +19,7 @@ import type { MigrationSettings } from './migrateFromFork';
 import { migrationGate, startMigration, type MigrationStart } from './startMigration';
 import { startJoining, type JoinSettings } from './startJoining';
 import { tabletopBoard, tabletopMinis } from './tabletopMinis';
+import { resourceVisibilityForMap } from '../app/online/gm-ui/resourceVisibilitySection';
 
 export interface ConnectOptions {
   /** Connect's own settings (`ConnectSettingsStore`). */
@@ -78,6 +79,11 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
     },
     people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, board, attachBoard: (session) => board.attachSession(session), ...options.hosting,
   };
+  // "Players see" on Tabletop's board: the Edit Token section's choices, read in the GM's view holding the map.
+  const shownResources = deps.resources;
+  if (resourceVisibility && shownResources) {
+    deps.resourceShows = (mapPath, tokenId) => resourceVisibilityForMap({ views: atlas.views, store: resourceVisibility, resources: shownResources }, mapPath, tokenId);
+  }
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
