@@ -138,6 +138,43 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     }
   });
 
+  it("loads Atlas's deferred tab when hosting starts (the GM only on Tabletop's board), so joiners get the presented scene", async () => {
+    const { connect, join, a, presented, leaves } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    // After a restart: Atlas's leaf is deferred, its view a placeholder until loaded.
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: vi.fn(async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); }),
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    expect(connect.run('start-online-session')).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deferred.loadIfDeferred).toHaveBeenCalledTimes(1);
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(2_500);
+    const snapshot = received.find((message) => message.type === 'scene-snapshot');
+    expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
+  });
+
+  it('presents the woken tab when nothing was presented before', async () => {
+    const { connect, join, a, presented, leaves } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); },
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(presented.get()).toEqual({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(true);
+  });
+
   it('shows players nothing of a scene saved lit whose lighting Atlas does not give (fails closed)', async () => {
     const { connect, join, a, presented } = stockHosting();
     await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);

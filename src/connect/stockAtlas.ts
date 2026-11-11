@@ -27,6 +27,7 @@ import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
+import { loadDeferredLeaves, wakeAtlasForHosting } from './stockWake';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
@@ -368,6 +369,55 @@ function trackedView(app: App, viewId: string): StockView | null {
   return mapViews(app).find((view) => view.viewId === viewId) ?? null;
 }
 
+/** How long a woken Atlas tab is waited for to become a map view. */
+const WAKE_VIEW_MS = 5_000;
+
+/** Atlas's map views with their map loaded, or soon: loads a deferred Atlas tab (`stockWake.ts`) and waits for it. */
+async function waitForLoadedView(app: App, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    if (mapViews(app).some((view) => loadedTabId(view) !== null)) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+}
+
+/**
+ * The map view to present `tabId` of when `viewId` names none: Atlas's tab was deferred (not shown since Obsidian
+ * started, the GM on Tabletop's board). It is loaded, then the view named, else the one holding the tab, else the first.
+ */
+async function wokenView(app: App, viewId: string, tabId: string | undefined): Promise<StockView | null> {
+  if (!(await loadDeferredLeaves(app, ATLAS_VIEW_TYPE))) return null;
+  const deadline = Date.now() + WAKE_VIEW_MS;
+  while (mapViews(app).length === 0 && Date.now() < deadline) await new Promise((resolve) => window.setTimeout(resolve, 50));
+  const views = mapViews(app);
+  return trackedView(app, viewId)
+    ?? (tabId === undefined ? null : views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.id === tabId)) ?? null)
+    ?? views[0] ?? null;
+}
+
+/**
+ * After waking Atlas's tab for hosting: players get a scene. The presented one (Atlas keeps it across restarts) is made
+ * the view's tab when it is not; with none presented, the view's tab is presented. Atlas's leaf is never made active, so
+ * the GM stays on their tab (Tabletop's board).
+ */
+async function ensurePresented(app: App, presented: StockPresentedScene): Promise<void> {
+  const scene = presented.get();
+  const views = mapViews(app);
+  if (scene) {
+    const owner = views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.id === scene.tabId))
+      ?? views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.filePath === scene.filePath));
+    const tab = owner?.tabMetaStore.getState().tabs.find((entry) => entry.id === scene.tabId)
+      ?? owner?.tabMetaStore.getState().tabs.find((entry) => entry.filePath === scene.filePath);
+    if (owner && tab && owner.tabMetaStore.getState().activeTabId !== tab.id) await owner.switchToTab(tab.id);
+    return;
+  }
+  const view = activeMapView(app);
+  const tabId = view ? loadedTabId(view) : null;
+  const tab = tabId === null ? undefined : view?.tabMetaStore.getState().tabs.find((entry) => entry.id === tabId);
+  if (tab) presented.set?.({ tabId: tab.id, filePath: tab.filePath });
+}
+
 function presentationApi(app: App, atlas: StockPlugin, presented: StockPresentedScene, disposers: Set<Disposer>): AtlasExtension['presentation'] {
   let counter = 0;
   let presentationId = '';
@@ -398,7 +448,7 @@ function presentationApi(app: App, atlas: StockPlugin, presented: StockPresented
   return Object.freeze({
     current,
     present: async (viewId: string, tabId?: string): Promise<boolean> => {
-      const view = trackedView(app, viewId);
+      const view = trackedView(app, viewId) ?? await wokenView(app, viewId, tabId);
       const target = tabId ?? view?.tabMetaStore.getState().activeTabId ?? null;
       const tab = view?.tabMetaStore.getState().tabs.find((entry) => entry.id === target);
       if (!view || !tab) return false;
@@ -650,6 +700,16 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       const presented = atlasPlugin.presentedScene as StockPresentedScene;
       const service = atlasPlugin.settingsService as StockSettings;
       disposers.add(watchViews(app, events));
+      // Online play needs Atlas's map view: a tab still deferred since Obsidian started is loaded when hosting starts and
+      // when a player comes in, and Start online session then makes sure a scene is presented.
+      disposers.add(wakeAtlasForHosting({
+        state: () => onlineSessionStore.getState(),
+        subscribe: (listener) => onlineSessionStore.subscribe(listener),
+        wake: () => loadDeferredLeaves(app, ATLAS_VIEW_TYPE),
+        hasLoadedView: () => mapViews(app).some((view) => loadedTabId(view) !== null),
+        waitForLoadedView: (ms) => waitForLoadedView(app, ms),
+        ensurePresented: () => ensurePresented(app, presented),
+      }));
       let previous = settingsView(service);
       disposers.add(service.onChange(() => {
         guard('settings', () => {
