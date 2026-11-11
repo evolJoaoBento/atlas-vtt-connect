@@ -15,7 +15,7 @@ import { tabletopBoardViews } from './tabletopMinis';
 import { withRoomWalls } from './stockRooms/stockRooms';
 import { backgroundOfLevel, levelHeld, objectsOnLevel, shownLevel } from './stockLevels';
 import { effectiveAlignment } from '../app/online/scene/mapPlacement';
-import { normalizePath, type App, type Plugin } from 'obsidian';
+import { normalizePath, TFile, type App, type Plugin } from 'obsidian';
 import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
   MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
@@ -26,6 +26,7 @@ import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
+import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
@@ -573,12 +574,14 @@ async function showTab(app: App, viewId: string, tabId: string, disposers: Set<D
 }
 
 /** Atlas's library tokens (`AssetService.getTokenAssets`), with whether each is a player character; none where it cannot be read. */
-async function libraryTokens(app: App): Promise<LibraryToken[]> {
+/** Atlas's library tokens; null while no loaded Atlas map view gives its asset service (a deferred tab). */
+async function libraryTokens(app: App): Promise<LibraryToken[] | null> {
   const manager = activeMapView(app)?.serviceManager;
   const getService = isObj(manager) ? manager.getAssetService : undefined;
   const service: unknown = typeof getService === 'function' ? (getService as () => unknown).call(manager) : null;
   const getTokens = isObj(service) ? service.getTokenAssets : undefined;
-  const list: unknown = typeof getTokens === 'function' ? await (getTokens as () => Promise<unknown>).call(service) : [];
+  if (typeof getTokens !== 'function') return null;
+  const list: unknown = await (getTokens as () => Promise<unknown>).call(service);
   if (!Array.isArray(list)) return [];
   return (list as unknown[]).flatMap((asset) => (isObj(asset) && typeof asset.id === 'string' && typeof asset.imagePath === 'string' ? [{ id: asset.id, imagePath: asset.imagePath, playerCharacter: asset.playerCharacter === true }] : []));
 }
@@ -701,19 +704,43 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       };
       // Connect's "Controlled by", kept across sessions: a token given to a player is theirs again next session, and a player
       // character on every scene.
+      // Maps the GM shows players without Atlas's view (the presented one, Tabletop's boards) are read from their file:
+      // after a restart Atlas's tab stays deferred, and a GM on Tabletop's board never shows it.
+      const sceneListeners = new Set<() => void>();
+      const sceneChanged = (): void => { for (const listener of [...sceneListeners]) listener(); };
+      const saved = new SavedSceneTokens(async (path) => {
+        const file = app.vault?.getAbstractFileByPath?.(path);
+        return file instanceof TFile ? app.vault.cachedRead(file) : null;
+      }, sceneChanged);
+      disposers.add(() => saved.dispose());
+      // A board's moves and edits are saved to the file: read again then. (A stand-in vault may hear nothing.)
+      const vault = app.vault as Partial<App['vault']> | undefined;
+      const vaultRefs = typeof vault?.on === 'function' ? [
+        app.vault.on('modify', (file) => saved.changed(file.path)),
+        app.vault.on('delete', (file) => saved.changed(file.path)),
+        app.vault.on('rename', (file, old) => { saved.changed(old); saved.changed(file.path); }),
+      ] : [];
+      disposers.add(() => { for (const ref of vaultRefs) app.vault.offref(ref); });
+      disposers.add(presented.onChange(sceneChanged));
       const party = new PartyLinks({
         session: { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) },
-        tokens: () => {
-          const view = activeMapView(app);
-          const state = view?.atlasStore.getState();
-          return view && state && loaded(state) ? state.objects.tokens : null;
+        scenes: () => {
+          const active = activeMapView(app);
+          const views = [...(active ? [active] : []), ...mapViews(app).filter((view) => view !== active)];
+          // A loaded view's tokens; its map path only once the store holds its active tab's map, so they are that map's, all of them.
+          const live = views.flatMap((view) => {
+            const state = view.atlasStore.getState();
+            return loaded(state) ? [{ mapPath: loadedTabId(view) !== null ? state.mapPath : null, tokens: state.objects.tokens }] : [];
+          });
+          const presentedPath = presented.get()?.filePath;
+          const wanted = [...(presentedPath ? [presentedPath] : []), ...tabletopBoardViews(app).map((board) => board.mapPath)];
+          return partyScenes(live, wanted, (path) => saved.get(path));
         },
-        // Only once the store holds the active tab's map: the tokens read are then that map's, all of them.
-        mapPath: () => {
-          const view = activeMapView(app);
-          return view && loadedTabId(view) !== null ? view.atlasStore.getState().mapPath : null;
+        watchScene: (listener) => {
+          sceneListeners.add(listener);
+          const stopTokens = watchTokens(app, events, listener);
+          return () => { sceneListeners.delete(listener); stopTokens(); };
         },
-        watchScene: (listener) => watchTokens(app, events, listener),
         library: () => libraryTokens(app),
         memory: fileMemory(async () => `${await folder()}/player-characters.json`, {
           exists: (path) => app.vault.adapter.exists(path),

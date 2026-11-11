@@ -14,9 +14,9 @@ import { hostPlugin } from './hostingFixtures';
 import { memorySettings } from './memorySettings';
 
 /** Connect hosting through the stand-in for a stock Atlas: no extension API anywhere, only what stock Atlas leaves reachable. */
-function stockHosting() {
+function stockHosting(files: Record<string, string> = {}) {
   const stock = setupStockAtlas();
-  const vault = createInMemoryApp({ files: {} }).app;
+  const vault = createInMemoryApp({ files }).app;
   const vaultEvents = fakeEvents();
   const cacheEvents = fakeEvents();
   Object.assign(stock.app, {
@@ -48,7 +48,7 @@ function stockHosting() {
     requests.at(-1)?.(true);
     return received;
   };
-  return { ...stock, connect, link, join };
+  return { ...stock, connect, link, join, vault };
 }
 
 describe('hosting on a stock Atlas through the stand-in', () => {
@@ -104,6 +104,38 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     a.scene.set({ mapPath: 'maps/one.atlasmap' } as never);
     await vi.advanceTimersByTimeAsync(80);
     expect(received.some((message) => message.type === 'scene-snapshot')).toBe(true);
+  });
+
+  it("remembers Controlled by while Atlas's tab is deferred (the GM on Tabletop's board), from the presented map's file, and gives it back next session", async () => {
+    const map = 'atlas-vtt/collections/Default/scenes/inn.atlasmap';
+    const file = JSON.stringify({ state: { mapPath: map, objects: { tokens: { tok_orc: { x: 1, y: 1, imagePath: 'art/orc.webp', kind: 'character' } } } }, version: 4 });
+    const { connect, join, presented, leaves, vault } = stockHosting({ [map]: file });
+    // After a restart Atlas's leaf is deferred: its view has no stores until it is shown.
+    leaves[0] = { view: {} as never };
+    presented.set({ tabId: 't1', filePath: map });
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    const memory = async (): Promise<unknown> => {
+      const path = [...(await vault.vault.adapter.list('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect').catch(() => ({ files: [] as string[] }))).files].find((entry) => entry.endsWith('player-characters.json'));
+      return path ? (JSON.parse(await vault.vault.adapter.read(path)) as { links: unknown }).links : null;
+    };
+    for (const round of [1, 2]) {
+      expect(connect.run('start-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      await join('Ana');
+      await vi.advanceTimersByTimeAsync(80);
+      const { tokenControl, players } = onlineSessionStore.getState();
+      const ana = players.find((player) => player.name === 'Ana')!;
+      if (round === 1) {
+        // Ticked from Tabletop's token menu: straight into the session's token control.
+        tokenControl!.set('tok_orc', ana.playerId, true);
+        await vi.advanceTimersByTimeAsync(80);
+        expect(await memory()).toEqual({ [`token:${map}#tok_orc`]: 'Ana' });
+      } else {
+        expect(tokenControl!.controls(ana.playerId, 'tok_orc')).toBe(true);
+      }
+      expect(connect.run('stop-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    }
   });
 
   it('shows players nothing of a scene saved lit whose lighting Atlas does not give (fails closed)', async () => {

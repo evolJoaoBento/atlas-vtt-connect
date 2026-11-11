@@ -12,8 +12,10 @@ const ana: PartyPlayer = { playerId: 'p-ana', name: 'Ana', status: 'admitted' };
 const bea: PartyPlayer = { playerId: 'p-bea', name: 'Bea', status: 'admitted' };
 
 /** A table with a session store, token control, a scene, and a library, as the stand-in wires them. */
-function table(options: { library?: LibraryToken[]; remembered?: Remembered; players?: PartyPlayer[]; hosting?: boolean; mapPath?: string | null } = {}) {
+function table(options: { library?: LibraryToken[] | null; remembered?: Remembered; players?: PartyPlayer[]; hosting?: boolean; mapPath?: string | null; live?: boolean; slowLibrary?: boolean } = {}) {
   let mapPath = options.mapPath === undefined ? 'maps/inn.md' : options.mapPath;
+  const live = options.live ?? true;
+  let libraryDone: (() => void) | null = null;
   const listeners = new Set<() => void>();
   let players = options.players ?? [ana];
   let control: TokenControl | null = options.hosting === false ? null : new TokenControl();
@@ -23,16 +25,21 @@ function table(options: { library?: LibraryToken[]; remembered?: Remembered; pla
   let reads = 0;
   const links = new PartyLinks({
     session: { state: () => ({ players, tokenControl: control as PartyControl | null }), subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; } },
-    tokens: () => tokens,
-    mapPath: () => mapPath,
+    scenes: () => (tokens ? [{ mapPath, tokens, live: live && mapPath !== null }] : []),
     watchScene: (listener) => { sceneListeners.add(listener); return () => { sceneListeners.delete(listener); }; },
-    library: () => { reads++; return Promise.resolve(options.library ?? LIBRARY); },
+    library: () => {
+      reads++;
+      const library = options.library === undefined ? LIBRARY : options.library;
+      if (!options.slowLibrary) return Promise.resolve(library);
+      return new Promise((resolve) => { libraryDone = () => resolve(library); });
+    },
     memory: { load: () => Promise.resolve(options.remembered ?? {}), save: (remembered) => { saved.push({ ...remembered }); return Promise.resolve(); } },
   }, () => 0);
   links.start();
   const settle = async (): Promise<void> => { await vi.advanceTimersByTimeAsync(0); await vi.advanceTimersByTimeAsync(0); };
   return {
     links, saved, settle, reads: () => reads,
+    finishLibrary: () => libraryDone?.(),
     control: () => control!,
     setControl: (next: TokenControl | null) => { control = next; for (const l of [...listeners]) l(); },
     setPlayers: (next: PartyPlayer[]) => { players = next; for (const l of [...listeners]) l(); },
@@ -243,6 +250,61 @@ describe('player characters and online players', () => {
       expect(t.links.links).toEqual({ cleric: 'Ana' });
       vi.useRealTimers();
     });
+  });
+
+  describe('without Atlas\'s view: the map\'s saved file (the GM on Tabletop\'s board after a restart)', () => {
+    const orcKey = tokenKey('maps/inn.md', 't2');
+
+    it('learns a token ticked on the board from the saved map, and gives it back in the next session', async () => {
+      vi.useFakeTimers();
+      const t = table({ live: false, library: null });
+      await t.settle();
+      t.control().set('t2', 'p-ana', true);
+      await t.settle();
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      t.setControl(null);
+      t.setPlayers([]);
+      await t.settle();
+      t.setControl(new TokenControl());
+      t.setPlayers([{ ...ana, playerId: 'p-ana-new' }]);
+      await t.settle();
+      expect(t.control().controls('p-ana-new', 't2')).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('never forgets a remembered token for missing from the saved file, which lacks tokens placed since', async () => {
+      vi.useFakeTimers();
+      const placed = tokenKey('maps/inn.md', 'new');
+      const t = table({ live: false, remembered: { [placed]: 'Ana' } });
+      await t.settle();
+      expect(t.links.links).toEqual({ [placed]: 'Ana' });
+      vi.useRealTimers();
+    });
+
+    it('gives back a player character remembered by its library token while the library cannot be read', async () => {
+      vi.useFakeTimers();
+      const t = table({ live: false, library: null, remembered: { cleric: 'Ana' } });
+      await t.settle();
+      expect(t.control().controls('p-ana', 't1')).toBe(true);
+      // Taken from Ana: the character is forgotten, not learned under its token.
+      t.control().set('t1', 'p-ana', false);
+      await t.settle();
+      expect(t.links.links).toEqual({});
+      vi.useRealTimers();
+    });
+  });
+
+  it('looks at a tick made while the library is being read, never dropping it', async () => {
+    vi.useFakeTimers();
+    const t = table({ slowLibrary: true });
+    await t.settle();
+    t.control().set('t2', 'p-ana', true);
+    await t.settle();
+    t.finishLibrary();
+    await t.settle();
+    await t.settle();
+    expect(t.links.links).toEqual({ [tokenKey('maps/inn.md', 't2')]: 'Ana' });
+    vi.useRealTimers();
   });
 
   describe('where there is nothing to do', () => {
