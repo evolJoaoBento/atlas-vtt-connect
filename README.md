@@ -94,7 +94,9 @@ Right-click a token → **Controlled by** → tick the player. They can drag it 
 
 Players see the stat block of every token they control, with exact numbers, and roll from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster you hand to a player. In Obsidian they see Atlas's own card for the token, in their own theme; stat blocks made with Atlas templates show their template's fields, without the hidden ones.
 
-**Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions.
+Connect remembers who you gave each token to, by the player's name, and gives it back when they rejoin, in this session or a later one (only while exactly one player of that name is at the table). Untick them to make it forget.
+
+**Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect gives that player the character on every scene, wherever it is placed.
 
 ## At the table (players)
 

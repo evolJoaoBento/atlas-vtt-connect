@@ -699,13 +699,19 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         });
         return made;
       };
-      // Atlas's player characters and Connect's players: a character given to a player is theirs again on every scene.
+      // Connect's "Controlled by", kept across sessions: a token given to a player is theirs again next session, and a player
+      // character on every scene.
       const party = new PartyLinks({
         session: { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) },
         tokens: () => {
           const view = activeMapView(app);
           const state = view?.atlasStore.getState();
           return view && state && loaded(state) ? state.objects.tokens : null;
+        },
+        // Only once the store holds the active tab's map: the tokens read are then that map's, all of them.
+        mapPath: () => {
+          const view = activeMapView(app);
+          return view && loadedTabId(view) !== null ? view.atlasStore.getState().mapPath : null;
         },
         watchScene: (listener) => watchTokens(app, events, listener),
         library: () => libraryTokens(app),

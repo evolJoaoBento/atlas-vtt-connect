@@ -1,11 +1,14 @@
 /**
- * Atlas 0.8's player characters and Connect's online players, on a stock Atlas.
+ * Connect's "Controlled by", remembered across sessions, on a stock Atlas.
  *
- * Atlas marks a library token as a player character (`TokenAsset.playerCharacter`); the tokens placed from it on any scene
- * are that character. Connect's "Controlled by" gives a placed token to an online player for the running session only (the
- * session's `TokenControl`), so every scene and every session would need the same assignments made again. This remembers
- * which player a character was given to, by the player's name, and gives each placed token of that character to them again
- * whenever they are at the table and have it in front of them. Taking a character from a player takes the memory with it.
+ * Connect's "Controlled by" gives a placed token to an online player for the running session only (the session's
+ * `TokenControl`), so every session would need the same assignments made again. This remembers which player each token was
+ * given to, by the player's name, and gives it to them again whenever they are at the table and the GM has its scene in
+ * front of them. Taking a token from a player takes the memory with it.
+ *
+ * Atlas 0.8 marks a library token as a player character (`TokenAsset.playerCharacter`); the tokens placed from it on any
+ * scene are that character, so a character is remembered by its library token and given back on every scene. Any other
+ * token is remembered as itself: its map and its id (`tokenKey`).
  *
  * It never gives a token to anyone who was not asked for by name: no player at the table of that name, or two of them, and
  * nothing is assigned.
@@ -44,8 +47,18 @@ export function playerCharacterTokens(tokens: Readonly<Record<string, PlacedToke
   return found;
 }
 
-/** Who each player character was given to: the library token's id, then the player's name. */
+/**
+ * Who each token was given to, by the player's name: a player character under its library token's id, any other token under
+ * `tokenKey` of its map and id.
+ */
 export type Remembered = Readonly<Record<string, string>>;
+
+const TOKEN_KEY = 'token:';
+
+/** Where a token that is no player character is remembered: its map's path and its id. */
+export function tokenKey(mapPath: string, tokenId: string): string {
+  return `${TOKEN_KEY}${mapPath}#${tokenId}`;
+}
 
 export interface PartyPlayer {
   playerId: string;
@@ -67,6 +80,8 @@ export interface PartyLinksDeps {
   };
   /** The tokens of the scene the GM is on, or null while there is none. */
   tokens(): Readonly<Record<string, PlacedToken | undefined>> | null;
+  /** The path of the map those tokens are on, or null while it is not known (then only player characters are kept). */
+  mapPath(): string | null;
   /** Calls `listener` when the scene or its tokens may have changed. */
   watchScene(listener: () => void): Disposer;
   /** Atlas's library tokens. */
@@ -86,7 +101,7 @@ export class PartyLinks {
   private queued = false;
   private control: PartyControl | null = null;
   private stopControl: Disposer | null = null;
-  /** Who controlled each player character's token at the last look: a player who still has no token they had was taken it from. */
+  /** Who controlled each token at the last look: a player who still has no token they had was taken it from. */
   private readonly lastControllers = new Map<string, ReadonlySet<string>>();
   private readonly stops: Disposer[] = [];
   private stopped = false;
@@ -165,27 +180,42 @@ export class PartyLinks {
   private look(players: readonly PartyPlayer[], control: PartyControl, tokens: Readonly<Record<string, PlacedToken | undefined>>, library: readonly LibraryToken[]): void {
     const admitted = players.filter((player) => player.status === 'admitted');
     const characters = playerCharacterTokens(tokens, library);
+    const mapPath = this.deps.mapPath();
     const now = new Map<string, ReadonlySet<string>>();
     let changed = false;
-    for (const [tokenId, assetId] of characters) {
-      const controllers = admitted.filter((player) => control.controls(player.playerId, tokenId));
-      if (controllers.length === 1) {
-        // Given to one player: that is who this character is.
-        const name = controllers[0]!.name;
-        if (this.remembered[assetId] !== name) {
-          this.remembered[assetId] = name;
+    if (mapPath !== null) {
+      // A token of this map that is remembered but no longer on it was deleted: its memory goes with it.
+      const prefix = tokenKey(mapPath, '');
+      for (const key of Object.keys(this.remembered)) {
+        if (key.startsWith(prefix) && !(key.slice(prefix.length) in tokens)) {
+          delete this.remembered[key];
           changed = true;
         }
-      } else if (controllers.length === 0 && assetId in this.remembered) {
+      }
+    }
+    for (const tokenId of Object.keys(tokens)) {
+      if (!tokens[tokenId]) continue;
+      // A player character is remembered by its library token, any other token as itself.
+      const key = characters.get(tokenId) ?? (mapPath === null ? null : tokenKey(mapPath, tokenId));
+      if (key === null) continue;
+      const controllers = admitted.filter((player) => control.controls(player.playerId, tokenId));
+      if (controllers.length === 1) {
+        // Given to one player: that is whose it is.
+        const name = controllers[0]!.name;
+        if (this.remembered[key] !== name) {
+          this.remembered[key] = name;
+          changed = true;
+        }
+      } else if (controllers.length === 0 && key in this.remembered) {
         // A player who had it, still at the table, no longer does: it was taken from them. One who left has not lost it.
         const prior = this.lastControllers.get(tokenId) ?? new Set<string>();
         if ([...prior].some((playerId) => admitted.some((player) => player.playerId === playerId))) {
-          delete this.remembered[assetId];
+          delete this.remembered[key];
           changed = true;
         }
       }
       if (controllers.length === 0) {
-        const name = this.remembered[assetId];
+        const name = this.remembered[key];
         const owners = name === undefined ? [] : admitted.filter((player) => player.name === name);
         // Asked for by name, and exactly one player at the table has it.
         if (owners.length === 1) {
@@ -194,7 +224,7 @@ export class PartyLinks {
           continue;
         }
       }
-      now.set(tokenId, new Set(controllers.map((player) => player.playerId)));
+      if (controllers.length > 0) now.set(tokenId, new Set(controllers.map((player) => player.playerId)));
     }
     this.lastControllers.clear();
     for (const [tokenId, ids] of now) this.lastControllers.set(tokenId, ids);
@@ -211,7 +241,7 @@ export function fileMemory(file: () => Promise<string>, adapter: { exists(path: 
       const parsed: unknown = JSON.parse(await adapter.read(path));
       const links = typeof parsed === 'object' && parsed !== null ? (parsed as { links?: unknown }).links : null;
       if (typeof links !== 'object' || links === null) return {};
-      // Only what is a name against a library token's id: anything else in the file is not a link.
+      // Only what is a name against a library token's id or a token's key: anything else in the file is not a link.
       return Object.fromEntries(Object.entries(links).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''));
     },
     save: async (remembered) => {
