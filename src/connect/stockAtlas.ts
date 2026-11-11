@@ -12,6 +12,7 @@
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { tabletopBoardViews } from './tabletopMinis';
+import { withRoomWalls } from './stockRooms/stockRooms';
 import { backgroundOfLevel, levelHeld, objectsOnLevel, shownLevel } from './stockLevels';
 import { effectiveAlignment } from '../app/online/scene/mapPlacement';
 import { normalizePath, type App, type Plugin } from 'obsidian';
@@ -215,7 +216,8 @@ function snapshot(view: StockView, presented: StockPresentedScene | null): Scene
     // How Atlas aligned that floor's map image (the grid's stretch, or the level's own alignment): players draw it so.
     mapAlignment: effectiveAlignment(state.grid, state.levelAlignments, shownLevel(state.levels, state.viewedLevel)),
     grid: state.grid,
-    objects: objectsOnLevel(state.objects, state.levels, state.viewedLevel),
+    // Atlas 0.14's rooms: their outline stands among the walls, as Atlas's `blockingWalls` has it.
+    objects: withRoomWalls(objectsOnLevel(state.objects, state.levels, state.viewedLevel)),
     widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
@@ -242,6 +244,8 @@ function snapshotSlice(view: StockView, presented: StockPresentedScene | null): 
     s.objects.fog, s.widgetSettings, s.widgetValues, s.initiative, s.initiativeTrackerOpen, s.lighting, s.tokenSettings,
     // Walls and lights: Tabletop's 3D board shows players doors opening and lights.
     (s.objects as { walls?: unknown }).walls, (s.objects as { lights?: unknown }).lights,
+    // Atlas 0.14's rooms, whose outline stands as walls.
+    (s.objects as { rooms?: unknown }).rooms,
     // Atlas 0.10's water, lava and acid: map art players are sent.
     (s.objects as { liquids?: unknown }).liquids,
     s.levels, s.viewedLevel, s.levelAlignments];

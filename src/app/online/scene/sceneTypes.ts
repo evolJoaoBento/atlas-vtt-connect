@@ -379,8 +379,10 @@ export interface PlayerPin {
   y: number;
   /** The pin's number or letter, for pins that show one. */
   label: string | null;
-  /** The linked note's title (its file name, or its heading). */
+  /** The pin's name: the one the GM gave it (Atlas 0.14), else the linked note's title (its file name, or its heading). */
   title: string | null;
+  /** The name shown under the pin on the map, where the GM shows it (Atlas 0.14's Show name); absent otherwise. */
+  name?: string;
   /** Atlas's pin icon (`resolvePinIcon`), or `number` / `letter` for a labelled pin; absent from an older GM. */
   icon?: string;
 }

@@ -2,7 +2,8 @@
  * The note pins the GM made readable (`PlayerScene.pins`), drawn as Atlas's `PinRenderer` draws pins: a round badge in
  * the theme's colours with the pin's icon in its tone, or its number or letter, and the readable mark (an open book) on
  * its rim, at Atlas's map marker size (`mapMarkerScale`), over the scene and its fog (only pins where players see the map
- * are sent). The note's title shows in the card under the mouse (`pinAt`). Shared with the web page.
+ * are sent). The note's title shows in the card under the mouse (`pinAt`); a pin whose name the GM shows (Atlas 0.14) has it
+ * under its badge, as Atlas labels it (`PinNameLabel`). Shared with the web page.
  */
 import type { PlayerPin, PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import { PIN_ICON_TONES } from '../pinIcons';
@@ -18,6 +19,10 @@ const BADGE_COLORS = { dark: { background: '#2a2a2a', stroke: '#ffffff' }, light
 const MARK_RADIUS = 9;
 /** Below this zoom, markers grow on screen instead of keeping their size. */
 const BOOST_ZOOM = 0.2;
+/** Atlas's pin name (`PinNameLabel`): 12 screen pixels, 3 under the badge, with a halo of the badge's colour and no box. */
+const NAME_PX = 12;
+const NAME_GAP = 3;
+const NAME_HALO = 2.5;
 
 /** Atlas's `mapMarkerScale`: world units per marker unit at viewport `zoom`, constant on screen, larger when zoomed far out. */
 export function mapMarkerScale(zoom: number): number {
@@ -37,6 +42,7 @@ export function createPinsLayer(): OverlayLayer {
       for (const pin of pins) {
         surface.push(pin.x, pin.y, 0, scale);
         drawPin(surface, pin, dark);
+        if (pin.name) drawName(surface, pin.name, dark);
         surface.pop();
       }
     },
@@ -73,6 +79,13 @@ function drawPin(surface: ViewSurface, pin: PlayerPin, dark: boolean): void {
     [{ x: 0.7, y: -2.8 }, { x: 5.6, y: -4.2 }, { x: 5.6, y: 3.4 }, { x: 0.7, y: 4.6 }],
   ], true, { fill: colors.background });
   surface.pop();
+}
+
+function drawName(surface: ViewSurface, name: string, dark: boolean): void {
+  const colors = dark ? BADGE_COLORS.dark : BADGE_COLORS.light;
+  surface.text(name, 0, PIN_BADGE_RADIUS + NAME_GAP + NAME_PX / 2, {
+    font: `600 ${NAME_PX}px Arial, sans-serif`, color: colors.stroke, align: 'center', outline: { color: colors.background, width: NAME_HALO },
+  });
 }
 
 /** The pin under a world point, at `zoom` screen pixels per world unit; null when none is within its marker. */

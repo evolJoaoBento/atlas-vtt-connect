@@ -188,6 +188,12 @@ function hasPins(objects: unknown): boolean {
 }
 
 /** A pin's title from its note link: the heading when it names one, else the file name, without folders or extension. */
+/** The name the GM gave a pin (Atlas 0.14's `ownPinName`), trimmed and cut to Atlas's longest; null where it has none. */
+function ownPinName(name: unknown): string | null {
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  return trimmed === '' ? null : trimmed.slice(0, SCENE_LIMITS.pinName);
+}
+
 function pinTitle(notePath: string): string | null {
   const [path = '', heading] = notePath.split('#');
   const name = heading?.trim() || (path.split('/').pop() ?? '').replace(/\.md$/i, '').trim();
@@ -215,7 +221,7 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
   for (const [, value] of entries) {
     if (found.length >= SCENE_LIMITS.pins) break;
     if (typeof value !== 'object' || value === null) continue;
-    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; icon?: unknown };
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; icon?: unknown; name?: unknown; showName?: unknown };
     if (pin.readable !== true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
     const x = finiteOrNull(pin.x);
     const y = finiteOrNull(pin.y);
@@ -226,9 +232,12 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
       x: finiteOr(x, 0, SCENE_RANGES.coordinate),
       y: finiteOr(y, 0, SCENE_RANGES.coordinate),
       label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
-      title: pinTitle(pin.notePath),
+      title: ownPinName(pin.name) ?? pinTitle(pin.notePath),
       icon: resolvePinIcon(pin.icon),
     };
+    // Atlas 0.14: the pin's name under it, where the GM shows it (`showsPinName`): the GM's name, else the note's.
+    const shownName = pin.showName === true ? (ownPinName(pin.name) ?? pinTitle(pin.notePath)) : null;
+    if (shownName) sent.name = shownName.slice(0, SCENE_LIMITS.pinName);
     pinNotePaths.set(sent, pin.notePath);
     found.push(sent);
   }

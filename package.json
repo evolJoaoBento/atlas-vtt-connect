@@ -18,6 +18,7 @@
     "inventory": "node scripts/test-inventory.mjs"
   },
   "dependencies": {
+    "clipper2-ts": "2.0.1-18",
     "js-aruco2": "2.0.0",
     "lucide-react": "^0.503.0",
     "peerjs": "^1.5.5",

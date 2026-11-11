@@ -16,7 +16,7 @@ import { isArPose, type ArPose } from './tools/arViews';
 import { isArTable, type ArSurvey } from './tools/arTable';
 import { isPinNote, type PinNote } from './tools/pinNotes';
 import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
-import { isMapSpells, isSpell, isSpellId, isSpellRequests, isSpellWordsList, type MapSpell, type Spell, type SpellRequest, type SpellWords } from './tools/spells';
+import { isAskRulesList, isCastName, isSpellAbout, isMapSpells, isSpell, isSpellId, isSpellRequests, isSpellRules, isSpellWordsList, type AskRules, type SpellRules, type MapSpell, type Spell, type SpellRequest, type SpellWords, type SpellAbout } from './tools/spells';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
@@ -133,11 +133,11 @@ export type ControlMessage =
    * Player to GM: cast a spell through a token's eyes on the scene they have (for the GM's ask `request`), take one of
    * theirs off, clear theirs, or turn down an ask (`decline`) (`tools/spells.ts`).
    */
-  | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; request?: string; remove?: string; clear?: true; decline?: string }
+  | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; request?: string; remove?: string; clear?: true; decline?: string; rules?: SpellRules; name?: string; about?: SpellAbout }
   /** Player to GM, on admission and when they pick another: their own colour (`tools/playerColors.ts`), one of the laser swatches. */
   | { v: 1; type: 'player-color'; color: string }
   /** GM to players: every spell on the scene, whenever they change. */
-  | { v: 1; type: 'map-spells'; sceneId: string; spells: MapSpell[]; asks?: SpellRequest[]; askWords?: SpellWords[] }
+  | { v: 1; type: 'map-spells'; sceneId: string; spells: MapSpell[]; asks?: SpellRequest[]; askWords?: SpellWords[]; askRules?: AskRules[] }
   /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
@@ -229,8 +229,10 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
   'map-spell': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear, m.decline].filter((part) => part !== undefined).length === 1
     && (m.add === undefined || isSpell(m.add)) && (m.remove === undefined || isSpellId(m.remove)) && (m.clear === undefined || m.clear === true)
-    && (m.request === undefined || (m.add !== undefined && isSpellId(m.request))) && (m.decline === undefined || isSpellId(m.decline)),
-  'map-spells': (m) => isSceneId(m.sceneId) && isMapSpells(m.spells) && (m.asks === undefined || isSpellRequests(m.asks)) && (m.askWords === undefined || isSpellWordsList(m.askWords)),
+    && (m.request === undefined || (m.add !== undefined && isSpellId(m.request))) && (m.decline === undefined || isSpellId(m.decline))
+    && (m.rules === undefined || (m.add !== undefined && isSpellRules(m.rules)))
+    && (m.name === undefined || (m.add !== undefined && isCastName(m.name))) && (m.about === undefined || (m.add !== undefined && isSpellAbout(m.about))),
+  'map-spells': (m) => isSceneId(m.sceneId) && isMapSpells(m.spells) && (m.asks === undefined || isSpellRequests(m.asks)) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
   'player-color': (m) => isLaserColor(m.color),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),

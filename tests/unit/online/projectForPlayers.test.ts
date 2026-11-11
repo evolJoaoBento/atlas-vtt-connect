@@ -368,6 +368,19 @@ describe('projectForPlayers fix round 1', () => {
     expect(notePathOf({ id: 'pin-0', x: 100, y: 100, label: null, title: 'The Cellar' })).toBeNull();
   });
 
+  it('sends a pin by the name the GM gave it, and that name under it where the GM shows it (Atlas 0.14)', () => {
+    const pins = {
+      a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md', readable: true, name: '  The Rusty Mug  ' },
+      b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Dock.md#North pier', readable: true, showName: true },
+      c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gate.md', readable: true, name: 'Gate', showName: true },
+      d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'Well.md', readable: true, name: '   ', showName: true },
+    };
+    const scene = projectForPlayers(withTokens({}, { pins } as never), context());
+    expect(scene.pins?.map((pin) => [pin.title, pin.name])).toEqual([['The Rusty Mug', undefined], ['North pier', 'North pier'], ['Gate', 'Gate'], ['Well', 'Well']]);
+    expect(isPlayerSceneBody({ ...scene, pins: [{ ...scene.pins![0]!, name: 'x'.repeat(61) }] })).toBe(false);
+    expect(isPlayerSceneBody(scene)).toBe(true);
+  });
+
   it('sends no conditions for plain tokens', () => {
     const plain = { id: 'rock', kind: 'token', x: 0, y: 0, imagePath: 'rock.png', conditions: ['prone'] } as unknown as Token;
     expect(projectForPlayers(withTokens({ rock: plain }), context()).tokens.rock?.conditions).toEqual([]);

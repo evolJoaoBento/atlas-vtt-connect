@@ -31,6 +31,8 @@ export const SCENE_LIMITS = {
   pins: 200,
   pinLabel: 8,
   pinTitle: 120,
+  /** Atlas 0.14's pin name (`MAX_PIN_NAME`). */
+  pinName: 60,
   /** A token has this many resource sockets; the window draws the first two. */
   resources: 6,
   widgets: 64,

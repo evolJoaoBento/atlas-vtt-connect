@@ -16,7 +16,7 @@ import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { GM_LASER_ID, laserColor } from './laserColors';
 import type { BoardSessionSink } from './BoardSessionHub';
 import { TEMPLATE_LIMITS, type MapTemplate } from './templates';
-import { askedSpell, cleanAsk, cleanSpell, splitAsks, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type Spell, type SpellAsk, type SpellRequest } from './spells';
+import { isCastName, isSpellAbout, type CastWords, cleanRules, isSpellRules, type SpellRules, askedSpell, cleanAsk, cleanSpell, splitAsks, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS, type MapSpell, type Spell, type SpellAsk, type SpellRequest } from './spells';
 
 export interface TemplateHostOptions {
   session: SceneSession;
@@ -170,11 +170,11 @@ export class TemplateHost implements SessionHandler {
   }
 
   /** The GM casts a spell on a scene (through a token's eyes on Tabletop's board), in the GM's colour; false over the limit. */
-  castGm(sceneId: string, spell: Spell): boolean {
+  castGm(sceneId: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean {
     const list = this.spellsByScene.get(sceneId) ?? [];
     if (list.length >= SPELL_LIMITS.perScene) return false;
     const order = this.options.session.getPlayers().map((each) => each.playerId);
-    list.push({ id: `s${this.nextSpell++}`, owner: GM_LASER_ID, color: laserColor(GM_LASER_ID, order), spell: cleanSpell(spell) });
+    list.push({ id: `s${this.nextSpell++}`, owner: GM_LASER_ID, color: laserColor(GM_LASER_ID, order), spell: cleanSpell(spell), ...(rules && isSpellRules(rules) ? { rules: cleanRules(rules) } : {}), ...wordsOf(words) });
     this.spellsByScene.set(sceneId, list);
     this.broadcastSpells(sceneId);
     return true;
@@ -248,7 +248,9 @@ export class TemplateHost implements SessionHandler {
       if (list.length >= SPELL_LIMITS.perScene) return;
       const order = this.options.session.getPlayers().map((each) => each.playerId);
       // Cast as the GM asked it, whatever the player's board sent.
-      list.push({ id: `s${this.nextSpell++}`, owner: player.playerId, color: this.colorOf(player.playerId, order), spell: askedSpell({ ...message.add, caster: pending.tokenId }, pending.ask) });
+      // Its rules the GM's ask's, else the player's.
+      const rules = pending.ask.rules ?? message.rules;
+      list.push({ id: `s${this.nextSpell++}`, owner: player.playerId, color: this.colorOf(player.playerId, order), spell: askedSpell({ ...message.add, caster: pending.tokenId }, pending.ask), ...(rules ? { rules: cleanRules(rules) } : {}), ...wordsOf(pending.ask.name ? { name: pending.ask.name, ...(pending.ask.about ? { about: pending.ask.about } : {}) } : message.name ? { name: message.name, ...(message.about ? { about: message.about } : {}) } : undefined) });
       this.spellsByScene.set(slot.sceneId, list);
       this.asks.delete(pending.id);
       this.asking?.notify?.(`${player.name} cast ${what}.`);
@@ -263,7 +265,7 @@ export class TemplateHost implements SessionHandler {
       const own = list.filter((spell) => spell.owner === player.playerId).length;
       if (own >= SPELL_LIMITS.perPlayer || list.length >= SPELL_LIMITS.perScene) return;
       const order = this.options.session.getPlayers().map((each) => each.playerId);
-      list.push({ id: `s${this.nextSpell++}`, owner: player.playerId, color: this.colorOf(player.playerId, order), spell: cleanSpell(message.add) });
+      list.push({ id: `s${this.nextSpell++}`, owner: player.playerId, color: this.colorOf(player.playerId, order), spell: cleanSpell(message.add), ...(message.rules ? { rules: cleanRules(message.rules) } : {}), ...wordsOf(message.name ? { name: message.name, ...(message.about ? { about: message.about } : {}) } : undefined) });
       this.spellsByScene.set(slot.sceneId, list);
     } else return;
     this.broadcastSpells(slot.sceneId);
@@ -326,8 +328,8 @@ export class TemplateHost implements SessionHandler {
 
   /** A scene's spells to one of its players, with what the GM asks of their tokens there. */
   private sendSpells(playerId: string, sceneId: string): void {
-    const { asks, words } = splitAsks(this.asksFor(playerId, sceneId));
-    this.options.session.send(playerId, { v: 1, type: 'map-spells', sceneId, spells: this.spellsByScene.get(sceneId) ?? [], ...(asks.length > 0 ? { asks } : {}), ...(words.length > 0 ? { askWords: words } : {}) });
+    const { asks, words, rules } = splitAsks(this.asksFor(playerId, sceneId));
+    this.options.session.send(playerId, { v: 1, type: 'map-spells', sceneId, spells: this.spellsByScene.get(sceneId) ?? [], ...(asks.length > 0 ? { asks } : {}), ...(words.length > 0 ? { askWords: words } : {}), ...(rules.length > 0 ? { askRules: rules } : {}) });
   }
 
   private broadcast(sceneId: string): void {
@@ -366,4 +368,21 @@ export class TemplateHost implements SessionHandler {
       // The view went with its templates.
     }
   }
+}
+
+/**
+ * The words a cast keeps: shorter than an ask's (its text to `CAST_TEXT`, each property to `CAST_VALUE`), as every cast
+ * on a scene goes out in each of its messages, which must stay under the control message's bytes at the scene's most.
+ */
+export const CAST_WORDS = { text: 600, value: 120 } as const;
+
+/** A cast's name and words, only those well formed (none: nothing). */
+function wordsOf(words: CastWords | undefined): Pick<MapSpell, 'name' | 'about'> {
+  if (!words || !isCastName(words.name)) return {};
+  if (!words.about || !isSpellAbout(words.about)) return { name: words.name.trim() };
+  const cut = (text: string, most: number): string => (text.length > most ? `${text.slice(0, most - 1)}…` : text);
+  return {
+    name: words.name.trim(),
+    about: { line: words.about.line, properties: words.about.properties.map(([label, value]) => [label, cut(value, CAST_WORDS.value)] as [string, string]), text: cut(words.about.text, CAST_WORDS.text) },
+  };
 }

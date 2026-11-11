@@ -47,6 +47,64 @@ export interface Spell {
   effect?: DamageType;
 }
 
+/**
+ * What a spell does beyond its shape and damage (Tabletop's `spellRules.ts`; the fields must stay the same): a wall, an
+ * obscuring or dark area, light, difficult terrain, a push or pull, a teleport, a gate, a summons. Sent beside a spell,
+ * never in it: a page from before rules checks a spell's keys and would turn the whole message down.
+ */
+export const WALL_LOOKS = ['stone', 'ice', 'force', 'wood', 'thorns', 'fire', 'plain'] as const;
+export interface SpellRules {
+  name?: string;
+  wall?: { blocks: 'both' | 'move' | 'sight'; look: typeof WALL_LOOKS[number] };
+  obscure?: true;
+  dark?: true;
+  light?: { bright: number; dim: number; color?: string };
+  difficult?: true;
+  push?: number;
+  teleport?: number;
+  portal?: string;
+  summon?: { name: string; count: number; statblock?: string };
+}
+export const SPELL_RULE_LIMITS = { feet: 10000, name: 120, count: 20 } as const;
+const isRuleFeet = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= SPELL_RULE_LIMITS.feet;
+const isRuleName = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= SPELL_RULE_LIMITS.name;
+const onlyKeys = (value: object, keys: readonly string[]): boolean => Object.keys(value).every((key) => keys.includes(key));
+
+export function isSpellRules(value: unknown): value is SpellRules {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const rules = value as Record<string, unknown>;
+  if (!onlyKeys(rules, ['name', 'wall', 'obscure', 'dark', 'light', 'difficult', 'push', 'teleport', 'portal', 'summon'])) return false;
+  if (rules.name !== undefined && !isRuleName(rules.name)) return false;
+  if (rules.wall !== undefined) {
+    const wall = rules.wall as Record<string, unknown>;
+    if (typeof wall !== 'object' || wall === null || !onlyKeys(wall, ['blocks', 'look'])) return false;
+    if (wall.blocks !== 'both' && wall.blocks !== 'move' && wall.blocks !== 'sight') return false;
+    if (!(WALL_LOOKS as readonly string[]).includes(wall.look as string)) return false;
+  }
+  for (const flag of ['obscure', 'dark', 'difficult'] as const) if (rules[flag] !== undefined && rules[flag] !== true) return false;
+  if (rules.light !== undefined) {
+    const light = rules.light as Record<string, unknown>;
+    if (typeof light !== 'object' || light === null || !onlyKeys(light, ['bright', 'dim', 'color'])) return false;
+    if (!isRuleFeet(light.bright) || !isRuleFeet(light.dim) || light.bright < 0 || light.dim < 0) return false;
+    if (light.color !== undefined && (typeof light.color !== 'string' || !HEX.test(light.color))) return false;
+  }
+  if (rules.push !== undefined && !isRuleFeet(rules.push)) return false;
+  if (rules.teleport !== undefined && (!isRuleFeet(rules.teleport) || rules.teleport <= 0)) return false;
+  if (rules.portal !== undefined && !isRuleName(rules.portal)) return false;
+  if (rules.summon !== undefined) {
+    const summon = rules.summon as Record<string, unknown>;
+    if (typeof summon !== 'object' || summon === null || !onlyKeys(summon, ['name', 'count', 'statblock'])) return false;
+    if (!isRuleName(summon.name) || typeof summon.count !== 'number' || !Number.isInteger(summon.count) || summon.count < 1 || summon.count > SPELL_RULE_LIMITS.count) return false;
+    if (summon.statblock !== undefined && !isRuleName(summon.statblock)) return false;
+  }
+  return true;
+}
+
+/** A copy of rules with only their own fields. */
+export function cleanRules(rules: SpellRules): SpellRules {
+  return JSON.parse(JSON.stringify(rules)) as SpellRules;
+}
+
 export interface MapSpell {
   id: string;
   /** The player who cast it (their session id). */
@@ -54,7 +112,20 @@ export interface MapSpell {
   /** `#rrggbb`: its caster's colour. */
   color: string;
   spell: Spell;
+  /** What it does beyond its shape, beside it (a page from before rules passes the entry's other keys by). */
+  rules?: SpellRules;
+  /** Its name and words (from its spell note), shown over it with Ctrl. */
+  name?: string;
+  about?: SpellAbout;
 }
+
+/** A spell's name and words as a cast carries them. */
+export interface CastWords {
+  name: string;
+  about?: SpellAbout;
+}
+
+export const isCastName = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= SPELL_NAME_LENGTH;
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e7;
 const isPoint = (value: unknown): value is ScenePoint => typeof value === 'object' && value !== null && isNumber((value as ScenePoint).x) && isNumber((value as ScenePoint).y);
@@ -98,11 +169,14 @@ export function cleanSpell(spell: Spell): Spell {
 export function isMapSpells(value: unknown): value is MapSpell[] {
   return Array.isArray(value) && value.length <= SPELL_LIMITS.perScene && value.every((entry) => typeof entry === 'object' && entry !== null
     && isSpellId((entry as MapSpell).id) && typeof (entry as MapSpell).owner === 'string' && (entry as MapSpell).owner.length <= 128
-    && typeof (entry as MapSpell).color === 'string' && HEX.test((entry as MapSpell).color) && isSpell((entry as MapSpell).spell));
+    && typeof (entry as MapSpell).color === 'string' && HEX.test((entry as MapSpell).color) && isSpell((entry as MapSpell).spell)
+    && ((entry as MapSpell).rules === undefined || isSpellRules((entry as MapSpell).rules))
+    && ((entry as MapSpell).name === undefined || isCastName((entry as MapSpell).name))
+    && ((entry as MapSpell).about === undefined || isSpellAbout((entry as MapSpell).about)));
 }
 
 /** What a player asks: cast one (for the GM's ask `request`), take one of theirs off, clear theirs, or turn down an ask. */
-export type SpellChange = { add: Spell; request?: string } | { remove: string } | { clear: true } | { decline: string };
+export type SpellChange = { add: Spell; request?: string; rules?: SpellRules; name?: string; about?: SpellAbout } | { remove: string } | { clear: true } | { decline: string };
 
 /**
  * A spell the GM asks of a token, as the GM sets it: its shape, where it starts and its sizes (map pixels), with a
@@ -127,6 +201,8 @@ export interface SpellAsk {
   effect?: DamageType;
   /** The spell's words, from the GM's spell note, shown to the player first. */
   about?: SpellAbout;
+  /** What the spell does beyond its shape; the cast takes them. */
+  rules?: SpellRules;
 }
 
 /** A spell's words as an ask carries them: its level line, its properties (label, value) and its description (Markdown). */
@@ -174,7 +250,8 @@ export function isSpellAsk(value: unknown): value is SpellAsk {
   if (ask.name !== undefined && (typeof ask.name !== 'string' || ask.name.length > SPELL_NAME_LENGTH)) return false;
   if (ask.effect !== undefined && !isDamageType(ask.effect)) return false;
   if (ask.about !== undefined && !isSpellAbout(ask.about)) return false;
-  const known = new Set(['name', 'shape', 'from', 'size', 'length', 'angle', 'longest', 'effect', 'about']);
+  if (ask.rules !== undefined && !isSpellRules(ask.rules)) return false;
+  const known = new Set(['name', 'shape', 'from', 'size', 'length', 'angle', 'longest', 'effect', 'about', 'rules']);
   return Object.keys(ask).every((key) => known.has(key));
 }
 
@@ -188,6 +265,17 @@ export interface SpellWords {
   about?: SpellAbout;
 }
 
+/** An ask's rules, beside the asks and their words (`map-spells`' `askRules`): a page from before them passes them by. */
+export interface AskRules {
+  id: string;
+  rules: SpellRules;
+}
+
+export function isAskRulesList(value: unknown): value is AskRules[] {
+  return Array.isArray(value) && value.length <= SPELL_ASKS_PER_PLAYER && (value as unknown[]).every((entry: unknown) => typeof entry === 'object' && entry !== null
+    && isSpellId((entry as AskRules).id) && isSpellRules((entry as AskRules).rules) && Object.keys(entry).every((key) => key === 'id' || key === 'rules'));
+}
+
 export function isSpellWordsList(value: unknown): value is SpellWords[] {
   return Array.isArray(value) && value.length <= SPELL_ASKS_PER_PLAYER && (value as unknown[]).every((entry: unknown) => {
     if (typeof entry !== 'object' || entry === null || !isSpellId((entry as SpellWords).id)) return false;
@@ -199,25 +287,29 @@ export function isSpellWordsList(value: unknown): value is SpellWords[] {
 }
 
 /** Asks as sent to players: each its shape and sizes, and their damage and words beside them. */
-export function splitAsks(requests: readonly SpellRequest[]): { asks: SpellRequest[]; words: SpellWords[] } {
+export function splitAsks(requests: readonly SpellRequest[]): { asks: SpellRequest[]; words: SpellWords[]; rules: AskRules[] } {
   const asks: SpellRequest[] = [];
   const words: SpellWords[] = [];
+  const rules: AskRules[] = [];
   for (const request of requests) {
-    const { effect, about, ...shape } = request.ask;
+    const { effect, about, rules: own, ...shape } = request.ask;
     asks.push({ ...request, ask: shape });
     if (effect !== undefined || about !== undefined) words.push({ id: request.id, ...(effect !== undefined ? { effect } : {}), ...(about !== undefined ? { about } : {}) });
+    if (own !== undefined) rules.push({ id: request.id, rules: own });
   }
-  return { asks, words };
+  return { asks, words, rules };
 }
 
 /** The asks a player gets, each with its damage and words again. */
-export function joinAsks(asks: readonly SpellRequest[], words: readonly SpellWords[] | undefined): SpellRequest[] {
-  if (!words || words.length === 0) return [...asks];
-  const byId = new Map(words.map((entry) => [entry.id, entry]));
+export function joinAsks(asks: readonly SpellRequest[], words: readonly SpellWords[] | undefined, rules?: readonly AskRules[]): SpellRequest[] {
+  if ((!words || words.length === 0) && (!rules || rules.length === 0)) return [...asks];
+  const byId = new Map((words ?? []).map((entry) => [entry.id, entry]));
+  const rulesOf = new Map((rules ?? []).map((entry) => [entry.id, entry.rules]));
   return asks.map((request) => {
     const extra = byId.get(request.id);
-    if (!extra) return request;
-    return { ...request, ask: { ...request.ask, ...(extra.effect !== undefined ? { effect: extra.effect } : {}), ...(extra.about !== undefined ? { about: extra.about } : {}) } };
+    const own = rulesOf.get(request.id);
+    if (!extra && !own) return request;
+    return { ...request, ask: { ...request.ask, ...(extra?.effect !== undefined ? { effect: extra.effect } : {}), ...(extra?.about !== undefined ? { about: extra.about } : {}), ...(own ? { rules: own } : {}) } };
   });
 }
 
@@ -236,6 +328,7 @@ export function cleanAsk(ask: SpellAsk): SpellAsk {
     ...(ask.shape === 'wall' && ask.longest !== undefined ? { longest: ask.longest } : {}),
     ...(ask.effect !== undefined ? { effect: ask.effect } : {}),
     ...(ask.about !== undefined ? { about: { line: ask.about.line, properties: ask.about.properties.map(([label, value]) => [label, value] as [string, string]), text: ask.about.text } } : {}),
+    ...(ask.rules !== undefined ? { rules: cleanRules(ask.rules) } : {}),
   };
 }
 
