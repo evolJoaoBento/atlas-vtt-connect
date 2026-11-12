@@ -3,7 +3,7 @@ import type { SceneSnapshot } from '@atlas-vtt/api-types';
 import type { TabInfo, TabScenes } from '../../../src/app/online/atlas/tabScenes';
 import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
 import { encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
-import { CutsceneSender, STEP_WAIT_MS, type CutsceneSenderOptions } from '../../../src/app/online/scene/CutsceneSender';
+import { CutsceneSender, STEP_BACKSTOP_MS, STEP_WAIT_MS, type CutsceneSenderOptions } from '../../../src/app/online/scene/CutsceneSender';
 import type { BoardCutscene } from '../../../src/app/online/scene/boardTypes';
 import type { GmCutscene } from '../../../src/app/online/scene/sceneContracts';
 import type { BoardPose, BoardSource } from '../../../src/app/online/scene/sceneSources';
@@ -272,7 +272,7 @@ describe('CutsceneSender', () => {
     warn.mockRestore();
   });
 
-  it('waits for the step\'s scene only once the GM is on its map: the run ends when that map is active and sends nothing for 3 s', () => {
+  it('waits for the step\'s scene only once the GM is on its map: the run ends when that map is active and sends nothing for 10 s', () => {
     const w = world();
     const anna = w.addPlayer('anna');
     w.ready(anna);
@@ -289,6 +289,39 @@ describe('CutsceneSender', () => {
     w.activate('b');
     vi.advanceTimersByTime(STEP_WAIT_MS - 100);
     expect(w.notices).toHaveLength(0);
+    vi.advanceTimersByTime(200);
+    expect(w.notices).toHaveLength(1);
+    expect(w.of('anna', 'cutscene').at(-1)).toEqual({ v: 1, type: 'cutscene', cutscene: null });
+    expect(w.sender.running()).toBe(false);
+  });
+
+  it('gives a slow map up to 10 s to load once the GM is on it', () => {
+    const w = world();
+    const anna = w.addPlayer('anna');
+    w.ready(anna);
+    w.goLive('a');
+    w.publish(run('r1', 'k1'));
+    w.publish(run('r1', 'k2', 'prepared', 2));
+    w.leave('a');
+    w.activate('b');
+    vi.advanceTimersByTime(8000);
+    expect(w.notices).toHaveLength(0);
+    w.goLive('b');
+    expect(w.notices).toHaveLength(0);
+    expect(w.of('anna', 'cutscene-scene').map((m) => (m as { key: string }).key)).toEqual(['k1', 'k2']);
+    expect(w.sender.running()).toBe(true);
+  });
+
+  it('ends the run after 30 s when the GM\'s board never gets on the step\'s map, with the notice', () => {
+    const w = world();
+    const anna = w.addPlayer('anna');
+    w.ready(anna);
+    w.goLive('a');
+    w.publish(run('r1', 'k1'));
+    w.publish(run('r1', 'k2', 'prepared', 2));
+    vi.advanceTimersByTime(STEP_BACKSTOP_MS - 100);
+    expect(w.notices).toHaveLength(0);
+    expect(w.sender.running()).toBe(true);
     vi.advanceTimersByTime(200);
     expect(w.notices).toHaveLength(1);
     expect(w.of('anna', 'cutscene').at(-1)).toEqual({ v: 1, type: 'cutscene', cutscene: null });
@@ -317,7 +350,7 @@ describe('CutsceneSender', () => {
     expect(w.of('anna', 'cutscene').some((m) => (m as { cutscene: unknown }).cutscene === null)).toBe(false);
   });
 
-  it('ends the run 3 s after a step whose map has no tab, or whose tab is closed while it waits', () => {
+  it('ends the run 10 s after a step whose map has no tab, or whose tab is closed while it waits', () => {
     const w = world();
     const anna = w.addPlayer('anna');
     w.ready(anna);

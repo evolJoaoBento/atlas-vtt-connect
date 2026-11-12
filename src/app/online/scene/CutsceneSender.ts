@@ -26,7 +26,9 @@ export const CAMERA_INTERVAL_MS = 100;
 /** The scenes of a run are projected again at most this often. */
 export const SCENE_INTERVAL_MS = 200;
 /** How long a ready player may wait for the scene of the step shown before the run is ended for players. */
-export const STEP_WAIT_MS = 3000;
+export const STEP_WAIT_MS = 10_000;
+/** The longest they wait for it in all, from the step, even when the GM's board never gets on the step's map. */
+export const STEP_BACKSTOP_MS = 30_000;
 
 export const CUTSCENE_ENDED_NOTICE = 'A cutscene scene could not be sent to players, so the cutscene was ended for them.';
 
@@ -85,6 +87,7 @@ export class CutsceneSender implements SessionHandler {
   private aborted: string | null = null;
   private invalidRun: string | null = null;
   private stepTimer: number | null = null;
+  private backstopTimer: number | null = null;
 
   constructor(private readonly options: CutsceneSenderOptions) {}
 
@@ -204,8 +207,7 @@ export class CutsceneSender implements SessionHandler {
     if (Object.keys(next.maps).some((key) => !this.entries.has(key))) this.refresh();
     else this.refreshSoon();
     this.cameraMoved();
-    if (this.stepTimer !== null) window.clearTimeout(this.stepTimer);
-    this.stepTimer = null;
+    this.clearGuards();
     this.guardStep();
   }
 
@@ -216,11 +218,20 @@ export class CutsceneSender implements SessionHandler {
    */
   private guardStep(): void {
     const run = this.run;
-    if (!run || this.stepTimer !== null || this.ready.size === 0 || this.entries.has(run.cutscene.key) || !this.onStepMap(run)) return;
-    this.stepTimer = window.setTimeout(() => {
-      this.stepTimer = null;
+    if (!run || this.ready.size === 0 || this.entries.has(run.cutscene.key)) return;
+    const give = (): void => {
       if (this.run && this.ready.size > 0 && !this.entries.has(this.run.cutscene.key)) this.abort();
-    }, STEP_WAIT_MS);
+    };
+    // The backstop: a GM whose switch to the step's map failed never gets on it, and players are not left on black for ever.
+    if (this.backstopTimer === null) this.backstopTimer = window.setTimeout(() => { this.backstopTimer = null; give(); }, STEP_BACKSTOP_MS);
+    if (this.stepTimer !== null || !this.onStepMap(run)) return;
+    this.stepTimer = window.setTimeout(() => { this.stepTimer = null; give(); }, STEP_WAIT_MS);
+  }
+
+  private clearGuards(): void {
+    if (this.stepTimer !== null) window.clearTimeout(this.stepTimer);
+    if (this.backstopTimer !== null) window.clearTimeout(this.backstopTimer);
+    this.stepTimer = this.backstopTimer = null;
   }
 
   /** Whether the step's map should be live by now: a tab of it is its view's active one, or no tab of it is open (closed, renamed). */
@@ -259,8 +270,8 @@ export class CutsceneSender implements SessionHandler {
     }
     if (this.sceneCooldown !== null) window.clearTimeout(this.sceneCooldown);
     if (this.cameraCooldown !== null) window.clearTimeout(this.cameraCooldown);
-    if (this.stepTimer !== null) window.clearTimeout(this.stepTimer);
-    this.sceneCooldown = this.cameraCooldown = this.stepTimer = null;
+    this.clearGuards();
+    this.sceneCooldown = this.cameraCooldown = null;
     this.sceneDirty = this.cameraDirty = false;
     if (hadRun) this.assetsChanged();
   }
@@ -362,10 +373,7 @@ export class CutsceneSender implements SessionHandler {
       entry = { path, memo, scene: null, sceneText: '', extras: null, extrasText: '', parts: [], seq: 0, ids: new Set() };
       this.entries.set(key, entry);
     }
-    if (key === run.cutscene.key && this.stepTimer !== null) {
-      window.clearTimeout(this.stepTimer);
-      this.stepTimer = null;
-    }
+    if (key === run.cutscene.key) this.clearGuards();
     if (sceneText === entry.sceneText && extrasText === entry.extrasText) return;
     if (extrasText !== entry.extrasText) {
       entry.seq = ++this.seq;
