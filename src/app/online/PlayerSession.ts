@@ -6,8 +6,8 @@
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneInbox } from './playerSessionScene';
-import type { BoardCamera, BoardCutscene, BoardExtras } from './scene/boardTypes';
-import { CutsceneExtrasInbox } from './scene/cutsceneExtrasInbox';
+import type { BoardCamera, BoardCutscene, BoardExtras, CutsceneCamera } from './scene/boardTypes';
+import { CutsceneExtrasInbox, mergeBoardExtras } from './scene/cutsceneExtrasInbox';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
@@ -22,8 +22,6 @@ import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
-
-type Point3 = { x: number; y: number; z: number };
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -107,7 +105,7 @@ export interface PlayerSessionOptions {
   /** The board extras of the run's map `key`, whole once every part of one `seq` is here. */
   onCutsceneExtras?(runId: string, key: string, extras: BoardExtras): void;
   /** The GM's camera in a live run. */
-  onCutsceneCamera?(runId: string, camera: { eye: Point3; target: Point3 }): void;
+  onCutsceneCamera?(runId: string, camera: CutsceneCamera): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -493,9 +491,7 @@ export class PlayerSession {
     this.board.parts[part] = extras;
     if (this.board.parts.some((entry) => entry === undefined)) return;
     const [first, ...rest] = this.board.parts as Array<BoardExtras | null>;
-    const whole = first ? rest.reduce<BoardExtras>((sum, next) => (next ? {
-      ...sum, walls: [...sum.walls, ...next.walls], lights: [...sum.lights, ...next.lights], props: [...sum.props, ...next.props],
-    } : sum), first) : null;
+    const whole = first ? mergeBoardExtras(first, rest.filter((next): next is BoardExtras => next !== null)) : null;
     this.options.onBoardExtras?.(whole);
   }
 

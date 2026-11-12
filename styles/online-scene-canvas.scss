@@ -39,7 +39,11 @@
     font-size: 18px; text-align: center; padding: 16px; pointer-events: auto;
   }
   /* The tools are locked while a cutscene runs. */
-  &.is-cutscene { .toolbar, .sheet-panel, .dice-tray, button[aria-label="Your sheets"] { display: none !important; } }
+  &.is-cutscene {
+    .toolbar, .sheet-panel, .dice-tray, button[aria-label="Your sheets"], .view-buttons { display: none !important; }
+    /* The top bar (the dice log) stays reachable over the board and the black. */
+    .top-bar { z-index: 50; }
+  }
   .atlas-connect-scene__dimension { font-weight: 600; font-size: var(--font-ui-smaller); min-width: 32px; }
   /* A grab hand over the player's own tokens; grabbing while a token or the map is dragged. */
   .atlas-connect-scene__map.can-grab { cursor: grab; }

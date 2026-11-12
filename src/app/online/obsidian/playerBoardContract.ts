@@ -4,7 +4,7 @@
  * cameras and what others do; it hands back the player's moves, pings, lasers, templates, pins and hovers. Tabletop
  * keeps a copy of these shapes (`src/connectContract.ts`); they must stay the same.
  */
-import type { BoardCamera, BoardExtras, BoardPoint } from '../scene/boardTypes';
+import type { BoardCamera, BoardExtras, BoardPoint, CutsceneCamera } from '../scene/boardTypes';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PlayerPing } from '../tools/pings';
@@ -137,11 +137,8 @@ export interface PlayerBoardHandle {
   /** The revealed scene of the map `key` for the run `runId`, and its board extras; sent again whenever either changes. */
   setCutsceneScene?(runId: string, key: string, scene: unknown, extras: BoardExtras | null): void;
   /** Live only: the GM's camera, a goal the board eases towards. */
-  setCutsceneCamera?(runId: string, camera: { eye: BoardPoint3; target: BoardPoint3 }): void;
+  setCutsceneCamera?(runId: string, camera: CutsceneCamera): void;
 }
-
-/** A point of the board's world. */
-export interface BoardPoint3 { x: number; y: number; z: number }
 
 /** What the board throws: dice by kind, the modifier, and the sheet roll it is for, handed back with the result unchanged. */
 export interface PlayerDiceRequest {

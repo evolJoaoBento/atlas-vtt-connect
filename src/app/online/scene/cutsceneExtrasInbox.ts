@@ -4,6 +4,13 @@
  */
 import type { BoardExtras } from './boardTypes';
 
+/** The parts of one extras put together: the first part's fields, with every part's walls, lights and props. */
+export function mergeBoardExtras(first: BoardExtras, rest: readonly BoardExtras[]): BoardExtras {
+  return rest.reduce<BoardExtras>((sum, next) => ({
+    ...sum, walls: [...sum.walls, ...next.walls], lights: [...sum.lights, ...next.lights], props: [...sum.props, ...next.props],
+  }), first);
+}
+
 export class CutsceneExtrasInbox {
   private readonly byKey = new Map<string, { seq: number; parts: Array<BoardExtras | undefined> }>();
 
@@ -20,9 +27,7 @@ export class CutsceneExtrasInbox {
     entry.parts[part] = extras;
     if (entry.parts.some((each) => each === undefined)) return null;
     const [first, ...rest] = entry.parts as BoardExtras[];
-    return rest.reduce<BoardExtras>((sum, next) => ({
-      ...sum, walls: [...sum.walls, ...next.walls], lights: [...sum.lights, ...next.lights], props: [...sum.props, ...next.props],
-    }), first!);
+    return mergeBoardExtras(first!, rest);
   }
 
   clear(): void {

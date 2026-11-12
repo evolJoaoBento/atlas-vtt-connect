@@ -229,6 +229,26 @@ describe('the revealed scenes of a cutscene', () => {
     loader.dispose();
   });
 
+  it('files only a cutscene shows are not written to the image store; the player\'s own are', async () => {
+    const stored: string[] = [];
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    let hashed = '';
+    const loader = new AssetLoader({
+      cache: { get: async () => null, put: async (entry) => { stored.push(entry.id); } },
+      decode: async () => ({ image: {} as HTMLImageElement, width: 1, height: 1, release: () => {} }),
+      hash: async () => hashed, models: () => false, onChange: () => {},
+    });
+    const accept = (id: string): Promise<unknown> => (hashed = id, loader as unknown as { accept(id: string, wanted: unknown, bytes: ArrayBuffer, mime: string, fromGm: boolean): Promise<unknown> })
+      .accept(id, (loader as unknown as { wanted: Map<string, unknown> }).wanted.get(id), bytes, 'image/png', true);
+    loader.setScene(scene('own'));
+    loader.setCutscene([{ scene: { sceneId: 'cutscene:r:k1', map: { asset: ID.tex, width: 1, height: 1, cellSize: 70 }, tokens: {} } as never, extras: null }]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await accept(ID.tex);
+    await accept(ID.map);
+    expect(stored).toEqual([ID.map]);
+    loader.dispose();
+  });
+
   it('the keeper pairs a scene with its extras, ignores another run, and forgets at the end', () => {
     const given: string[] = [];
     const files: number[] = [];
@@ -246,6 +266,12 @@ describe('the revealed scenes of a cutscene', () => {
     const late: string[] = [];
     keeper.replay({ cutscene: (c) => late.push(`run:${c?.runId}`), cutsceneScene: (r, k, _s, e) => late.push(`scene:${r}:${k}:${e ? 'extras' : 'none'}`) });
     expect(late).toEqual(['run:r', 'scene:r:k1:extras']);
+    // A live run's camera reaches a tab that attaches later.
+    const pose = { eye: { x: 1, y: 2, z: 3 }, target: { x: 0, y: 0, z: 0 } };
+    keeper.camera('r', pose);
+    const cameras: unknown[] = [];
+    keeper.replay({ cutsceneCamera: (_runId, camera) => cameras.push(camera) });
+    expect(cameras).toEqual([pose]);
     keeper.cutscene(null);
     expect(files.at(-1)).toBe(0);
     const empty: string[] = [];

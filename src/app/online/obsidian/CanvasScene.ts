@@ -18,7 +18,7 @@ import { MapView } from '../../../../online-client/mapView.mts';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import { BoardSceneView } from './BoardSceneView';
 import { CutsceneStage } from './CutsceneStage';
-import type { BoardCutscene } from '../scene/boardTypes';
+import type { BoardCutscene, CutsceneCamera } from '../scene/boardTypes';
 import type { PlayerBoardFactory, PlayerDiceRequest } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 import { PageToolbar } from '../../../../online-client/toolbar.mts';
@@ -242,7 +242,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.stage.scene(runId, key, scene, extras);
   }
 
-  cutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+  cutsceneCamera(runId: string, camera: CutsceneCamera): void {
     this.stage.cameraMoved(runId, camera);
   }
 

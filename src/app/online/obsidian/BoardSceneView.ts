@@ -11,7 +11,7 @@ import { NOTE_WAIT_MS, type ToolState } from '../../../../online-client/mapView.
 import { NoteView, type NoteViewOptions } from '../../../../online-client/noteView.mts';
 import { StatblockPreviewView } from '../../../../online-client/statblockPreviewView.mts';
 import type { DecodedImage } from '../assets/AssetLoader';
-import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
+import type { BoardCamera, BoardCutscene, BoardExtras, CutsceneCamera } from '../scene/boardTypes';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { ArPose } from '../tools/arViews';
 import type { ArTable } from '../tools/arTable';
@@ -245,7 +245,7 @@ export class BoardSceneView implements SceneViewport {
   }
 
   /** The run (null ends it); a board that plays none ignores it. */
-  setCutscene(cutscene: unknown, options?: PlayerCutsceneOptions): void {
+  setCutscene(cutscene: BoardCutscene | null, options?: PlayerCutsceneOptions): void {
     if (this.playsCutscenes) this.board.setCutscene?.(cutscene, options);
   }
 
@@ -253,7 +253,7 @@ export class BoardSceneView implements SceneViewport {
     if (this.playsCutscenes) this.board.setCutsceneScene?.(runId, key, scene, extras);
   }
 
-  setCutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+  setCutsceneCamera(runId: string, camera: CutsceneCamera): void {
     if (this.playsCutscenes) this.board.setCutsceneCamera?.(runId, camera);
   }
 

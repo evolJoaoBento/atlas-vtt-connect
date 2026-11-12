@@ -7,6 +7,10 @@
 import type { ArTable } from '../tools/arTable';
 
 export interface BoardPoint { x: number; y: number }
+/** A point of the board's world. */
+export interface BoardPoint3 { x: number; y: number; z: number }
+/** The camera of a live cutscene: where the GM's eye is and what it looks at. */
+export interface CutsceneCamera { eye: BoardPoint3; target: BoardPoint3 }
 
 export interface BoardDoor {
   open: boolean;

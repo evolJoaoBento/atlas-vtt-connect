@@ -685,7 +685,9 @@ button:disabled { opacity: 0.5; cursor: default; }
   font-size: 18px; text-align: center; padding: 16px; pointer-events: auto;
 }
 /* The tools are locked while a cutscene runs. */
-.table.is-cutscene .toolbar, .table.is-cutscene .sheet-panel, .table.is-cutscene .dice-tray, .table.is-cutscene #sheet-button { display: none !important; }
+.table.is-cutscene .toolbar, .table.is-cutscene .sheet-panel, .table.is-cutscene .dice-tray, .table.is-cutscene #sheet-button, .table.is-cutscene .view-buttons { display: none !important; }
+/* The top bar (the menu, the dice log) stays reachable over the board and the black. */
+.table.is-cutscene .top-bar { z-index: 50; }
 .back-to-ar { grid-row: 2; grid-column: 1; align-self: end; justify-self: center; z-index: 5; margin-bottom: 72px; }
 .back-to-ar[hidden] { display: none; }
 .board-buttons { display: flex; align-items: center; gap: var(--inset); }

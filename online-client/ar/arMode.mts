@@ -65,6 +65,8 @@ export interface ArModeOptions {
   tokens(): Array<{ id: string; name: string }>;
   /** Augmented reality ended (Leave, or the camera or session stopped). */
   onEnd(): void;
+  /** Room tracking could not restart after a cutscene and waits for another tap (Back to AR). */
+  onRoomSuspended?(): void;
   /** The player chose the other tracking in the menu (a tap: AR starts again with it there and then). */
   onSwitch?(tracking: Tracking): void;
   /** Tells the GM where the camera is (the eye on the GM's board); null when not tracking. False when it cannot go. */
@@ -615,11 +617,21 @@ export class ArMode {
   resumeRoom(session: Promise<unknown>): void {
     if (this.ended || !this.suspended) { session.then((s) => (s as XrSessionLike).end(), () => undefined).catch(() => undefined); return; }
     this.suspended = false;
+    // A new session has a room of its own (its origin is where the phone is now): the old place means nothing in it, so
+    // the player puts the board down again, as with Move the board.
+    this.placed = false;
+    this.preview = null;
+    this.resuming = true;
     session.then((s) => this.beginRoom(s as XrSessionLike), (error: unknown) => {
       console.warn('[Atlas VTT Connect] Room tracking could not restart:', error);
-      this.end();
+      this.resuming = false;
+      this.suspended = true;
+      this.options.onRoomSuspended?.();
     });
   }
+
+  /** The session being started is the one after a cutscene: if it cannot start, room tracking waits for another tap. */
+  private resuming = false;
 
   private beginRoom(session: XrSessionLike): void {
     if (this.ended) { session.end().catch(() => undefined); return; }
@@ -659,14 +671,21 @@ export class ArMode {
     this.options.boardEl.classList.add('is-room-ar');
     board.startRoomAr(session, (frame, space) => this.roomFrame(frame as XrFrameLike, space)).then((started) => {
       if (!started) throw new Error('The board would not draw into the session');
-      // Back from a cutscene the board keeps the place it was put down at.
-      if (!this.placed) this.say('Move the phone slowly over the table until the board shows on it, then tap to put it down.');
+      this.resuming = false;
+      this.say('Move the phone slowly over the table until the board shows on it, then tap to put it down.');
       return session.requestReferenceSpace('viewer');
     }).then((viewer) => session.requestHitTestSource?.({ space: viewer })).then((source) => {
       if (source) this.hitSource = source;
       else this.say('This phone cannot find the table: tap AR settings, then Use printed markers.');
     }).catch((error: unknown) => {
       console.warn('[Atlas VTT Connect] Room tracking failed:', error);
+      if (this.resuming && this.session === session) {
+        // Back from a cutscene and the board would not draw into the new session: AR stays, waiting for another tap.
+        this.resuming = false;
+        this.suspendRoom();
+        this.options.onRoomSuspended?.();
+        return;
+      }
       session.end().catch(() => undefined);
     });
   }

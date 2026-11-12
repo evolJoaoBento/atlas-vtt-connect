@@ -592,12 +592,33 @@ describe('cutscenes in the player tab', () => {
     expect(t.q('.toolbar').hidden).toBe(false);
   });
 
-  it('a new admission asks for the reveal again while a run goes on', async () => {
+  it('after a drop the run is over for the tab, and the GM resending it on the new admission asks for the reveal again', async () => {
     const t = await playing();
     t.sink.cutscene?.(cutscene);
+    // The real session ends the run when the link drops, then the GM's `cutscene` follows the new admission.
     t.sink.session({ ...admitted, status: 'connecting' });
+    t.sink.cutscene?.(null);
     t.sink.session(admitted);
+    t.sink.cutscene?.(cutscene);
+    // Not admitted, nothing to take back (the GM forgot the old link); the new run asks anew.
     expect(t.ready).toEqual([true, true]);
+  });
+
+  it('the black fades in: the overlay is shown and its style flushed before the class that moves its opacity', async () => {
+    const t = await playing();
+    const overlay = t.q('.atlas-connect-scene__cutscene-overlay');
+    const reads: Array<{ hidden: boolean; black: boolean }> = [];
+    Object.defineProperty(overlay, 'offsetHeight', { configurable: true, get: () => { reads.push({ hidden: overlay.hidden, black: overlay.classList.contains('is-black') }); return 0; } });
+    t.sink.cutscene?.(cutscene);
+    expect(reads[0]).toEqual({ hidden: false, black: false });
+    expect(overlay.classList.contains('is-black')).toBe(true);
+  });
+
+  it('closing the tab mid-run tells the GM to stop sending the reveal', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    await t.view.onClose();
+    expect(t.ready).toEqual([true, false]);
   });
 
   it('the view does not change during the run and is chosen anew after it', async () => {

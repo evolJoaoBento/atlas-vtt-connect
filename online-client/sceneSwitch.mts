@@ -13,7 +13,7 @@ import type { MapSpell, SpellRequest } from '../src/app/online/tools/spells';
 import type { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { PlayerBoardFactory } from '../src/app/online/obsidian/playerBoardContract';
 import type { SceneViewport } from '../src/app/online/obsidian/sceneViewport';
-import type { BoardCamera, BoardCutscene, BoardExtras } from '../src/app/online/scene/boardTypes';
+import type { BoardCamera, BoardCutscene, BoardExtras, CutsceneCamera } from '../src/app/online/scene/boardTypes';
 import { CutsceneStage } from '../src/app/online/obsidian/CutsceneStage';
 import type { SceneCamera } from '../src/app/online/scene/sceneCamera';
 import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
@@ -169,18 +169,24 @@ export class SceneSwitch implements SceneViewport {
     this.offered = available;
     // Offered anew (a new admission): the GM holds no request of ours.
     this.asked = false;
-    if (available && !this.factory && !this.loading) {
-      this.loading = true;
-      this.options.loadBoard().then((factory) => {
-        this.factory = factory;
-      }, (error: unknown) => {
-        this.options.onError?.('The 3D board could not load; the map stays 2D.', error);
-      }).finally(() => {
-        this.loading = false;
-        this.choose();
-      });
-    }
+    if (available) this.ensureBoardChunk();
     this.choose();
+  }
+
+  /** Starts loading the board's code unless it is here or on its way; a cutscene needs it too. */
+  private ensureBoardChunk(): void {
+    if (this.factory || this.loading) return;
+    this.loading = true;
+    this.options.loadBoard().then((factory) => {
+      this.factory = factory;
+    }, (error: unknown) => {
+      this.options.onError?.('The 3D board could not load; the map stays 2D.', error);
+    }).finally(() => {
+      this.loading = false;
+      this.choose();
+      // A run that met the curtain for want of the board plays on it now.
+      this.stage?.retry();
+    });
   }
 
   boardExtras(extras: BoardExtras | null): void {
@@ -197,25 +203,38 @@ export class SceneSwitch implements SceneViewport {
   cutscene(cutscene: BoardCutscene | null): void {
     if (!this.stage) return;
     const wasRunning = this.stage.running;
+    // A page that has not the board's code yet (a slow join, a player who joins mid-run) loads it now.
+    if (cutscene && !this.factory && !this.board) this.ensureBoardChunk();
     this.stage.cutscene(cutscene);
+    if (this.backTimer !== null) { window.clearTimeout(this.backTimer); this.backTimer = null; }
     // Room AR cannot draw a driven camera: its session ends for the run (marker AR goes on under the locked board and
     // resumes by itself); a WebXR session starts only from a tap, so the player is offered Back to AR afterwards.
-    if (cutscene && !wasRunning) this.ar?.suspendRoom();
-    if (!cutscene) this.showBackToAr();
+    if (cutscene) {
+      this.runFadeMs = cutscene.look.fadeMs;
+      const back = this.options.cutscene?.backButton;
+      if (back) back.hidden = true;
+      if (!wasRunning) this.ar?.suspendRoom();
+    } else if (this.ar?.roomSuspended) {
+      // Only once the board has faded out and given the camera back: a tap earlier cannot start the session.
+      this.backTimer = window.setTimeout(() => { this.backTimer = null; this.showBackToAr(); }, this.runFadeMs);
+    }
   }
+
+  private runFadeMs = 600;
+  private backTimer: number | null = null;
 
   cutsceneScene(runId: string, key: string, scene: PlayerScene, extras: BoardExtras | null): void {
     this.stage?.scene(runId, key, scene, extras);
   }
 
-  cutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+  cutsceneCamera(runId: string, camera: CutsceneCamera): void {
     this.stage?.cameraMoved(runId, camera);
   }
 
   /** The Back to AR button shows while room AR waits for a tap after a run. */
   private showBackToAr(): void {
     const back = this.options.cutscene?.backButton;
-    if (back) back.hidden = this.ar?.roomSuspended !== true;
+    if (back) back.hidden = this.ar?.roomSuspended !== true || this.stage?.running === true;
   }
 
   private backToAr(): void {
@@ -395,6 +414,7 @@ export class SceneSwitch implements SceneViewport {
         ...(this.options.sendArView ? { sendView: (pose: ArPose | null) => this.options.sendArView?.(pose) ?? false } : {}),
         ...(this.options.sendArSurvey ? { sendSurvey: (survey: ArSurvey) => this.options.sendArSurvey?.(survey) ?? false } : {}),
         onEnd: () => { this.ar = null; this.showEyes(); this.showBackToAr(); },
+        onRoomSuspended: () => this.showBackToAr(),
         // The other tracking, chosen in the menu: this one ends and the other starts, inside the same tap.
         onSwitch: () => {
           this.ar?.end();
@@ -503,6 +523,7 @@ export class SceneSwitch implements SceneViewport {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.backTimer !== null) window.clearTimeout(this.backTimer);
     this.stage?.dispose();
     this.ar?.end();
     for (const stop of this.stops) stop();
