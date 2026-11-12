@@ -756,3 +756,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* Through a token's eyes Tabletop's spell toolbar takes the toolbar's place (sceneSwitch's onSeeing). */
 .toolbar[hidden] { display: none; }
+
+/* A toolbar button whose face is a word (AR) rather than an icon. */
+.tool-word { font-weight: 700; font-size: 13px; letter-spacing: 0.04em; line-height: 1; }

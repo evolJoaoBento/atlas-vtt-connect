@@ -285,7 +285,8 @@ function isPlayerPins(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.pins && value.every((pin) => isFields(pin)
     && isText(pin.id, SCENE_LIMITS.idLength) && isCoordinate(pin.x) && isCoordinate(pin.y)
     && (pin.label === null || isText(pin.label, SCENE_LIMITS.pinLabel)) && (pin.title === null || isText(pin.title, SCENE_LIMITS.pinTitle))
-    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(pin.icon));
+    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(pin.icon)
+    && optional((name: unknown) => isText(name, SCENE_LIMITS.pinName) && name !== '')(pin.name));
 }
 
 function isPlayerHandout(value: unknown): boolean {

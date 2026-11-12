@@ -235,7 +235,16 @@ export class SceneSwitch implements SceneViewport {
     if (ar && this.board?.augmentedReality === true && !this.roomAsked) this.askRoom();
     if (ar) {
       ar.button.hidden = this.board?.augmentedReality !== true;
-      label(ar.button, inAr ? 'AR settings' : 'AR: the board on your table', 'scan');
+      // Its face the word AR (plainer than any icon for it); the tooltip says the rest.
+      const words = inAr ? 'AR settings' : 'AR: the board on your table';
+      ar.button.setAttribute('aria-label', words);
+      ar.button.dataset.label = words;
+      if (ar.button.querySelector('.tool-icon') || ar.button.textContent !== 'AR') {
+        const face = document.createElement('span');
+        face.className = 'tool-word';
+        face.textContent = 'AR';
+        ar.button.replaceChildren(face);
+      }
       ar.button.setAttribute('aria-pressed', String(inAr));
       ar.button.classList.toggle('is-active', inAr);
     }

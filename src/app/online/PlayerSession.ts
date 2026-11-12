@@ -15,7 +15,7 @@ import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
 import type { MapSpell, SpellChange, SpellRequest } from './tools/spells';
-import { joinAsks } from './tools/spells';
+import { isCastName, isSpellAbout, type SpellAbout, isSpellRules, type SpellRules, joinAsks } from './tools/spells';
 import type { TemplateChange } from './view/tools/PlayerTools';
 import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
@@ -364,7 +364,7 @@ export class PlayerSession {
         this.options.onSheets?.(message.entries);
         break;
       case 'map-spells':
-        this.options.onSpells?.(message.sceneId, message.spells, joinAsks(message.asks ?? [], message.askWords));
+        this.options.onSpells?.(message.sceneId, message.spells, joinAsks(message.asks ?? [], message.askWords, message.askRules));
         break;
       case 'map-templates':
         this.options.onTemplates?.(message.sceneId, message.templates);
@@ -492,8 +492,13 @@ export class PlayerSession {
 }
 
 /** A spell change as `map-spell` carries it. */
-function spellParts(change: SpellChange): { add: MapSpell['spell']; request?: string } | { remove: string } | { clear: true } | { decline: string } {
-  if ('add' in change) return { add: change.add, ...(change.request !== undefined ? { request: change.request } : {}) };
+function spellParts(change: SpellChange): { add: MapSpell['spell']; request?: string; rules?: SpellRules; name?: string; about?: SpellAbout } | { remove: string } | { clear: true } | { decline: string } {
+  if ('add' in change) {
+    return {
+      add: change.add, ...(change.request !== undefined ? { request: change.request } : {}), ...(change.rules !== undefined && isSpellRules(change.rules) ? { rules: change.rules } : {}),
+      ...(isCastName(change.name) ? { name: change.name } : {}), ...(change.about !== undefined && isSpellAbout(change.about) ? { about: change.about } : {}),
+    };
+  }
   if ('remove' in change) return { remove: change.remove };
   if ('decline' in change) return { decline: change.decline };
   return { clear: true };

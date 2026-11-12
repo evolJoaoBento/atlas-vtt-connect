@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
-import { askedSpell, cleanAsk, isSpellAsk, joinAsks, type Spell, type SpellAsk, type SpellRequest } from '../../../src/app/online/tools/spells';
+import { askedSpell, cleanAsk, isMapSpells, isSpellAsk, isSpellRules, joinAsks, type Spell, type SpellAsk, type SpellRequest, type SpellRules } from '../../../src/app/online/tools/spells';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
@@ -151,5 +151,56 @@ describe('spell ask messages', () => {
     const plain = world();
     plain.host.requestSpell('s1', 'wizard', fireball);
     expect(plain.lastOf('p1')!.askWords).toBeUndefined();
+  });
+
+  it("a spell's rules (wall, light, push…) travel beside it: in the cast's entry, beside an ask, and with a player's cast", () => {
+    const rules: SpellRules = { name: 'Thunderwave', push: 10, wall: { blocks: 'both', look: 'stone' }, light: { bright: 20, dim: 20 }, summon: { name: 'Wolf', count: 2 }, portal: 'Gate', difficult: true };
+    expect(isSpellRules(rules)).toBe(true);
+    expect(isSpellRules({ push: 'far' })).toBe(false);
+    expect(isSpellRules({ wall: { blocks: 'both', look: 'gold' } })).toBe(false);
+    expect(isSpellRules({ summon: { name: 'Wolf', count: 99 } })).toBe(false);
+    expect(isSpellRules({ teleport: 30, extra: 1 })).toBe(false);
+    // An ask's rules go beside it, and come back joined.
+    const w = world();
+    w.host.requestSpell('s1', 'wizard', { ...fireball, rules });
+    const message = w.lastOf('p1')!;
+    expect(message.asks).toEqual([{ id: 'a1', tokenId: 'wizard', ask: fireball }]);
+    expect(message.askWords).toBeUndefined();
+    expect(message.askRules).toEqual([{ id: 'a1', rules }]);
+    expect(joinAsks(message.asks ?? [], message.askWords, message.askRules)[0]!.ask.rules).toEqual(rules);
+    // The cast for it takes the ask's rules, whatever the player sent.
+    w.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', add: { ...aimed, size: 10 }, request: 'a1', rules: { push: 99 } });
+    const cast = w.lastOf('p1')!.spells[0]!;
+    expect(cast.rules).toEqual(rules);
+    expect(cast.spell).not.toHaveProperty('rules');
+    expect(isMapSpells([cast])).toBe(true);
+    // A cast of the player's own takes theirs.
+    w.send(BEN, { v: 1, type: 'map-spell', sceneId: 's1', add: { ...aimed, size: 10 }, rules: { teleport: 30 } });
+    expect(w.lastOf('p1')!.spells.at(-1)!.rules).toEqual({ teleport: 30 });
+    // The GM's own.
+    expect(w.host.castGm('s1', { ...aimed, size: 10 }, { obscure: true, dark: true })).toBe(true);
+    expect(w.lastOf('p1')!.spells.at(-1)!.rules).toEqual({ obscure: true, dark: true });
+    // Each cast carries its name and words: the ask's, else the player's, else the GM's own.
+    expect(cast.name).toBe('Fireball');
+    w.send(BEN, { v: 1, type: 'map-spell', sceneId: 's1', add: { ...aimed, size: 10 }, name: 'Misty Step', about: { line: 'Level 2 Conjuration', properties: [], text: 'You teleport.' } });
+    expect(w.lastOf('p1')!.spells.at(-1)).toMatchObject({ name: 'Misty Step', about: { text: 'You teleport.' } });
+    expect(w.host.castGm('s1', { ...aimed, size: 10 }, undefined, { name: 'Web' })).toBe(true);
+    expect(w.lastOf('p1')!.spells.at(-1)!.name).toBe('Web');
+    expect(decodeControl(encodeControl({ v: 1, type: 'map-spell', sceneId: 's1', add: aimed, name: 'x'.repeat(61) } as never)).kind).not.toBe('message');
+    // The messages decode; bad rules are turned down.
+    expect(decodeControl(encodeControl(w.lastOf('p1')!)).kind).toBe('message');
+    expect(decodeControl(encodeControl({ v: 1, type: 'map-spell', sceneId: 's1', add: aimed, rules: { push: 'far' } } as never)).kind).not.toBe('message');
+    expect(decodeControl(encodeControl({ v: 1, type: 'map-spell', sceneId: 's1', remove: 's1', rules: { push: 1 } } as never)).kind).not.toBe('message');
+  });
+
+  it("a scene full of spells, each with the longest words and rules, still goes out in one message", () => {
+    const w = world();
+    const about = { line: 'L'.repeat(120), properties: Array.from({ length: 10 }, (_, k) => [`P${k}`.padEnd(30, 'x'), 'é'.repeat(200)] as [string, string]), text: '火'.repeat(4000) };
+    const rules: SpellRules = { name: 'n'.repeat(120), wall: { blocks: 'both', look: 'stone' }, obscure: true, dark: true, light: { bright: 9999, dim: 9999, color: '#ffffff' }, difficult: true, push: -9999, teleport: 9999, portal: 'p'.repeat(120), summon: { name: 's'.repeat(120), count: 20, statblock: 'b'.repeat(120) } };
+    for (let k = 0; k < 40; k++) expect(w.host.castGm('s1', { ...aimed, size: 10, caster: 'c'.repeat(200) }, rules, { name: 'N'.repeat(60), about })).toBe(true);
+    const message = w.lastOf('p1')!;
+    expect(message.spells).toHaveLength(40);
+    expect(message.spells[0]!.about!.text.length).toBe(600);
+    expect(decodeControl(encodeControl(message)).kind).toBe('message');
   });
 });
