@@ -168,7 +168,11 @@ export interface BoardCutsceneShot {
   transition: 'fade' | 'cut' | 'move';
 }
 
-/** A cutscene running for players (a copy of Tabletop's `BoardCutscene`); `null` is sent when it ends. */
+/**
+ * A cutscene running for players (a copy of Tabletop's `BoardCutscene`); `null` is sent when it ends. A map keeps its
+ * `key` for the whole run: a live run back on a map names it by its old key, the player drops the scenes of keys a
+ * publication no longer names, and `CutsceneSender` sends the map again, as it is now.
+ */
 export interface BoardCutscene {
   runId: string;
   mode: 'prepared' | 'live';

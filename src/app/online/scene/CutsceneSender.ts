@@ -183,7 +183,8 @@ export class CutsceneSender implements SessionHandler {
     if (this.aborted === next.cutscene.runId) return;
     if (this.run && this.run.cutscene.runId !== next.cutscene.runId) this.finish();
     this.run = next;
-    // `maps` covers this publication only: what the run no longer names is dropped, and sent again if it returns.
+    // `maps` covers this publication only: what the run no longer names is dropped, and when its key comes back (a live
+    // run back on a map keeps its key) the map is projected and sent again as it is now, never left as it was.
     for (const key of [...this.entries.keys()]) {
       if (Object.hasOwn(next.maps, key)) continue;
       this.entries.delete(key);
@@ -208,14 +209,27 @@ export class CutsceneSender implements SessionHandler {
     this.guardStep();
   }
 
-  /** Ready players wait at most `STEP_WAIT_MS` for the scene of the step shown; after that the run ends for them, never on black. */
+  /**
+   * Ready players wait at most `STEP_WAIT_MS` for the scene of the step shown; after that the run ends for them, never on
+   * black. The wait counts from when the GM is on the step's map (a tab of it active), or at once when no tab of it is
+   * open: the GM's board goes to another map only at the black of the fade into it, which may be long after the step.
+   */
   private guardStep(): void {
     const run = this.run;
-    if (!run || this.stepTimer !== null || this.ready.size === 0 || this.entries.has(run.cutscene.key)) return;
+    if (!run || this.stepTimer !== null || this.ready.size === 0 || this.entries.has(run.cutscene.key) || !this.onStepMap(run)) return;
     this.stepTimer = window.setTimeout(() => {
       this.stepTimer = null;
       if (this.run && this.ready.size > 0 && !this.entries.has(this.run.cutscene.key)) this.abort();
     }, STEP_WAIT_MS);
+  }
+
+  /** Whether the step's map should be live by now: a tab of it is its view's active one, or no tab of it is open (closed, renamed). */
+  private onStepMap(run: GmCutscene): boolean {
+    const { tabs } = this.options;
+    const path = run.maps[run.cutscene.key];
+    if (!tabs || path === undefined) return true;
+    const open = this.tabsOf(path);
+    return open.length === 0 || open.some((tab) => tabs.isActive(tab));
   }
 
   /** The run cannot be carried: players are told it ended (they unlock and return to their own view) and the GM is told why. */
@@ -278,9 +292,10 @@ export class CutsceneSender implements SessionHandler {
     for (const path of Object.values(this.run.maps)) for (const tab of this.tabsOf(path)) views.add(tab.viewId);
     for (const viewId of views) this.watching.push(tabs.watch(viewId, () => this.refreshSoon()));
     this.watching.push(
-      // A tab that goes live brings its map: sent without waiting for the pace.
-      tabs.subscribeLive(() => this.refresh()),
-      tabs.subscribeTabs(() => { this.watch(); this.refresh(); }),
+      // A tab that goes live brings its map: sent without waiting for the pace. A tab made active, or closed, starts the
+      // wait for the step's scene.
+      tabs.subscribeLive(() => { this.refresh(); this.guardStep(); }),
+      tabs.subscribeTabs(() => { this.watch(); this.refresh(); this.guardStep(); }),
       assets.onChange(() => this.refreshSoon()),
     );
     if (board) this.watching.push(board.subscribe(() => this.refreshSoon()));

@@ -97,6 +97,9 @@ export class CutsceneStage {
     const fresh = this.run?.runId !== cutscene.runId;
     if (fresh && this.mode !== null) this.cleanUp();
     this.run = cutscene;
+    // A map the run no longer names is not kept to be given again: when its key comes back, the GM sends it as it is now.
+    const named = new Set([cutscene.key, ...cutscene.shots.map((shot) => shot.key)]);
+    for (const key of [...this.scenes.keys()]) if (!named.has(key)) this.scenes.delete(key);
     if (fresh) this.begin(cutscene);
     else if (this.mode === 'board') this.options.board()?.setCutscene(cutscene);
     else if (this.mode === 'handoff' && this.active) this.runBoard?.setCutscene(cutscene);

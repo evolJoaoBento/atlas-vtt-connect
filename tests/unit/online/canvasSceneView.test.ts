@@ -424,6 +424,8 @@ const cutscene: BoardCutscene = {
 function cutsceneFactory(plays = true) {
   const calls: string[] = [];
   const cutscenes: Array<{ cutscene: unknown; options: unknown }> = [];
+  /** The map keys of the scenes handed to the board, in order. */
+  const sceneKeys: string[] = [];
   let host: PlayerBoardHost | null = null;
   let created = 0;
   let disposed = 0;
@@ -431,7 +433,7 @@ function cutsceneFactory(plays = true) {
     get: (_target, name: string) => {
       if (name === 'cutscenes') return plays ? true : undefined;
       if (name === 'setCutscene') return plays ? (value: unknown, options?: unknown) => { calls.push(value === null ? 'setCutscene:null' : 'setCutscene'); cutscenes.push({ cutscene: value, options }); } : undefined;
-      if (name === 'setCutsceneScene') return plays ? () => { calls.push('setCutsceneScene'); } : undefined;
+      if (name === 'setCutsceneScene') return plays ? (_runId: string, key: string) => { calls.push('setCutsceneScene'); sceneKeys.push(key); } : undefined;
       if (name === 'setCutsceneCamera') return plays ? () => { calls.push('setCutsceneCamera'); } : undefined;
       if (name === 'dispose') return () => { disposed++; calls.push('dispose'); };
       if (name === 'toolState') return () => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '#fff', gmView: true });
@@ -439,7 +441,7 @@ function cutsceneFactory(plays = true) {
     },
   });
   const factory: PlayerBoardFactory = { version: 1, create: (_parent, given) => { host = given; created++; calls.push('create'); return handle; } };
-  return { factory, calls, cutscenes, host: () => host!, created: () => created, disposed: () => disposed };
+  return { factory, calls, cutscenes, sceneKeys, host: () => host!, created: () => created, disposed: () => disposed };
 }
 
 describe('cutscenes in the player tab', () => {
@@ -512,6 +514,18 @@ describe('cutscenes in the player tab', () => {
     expect(t.scene().map).toBe(map);
     expect(map.camera.current()).toEqual(own);
     expect(t.ready).toEqual([true, false]);
+  });
+
+  it('a live run\'s map the publication no longer names is not given to the board made for it, so it never shows as it was', async () => {
+    const t = await playing();
+    const live: BoardCutscene = { ...cutscene, runId: 'live1', mode: 'live', shots: [], step: { shot: 0, seq: 1 }, key: 'k1' };
+    t.sink.cutscene?.(live);
+    // Before the board takes over (the overlay is still fading in), the crypt's scene comes, then the GM goes to the tavern.
+    t.sink.cutsceneScene?.('live1', 'k1', playerScene({ sceneId: 'cutscene:live1:k1' }), null);
+    t.sink.cutscene?.({ ...live, step: { shot: 0, seq: 2 }, key: 'k2' });
+    t.sink.cutsceneScene?.('live1', 'k2', playerScene({ sceneId: 'cutscene:live1:k2' }), null);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(t.given!.sceneKeys).toEqual(['k2']);
   });
 
   it('the toolbar is hidden during the run and shown after', async () => {

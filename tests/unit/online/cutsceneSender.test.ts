@@ -37,21 +37,28 @@ function world(initial: GmCutscene | null = null, extra: Partial<CutsceneSenderO
   } as BoardSource;
 
   const live = new Set<string>();
+  /** The tabs the GM is on (their view's active tab); a live tab is active too. */
+  const active = new Set<string>();
   const watchers = new Set<() => void>();
   const liveListeners = new Set<() => void>();
+  const tabsListeners = new Set<() => void>();
   const infos: TabInfo[] = [
     { viewId: 'v1', tabId: 'a', mapPath: PATHS.k1, name: 'Crypt' },
     { viewId: 'v1', tabId: 'b', mapPath: PATHS.k2, name: 'Tavern' },
   ];
+  /** The tokens each tab's map holds now. */
+  const tokensOf = new Map<string, Record<string, unknown>>();
   const tabs = {
     tabs: () => infos,
     liveSnapshot: (key: { tabId: string }): SceneSnapshot | null => (live.has(key.tabId)
-      ? snapshotOf({ mapPath: infos.find((info) => info.tabId === key.tabId)!.mapPath, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} } })
+      ? snapshotOf({ mapPath: infos.find((info) => info.tabId === key.tabId)!.mapPath, objects: { tokens: tokensOf.get(key.tabId) ?? {}, texts: {}, drawings: {}, fog: {} } as SceneSnapshot['objects'] })
       : null),
+    isActive: (key: { tabId: string }) => active.has(key.tabId),
     watch: (_view: string, listener: () => void) => { watchers.add(listener); return () => { watchers.delete(listener); }; },
     subscribeLive: (listener: () => void) => { liveListeners.add(listener); return () => { liveListeners.delete(listener); }; },
-    subscribeTabs: () => () => undefined,
+    subscribeTabs: (listener: () => void) => { tabsListeners.add(listener); return () => { tabsListeners.delete(listener); }; },
   } as unknown as TabScenes;
+  const tellLive = (): void => { for (const listener of [...liveListeners]) listener(); };
 
   const sent: Array<{ to: string; message: ControlMessage }> = [];
   const handlers: SessionHandler[] = [];
@@ -81,7 +88,23 @@ function world(initial: GmCutscene | null = null, extra: Partial<CutsceneSenderO
     kick: (player: SessionPlayer) => { player.status = 'removed' as never; sender.playersChanged(players); },
     publish: (next: GmCutscene | null) => { current = next; for (const listener of [...changes]) listener(); },
     moveCamera: (z: number) => { camera = { eye: pose, target: { x: 1, y: 2, z } }; for (const listener of [...cameras]) listener(); },
-    goLive: (...tabIds: string[]) => { tabIds.forEach((id) => live.add(id)); for (const listener of [...liveListeners]) listener(); },
+    goLive: (...tabIds: string[]) => { tabIds.forEach((id) => { live.add(id); active.add(id); }); tellLive(); },
+    /** The GM's board went to a tab: active, its map still loading (not live). */
+    activate: (tabId: string) => { active.add(tabId); tellLive(); },
+    /** The GM's board left a tab: neither active nor live. */
+    leave: (tabId: string) => { active.delete(tabId); live.delete(tabId); tellLive(); },
+    closeTab: (tabId: string) => {
+      const at = infos.findIndex((info) => info.tabId === tabId);
+      if (at >= 0) infos.splice(at, 1);
+      active.delete(tabId);
+      live.delete(tabId);
+      for (const listener of [...tabsListeners]) listener();
+    },
+    /** The map of `tabId` changes: a token is added (watchers hear it while it is live). */
+    addToken: (tabId: string, id: string) => {
+      tokensOf.set(tabId, { ...tokensOf.get(tabId), [id]: { id, kind: 'character', x: 140, y: 140, imagePath: 'tokens/hero.png', name: id, resources: {} } });
+      for (const listener of [...watchers]) listener();
+    },
     ready: (player: SessionPlayer, on = true) => handler.onMessage?.(player, { v: 1, type: 'cutscene-ready', on }),
     resync: (player: SessionPlayer) => handler.onMessage?.(player, { v: 1, type: 'scene-resync', seq: 0 }),
     admit: (player: SessionPlayer) => handler.onAdmitted?.(player),
@@ -249,24 +272,90 @@ describe('CutsceneSender', () => {
     warn.mockRestore();
   });
 
-  it('ends the run for ready players when the scene of the step is not sent within 3 s, and not when it arrives in time', () => {
+  it('waits for the step\'s scene only once the GM is on its map: the run ends when that map is active and sends nothing for 3 s', () => {
     const w = world();
     const anna = w.addPlayer('anna');
     w.ready(anna);
-    w.publish(run('r1', 'k1'));
-    vi.advanceTimersByTime(STEP_WAIT_MS - 100);
-    expect(w.notices).toHaveLength(0);
     w.goLive('a');
-    vi.advanceTimersByTime(STEP_WAIT_MS);
+    w.publish(run('r1', 'k1'));
+    expect(w.of('anna', 'cutscene-scene')).toMatchObject([{ key: 'k1' }]);
+    // A step to the tavern: the GM's board is not on it yet (it goes there at the black of the fade), so nothing is waited for.
+    w.publish(run('r1', 'k2', 'prepared', 2));
+    vi.advanceTimersByTime(10_000);
     expect(w.notices).toHaveLength(0);
     expect(w.sender.running()).toBe(true);
-    w.publish(null);
-    // A tab that never comes: black is never left.
-    w.publish(run('r2', 'k2', 'prepared', 1));
-    vi.advanceTimersByTime(STEP_WAIT_MS);
+    // The GM's board is on the tavern's tab, but its map never loads: black is never left.
+    w.leave('a');
+    w.activate('b');
+    vi.advanceTimersByTime(STEP_WAIT_MS - 100);
+    expect(w.notices).toHaveLength(0);
+    vi.advanceTimersByTime(200);
     expect(w.notices).toHaveLength(1);
     expect(w.of('anna', 'cutscene').at(-1)).toEqual({ v: 1, type: 'cutscene', cutscene: null });
     expect(w.sender.running()).toBe(false);
+  });
+
+  it('keeps a run whose cross-map step the GM reaches after a 5 s fade, and sends the new map at the fade\'s black', () => {
+    const w = world();
+    const anna = w.addPlayer('anna');
+    w.ready(anna);
+    w.goLive('a');
+    w.publish(run('r1', 'k1'));
+    w.publish(run('r1', 'k2', 'prepared', 2));
+    // The fade's first half (and any keyframe moves before it): the GM is still on the crypt.
+    vi.advanceTimersByTime(5000);
+    expect(w.notices).toHaveLength(0);
+    // The black: the GM's board goes to the tavern, which loads for a second, then is live.
+    w.leave('a');
+    w.activate('b');
+    vi.advanceTimersByTime(1000);
+    w.goLive('b');
+    vi.advanceTimersByTime(5000);
+    expect(w.notices).toHaveLength(0);
+    expect(w.sender.running()).toBe(true);
+    expect(w.of('anna', 'cutscene-scene').map((m) => (m as { key: string }).key)).toEqual(['k1', 'k2']);
+    expect(w.of('anna', 'cutscene').some((m) => (m as { cutscene: unknown }).cutscene === null)).toBe(false);
+  });
+
+  it('ends the run 3 s after a step whose map has no tab, or whose tab is closed while it waits', () => {
+    const w = world();
+    const anna = w.addPlayer('anna');
+    w.ready(anna);
+    w.publish({ cutscene: run('r1', 'k1').cutscene, maps: { k1: 'maps/gone.atlasmap', k2: PATHS.k2 } });
+    vi.advanceTimersByTime(STEP_WAIT_MS);
+    expect(w.notices).toHaveLength(1);
+    expect(w.sender.running()).toBe(false);
+    w.publish(null);
+    w.goLive('a');
+    w.publish(run('r2', 'k1'));
+    w.publish(run('r2', 'k2', 'prepared', 2));
+    vi.advanceTimersByTime(10_000);
+    expect(w.notices).toHaveLength(1);
+    w.closeTab('b');
+    vi.advanceTimersByTime(STEP_WAIT_MS);
+    expect(w.notices).toHaveLength(2);
+    expect(w.of('anna', 'cutscene').at(-1)).toEqual({ v: 1, type: 'cutscene', cutscene: null });
+  });
+
+  it('sends a map a live run comes back to as it is now, not as it was when the GM left it', () => {
+    const w = world();
+    const anna = w.addPlayer('anna');
+    w.goLive('a');
+    const at = (key: string, maps: Record<string, string>, seq: number): GmCutscene => ({ cutscene: run('r1', key, 'live', seq).cutscene, maps });
+    w.publish(at('k1', { k1: PATHS.k1 }, 1));
+    w.ready(anna);
+    // To the tavern: the crypt's tab is no longer live, and the GM's crypt changes meanwhile.
+    w.leave('a');
+    w.goLive('b');
+    w.publish(at('k2', { k2: PATHS.k2 }, 2));
+    w.addToken('a', 'newcomer');
+    // Back to the crypt, under its old key.
+    w.goLive('a');
+    w.publish(at('k1', { k1: PATHS.k1 }, 3));
+    const scenes = w.of('anna', 'cutscene-scene') as Array<{ key: string; scene: { tokens: Record<string, unknown> } }>;
+    expect(scenes.map((m) => m.key)).toEqual(['k1', 'k2', 'k1']);
+    expect(Object.keys(scenes[0]!.scene.tokens)).toEqual([]);
+    expect(Object.keys(scenes[2]!.scene.tokens)).toEqual(['newcomer']);
   });
 
   it('forgets a player who left or was kicked: nothing more is sent and no file is served', () => {
