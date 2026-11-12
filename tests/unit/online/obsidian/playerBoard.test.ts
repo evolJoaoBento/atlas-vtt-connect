@@ -286,6 +286,20 @@ describe('the revealed scenes of a cutscene', () => {
     keeper.replay({ cutscene: () => empty.push('run') });
     expect(empty).toEqual([]);
   });
+
+  it('the cutscene keeper lets go of a live run\'s map the publication no longer names, so a view attaching later never gets it as it was', () => {
+    const files: number[] = [];
+    const keeper = new CutsceneKeeper({ setCutscene: (list) => files.push(list.length) }, () => null);
+    const live = (key: string, seq: number) => ({ runId: 'r', mode: 'live', look: { bars: null, fadeMs: 600 }, shots: [], step: { shot: 0, seq }, key }) as never;
+    keeper.cutscene(live('k1', 1));
+    keeper.scene('r', 'k1', scene('cutscene:r:k1'));
+    keeper.cutscene(live('k2', 2));
+    expect(files.at(-1)).toBe(0);
+    keeper.scene('r', 'k2', scene('cutscene:r:k2'));
+    const late: string[] = [];
+    keeper.replay({ cutsceneScene: (_r, key) => late.push(key) });
+    expect(late).toEqual(['k2']);
+  });
 });
 
 void decodeControl;

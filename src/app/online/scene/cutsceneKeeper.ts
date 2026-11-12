@@ -34,6 +34,12 @@ export class CutsceneKeeper {
       this.scenes.clear();
       this.lastCamera = null;
       this.assets.setCutscene([]);
+    } else if (cutscene) {
+      // A map the run no longer names is let go: when its key comes back (a live run back on it), the GM sends it as it is now.
+      const named = new Set([cutscene.key, ...cutscene.shots.map((shot) => shot.key)]);
+      const before = this.scenes.size;
+      for (const key of [...this.scenes.keys()]) if (!named.has(key)) this.scenes.delete(key);
+      if (this.scenes.size !== before) this.listFiles();
     }
     this.run = cutscene;
     this.sink()?.cutscene?.(cutscene);
@@ -72,8 +78,12 @@ export class CutsceneKeeper {
     if (this.lastCamera) sink.cutsceneCamera?.(this.run.runId, this.lastCamera);
   }
 
-  private give(key: string, entry: { scene: PlayerScene | null; extras: BoardExtras | null }): void {
+  private listFiles(): void {
     this.assets.setCutscene([...this.scenes.values()].flatMap((each) => (each.scene ? [{ scene: each.scene, extras: each.extras }] : [])));
+  }
+
+  private give(key: string, entry: { scene: PlayerScene | null; extras: BoardExtras | null }): void {
+    this.listFiles();
     if (entry.scene && this.run) this.sink()?.cutsceneScene?.(this.run.runId, key, entry.scene, entry.extras);
   }
 }
