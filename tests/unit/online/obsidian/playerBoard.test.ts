@@ -206,6 +206,14 @@ describe('the join page and the Roll dice tray', () => {
     expect(readFileSync('online-client/index.html', 'utf8')).toMatch(/id="board-3d" class="[^"]*atlas-tabletop-atlas/);
     expect(readFileSync('online-client/tabletopBoard.mts', 'utf8')).toContain("import './atlas-dice-tray.css'");
   });
+
+  it('gives the page\'s board the dice the Roll dice button throws: a board with no sendDiceResult makes no button, and a cutscene leaves the page no way to roll', () => {
+    const main = readFileSync('online-client/main.mts', 'utf8');
+    const made = main.slice(main.indexOf('makeBoard:'), main.indexOf('loadBoard:'));
+    expect(made).toContain('sendDiceResult: (result) => session?.sendDiceResult(result)');
+    expect(made).toContain('diceRules: () => boardDice?.rules');
+    expect(main).toMatch(/onBoardOffer: \(available, dice\) => \{[\s\S]{0,120}boardDice = dice \?\? null/);
+  });
 });
 
 describe('the revealed scenes of a cutscene', () => {

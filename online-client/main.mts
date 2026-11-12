@@ -16,7 +16,7 @@ import { loadLaserColor, loadLaserSize, saveLaserColor, saveLaserSize } from '..
 import { OwnRollThrows } from '../src/app/online/page/ownRollThrows';
 import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
-import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
+import type { BoardDiceOffer, PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
 import { playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
 import { normalizePlayerName } from '../src/app/online/protocol';
@@ -73,6 +73,8 @@ const fitButton = element<HTMLButtonElement>('fit-map');
 let session: PlayerSession | null = null;
 /** A cutscene runs: the tools are locked. */
 let cutsceneLocked = false;
+/** Whether the GM takes dice thrown on the board, and its rules: the board's Roll dice (the one tool a cutscene leaves) throws and sends them. */
+let boardDice: BoardDiceOffer | null = null;
 // The lookup runs at draw time, in a later animation frame, so `loader` below is already set;
 // it asks the loader every time, so a released image is never drawn.
 const mapOptions = (): MapViewOptions => ({
@@ -122,6 +124,8 @@ const map: SceneSwitch | null = surface
       sendPing: (x, y) => session?.sendPing(x, y) ?? false,
       sendTemplate: (change) => session?.sendTemplate(change) ?? false,
       sendSpell: (change) => session?.sendSpell(change) ?? false,
+      sendDiceResult: (result) => session?.sendDiceResult(result) ?? false,
+      diceRules: () => boardDice?.rules ?? null,
       onEyeChange: () => map?.eyesChanged(),
       requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
       onToolsChange: () => syncToolbar(),
@@ -437,8 +441,9 @@ if (!target) {
         map.setSheets(entries);
       },
       onPinNote: (answer) => map.receiveNote(answer),
-      onBoardOffer: (available) => {
+      onBoardOffer: (available, dice) => {
         log.event('board offer', { available });
+        boardDice = dice ?? null;
         map.boardOffer(available);
       },
       onBoardExtras: (extras) => {
