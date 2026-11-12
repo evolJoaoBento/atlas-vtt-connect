@@ -32,6 +32,7 @@ import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
 import { MapView, type MapViewOptions } from './mapView.mts';
 import { SceneSwitch } from './sceneSwitch.mts';
+import { CutsceneKeeper } from '../src/app/online/scene/cutsceneKeeper';
 import { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
 import type { AssetMime } from '../src/app/online/assets/assetIds';
@@ -70,6 +71,8 @@ const followButton = element<HTMLButtonElement>('follow-gm');
 const fitButton = element<HTMLButtonElement>('fit-map');
 /** Set once the player joins; until then a drop, a laser or a roll has nowhere to go. */
 let session: PlayerSession | null = null;
+/** A cutscene runs: the tools are locked. */
+let cutsceneLocked = false;
 // The lookup runs at draw time, in a later animation frame, so `loader` below is already set;
 // it asks the loader every time, so a released image is never drawn.
 const mapOptions = (): MapViewOptions => ({
@@ -103,13 +106,14 @@ const map: SceneSwitch | null = surface
   ? new SceneSwitch({
     // Through a token's eyes, Tabletop's spell toolbar takes the place of the page's.
     onSeeing: (seeing) => {
-      element('toolbar').hidden = seeing;
+      element('toolbar').hidden = seeing || cutsceneLocked;
       // Follow GM and Fit map move a camera the eyes do not use.
       element('view-buttons').style.display = seeing ? 'none' : '';
     },
     makeMap: () => new MapView(mapOptions()),
-    makeBoard: (factory, parent) => new BoardSceneView({
+    makeBoard: (factory, parent, over) => new BoardSceneView({
       parent, factory,
+      ...(over ? { onCutsceneOver: over } : {}),
       image: (id) => loader.image(id),
       imageUrl: (id) => urlOf(loader.image(id)),
       model: (id) => loader.model(id),
@@ -138,6 +142,17 @@ const map: SceneSwitch | null = surface
     eyeButton: element('eye-button'),
     eyeMenu: element('eye-menu'),
     ar: { button: element('ar-button'), panel: element('ar-panel'), video: element('ar-video'), overlay: element('table') },
+    cutscene: {
+      overlay: element('cutscene-overlay'), curtain: element('cutscene-curtain'), backButton: element('back-to-ar'),
+      sendReady: (on) => session?.sendCutsceneReady(on) ?? false,
+      // The toolbar, the sheets drawer and the dice tray hide while a cutscene runs (the board's Roll dice stays).
+      onLock: (locked) => {
+        cutsceneLocked = locked;
+        table.classList.toggle('is-cutscene', locked);
+        if (locked) setDiceOpen(false);
+        element('toolbar').hidden = locked;
+      },
+    },
     viewButtons: element('view-buttons'),
     requestBoard: (on) => {
       // Back to 2D: the board's materials and models are let go.
@@ -230,6 +245,8 @@ const loader: AssetLoader = new AssetLoader({
     });
   },
 });
+/** The cutscene running now with its revealed scenes: the view plays it, the loader fetches its files. */
+const cutscenes = new CutsceneKeeper(loader, () => map);
 let sessionState: PlayerSessionState | null = null;
 let scene: PlayerScene | null = null;
 let started = false;
@@ -429,6 +446,13 @@ if (!target) {
         map.boardExtras(extras);
       },
       onBoardCamera: (camera) => map.setBoardCamera(camera),
+      onCutscene: (cutscene) => {
+        log.event('cutscene', { runId: cutscene?.runId ?? null });
+        cutscenes.cutscene(cutscene);
+      },
+      onCutsceneScene: (runId, key, scene) => cutscenes.scene(runId, key, scene),
+      onCutsceneExtras: (runId, key, extras) => cutscenes.extras(runId, key, extras),
+      onCutsceneCamera: (runId, camera) => cutscenes.camera(runId, camera),
     });
     session.start();
   });

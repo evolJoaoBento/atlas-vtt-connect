@@ -347,6 +347,9 @@
   pointer-events: none;
 }
 
+/* While a cutscene is made the bars cover the toolbar: it is taken away, not left clickable under them. */
+.tabletop-authoring .atlas-tabletop-toolbar-row { visibility: hidden; }
+
 .atlas-tabletop-toolbar,
 .atlas-tabletop-palette {
   pointer-events: auto;
@@ -2056,3 +2059,235 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-defaults__thumb { width: 28px; height: 28px; border-radius: 4px; overflow: hidden; background: var(--background-secondary); }
 .atlas-tabletop-defaults__thumb img { width: 100%; height: 100%; object-fit: cover; }
 .atlas-tabletop-defaults__row select { min-width: 0; width: 100%; }
+
+/* The web player's sound control: a speaker button in the board's top-right corner that opens a volume slider and Mute. */
+.atlas-tabletop-sound { position: absolute; top: 10px; right: 10px; z-index: 30; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.atlas-tabletop-sound__button { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #2a2a2a; color: #fff; border: 0.75px solid rgba(255, 255, 255, 0.4); cursor: pointer; }
+.atlas-tabletop-sound__button:hover { border-color: rgba(255, 255, 255, 0.7); }
+/* A sound in the settings list that is the player's own file. */
+.tabletop-sound-custom { color: var(--text-accent); font-size: var(--font-ui-smaller); margin-right: 4px; }
+.atlas-tabletop-sound__button svg { width: 20px; height: 20px; }
+.atlas-tabletop-sound__button .cross { display: none; }
+.atlas-tabletop-sound__button.is-muted .cross { display: inline; }
+.atlas-tabletop-sound__button.is-muted .wave { display: none; }
+.atlas-tabletop-sound__panel { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: #2a2a2a; color: #fff; border: 0.75px solid rgba(255, 255, 255, 0.4); font-size: 13px; }
+.atlas-tabletop-sound__panel[hidden] { display: none; }
+.atlas-tabletop-sound__volume { width: 110px; }
+.atlas-tabletop-sound__mute { display: flex; align-items: center; cursor: pointer; }
+/* On a short board the layers ruler (centred, up to 430px tall) would reach the top-right corner: the control moves to the left. */
+@media (max-height: 560px) { .atlas-tabletop-sound { right: auto; left: 10px; align-items: flex-start; } }
+
+/* The cinema look over a board: letterbox bars and a black fade, above every other overlay, taking no pointer events. */
+.tabletop-cinema {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  overflow: hidden;
+}
+.tabletop-cinema__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: #000;
+}
+.tabletop-cinema__bar[hidden] { display: none; }
+.tabletop-cinema__bar--top { top: 0; }
+.tabletop-cinema__bar--bottom { bottom: 0; }
+/* The players' picture held over their stage while the board changes underneath (below the cinema layer). */
+.tabletop-cinema__hold {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  pointer-events: none;
+}
+.tabletop-cinema__fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+/* The Roll dice button of a player's board during a cutscene: just above the bottom bar, above the cinema layer, the one thing there to press. */
+.tabletop-cinema-roll {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 210;
+  pointer-events: auto;
+}
+.tabletop-cinema-roll[hidden] { display: none; }
+.tabletop-cinema-roll__button {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 0.75px solid rgba(255, 255, 255, 0.4);
+  background: #2a2a2a;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tabletop-cinema-roll__button:hover { background: #3a3a3a; }
+
+/* Cutscene authoring: the gallery of a scene's cutscenes, the timeline strip above the toolbar, the preview controls. */
+.tabletop-gallery,
+.tabletop-timeline,
+.tabletop-preview,
+.tabletop-run,
+.tabletop-menu {
+  background: var(--background-primary);
+  color: var(--text-normal);
+  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
+  border-radius: var(--radius-l, 12px);
+  box-shadow: var(--shadow-l);
+  font-size: var(--font-ui-small, 13px);
+}
+.tabletop-gallery {
+  position: absolute;
+  left: 16px;
+  bottom: 84px;
+  width: 360px;
+  max-height: 60%;
+  overflow-y: auto;
+  /* Above the cinema bars (200): the controls are never under a bar. */
+  z-index: 210;
+  padding: 8px;
+}
+.tabletop-gallery__head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.tabletop-gallery__title { flex: 1; font-weight: var(--font-semibold, 600); }
+.tabletop-gallery__list { display: flex; flex-direction: column; gap: 6px; }
+.tabletop-gallery__empty { color: var(--text-muted); padding: 6px 2px; }
+.tabletop-gallery__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px;
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-secondary);
+}
+.tabletop-gallery__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold, 600); }
+.tabletop-gallery__count { color: var(--text-muted); font-size: var(--font-ui-smaller, 12px); }
+.tabletop-gallery__row--empty .tabletop-gallery__count { color: var(--text-error); }
+.tabletop-gallery__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tabletop-gallery__actions button,
+.tabletop-gallery__head button,
+.tabletop-timeline__head button,
+.tabletop-preview button,
+.tabletop-run button { height: 26px; padding: 0 10px; }
+.tabletop-gallery__actions button:disabled,
+.tabletop-timeline__head button:disabled,
+.tabletop-preview button:disabled,
+.tabletop-run button:disabled { opacity: 0.45; cursor: not-allowed; }
+.tabletop-gallery__ask { color: var(--text-error); }
+.tabletop-gallery__settings { display: flex; flex-direction: column; gap: 6px; padding: 6px 2px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); }
+.tabletop-gallery__field { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tabletop-gallery__field input[type='number'] { width: 70px; }
+
+.tabletop-timeline {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 84px;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+}
+.tabletop-timeline[hidden],
+.tabletop-preview[hidden],
+.tabletop-run[hidden] { display: none; }
+.tabletop-timeline__head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.tabletop-timeline__title { font-weight: var(--font-semibold, 600); }
+.tabletop-timeline__hint { flex: 1; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabletop-timeline__scroll { overflow-x: auto; overflow-y: hidden; border-top: 1px solid var(--background-modifier-border); cursor: copy; }
+.tabletop-timeline__track { position: relative; height: 72px; min-width: 100%; }
+.tabletop-timeline__tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-left: 1px solid var(--background-modifier-border);
+  padding: 2px 0 0 3px;
+  font-size: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+/* The transition into a shot: its name over a line from the shot before, fade solid, cut dashed, move green. */
+.tabletop-timeline__link {
+  position: absolute;
+  top: 24px;
+  height: 14px;
+  box-sizing: content-box;
+  border-bottom: 3px solid var(--interactive-accent);
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tabletop-timeline__link--cut { border-bottom-style: dashed; border-bottom-color: var(--text-muted); }
+.tabletop-timeline__link--move { border-bottom-color: var(--color-green, #44cf6e); }
+.tabletop-timeline__shot {
+  position: absolute;
+  top: 28px;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--font-semibold, 600);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.tabletop-timeline__shot--keyframe { border-radius: 4px; transform: rotate(45deg); }
+.tabletop-timeline__shot--keyframe { background: var(--color-orange, #e8a33d); }
+.tabletop-timeline__shot--other { background: var(--color-purple, #b86ee0); }
+.tabletop-timeline__shot.is-dragging { cursor: grabbing; opacity: 0.85; }
+
+.tabletop-preview,
+.tabletop-run {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.tabletop-preview__label,
+.tabletop-run__label { min-width: 90px; text-align: center; font-weight: var(--font-semibold, 600); }
+
+.tabletop-menu {
+  position: absolute;
+  z-index: 300;
+  min-width: 190px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.tabletop-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--text-normal);
+  text-align: left;
+  border-radius: var(--radius-s, 4px);
+}
+.tabletop-menu__item:hover:not(:disabled) { background: var(--background-modifier-hover); }
+.tabletop-menu__item:disabled { opacity: 0.45; cursor: not-allowed; }
+.tabletop-menu__tick { width: 16px; text-align: center; }

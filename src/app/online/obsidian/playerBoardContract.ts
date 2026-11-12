@@ -38,6 +38,16 @@ export interface PlayerBoardHost {
   sendDiceResult?(result: PhysicalRoll): boolean;
   /** The rules of the player's map as the GM offered them; null for the default rules. */
   diceRules?(): OfferedDiceRules | null;
+  /** A run handed back (`PlayerCutsceneOptions.handBack`) is at its black: Connect puts the view it had back and disposes this board. */
+  cutsceneOver?(): void;
+}
+
+/** How `setCutscene` starts and ends a run on a player's board (Tabletop has the same shape). */
+export interface PlayerCutsceneOptions {
+  /** Connect has just made this board for the run, over a view it faded to black itself (or joins mid-run): no enter fade. */
+  startBlack?: boolean;
+  /** At the leave fade's black the board does not reload its own scene: it calls `host.cutsceneOver()` and stays black. */
+  handBack?: boolean;
 }
 
 export type PlayerBoardTool = 'move' | 'measure' | 'template' | 'laser' | 'ping';
@@ -120,7 +130,18 @@ export interface PlayerBoardHandle {
    * which the GM would refuse, so Connect asks for a reroll only of a board that says so.
    */
   readonly rerolls?: true;
+  /** This board plays cutscenes locally; absent from an older Tabletop. Connect trusts it only with the three methods below. */
+  readonly cutscenes?: true;
+  /** The run (a `BoardCutscene`, whenever it changes); null ends it. */
+  setCutscene?(cutscene: unknown, options?: PlayerCutsceneOptions): void;
+  /** The revealed scene of the map `key` for the run `runId`, and its board extras; sent again whenever either changes. */
+  setCutsceneScene?(runId: string, key: string, scene: unknown, extras: BoardExtras | null): void;
+  /** Live only: the GM's camera, a goal the board eases towards. */
+  setCutsceneCamera?(runId: string, camera: { eye: BoardPoint3; target: BoardPoint3 }): void;
 }
+
+/** A point of the board's world. */
+export interface BoardPoint3 { x: number; y: number; z: number }
 
 /** What the board throws: dice by kind, the modifier, and the sheet roll it is for, handed back with the result unchanged. */
 export interface PlayerDiceRequest {

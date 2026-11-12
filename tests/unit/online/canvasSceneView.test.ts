@@ -9,6 +9,8 @@ import { PAUSED_BANNER } from '../../../src/app/online/split/splitCopy';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 import { memorySettings } from '../connect/memorySettings';
+import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost } from '../../../src/app/online/obsidian/playerBoardContract';
+import type { BoardCutscene } from '../../../src/app/online/scene/boardTypes';
 import { fakeFrames, RecordingSurface } from './recordingSurface';
 import { playerScene } from './sceneFixtures';
 
@@ -409,5 +411,206 @@ describe('CanvasSceneView', () => {
     w.sinks[0]!.session({ ...admitted, status: 'denied', reason: 'kicked' });
     expect(text('.scene-message')).toBe('The GM removed you from the session.');
     expect(reconnect.hidden).toBe(true);
+  });
+});
+
+const cutscene: BoardCutscene = {
+  runId: 'run1', mode: 'prepared', look: { bars: 2.39, fadeMs: 600 },
+  shots: [{ key: 'k1', eye: { x: 0, y: 5, z: 5 }, target: { x: 0, y: 0, z: 0 }, at: 0, keyframe: false, transition: 'fade' }],
+  step: { shot: 0, seq: 1 }, key: 'k1',
+};
+
+/** A board factory that plays cutscenes (or says it does not) and records what the tab asks of the handle, in order. */
+function cutsceneFactory(plays = true) {
+  const calls: string[] = [];
+  const cutscenes: Array<{ cutscene: unknown; options: unknown }> = [];
+  let host: PlayerBoardHost | null = null;
+  let created = 0;
+  let disposed = 0;
+  const handle = new Proxy({} as PlayerBoardHandle, {
+    get: (_target, name: string) => {
+      if (name === 'cutscenes') return plays ? true : undefined;
+      if (name === 'setCutscene') return plays ? (value: unknown, options?: unknown) => { calls.push(value === null ? 'setCutscene:null' : 'setCutscene'); cutscenes.push({ cutscene: value, options }); } : undefined;
+      if (name === 'setCutsceneScene') return plays ? () => { calls.push('setCutsceneScene'); } : undefined;
+      if (name === 'setCutsceneCamera') return plays ? () => { calls.push('setCutsceneCamera'); } : undefined;
+      if (name === 'dispose') return () => { disposed++; calls.push('dispose'); };
+      if (name === 'toolState') return () => ({ tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '#fff', gmView: true });
+      return (...args: unknown[]) => { calls.push(`${name}${args.length && typeof args[0] === 'string' ? `:${args[0]}` : ''}`); };
+    },
+  });
+  const factory: PlayerBoardFactory = { version: 1, create: (_parent, given) => { host = given; created++; calls.push('create'); return handle; } };
+  return { factory, calls, cutscenes, host: () => host!, created: () => created, disposed: () => disposed };
+}
+
+describe('cutscenes in the player tab', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  async function playing(options: { factory?: ReturnType<typeof cutsceneFactory> | null } = {}) {
+    const w = world();
+    const given = options.factory === undefined ? cutsceneFactory() : options.factory;
+    vi.spyOn(w.service, 'boardPainter').mockImplementation(() => given?.factory ?? null);
+    const ready: boolean[] = [];
+    vi.spyOn(w.service, 'sendCutsceneReady').mockImplementation((on) => { ready.push(on); return true; });
+    const { view } = w.open();
+    await view.onOpen();
+    const sink = w.sinks[0]!;
+    sink.session(admitted);
+    sink.scene(playerScene());
+    const q = <T extends HTMLElement>(selector: string): T => view.contentEl.querySelector<T>(selector)!;
+    const scene = (): { map: { camera: { current(): unknown; pan(dx: number, dy: number): void } } | null } => (view as unknown as { scene: { map: never } }).scene as never;
+    return { w, view, sink, ready, given, q, scene };
+  }
+
+  it('a 2D player with a factory gets a board on cutscene, made with startBlack and handBack before its first scene, and asks for the reveal', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    expect(t.ready).toEqual([true]);
+    const overlay = t.q('.atlas-connect-scene__cutscene-overlay');
+    expect(overlay.hidden).toBe(false);
+    expect(overlay.classList.contains('is-black')).toBe(true);
+    // The board is made now but shows (and plays) only once the picture is black.
+    expect(t.q('.atlas-connect-scene__board').hidden).toBe(true);
+    await vi.advanceTimersByTimeAsync(600);
+    const calls = t.given!.calls;
+    expect(t.given!.cutscenes[0]).toEqual({ cutscene, options: { startBlack: true, handBack: true } });
+    expect(calls.indexOf('setCutscene')).toBeGreaterThan(calls.indexOf('create'));
+    expect(calls.indexOf('setCutscene')).toBeLessThan(calls.indexOf('setScene'));
+    expect(t.q('.atlas-connect-scene__board').hidden).toBe(false);
+    expect(t.q('canvas').hidden).toBe(true);
+    // The overlay stays under the board.
+    expect(overlay.classList.contains('is-black')).toBe(true);
+    t.sink.cutsceneScene?.('run1', 'k1', playerScene({ sceneId: 'cutscene:run1:k1' }), null);
+    expect(t.given!.calls).toContain('setCutsceneScene');
+  });
+
+  it('the 2D map is the same instance after the run, with the player\'s own pan and zoom, and the board goes only after cutsceneOver', async () => {
+    const t = await playing();
+    const map = t.scene().map!;
+    map.camera.pan(40, 25);
+    const own = JSON.parse(JSON.stringify(map.camera.current()));
+    t.sink.cutscene?.(cutscene);
+    await vi.advanceTimersByTimeAsync(600);
+    // The GM's camera moves on meanwhile; it is not the player's.
+    t.sink.camera({ sceneId: playerScene().sceneId, centerX: 900, centerY: 900, zoom: 3 } as never);
+    t.sink.cutscene?.(null);
+    expect(t.given!.cutscenes.at(-1)).toEqual({ cutscene: null, options: { handBack: true } });
+    // The board fades to black by itself; until it says it is over, it stays and so does the black.
+    expect(t.given!.disposed()).toBe(0);
+    expect(t.q('.atlas-connect-scene__board').hidden).toBe(false);
+    expect(t.q('.atlas-connect-scene__cutscene-overlay').classList.contains('is-black')).toBe(true);
+    t.given!.host().cutsceneOver?.();
+    expect(t.given!.disposed()).toBe(1);
+    expect(t.q('canvas').hidden).toBe(false);
+    expect(t.q('.atlas-connect-scene__board').hidden).toBe(true);
+    // Under the black the map is shown; the overlay fades out over fadeMs.
+    const overlay = t.q('.atlas-connect-scene__cutscene-overlay');
+    expect(overlay.classList.contains('is-black')).toBe(false);
+    expect(overlay.hidden).toBe(false);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(overlay.hidden).toBe(true);
+    expect(t.scene().map).toBe(map);
+    expect(map.camera.current()).toEqual(own);
+    expect(t.ready).toEqual([true, false]);
+  });
+
+  it('the toolbar is hidden during the run and shown after', async () => {
+    const t = await playing();
+    const toolbar = t.q('.toolbar');
+    expect(toolbar.hidden).toBe(false);
+    t.sink.cutscene?.(cutscene);
+    expect(toolbar.hidden).toBe(true);
+    expect(t.view.contentEl.querySelector('.atlas-connect-scene')!.classList.contains('is-cutscene')).toBe(true);
+    await vi.advanceTimersByTimeAsync(600);
+    t.sink.cutscene?.(null);
+    t.given!.host().cutsceneOver?.();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(toolbar.hidden).toBe(false);
+    expect(t.view.contentEl.querySelector('.atlas-connect-scene')!.classList.contains('is-cutscene')).toBe(false);
+  });
+
+  it('without a factory the curtain shows, the tools lock, and no cutscene-ready is sent', async () => {
+    const t = await playing({ factory: null });
+    t.sink.cutscene?.(cutscene);
+    const curtain = t.q('.atlas-connect-scene__cutscene-curtain');
+    expect(curtain.hidden).toBe(false);
+    expect(curtain.textContent).toBe('The GM is showing a scene.');
+    expect(t.q('.toolbar').hidden).toBe(true);
+    expect(t.ready).toEqual([]);
+    t.sink.cutsceneScene?.('run1', 'k1', playerScene({ sceneId: 'cutscene:run1:k1' }), null);
+    t.sink.cutscene?.(null);
+    expect(curtain.hidden).toBe(true);
+    expect(t.q('.toolbar').hidden).toBe(false);
+    expect(t.ready).toEqual([]);
+  });
+
+  it('a board that does not play cutscenes gets the curtain too, and is not kept', async () => {
+    const t = await playing({ factory: cutsceneFactory(false) });
+    t.sink.cutscene?.(cutscene);
+    expect(t.q('.atlas-connect-scene__cutscene-curtain').hidden).toBe(false);
+    expect(t.ready).toEqual([]);
+    expect(t.given!.disposed()).toBe(1);
+  });
+
+  it('a player already on the board is handed the run, with startBlack when the run is already past its first step', async () => {
+    const t = await playing();
+    t.sink.boardOffer?.(true);
+    expect(t.given!.created()).toBe(1);
+    t.sink.cutscene?.({ ...cutscene, step: { shot: 1, seq: 3 } });
+    expect(t.given!.cutscenes[0]!.options).toEqual({ startBlack: true });
+    expect(t.ready).toEqual([true]);
+    t.sink.cutscene?.(null);
+    expect(t.given!.cutscenes.at(-1)).toEqual({ cutscene: null, options: undefined });
+    // A run from its start gets no startBlack: the board fades to black itself.
+    t.sink.cutscene?.({ ...cutscene, runId: 'run2' });
+    expect(t.given!.cutscenes.at(-1)!.options).toBeUndefined();
+    // The player did not leave their board for a hand-back one.
+    expect(t.given!.created()).toBe(1);
+  });
+
+  it('ends an aborted run while waiting: the overlay fades out and the map is back with no board shown', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    // The GM aborts before the picture is even black.
+    await vi.advanceTimersByTimeAsync(100);
+    t.sink.cutscene?.(null);
+    expect(t.given!.disposed()).toBe(1);
+    expect(t.q('canvas').hidden).toBe(false);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(t.q('.atlas-connect-scene__cutscene-overlay').hidden).toBe(true);
+    expect(t.q('.toolbar').hidden).toBe(false);
+  });
+
+  it('a board that never reaches its black does not keep the player locked', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    await vi.advanceTimersByTimeAsync(600);
+    t.sink.cutscene?.(null);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(t.given!.disposed()).toBe(1);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(t.q('.toolbar').hidden).toBe(false);
+  });
+
+  it('a new admission asks for the reveal again while a run goes on', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    t.sink.session({ ...admitted, status: 'connecting' });
+    t.sink.session(admitted);
+    expect(t.ready).toEqual([true, true]);
+  });
+
+  it('the view does not change during the run and is chosen anew after it', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    await vi.advanceTimersByTimeAsync(600);
+    // The GM offers the board meanwhile: nothing swaps under the run.
+    t.sink.boardOffer?.(true);
+    expect(t.given!.created()).toBe(1);
+    t.sink.cutscene?.(null);
+    t.given!.host().cutsceneOver?.();
+    await vi.advanceTimersByTimeAsync(600);
+    // Now the offer takes effect: a board for the player's own view.
+    expect(t.given!.created()).toBe(2);
   });
 });

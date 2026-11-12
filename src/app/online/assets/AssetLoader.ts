@@ -97,6 +97,14 @@ export class AssetLoader implements PlayerAssetHandler {
     this.want();
   }
 
+  private cutscene: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }> = [];
+
+  /** The revealed scenes of the running cutscene and their board files, wanted beside the player's own; empty once it ends. */
+  setCutscene(scenes: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }>): void {
+    this.cutscene = scenes;
+    this.want();
+  }
+
   /** The files of Tabletop's 3D board of the scene (its materials' maps, door props and props); null for none. */
   setBoard(board: BoardExtras | null): void {
     this.board = board;
@@ -107,7 +115,12 @@ export class AssetLoader implements PlayerAssetHandler {
   private want(): void {
     if (this.disposed) return;
     // The board's files are wanted only by a player showing the board, which draws them (and the minis) in 3D.
-    const ids = [...new Set([...sceneAssetIds(this.scene, { minis: this.options.models?.() === true, video: this.options.video?.() === true }), ...boardAssetIds(this.board)])];
+    const shown = { minis: this.options.models?.() === true, video: this.options.video?.() === true };
+    const ids = [...new Set([
+      ...sceneAssetIds(this.scene, shown), ...boardAssetIds(this.board),
+      // A cutscene is drawn by the board, which draws minis and the board's files.
+      ...this.cutscene.flatMap((each) => [...sceneAssetIds(each.scene, { ...shown, minis: true }), ...boardAssetIds(each.extras)]),
+    ])];
     const keep = new Set(ids);
     const cancelled: string[] = [];
     for (const [id, wanted] of [...this.wanted]) {

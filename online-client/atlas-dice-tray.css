@@ -1,0 +1,56 @@
+/*
+ * Atlas's dice tray and the buttons in it, for Tabletop's Roll dice button during a cutscene. Tabletop's picker is built of
+ * Atlas's classes (`atlas-dice-tray`, `atlas-segmented`, `btn`), which Atlas styles under `.atlas-vtt-plugin`; the join page
+ * loads no Atlas styles, so these rules are Atlas's own for those classes (styles.css of Atlas VTT), under the class
+ * `atlas-tabletop-atlas` that the page puts on the board's element (the scope Tabletop's own styles for the picker use too).
+ * Obsidian's variables that the page does not have are given below.
+ */
+.atlas-tabletop-atlas {
+  --radius-m: 8px; --radius-l: 12px; --radius-xl: 16px; --shadow-l: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --font-ui-smaller: 12px; --font-ui-small: 13px; --font-ui-medium: 15px; --font-medium: 500; --input-height: 32px;
+}
+@keyframes atlas-dice-slide-up{0%{opacity:0;transform:translate(-50%) translateY(8px)}to{opacity:1;transform:translate(-50%) translateY(0)}}
+@keyframes atlas-dice-badge-pop{0%{transform:scale(0)}to{transform:scale(1)}}
+/* The page's own button look gives way to the tray's. */
+.atlas-tabletop-atlas .atlas-dice-tray button { min-height: 0; font: inherit; font-weight: var(--font-medium); }
+.atlas-tabletop-atlas .atlas-segmented{display:flex;gap:4px;padding:4px;background:var(--background-modifier-border);border-radius:var(--radius-m)}
+.atlas-tabletop-atlas .atlas-segmented__option{flex:1;height:auto;padding:4px 8px;border-radius:var(--radius-m);color:var(--text-muted);font-size:var(--font-ui-small);font-weight:var(--font-medium)}
+.atlas-tabletop-atlas .atlas-segmented__option.atlas-active{background:var(--background-primary)!important;color:var(--text-normal);box-shadow:0 1px 2px #0000001a}
+.atlas-tabletop-atlas .atlas-segmented--fit .atlas-segmented__option{flex:1 1 auto;padding:4px;white-space:nowrap}
+.atlas-tabletop-atlas .atlas-segmented__option[aria-disabled=true]{opacity:.45;cursor:default}
+.atlas-tabletop-atlas .atlas-dice-tray{position:absolute;bottom:100%;left:50%;margin-bottom:16px;transform:translate(-50%);z-index:9999;pointer-events:auto;animation:atlas-dice-slide-up .2s ease-out both;translate:var(--atlas-keep-in-view-x)}
+.atlas-tabletop-atlas .atlas-dice-tray.atlas-keep-in-view--capped{box-sizing:border-box;max-height:var(--atlas-keep-in-view-max-height);overflow-y:auto;overscroll-behavior:contain}
+.atlas-tabletop-atlas .atlas-dice-tray.atlas-keep-in-view--capped>*{flex-shrink:0}
+.atlas-tabletop-atlas .atlas-dice-panel{background:var(--background-primary);border:1.5px solid color-mix(in oklch,var(--mono-100) 18%,transparent);--atlas-panel-inner-radius: calc(var(--radius-xl) - 1.5px);border-radius:var(--radius-xl);box-shadow:var(--shadow-l);padding:8px;display:flex;flex-direction:column;gap:8px;width:fit-content}
+.atlas-tabletop-atlas .atlas-dice-tray__content{display:flex;flex-direction:column;gap:8px}
+.atlas-tabletop-atlas .atlas-dice-tray__dice{display:grid;grid-template-columns:repeat(7,48px);gap:8px}
+@media (max-width: 440px) { .atlas-tabletop-atlas .atlas-dice-tray__dice{grid-template-columns:repeat(4,48px)} }
+.atlas-tabletop-atlas .atlas-dice-tray__die{display:flex;flex-direction:column;gap:4px}
+.atlas-tabletop-atlas .atlas-dice-tray__face,.atlas-tabletop-atlas .atlas-dice-tray__grip{display:flex;align-items:center;justify-content:center;width:100%;margin:0;padding:0;box-shadow:none;cursor:pointer;transition:background-color .1s cubic-bezier(.4,0,.2,1)}
+.atlas-tabletop-atlas .atlas-dice-tray__face:disabled,.atlas-tabletop-atlas .atlas-dice-tray__grip:disabled{cursor:default;opacity:.6}
+.atlas-tabletop-atlas .atlas-dice-tray__face{position:relative;height:48px;background:var(--background-secondary);color:var(--text-normal);border:1.5px solid color-mix(in oklch,var(--mono-100) 10%,transparent);border-radius:var(--radius-m)}
+.atlas-tabletop-atlas .atlas-dice-tray__face:hover:not(:disabled){background:var(--background-modifier-hover)}
+.atlas-tabletop-atlas .atlas-dice-tray__face:active:not(:disabled){transform:scale(.96)}
+.atlas-tabletop-atlas .atlas-dice-tray__grip{height:24px;background:transparent;border:none;border-radius:var(--radius-m);color:var(--text-muted)}
+.atlas-tabletop-atlas .atlas-dice-tray__grip svg{width:14px;height:14px}
+.atlas-tabletop-atlas .atlas-dice-tray__grip:hover:not(:disabled){background:var(--background-modifier-hover);color:var(--text-normal)}
+.atlas-tabletop-atlas .atlas-dice-tray__grip-space{height:24px}
+.atlas-tabletop-atlas .atlas-dice-tray__count{position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:var(--interactive-accent);color:var(--text-on-accent);font-size:11px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;pointer-events:none;animation:atlas-dice-badge-pop .15s ease-out both}
+.atlas-tabletop-atlas .atlas-dice-tray__modifier{display:flex;align-items:center;gap:4px}
+.atlas-tabletop-atlas .atlas-dice-tray__modifier-label{margin-right:auto;font-size:var(--font-ui-smaller);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+.atlas-tabletop-atlas .atlas-dice-tray__step{width:32px}
+.atlas-tabletop-atlas .atlas-dice-tray__modifier-value{width:32px;text-align:center;font-family:var(--atlas-dice-font, Palatino Linotype, Palatino, Georgia, serif);font-size:var(--font-ui-medium);font-variant-numeric:tabular-nums;color:var(--text-normal)}
+.atlas-tabletop-atlas .atlas-dice-tray__formula{margin:0;padding:4px 8px;border:1px solid color-mix(in oklch,var(--mono-100) 10%,transparent);border-radius:var(--radius-m);background:var(--background-secondary);text-align:center;font-family:var(--atlas-dice-font, Palatino Linotype, Palatino, Georgia, serif);font-size:var(--font-ui-medium);font-variant-numeric:tabular-nums;color:var(--text-normal)}
+.atlas-tabletop-atlas .atlas-dice-tray__formula--empty{font-style:italic;color:var(--text-faint)}
+.atlas-tabletop-atlas .atlas-dice-tray__actions{display:flex;gap:8px}
+.atlas-tabletop-atlas .atlas-dice-tray__actions .btn{height:32px;border-radius:var(--radius-m)}
+.atlas-tabletop-atlas .atlas-dice-tray__roll{flex:1}
+.atlas-tabletop-atlas .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;height:40px;padding:8px 16px;border-radius:var(--radius-m);font-size:var(--font-ui-small);font-weight:var(--font-medium);transition:color .2s cubic-bezier(.4,0,.2,1),background-color .2s cubic-bezier(.4,0,.2,1)}
+.atlas-tabletop-atlas .btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--background-modifier-border-focus, var(--accent)),0 0 0 4px var(--background-primary)}
+.atlas-tabletop-atlas .btn:disabled{pointer-events:none;opacity:.5}
+.atlas-tabletop-atlas .btn--ghost{background:transparent;color:inherit;border:none;box-shadow:none}
+.atlas-tabletop-atlas .btn--ghost:hover{background:var(--background-modifier-hover);color:var(--text-normal)}
+.atlas-tabletop-atlas .btn--sm{height:var(--input-height);padding:0 12px;border-radius:var(--radius-m);font-size:var(--font-ui-small)}
+.atlas-tabletop-atlas .btn--default{background:color-mix(in oklch,var(--interactive-accent) 82%,black);color:var(--text-on-accent)}
+.atlas-tabletop-atlas .btn--default:hover:not(:disabled){background:color-mix(in oklch,var(--interactive-accent) 88%,black)}
+.atlas-tabletop-atlas .btn--outline{border:1px solid var(--background-modifier-border);background:var(--background-primary);color:var(--text-normal)}

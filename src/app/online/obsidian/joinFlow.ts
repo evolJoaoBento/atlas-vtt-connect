@@ -11,6 +11,7 @@ import type { JoinTarget } from '../joinLink';
 import { mergeDiceLog, ownRolls } from '../page/diceLogModel';
 import type { BoardDiceOffer, PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
+import { CutsceneKeeper } from '../scene/cutsceneKeeper';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { JoinIdentity } from '../sharing/identity/JoinIdentity';
@@ -48,6 +49,8 @@ export interface Joined {
   boardCamera?: BoardCamera | null;
   /** This admission asked the GM for the board (`board-request`): asked once, again after a new admission. */
   boardAsked?: boolean;
+  /** The cutscene running now with its revealed scenes; made with the first session. */
+  cutscenes?: CutsceneKeeper;
   ids: JoinIdentity;
 }
 
@@ -70,6 +73,7 @@ export interface FlowHost {
 export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSession {
   const current = (): boolean => host.isCurrent(joined) && joined.session === session;
   const share = host.shareHandler();
+  const cutscenes = joined.cutscenes ??= new CutsceneKeeper(joined.loader, () => host.sink());
   const session: PlayerSession = createJoinSession({
     loader: joined.loader,
     hostId: joined.target.hostId,
@@ -162,6 +166,10 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.boardCamera = camera;
       host.sink()?.boardCamera?.(camera);
     },
+    onCutscene: (cutscene) => { if (current()) cutscenes.cutscene(cutscene); },
+    onCutsceneScene: (runId, key, scene) => { if (current()) cutscenes.scene(runId, key, scene); },
+    onCutsceneExtras: (runId, key, extras) => { if (current()) cutscenes.extras(runId, key, extras); },
+    onCutsceneCamera: (runId, camera) => { if (current()) cutscenes.camera(runId, camera); },
   });
   return session;
 }
@@ -187,6 +195,7 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },
     () => { if (joined.boardCamera !== undefined) sink.boardCamera?.(joined.boardCamera); },
     () => sink.images(),
+    () => joined.cutscenes?.replay(sink),
   ];
   for (const step of steps) {
     try {

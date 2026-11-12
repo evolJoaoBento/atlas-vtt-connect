@@ -289,6 +289,11 @@ export class OnlineJoinService {
     return this.joined?.session?.sendDiceResult(result) ?? false;
   }
 
+  /** This tab can draw cutscenes: asks the GM to send (or stop sending) the revealed scenes of the run; false when it cannot go. */
+  sendCutsceneReady(on: boolean): boolean {
+    return this.joined?.session?.sendCutsceneReady(on) ?? false;
+  }
+
   /** Asks the GM to add a template or remove one of the player's own. */
   sendTemplate(change: TemplateChange): boolean {
     return this.joined?.session?.sendTemplate(change) ?? false;

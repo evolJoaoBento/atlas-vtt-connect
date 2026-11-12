@@ -1,6 +1,6 @@
 /** What the scene tab takes from a joined session, what it asks of it, and why a join may not start. */
 import type { MapSpell, SpellRequest } from '../tools/spells';
-import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
+import type { BoardCamera, BoardCutscene, BoardExtras } from '../scene/boardTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { TokenSheet } from '../tools/sheets';
 import type { PlayerPing } from '../tools/pings';
@@ -44,6 +44,12 @@ export interface OnlineSceneSink {
   boardExtras?(extras: BoardExtras | null): void;
   /** The GM's 3D camera of the scene, or null; a view without the board leaves it out. */
   boardCamera?(camera: BoardCamera | null): void;
+  /** The cutscene running now, again whenever it changes; null when it ends (also when the link drops). A view that plays none leaves it out. */
+  cutscene?(cutscene: BoardCutscene | null): void;
+  /** The revealed scene of the run's map `key` with its board extras (null until they arrive); said again whenever either changes. */
+  cutsceneScene?(runId: string, key: string, scene: PlayerScene, extras: BoardExtras | null): void;
+  /** The GM's camera in a live run. */
+  cutsceneCamera?(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void;
   /** Images arrived, failed or went. */
   images(): void;
   /** The session was left from elsewhere (a new join, the plugin unloading): close the tab. */

@@ -34,7 +34,7 @@
     <canvas id="map" role="img" aria-label="Map"></canvas>
     <!-- Augmented reality: the phone's back camera, under the board. -->
     <video id="ar-video" class="ar-video" playsinline muted autoplay hidden></video>
-    <div id="board-3d" class="board-3d" hidden></div>
+    <div id="board-3d" class="board-3d atlas-tabletop-atlas" hidden></div>
     <header class="top-bar">
       <div class="top-pill top-info">
         <span id="connection" class="connection" role="status"></span>
@@ -52,6 +52,10 @@
         <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
       </div>
     </header>
+    <!-- A cutscene: the black the 2D map fades into, the curtain of a browser that cannot draw it, and Back to AR for room AR. -->
+    <div id="cutscene-overlay" class="cutscene-overlay" hidden></div>
+    <div id="cutscene-curtain" class="cutscene-curtain" role="status" hidden></div>
+    <button id="back-to-ar" class="back-to-ar" type="button" hidden>Back to AR</button>
     <div id="view-buttons" class="view-buttons" hidden>
       <button id="follow-gm" type="button">Follow GM</button>
       <button id="fit-map" class="secondary" type="button">Fit map</button>

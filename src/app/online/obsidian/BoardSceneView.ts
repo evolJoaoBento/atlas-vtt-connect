@@ -26,7 +26,7 @@ import { conditionRows } from '../view/tokenHover';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool, TemplateChange } from '../view/tools/PlayerTools';
 import { nextTurnOf, turnNotice, turnOf } from '../view/turns';
-import type { AugmentedView, PlayerBoardFactory, PlayerBoardHandle, PlayerDiceRequest, RoomPlace } from './playerBoardContract';
+import type { AugmentedView, PlayerBoardFactory, PlayerBoardHandle, PlayerCutsceneOptions, PlayerDiceRequest, RoomPlace } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 
 export interface BoardSceneViewOptions {
@@ -51,6 +51,8 @@ export interface BoardSceneViewOptions {
   /** The dice rules of the player's map, as the GM offered them; null for the default. */
   diceRules?(): OfferedDiceRules | null;
   onToolsChange(): void;
+  /** A run handed back reached its black: the tab puts back the view it had. */
+  onCutsceneOver?(): void;
   hoverCard: HTMLElement;
   statblockPreview: HTMLElement;
   initiative: HTMLElement;
@@ -94,6 +96,7 @@ export class BoardSceneView implements SceneViewport {
       openPin: (pinId) => this.openPin(pinId),
       hover: (tokenId, client, modifier) => this.hover(tokenId, client, modifier),
       toolsChanged: () => options.onToolsChange(),
+      ...(options.onCutsceneOver ? { cutsceneOver: () => options.onCutsceneOver?.() } : {}),
       ...(options.sendDiceResult ? {
         sendDiceResult: (result: PhysicalRoll) => options.sendDiceResult?.(result) ?? false,
         diceRules: () => options.diceRules?.() ?? null,
@@ -232,6 +235,26 @@ export class BoardSceneView implements SceneViewport {
   /** In augmented reality: where the phone's camera is over the map, for the GM's eye; null otherwise (or an older Tabletop). */
   arViewer(): ArPose | null {
     return this.board.arViewer?.() ?? null;
+  }
+
+  /** Whether the board plays cutscenes: it says so and has all three methods (an older Tabletop's does not). */
+  get playsCutscenes(): boolean {
+    const board = this.board;
+    return board.cutscenes === true && typeof board.setCutscene === 'function'
+      && typeof board.setCutsceneScene === 'function' && typeof board.setCutsceneCamera === 'function';
+  }
+
+  /** The run (null ends it); a board that plays none ignores it. */
+  setCutscene(cutscene: unknown, options?: PlayerCutsceneOptions): void {
+    if (this.playsCutscenes) this.board.setCutscene?.(cutscene, options);
+  }
+
+  setCutsceneScene(runId: string, key: string, scene: unknown, extras: BoardExtras | null): void {
+    if (this.playsCutscenes) this.board.setCutsceneScene?.(runId, key, scene, extras);
+  }
+
+  setCutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+    if (this.playsCutscenes) this.board.setCutsceneCamera?.(runId, camera);
   }
 
   /** Whether the board throws dice (an older Tabletop's has none). */

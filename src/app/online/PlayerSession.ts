@@ -6,7 +6,8 @@
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneInbox } from './playerSessionScene';
-import type { BoardCamera, BoardExtras } from './scene/boardTypes';
+import type { BoardCamera, BoardCutscene, BoardExtras } from './scene/boardTypes';
+import { CutsceneExtrasInbox } from './scene/cutsceneExtrasInbox';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
@@ -21,6 +22,8 @@ import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
+
+type Point3 = { x: number; y: number; z: number };
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -97,6 +100,14 @@ export interface PlayerSessionOptions {
   onBoardExtras?(extras: BoardExtras | null): void;
   /** The GM's 3D camera of the scene, or null. */
   onBoardCamera?(camera: BoardCamera | null): void;
+  /** The cutscene running now (again whenever it changes); null when it ends, the link drops, the GM says bye or the player leaves. */
+  onCutscene?(cutscene: BoardCutscene | null): void;
+  /** The revealed scene of the run's map `key`. */
+  onCutsceneScene?(runId: string, key: string, scene: PlayerScene): void;
+  /** The board extras of the run's map `key`, whole once every part of one `seq` is here. */
+  onCutsceneExtras?(runId: string, key: string, extras: BoardExtras): void;
+  /** The GM's camera in a live run. */
+  onCutsceneCamera?(runId: string, camera: { eye: Point3; target: Point3 }): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
@@ -124,6 +135,11 @@ export class PlayerSession {
   private tableProof: TableProof | null = null;
   /** The latest board offer took `dice-result`. */
   private takesDiceResults = false;
+  /** A cutscene was announced and not yet ended: the next end tells the view. */
+  private cutsceneOn = false;
+  /** The client asked for the revealed scenes (`cutscene-ready`): asked again on every admission. */
+  private cutsceneReady = false;
+  private readonly cutsceneExtras = new CutsceneExtrasInbox();
 
   private readonly inbox: PlayerSceneInbox;
 
@@ -241,6 +257,25 @@ export class PlayerSession {
     return true;
   }
 
+  /**
+   * This client can draw cutscenes: asks the GM to send (or stop sending) the revealed scenes of the run. Remembered, and
+   * asked again on every admission (a reconnect's GM has forgotten it); false when it cannot go now.
+   */
+  sendCutsceneReady(on: boolean): boolean {
+    this.cutsceneReady = on;
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'cutscene-ready', on }));
+    return true;
+  }
+
+  /** The cutscene is over for this client (it ended, the link dropped, the GM left or the player did): the view is told once. */
+  private endCutscene(): void {
+    this.cutsceneExtras.clear();
+    if (!this.cutsceneOn) return;
+    this.cutsceneOn = false;
+    this.options.onCutscene?.(null);
+  }
+
   start(): void {
     if (this.started) return;
     this.started = true;
@@ -253,6 +288,7 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.endCutscene();
     this.leaveAssets();
     this.link?.send('control', encodeControl({ v: 1, type: 'bye', reason: 'left' }));
     this.link?.close();
@@ -269,6 +305,7 @@ export class PlayerSession {
     this.retryTimer = null;
     const old = this.link;
     this.link = null;
+    this.endCutscene();
     if (old && this.assetLink === old) this.leaveAssets();
     old?.close();
     this.attempt = 0;
@@ -300,7 +337,7 @@ export class PlayerSession {
     });
     link.onClose(() => {
       if (this.assetLink === link) this.leaveAssets();
-      if (this.link === link) { this.link = null; this.dropped(); }
+      if (this.link === link) { this.link = null; this.endCutscene(); this.dropped(); }
     });
     link.send('control', encodeControl({
       v: 1, type: 'join', name: this.options.name, playerKey: this.options.playerKey,
@@ -323,6 +360,7 @@ export class PlayerSession {
         this.attempt = 0;
         // A new admission takes no thrown dice until the GM offers them again (it does right after).
         this.takesDiceResults = false;
+        if (this.cutsceneReady) link.send('control', encodeControl({ v: 1, type: 'cutscene-ready', on: true }));
         this.tableProof = message.table ?? null;
         this.update({ status: 'admitted', playerId: message.playerId, title: message.session.title, reason: null });
         {
@@ -389,6 +427,24 @@ export class PlayerSession {
         break;
       case 'board-camera':
         this.options.onBoardCamera?.(message.camera);
+        break;
+      case 'cutscene':
+        if (message.cutscene === null) this.endCutscene();
+        else {
+          this.cutsceneOn = true;
+          this.options.onCutscene?.(message.cutscene);
+        }
+        break;
+      case 'cutscene-scene':
+        this.options.onCutsceneScene?.(message.runId, message.key, message.scene);
+        break;
+      case 'cutscene-extras': {
+        const whole = this.cutsceneExtras.part(message.runId, message.key, message.seq, message.part, message.parts, message.extras);
+        if (whole) this.options.onCutsceneExtras?.(message.runId, message.key, whole);
+        break;
+      }
+      case 'cutscene-camera':
+        this.options.onCutsceneCamera?.(message.runId, { eye: message.eye, target: message.target });
         break;
       case 'laser':
         // Only the GM's relays carry `from`.
@@ -466,6 +522,7 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.endCutscene();
     this.leaveAssets();
     this.setControlled([]);
     this.update({ status, reason });

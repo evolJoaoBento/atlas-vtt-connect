@@ -17,6 +17,8 @@ import { DiceTrayView } from '../../../../online-client/diceTrayView.mts';
 import { MapView } from '../../../../online-client/mapView.mts';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
 import { BoardSceneView } from './BoardSceneView';
+import { CutsceneStage } from './CutsceneStage';
+import type { BoardCutscene } from '../scene/boardTypes';
 import type { PlayerBoardFactory, PlayerDiceRequest } from './playerBoardContract';
 import type { SceneViewport } from './sceneViewport';
 import { PageToolbar } from '../../../../online-client/toolbar.mts';
@@ -37,7 +39,7 @@ import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
 export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
-  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult' | 'sendSpell' | 'sendColor' | 'playerColor'>>;
+  & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult' | 'sendSpell' | 'sendColor' | 'playerColor' | 'sendCutsceneReady'>>;
 
 export interface CanvasSceneOptions {
   dom: SceneDom;
@@ -95,6 +97,9 @@ export class CanvasScene implements OnlineSceneSink {
   private detachSession: (() => void) | null = null;
   private hasLog = false;
   private disposed = false;
+  /** A cutscene runs: the tools are locked and the view stays as it is. */
+  private locked = false;
+  private readonly stage: CutsceneStage;
 
   constructor(private readonly options: CanvasSceneOptions) {
     const { dom, service } = options;
@@ -104,6 +109,24 @@ export class CanvasScene implements OnlineSceneSink {
     this.boardEl = dom.root.createDiv({ cls: 'atlas-connect-scene__board' });
     this.boardEl.hidden = true;
     dom.canvas.after(this.boardEl);
+    // A cutscene: the black the 2D map fades into, and the curtain of a client that cannot draw it.
+    const overlay = dom.root.createDiv({ cls: 'atlas-connect-scene__cutscene-overlay' });
+    overlay.hidden = true;
+    const curtain = dom.root.createDiv({ cls: 'atlas-connect-scene__cutscene-curtain', attr: { role: 'status' } });
+    curtain.hidden = true;
+    this.stage = new CutsceneStage({
+      canvas: dom.canvas, boardEl: this.boardEl, overlay, curtain, win: doc.defaultView ?? window,
+      board: () => (this.view instanceof BoardSceneView ? this.view : null),
+      canMakeBoard: () => (service.boardPainter?.() ?? null) !== null,
+      makeBoard: (over) => {
+        const factory = service.boardPainter?.() ?? null;
+        return factory ? this.makeBoard(factory, over) : null;
+      },
+      replay: (board) => this.replayInto(board),
+      sendReady: (on) => service.sendCutsceneReady?.(on) ?? false,
+      setLocked: (locked) => this.lock(locked),
+      finished: () => { this.chooseView(); this.map?.measure(); this.showEyes(); },
+    });
     this.view = this.makeMap();
     if (this.pickedColor) this.view?.selectLaserColor(this.pickedColor);
     this.tray = new DiceTrayView({
@@ -190,6 +213,7 @@ export class CanvasScene implements OnlineSceneSink {
 
   session(state: PlayerSessionState): void {
     this.state = state;
+    this.stage.sessionChanged(state.status === 'admitted');
     // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
     if (state.status !== 'admitted') this.diceOffer = null;
     this.chooseView();
@@ -206,6 +230,30 @@ export class CanvasScene implements OnlineSceneSink {
     this.map?.setScene(scene);
     this.showStatus();
     if (this.view instanceof BoardSceneView) this.syncToolbar();
+    this.showEyes();
+  }
+
+  /** The cutscene running now (again whenever it changes), or null when it ended or the link dropped. */
+  cutscene(cutscene: BoardCutscene | null): void {
+    this.stage.cutscene(cutscene);
+  }
+
+  cutsceneScene(runId: string, key: string, scene: PlayerScene, extras: BoardExtras | null): void {
+    this.stage.scene(runId, key, scene, extras);
+  }
+
+  cutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+    this.stage.cameraMoved(runId, camera);
+  }
+
+  /** The toolbar, the sheets drawer and the dice tray hide while a cutscene runs (the board's own Roll dice stays). */
+  private lock(locked: boolean): void {
+    this.locked = locked;
+    this.options.dom.root.classList.toggle('is-cutscene', locked);
+    if (locked) {
+      this.setDiceOpen(false);
+      this.eyeMenu.hidden = true;
+    }
     this.showEyes();
   }
 
@@ -243,7 +291,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.eyeButton.classList.toggle('is-active', seeing !== null);
     if (!can) this.eyeMenu.hidden = true;
     // Through a token's eyes, Tabletop's spell toolbar takes the place of this one.
-    this.options.dom.toolbar.hidden = seeing !== null;
+    this.options.dom.toolbar.hidden = this.locked || seeing !== null;
   }
 
   private eyeClicked(): void {
@@ -352,7 +400,9 @@ export class CanvasScene implements OnlineSceneSink {
   }
 
   resize(): void {
-    this.map?.measure();
+    // The 2D map kept under a cutscene's board has no size to measure; the board has.
+    if (this.stage.hidesMap) this.stage.handoffBoard?.measure();
+    else this.map?.measure();
     this.toolbar.fit();
   }
 
@@ -365,6 +415,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.log.dispose();
     this.sheetView.dispose();
     this.toolbar.dispose();
+    this.stage.dispose();
     this.map?.dispose();
   }
 
@@ -403,11 +454,12 @@ export class CanvasScene implements OnlineSceneSink {
   }
 
   /** Tabletop's 3D board, drawing where the 2D map was. */
-  private makeBoard(factory: PlayerBoardFactory): BoardSceneView {
+  private makeBoard(factory: PlayerBoardFactory, over?: () => void): BoardSceneView {
     const { dom, service } = this.options;
     return new BoardSceneView({
       parent: this.boardEl,
       factory,
+      ...(over ? { onCutsceneOver: over } : {}),
       image: (id) => service.image(id),
       imageUrl: (id) => service.images?.background(id) ?? null,
       model: (id) => service.model?.(id) ?? null,
@@ -439,7 +491,8 @@ export class CanvasScene implements OnlineSceneSink {
    * keeps all the session gave the tab, and asks the GM for the board (or stops asking).
    */
   private chooseView(): void {
-    if (this.disposed) return;
+    // The view stays as it is during a cutscene; it is chosen anew when the run is over.
+    if (this.disposed || this.stage.running) return;
     const factory = this.options.service.boardPainter?.() ?? null;
     const possible = factory !== null && this.offered;
     const board = possible && this.wantsBoard;
@@ -466,6 +519,13 @@ export class CanvasScene implements OnlineSceneSink {
   private replay(): void {
     const view = this.view;
     if (!view) return;
+    this.replayInto(view);
+    this.syncToolbar();
+    this.showEyes();
+  }
+
+  /** What the session gave the tab, to `view` (the shown one, or a board made for a cutscene). */
+  private replayInto(view: SceneViewport): void {
     const state = this.state;
     if (state) {
       view.setConnected(state.status === 'admitted');
@@ -484,8 +544,6 @@ export class CanvasScene implements OnlineSceneSink {
       if (this.sceneSpells) view.receiveSpells(this.sceneSpells.sceneId, this.sceneSpells.list, this.sceneSpells.asks);
     }
     view.measure();
-    this.syncToolbar();
-    this.showEyes();
   }
 
   /**

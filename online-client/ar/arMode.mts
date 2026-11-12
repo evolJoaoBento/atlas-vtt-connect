@@ -577,6 +577,50 @@ export class ArMode {
 
   // ── Room tracking ───────────────────────────────────────────────────────────
 
+  /** Whether a room tracking session is running now. */
+  get roomActive(): boolean {
+    return !this.ended && this.session !== null;
+  }
+
+  /** Whether room tracking was stopped for a cutscene and waits for the player to start it again (`resumeRoom`). */
+  get roomSuspended(): boolean {
+    return !this.ended && this.suspended;
+  }
+
+  private suspended = false;
+
+  /**
+   * A cutscene's camera is not the room's: the session ends (the board draws plain), the place the player put the board is
+   * kept, and AR stays on. WebXR starts only from a tap, so `resumeRoom` waits for one. Nothing happens off room tracking.
+   */
+  suspendRoom(): void {
+    const session = this.session;
+    if (this.ended || !session) return;
+    this.suspended = true;
+    this.session = null;
+    this.hitSource?.cancel();
+    this.hitSource = null;
+    if (this.roomTimer) window.clearInterval(this.roomTimer);
+    this.roomTimer = 0;
+    this.options.board()?.stopRoomAr?.();
+    session.end().catch(() => undefined);
+    this.stopUi?.();
+    this.stopUi = null;
+    this.options.boardEl.classList.remove('is-room-ar');
+    this.options.overlay?.classList.remove('is-room-ar-overlay');
+    this.say('');
+  }
+
+  /** Starts room tracking again, inside a tap (`session` is its `requestSession`), with the board where it was put down. */
+  resumeRoom(session: Promise<unknown>): void {
+    if (this.ended || !this.suspended) { session.then((s) => (s as XrSessionLike).end(), () => undefined).catch(() => undefined); return; }
+    this.suspended = false;
+    session.then((s) => this.beginRoom(s as XrSessionLike), (error: unknown) => {
+      console.warn('[Atlas VTT Connect] Room tracking could not restart:', error);
+      this.end();
+    });
+  }
+
   private beginRoom(session: XrSessionLike): void {
     if (this.ended) { session.end().catch(() => undefined); return; }
     const board = this.options.board();
@@ -592,6 +636,8 @@ export class ArMode {
       return;
     }
     session.addEventListener('end', () => {
+      // Stopped by us for a cutscene: AR goes on.
+      if (this.session !== session) return;
       // Ended before the board was ever put down: room tracking did not work here; markers next time.
       if (!this.placed) this.change({ tracking: 'markers' });
       this.end();
@@ -613,7 +659,8 @@ export class ArMode {
     this.options.boardEl.classList.add('is-room-ar');
     board.startRoomAr(session, (frame, space) => this.roomFrame(frame as XrFrameLike, space)).then((started) => {
       if (!started) throw new Error('The board would not draw into the session');
-      this.say('Move the phone slowly over the table until the board shows on it, then tap to put it down.');
+      // Back from a cutscene the board keeps the place it was put down at.
+      if (!this.placed) this.say('Move the phone slowly over the table until the board shows on it, then tap to put it down.');
       return session.requestReferenceSpace('viewer');
     }).then((viewer) => session.requestHitTestSource?.({ space: viewer })).then((source) => {
       if (source) this.hitSource = source;

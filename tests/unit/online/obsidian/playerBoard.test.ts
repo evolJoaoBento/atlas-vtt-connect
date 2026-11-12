@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
 import { AssetLoader, type ImageDecoder } from '../../../../src/app/online/assets/AssetLoader';
 import { decodeAsset } from '../../../../src/app/online/assets/assetProtocol';
 import { GmSession, type SessionPlayer } from '../../../../src/app/online/GmSession';
+import { BoardSceneView } from '../../../../src/app/online/obsidian/BoardSceneView';
+import type { PlayerBoardHandle } from '../../../../src/app/online/obsidian/playerBoardContract';
+import { CutsceneKeeper } from '../../../../src/app/online/scene/cutsceneKeeper';
 import { joinedSessionStore } from '../../../../src/app/online/obsidian/joinedSessionStore';
 import { OnlineJoinService, type OnlineSceneSink } from '../../../../src/app/online/obsidian/OnlineJoinService';
 import { DEFAULT_ONLINE_SETTINGS } from '../../../../src/app/online/onlineSettings';
@@ -174,6 +178,79 @@ describe('AssetLoader and the board', () => {
     loader.setBoard(null);
     expect(cancelled.flat().sort()).toEqual([ID.glb, ID.tex].sort());
     loader.dispose();
+  });
+});
+
+describe('the board handle and cutscenes', () => {
+  /** `BoardSceneView.playsCutscenes` for a handle, without building the whole view around it. */
+  const plays = (handle: Partial<PlayerBoardHandle>): boolean =>
+    Object.getOwnPropertyDescriptor(BoardSceneView.prototype, 'playsCutscenes')!.get!.call({ board: handle }) as boolean;
+  const noop = (): void => {};
+
+  it('a handle with cutscenes and its three methods plays cutscenes', () => {
+    expect(plays({ cutscenes: true, setCutscene: noop, setCutsceneScene: noop, setCutsceneCamera: noop })).toBe(true);
+  });
+
+  it('a handle with cutscenes but no setCutscene (or a missing method, or no flag) is treated as not playing them', () => {
+    expect(plays({ cutscenes: true, setCutsceneScene: noop, setCutsceneCamera: noop })).toBe(false);
+    expect(plays({ cutscenes: true, setCutscene: noop, setCutsceneScene: noop })).toBe(false);
+    expect(plays({ setCutscene: noop, setCutsceneScene: noop, setCutsceneCamera: noop })).toBe(false);
+    expect(plays({})).toBe(false);
+  });
+});
+
+describe('the join page and the Roll dice tray', () => {
+  it('has the styles Tabletop\'s picker needs, under the class the board element carries', () => {
+    const css = readFileSync('online-client/atlas-dice-tray.css', 'utf8');
+    for (const name of ['.atlas-dice-tray', '.atlas-dice-panel', '.atlas-dice-tray__face', '.atlas-segmented__option', '.btn--default']) expect(css).toContain(`.atlas-tabletop-atlas ${name}`);
+    expect(readFileSync('online-client/index.html', 'utf8')).toMatch(/id="board-3d" class="[^"]*atlas-tabletop-atlas/);
+    expect(readFileSync('online-client/tabletopBoard.mts', 'utf8')).toContain("import './atlas-dice-tray.css'");
+  });
+});
+
+describe('the revealed scenes of a cutscene', () => {
+  const scene = (sceneId: string) => ({ sceneId, map: { asset: ID.map, width: 1, height: 1, cellSize: 70 }, tokens: {} }) as never;
+
+  it('the loader asks for their files, minis too, and lets go when the run ends', async () => {
+    const sent: string[][] = [];
+    const cancelled: string[][] = [];
+    const loader = new AssetLoader({ cache: { get: async () => null, put: async () => {} }, decode: async () => null, hash: nodeHash, models: () => false, onChange: () => {} });
+    loader.connected((data) => {
+      const decoded = decodeAsset(data);
+      if (decoded.kind !== 'message') return;
+      if (decoded.message.type === 'asset-request') sent.push(decoded.message.ids);
+      if (decoded.message.type === 'asset-cancel') cancelled.push(decoded.message.ids);
+    });
+    loader.setCutscene([{ scene: scene('cutscene:r:k1'), extras: board(0, { materials: [{ id: ID.tex, scale: 1, maps: { color: ID.tex } }] }) }]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(sent.flat().sort()).toEqual([ID.map, ID.tex].sort());
+    loader.setCutscene([]);
+    expect(cancelled.flat().sort()).toEqual([ID.map, ID.tex].sort());
+    loader.dispose();
+  });
+
+  it('the keeper pairs a scene with its extras, ignores another run, and forgets at the end', () => {
+    const given: string[] = [];
+    const files: number[] = [];
+    const keeper = new CutsceneKeeper({ setCutscene: (list) => files.push(list.length) }, () => ({
+      cutscene: (run) => given.push(`run:${run?.runId ?? 'null'}`),
+      cutsceneScene: (runId, key, _scene, extras) => given.push(`scene:${runId}:${key}:${extras ? 'extras' : 'none'}`),
+    }));
+    const run = { runId: 'r', mode: 'prepared', look: { bars: null, fadeMs: 600 }, shots: [], step: { shot: 0, seq: 1 }, key: 'k1' } as never;
+    keeper.cutscene(run);
+    keeper.scene('other', 'k1', scene('x'));
+    keeper.scene('r', 'k1', scene('cutscene:r:k1'));
+    keeper.extras('r', 'k1', board(1));
+    expect(given).toEqual(['run:r', 'scene:r:k1:none', 'scene:r:k1:extras']);
+    // A view that attaches later gets it all.
+    const late: string[] = [];
+    keeper.replay({ cutscene: (c) => late.push(`run:${c?.runId}`), cutsceneScene: (r, k, _s, e) => late.push(`scene:${r}:${k}:${e ? 'extras' : 'none'}`) });
+    expect(late).toEqual(['run:r', 'scene:r:k1:extras']);
+    keeper.cutscene(null);
+    expect(files.at(-1)).toBe(0);
+    const empty: string[] = [];
+    keeper.replay({ cutscene: () => empty.push('run') });
+    expect(empty).toEqual([]);
   });
 });
 

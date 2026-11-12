@@ -13,7 +13,8 @@ import type { MapSpell, SpellRequest } from '../src/app/online/tools/spells';
 import type { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { PlayerBoardFactory } from '../src/app/online/obsidian/playerBoardContract';
 import type { SceneViewport } from '../src/app/online/obsidian/sceneViewport';
-import type { BoardCamera, BoardExtras } from '../src/app/online/scene/boardTypes';
+import type { BoardCamera, BoardCutscene, BoardExtras } from '../src/app/online/scene/boardTypes';
+import { CutsceneStage } from '../src/app/online/obsidian/CutsceneStage';
 import type { SceneCamera } from '../src/app/online/scene/sceneCamera';
 import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
 import type { PinNoteAnswer } from '../src/app/online/tools/pinNotes';
@@ -44,8 +45,17 @@ export interface SceneSwitchOptions {
   onSeeing?(seeing: boolean): void;
   /** The 2D map, made anew each time it shows. */
   makeMap(): SceneViewport;
-  /** Tabletop's board, drawing in `boardEl`. */
-  makeBoard(factory: PlayerBoardFactory, parent: HTMLElement): BoardSceneView;
+  /** Tabletop's board, drawing in `boardEl`; `over` is a handed-back cutscene's `cutsceneOver`. */
+  makeBoard(factory: PlayerBoardFactory, parent: HTMLElement, over?: () => void): BoardSceneView;
+  /** A cutscene: the black the 2D map fades into, the curtain of a client that cannot draw it, and the tools' lock. */
+  cutscene?: {
+    overlay: HTMLElement;
+    curtain: HTMLElement;
+    sendReady(on: boolean): boolean;
+    onLock(locked: boolean): void;
+    /** Room AR stopped for a run: this button (in the page) starts it again, with the board where it was put. */
+    backButton?: HTMLButtonElement;
+  };
   /** Loads the board's chunk. */
   loadBoard(): Promise<PlayerBoardFactory>;
   canvas: HTMLElement;
@@ -101,7 +111,23 @@ export class SceneSwitch implements SceneViewport {
   private roomSupported = false;
   private roomAsked = false;
 
+  private readonly stage: CutsceneStage | null;
+
   constructor(private readonly options: SceneSwitchOptions) {
+    const cut = options.cutscene;
+    this.stage = cut ? new CutsceneStage({
+      canvas: options.canvas, boardEl: options.boardEl, overlay: cut.overlay, curtain: cut.curtain, win: window,
+      board: () => this.board,
+      canMakeBoard: () => this.factory !== null,
+      makeBoard: (over) => {
+        const factory = this.factory;
+        return factory ? options.makeBoard(factory, options.boardEl, over) : null;
+      },
+      replay: (board) => this.replayInto(board, board),
+      sendReady: (on) => cut.sendReady(on),
+      setLocked: (locked) => { cut.onLock(locked); this.showEyes(); },
+      finished: () => { this.choose(); this.view.measure(); this.showEyes(); },
+    }) : null;
     this.view = options.makeMap();
     const listen = (target: EventTarget, type: string, handler: (event: Event) => void): void => {
       target.addEventListener(type, handler);
@@ -113,6 +139,10 @@ export class SceneSwitch implements SceneViewport {
     });
     listen(options.eyeButton, 'click', () => this.eyeClicked());
     if (options.ar) listen(options.ar.button, 'click', () => this.arClicked());
+    if (cut?.backButton) {
+      cut.backButton.hidden = true;
+      listen(cut.backButton, 'click', () => this.backToAr());
+    }
     // A tap anywhere else closes the Eyes menu.
     listen(options.eyeMenu.ownerDocument, 'pointerdown', (event) => {
       const target = event.target as Node | null;
@@ -163,9 +193,52 @@ export class SceneSwitch implements SceneViewport {
     this.board?.setBoardCamera(camera);
   }
 
+  /** The cutscene running now (again whenever it changes), or null when it ended or the link dropped. */
+  cutscene(cutscene: BoardCutscene | null): void {
+    if (!this.stage) return;
+    const wasRunning = this.stage.running;
+    this.stage.cutscene(cutscene);
+    // Room AR cannot draw a driven camera: its session ends for the run (marker AR goes on under the locked board and
+    // resumes by itself); a WebXR session starts only from a tap, so the player is offered Back to AR afterwards.
+    if (cutscene && !wasRunning) this.ar?.suspendRoom();
+    if (!cutscene) this.showBackToAr();
+  }
+
+  cutsceneScene(runId: string, key: string, scene: PlayerScene, extras: BoardExtras | null): void {
+    this.stage?.scene(runId, key, scene, extras);
+  }
+
+  cutsceneCamera(runId: string, camera: { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }): void {
+    this.stage?.cameraMoved(runId, camera);
+  }
+
+  /** The Back to AR button shows while room AR waits for a tap after a run. */
+  private showBackToAr(): void {
+    const back = this.options.cutscene?.backButton;
+    if (back) back.hidden = this.ar?.roomSuspended !== true;
+  }
+
+  private backToAr(): void {
+    const ar = this.ar;
+    const back = this.options.cutscene?.backButton;
+    if (!ar?.roomSuspended) { if (back) back.hidden = true; return; }
+    if (back) back.hidden = true;
+    ar.resumeRoom(this.requestRoomSession());
+  }
+
+  /** Asks for a WebXR immersive AR session; inside a tap. */
+  private requestRoomSession(): Promise<unknown> {
+    const xr = (navigator as Navigator & { xr?: { requestSession: (mode: string, init: unknown) => Promise<unknown> } }).xr!;
+    const overlay = this.options.ar?.overlay;
+    const session = xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], ...(overlay ? { domOverlay: { root: overlay } } : {}) });
+    session.catch(() => undefined);
+    return session;
+  }
+
   /** The board while it can be shown and is wanted; else the 2D map. A board that will not start leaves the map. */
   private choose(): void {
-    if (this.disposed) return;
+    // The view stays as it is during a cutscene; it is chosen anew when the run is over.
+    if (this.disposed || this.stage?.running) return;
     const possible = this.factory !== null && this.offered;
     const wanted = possible && this.wantsBoard;
     const { dimensionButton, canvas, boardEl } = this.options;
@@ -209,7 +282,11 @@ export class SceneSwitch implements SceneViewport {
 
   /** What the session gave, to the view just made. */
   private replay(): void {
-    const view = this.view;
+    this.replayInto(this.view, this.board);
+  }
+
+  /** What the session gave, to `view`: the one just made, or a board made for a cutscene (`board` is `view` when it is one). */
+  private replayInto(view: SceneViewport, board: BoardSceneView | null): void {
     view.setPlayers(this.players.order, this.players.self);
     view.setConnected(this.connected);
     view.setControlled(this.controlled);
@@ -218,11 +295,11 @@ export class SceneSwitch implements SceneViewport {
     view.setScene(this.scene);
     view.setGmCamera(this.gmCamera);
     if (this.templates) view.receiveTemplates(this.templates.sceneId, this.templates.list);
-    if (this.board && this.spells) this.board.receiveSpells(this.spells.sceneId, this.spells.list, this.spells.asks);
+    if (board && this.spells) board.receiveSpells(this.spells.sceneId, this.spells.list, this.spells.asks);
     if (this.laserColor) view.selectLaserColor(this.laserColor);
-    if (this.board) {
-      this.board.setExtras(this.extras);
-      this.board.setBoardCamera(this.boardCamera);
+    if (board) {
+      board.setExtras(this.extras);
+      board.setBoardCamera(this.boardCamera);
     }
     view.measure();
   }
@@ -286,10 +363,7 @@ export class SceneSwitch implements SceneViewport {
     const roomCapable = this.roomSupported && board.roomAr;
     if (roomCapable && readArSettings().tracking === 'room') {
       // Room tracking: the session asked for inside the tap; ARCore has the camera (no getUserMedia here).
-      const xr = (navigator as Navigator & { xr?: { requestSession: (mode: string, init: unknown) => Promise<unknown> } }).xr!;
-      const overlay = ar.overlay;
-      const session = xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], ...(overlay ? { domOverlay: { root: overlay } } : {}) });
-      session.catch(() => undefined);
+      const session = this.requestRoomSession();
       this.loadAr(board, { stream: null, session, roomCapable: true }, () => { session.then((s) => (s as { end(): Promise<void> }).end(), () => undefined).catch(() => undefined); });
       return;
     }
@@ -320,7 +394,7 @@ export class SceneSwitch implements SceneViewport {
         tokens: () => this.controlled.map((id) => ({ id, name: this.options.tokenName(id) })),
         ...(this.options.sendArView ? { sendView: (pose: ArPose | null) => this.options.sendArView?.(pose) ?? false } : {}),
         ...(this.options.sendArSurvey ? { sendSurvey: (survey: ArSurvey) => this.options.sendArSurvey?.(survey) ?? false } : {}),
-        onEnd: () => { this.ar = null; this.showEyes(); },
+        onEnd: () => { this.ar = null; this.showEyes(); this.showBackToAr(); },
         // The other tracking, chosen in the menu: this one ends and the other starts, inside the same tap.
         onSwitch: () => {
           this.ar?.end();
@@ -393,6 +467,7 @@ export class SceneSwitch implements SceneViewport {
 
   setConnected(connected: boolean): void {
     this.connected = connected;
+    this.stage?.sessionChanged(connected);
     this.view.setConnected(connected);
     if (!connected) this.asked = false;
     else this.choose();
@@ -419,11 +494,16 @@ export class SceneSwitch implements SceneViewport {
   receivePing(ping: PlayerPing): void { this.view.receivePing(ping); }
   receiveLaser(laser: PlayerLaser): void { this.view.receiveLaser(laser); }
   refresh(): void { this.view.refresh(); }
-  measure(): void { this.view.measure(); }
+  measure(): void {
+    // The 2D map kept under a cutscene's board has no size to measure; the board has.
+    if (this.stage?.hidesMap) this.stage.handoffBoard?.measure();
+    else this.view.measure();
+  }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.stage?.dispose();
     this.ar?.end();
     for (const stop of this.stops) stop();
     this.view.dispose();
