@@ -14,7 +14,7 @@ import type { SheetCard } from '../tools/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi, movesOnTurn?: () => boolean): NonNullable<OptionalParts['tokenControl']> {
-  return ({ session, projection }) => new TokenControlHost({ session, projection, tokens, ...(movesOnTurn ? { movesOnTurn } : {}) });
+  return ({ session, projection, cutscene }) => new TokenControlHost({ session, projection, tokens, ...(movesOnTurn ? { movesOnTurn } : {}), ...(cutscene ? { cutscene } : {}) });
 }
 
 /**
@@ -118,8 +118,8 @@ type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly Ma
 /** Players' lasting templates, kept per scene and drawn in the GM's view where the lasers can draw. */
 export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: string | null) => number): NonNullable<OptionalParts['templates']> {
   const showTemplates = lasers ? (lasers as unknown as TemplateShowing).showTemplates : undefined;
-  return ({ session, projection, board, colors }) => new TemplateHost({
-    session, projection, ...(board ? { board } : {}), ...(colors ? { colors } : {}),
+  return ({ session, projection, board, colors, cutscene }) => new TemplateHost({
+    session, projection, ...(board ? { board } : {}), ...(colors ? { colors } : {}), ...(cutscene ? { cutscene } : {}),
     ...(typeof showTemplates === 'function'
       ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null), erase) }
       : {}),

@@ -128,6 +128,7 @@ describe("the GM's board hears of players in AR", () => {
       projection: { shownSlot: () => null, onSlotChange: () => () => undefined } as never,
       handouts: { current: () => null, subscribe: () => () => undefined } as never,
       coneAngle: () => 90,
+      cutscenes: false,
     });
     const heard: BoardViewer[] = [];
     hub.onViewer((viewer) => heard.push(viewer));

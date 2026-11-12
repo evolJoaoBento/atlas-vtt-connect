@@ -1,5 +1,5 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
-import type { BoardLook } from './sceneContracts';
+import type { BoardLook, GmCutscene } from './sceneContracts';
 import type { HandoutSource } from '../handouts';
 import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
@@ -74,6 +74,13 @@ export interface BoardSource {
   subscribe(listener: () => void): () => void;
   /** Calls `listener` (often) while the GM's 3D camera moves; returns the stop. */
   subscribeCamera(listener: () => void): () => void;
+  /** The cutscene running on the GM's board (Tabletop's `api.cutscene`), or null; absent without a Tabletop that offers one. */
+  cutscene?(): GmCutscene | null;
+  /** Calls `listener` when `cutscene()` changed (started, stepped, changed scene, ended); returns the stop. */
+  subscribeCutscene?(listener: () => void): () => void;
+  /** Live runs only: the GM's own board camera. */
+  cutsceneCamera?(): BoardPose | null;
+  subscribeCutsceneCamera?(listener: () => void): () => void;
 }
 
 /** The minis standing on each map's tokens, as the Tabletop extension keeps them (`connect/tabletopMinis.ts`). */

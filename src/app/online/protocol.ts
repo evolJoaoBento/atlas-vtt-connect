@@ -4,12 +4,12 @@
  */
 import type { SceneCamera } from './scene/sceneCamera';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
-import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
+import type { PlayerDrawing, PlayerFogOp, PlayerScene, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
-import type { BoardCamera, BoardExtras } from './scene/boardTypes';
-import { isBoardCamera, isBoardExtras, isBoardPart } from './scene/boardValidation';
+import type { BoardCamera, BoardCutscene, BoardExtras } from './scene/boardTypes';
+import { isBoardCamera, isBoardCutscene, isBoardExtras, isBoardPart, isCutsceneKeyName, isCutsceneRunId, isCutscenePose } from './scene/boardValidation';
 import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from './tools/sheets';
 import { isPingPoint } from './tools/pings';
 import { isArPose, type ArPose } from './tools/arViews';
@@ -156,11 +156,23 @@ export type ControlMessage =
    */
   | { v: 1; type: 'ar-view'; sceneId: string; pose: ArPose | null }
   /** Player to GM: the marker sheets on the table as this phone learnt them (`tools/arTable.ts`), for the GM to place on the map. */
-  | { v: 1; type: 'ar-survey'; sceneId: string; survey: ArSurvey };
+  | { v: 1; type: 'ar-survey'; sceneId: string; survey: ArSurvey }
+  /** GM to every admitted player: the cutscene running now, whenever it changes (a step, a scene in live), and `null` when it ends. */
+  | { v: 1; type: 'cutscene'; cutscene: BoardCutscene | null }
+  /** Player to GM: this client can draw cutscenes; start (or stop) sending it the revealed scene of the run. */
+  | { v: 1; type: 'cutscene-ready'; on: boolean }
+  /** GM to a ready player: the revealed scene of the run's map `key` (no fog), for the length of the run only. */
+  | { v: 1; type: 'cutscene-scene'; runId: string; key: string; scene: PlayerScene }
+  /** GM to a ready player: the board extras of `key`'s scene, in parts of one `seq`. */
+  | { v: 1; type: 'cutscene-extras'; runId: string; key: string; seq: number; part: number; parts: number; extras: BoardExtras }
+  /** GM to a ready player, live runs only: the GM's camera, at most every 100 ms. */
+  | { v: 1; type: 'cutscene-camera'; runId: string; eye: Vec3; target: Vec3 };
+
+type Vec3 = { x: number; y: number; z: number };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view', 'ar-survey', 'map-spell', 'player-color',
+  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view', 'ar-survey', 'map-spell', 'player-color', 'cutscene-ready',
 ]);
 
 export type Decoded =
@@ -244,6 +256,12 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'board-camera': (m) => m.camera === null || isBoardCamera(m.camera),
   'ar-view': (m) => isSceneId(m.sceneId) && (m.pose === null || isArPose(m.pose)),
   'ar-survey': (m) => isSceneId(m.sceneId) && isArTable(m.survey),
+  cutscene: (m) => m.cutscene === null || isBoardCutscene(m.cutscene),
+  'cutscene-ready': (m) => typeof m.on === 'boolean',
+  'cutscene-scene': (m) => isCutsceneRunId(m.runId) && isCutsceneKeyName(m.key) && isPlayerSceneBody(m.scene)
+    && isFogRecords((m.scene as Fields).fog) && isDrawingRecords((m.scene as Fields).drawings),
+  'cutscene-extras': (m) => isCutsceneRunId(m.runId) && isCutsceneKeyName(m.key) && isBoardPart(m) && isBoardExtras(m.extras),
+  'cutscene-camera': (m) => isCutsceneRunId(m.runId) && isCutscenePose(m.eye) && isCutscenePose(m.target),
 };
 
 export function encodeControl(message: ControlMessage): string {

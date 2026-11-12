@@ -59,6 +59,8 @@ export interface BoardOverlay {
 /** What Tabletop reads of the session (its `connectContract.ts` keeps the same shape). */
 export interface BoardSession {
   hosting(): boolean;
+  /** Carries cutscenes to players; absent from a session that cannot (no scene tabs). */
+  readonly cutscenes?: true;
   presentedMap(): string | null;
   overlay(mapPath: string): BoardOverlay;
   onChange(listener: () => void): () => void;
@@ -178,9 +180,16 @@ export interface BoardSessionHubOptions {
   handouts: HandoutSource;
   /** The cone angle of the map's collection, in degrees. */
   coneAngle(mapPath: string): number;
+  /**
+   * Whether this session carries cutscenes to players: it needs the GM's scene tabs (a shot's map is read from its tab's
+   * live snapshot). Told to Tabletop (`cutscenes`), which otherwise refuses Play for players.
+   */
+  cutscenes: boolean;
 }
 
 export class BoardSessionHub implements BoardSession, BoardSessionSink {
+  /** Set only when the session carries cutscenes. */
+  readonly cutscenes?: true;
   private readonly changes = new Set<() => void>();
   private readonly marks = new Set<(mark: BoardMark) => void>();
   private readonly viewers = new Set<(viewer: BoardViewer) => void>();
@@ -195,7 +204,9 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   private shows: ((mapPath: string, tokenId: string) => EditTokenSectionSpec | null) | null = null;
   private started = false;
 
-  constructor(private readonly options: BoardSessionHubOptions) {}
+  constructor(private readonly options: BoardSessionHubOptions) {
+    if (options.cutscenes) this.cutscenes = true;
+  }
 
   useTemplates(templates: TemplateHost | null): void {
     this.templates = templates;

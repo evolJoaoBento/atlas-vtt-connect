@@ -17,6 +17,7 @@ import { peerServerOptions, type OnlineSettings } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
 import { BoardSender } from './scene/BoardSender';
+import { CutsceneSender } from './scene/CutsceneSender';
 import { BoardSessionHub, type BoardSession } from './tools/BoardSessionHub';
 import { followMovedTokens } from './control/movedTokens';
 import type { HandoutSource } from './handouts';
@@ -60,6 +61,8 @@ export interface HostedContext {
   board?: BoardSessionHub;
   /** The colour each player picked (else their place's). */
   colors?: PlayerColors;
+  /** Whether a cutscene runs: players' moves and templates are refused meanwhile. */
+  cutscene?: { running(): boolean };
 }
 
 export interface HostedPart {
@@ -212,11 +215,15 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     projection: hub,
     handouts: env.scene.handout ?? NO_HANDOUT,
     coneAngle: (mapPath) => env.scene.coneAngle?.(mapPath) ?? 90,
+    // Without scene tabs there is no live snapshot of a shot's map: Tabletop refuses Play for players.
+    cutscenes: tabs !== null,
   }) : null;
   // Each player's colour: started first, so the relays colour a player's first ping or template with it.
   const colors = new PlayerColors(scenes);
   colors.start();
-  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}), colors };
+  // Tabletop's cutscenes to players: made here so the guards of the moves and templates can ask it; started after the board.
+  const cutsceneSender = new CutsceneSender({ session: scenes, tabs, board: env.scene.board ?? null, sceneOptions, assets: registry });
+  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}), colors, cutscene: cutsceneSender };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
   // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
@@ -225,7 +232,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     ...(env.dice && env.diceRules ? { diceRules: env.diceRules } : {}),
   });
   // Serves the images of the scene players have, over each player's assets channel.
-  const assetServer = new AssetServer({ session, projection: hub, files: registry });
+  const assetServer = new AssetServer({ session, projection: hub, files: registry, cutscene: cutsceneSender });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
   const tokenControl = env.tokenControl?.(context) ?? null;
   const dice = env.dice?.(context) ?? null;
@@ -270,6 +277,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     assetServer.stop();
     for (const part of given([arViews, notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
     colors.stop();
+    cutsceneSender.stop();
     boardSender.stop();
     cameraSender.stop();
     stopLog?.();
@@ -288,6 +296,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSplit = syncSplitState(hub);
     cameraSender.start();
     boardSender.start();
+    cutsceneSender.start();
     assetServer.start();
     for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes, arViews])) {
       part.start();

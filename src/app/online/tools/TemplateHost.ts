@@ -27,6 +27,8 @@ export interface TemplateHostOptions {
   colors?: Pick<PlayerColors, 'colorOf' | 'onChange'>;
   /** Tabletop's 3D board on the GM's side: told whenever a scene's templates change. */
   board?: Pick<BoardSessionSink, 'templatesChanged'>;
+  /** While a cutscene runs, players add no template or spell (removing their own still works). */
+  cutscene?: { running(): boolean };
 }
 
 /** What the GM's asks for spells need: who controls a token, and a way to tell the GM how an ask was answered. */
@@ -208,6 +210,7 @@ export class TemplateHost implements SessionHandler {
   onMessage(player: SessionPlayer, message: ControlMessage): void {
     if (message.type === 'map-spell') { this.spellMessage(player, message); return; }
     if (message.type !== 'map-template') return;
+    if (message.add && this.options.cutscene?.running()) return;
     const slot = this.options.projection.slotOf(player.playerId);
     if (!slot?.lastSent || message.sceneId !== slot.sceneId || !this.limit.allow(player.playerId, Date.now())) return;
     const list = this.byScene.get(slot.sceneId) ?? [];
@@ -228,6 +231,7 @@ export class TemplateHost implements SessionHandler {
 
   /** A player's spell: cast (at most `perPlayer` of theirs, `perScene` in all), one of theirs taken off, or theirs cleared. */
   private spellMessage(player: SessionPlayer, message: Extract<ControlMessage, { type: 'map-spell' }>): void {
+    if (message.add && this.options.cutscene?.running()) return;
     const slot = this.options.projection.slotOf(player.playerId);
     // An answer to an ask can land only once, so it is not held to the rate.
     const answer = message.request !== undefined || message.decline !== undefined;

@@ -1,5 +1,5 @@
 /** The shapes the scene, asset and control code share with the session side (`AssetRegistry`, `sceneSources`). */
-import type { BoardWater } from './boardTypes';
+import type { BoardCutscene, BoardWater } from './boardTypes';
 import type { AssetMime } from '../assets/assetIds';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
@@ -44,6 +44,15 @@ export interface AssetIds {
   idFor(path: string | null | undefined): string | null;
   /** The fingerprint of an animated map's video itself (`idFor` gives its still); null for any other file, or while it is hashed. */
   videoIdFor?(path: string | null | undefined): string | null;
+}
+
+/**
+ * A cutscene as Tabletop publishes it (`api.cutscene`): what goes to players, and, on the GM's side only, the vault map
+ * each run-local key stands for. The paths never leave the GM's machine.
+ */
+export interface GmCutscene {
+  cutscene: BoardCutscene;
+  maps: Readonly<Record<string, string>>;
 }
 
 /** What the scene handlers need of the session: register a handler, send to a player, list the players. */

@@ -10,7 +10,8 @@ import type { App, EventRef } from 'obsidian';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
-import type { BoardLook } from '../app/online/scene/sceneContracts';
+import type { BoardLook, GmCutscene } from '../app/online/scene/sceneContracts';
+import { isBoardCutscene } from '../app/online/scene/boardValidation';
 import type { BoardSession } from '../app/online/tools/BoardSessionHub';
 import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
@@ -176,6 +177,43 @@ function boardApi(app: App): TabletopBoardApi | null {
     && camera && typeof camera.camera === 'function' && typeof camera.onChange === 'function' ? api as TabletopBoardApi : null;
 }
 
+/** Tabletop's running cutscene (`api.cutscene`), when it has the shape Connect reads. */
+interface CutsceneApi {
+  current(): unknown;
+  onChange(listener: () => void): () => void;
+  camera(): unknown;
+  onCamera(listener: () => void): () => void;
+}
+
+function cutsceneApi(api: TabletopBoardApi | null): CutsceneApi | null {
+  const source = (api as { cutscene?: Partial<CutsceneApi> } | null)?.cutscene;
+  return source && typeof source.current === 'function' && typeof source.onChange === 'function'
+    && typeof source.camera === 'function' && typeof source.onCamera === 'function' ? source as CutsceneApi : null;
+}
+
+/** A published run, rebuilt field by field so nothing but the checked wire shape (and the GM-side map paths) is kept. */
+function cleanCutscene(raw: unknown): GmCutscene | null {
+  const given = raw as { cutscene?: unknown; maps?: unknown } | null;
+  if (typeof given !== 'object' || given === null || !isBoardCutscene(given.cutscene)) return null;
+  const { runId, mode, look, shots, step, key } = given.cutscene;
+  const maps: Record<string, string> = {};
+  if (typeof given.maps === 'object' && given.maps !== null) {
+    for (const [name, path] of Object.entries(given.maps)) if (typeof path === 'string') Object.defineProperty(maps, name, { value: path, enumerable: true });
+  }
+  return {
+    cutscene: {
+      runId, mode, key,
+      look: { bars: look.bars, fadeMs: look.fadeMs },
+      shots: shots.map((shot) => ({
+        key: shot.key, eye: { x: shot.eye.x, y: shot.eye.y, z: shot.eye.z }, target: { x: shot.target.x, y: shot.target.y, z: shot.target.z },
+        at: shot.at, keyframe: shot.keyframe, transition: shot.transition,
+      })),
+      step: { shot: step.shot, seq: step.seq },
+    },
+    maps,
+  };
+}
+
 const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } => {
   const point = value as Record<string, unknown> | null;
   return typeof point === 'object' && point !== null && [point.x, point.y, point.z].every((n) => typeof n === 'number' && Number.isFinite(n));
@@ -184,7 +222,10 @@ const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } 
 export function tabletopBoard(app: App): TabletopBoard {
   const listeners = new Set<() => void>();
   const cameraListeners = new Set<() => void>();
+  const cutsceneListeners = new Set<() => void>();
+  const cutsceneCameraListeners = new Set<() => void>();
   let api: TabletopBoardApi | null = null;
+  let cutscenes: CutsceneApi | null = null;
   /** The session handed over, and Tabletop's release of it. */
   let session: BoardSession | null = null;
   let releaseSession: (() => void) | null = null;
@@ -216,6 +257,7 @@ export function tabletopBoard(app: App): TabletopBoard {
     if (next === api) return;
     for (const stop of stops.splice(0)) stop();
     api = next;
+    cutscenes = null;
     if (api) {
       try {
         stops = [api.onBoardChange(() => emit()), api.gmCamera.onChange(() => emitTo(cameraListeners))];
@@ -224,8 +266,19 @@ export function tabletopBoard(app: App): TabletopBoard {
         api = null;
       }
     }
+    const source = api ? cutsceneApi(api) : null;
+    if (source) {
+      try {
+        stops.push(source.onChange(() => emitTo(cutsceneListeners)), source.onCamera(() => emitTo(cutsceneCameraListeners)));
+        cutscenes = source;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not follow the Tabletop cutscene:', error);
+      }
+    }
     handOver();
     emit();
+    // A run that was going when Tabletop went away or came back is over or new: the sender reads it again.
+    emitTo(cutsceneListeners);
   };
   const refs: EventRef[] = [
     ...[READY, OLD_READY].map((name) => app.workspace.on(name as never, (() => bind()) as never)),
@@ -273,14 +326,45 @@ export function tabletopBoard(app: App): TabletopBoard {
       cameraListeners.add(listener);
       return () => { cameraListeners.delete(listener); };
     },
+    cutscene: () => {
+      if (!cutscenes) return null;
+      try {
+        return cleanCutscene(cutscenes.current());
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop cutscene:', error);
+        return null;
+      }
+    },
+    subscribeCutscene: (listener) => {
+      cutsceneListeners.add(listener);
+      return () => { cutsceneListeners.delete(listener); };
+    },
+    cutsceneCamera: () => {
+      if (!cutscenes) return null;
+      try {
+        const pose = cutscenes.camera() as Partial<BoardPose> | null;
+        return pose && isPoint3(pose.eye) && isPoint3(pose.target) ? { eye: { ...pose.eye }, target: { ...pose.target } } : null;
+      } catch (error) {
+        console.warn('[Atlas VTT Connect] Could not read the Tabletop cutscene camera:', error);
+        return null;
+      }
+    },
+    subscribeCutsceneCamera: (listener) => {
+      cutsceneCameraListeners.add(listener);
+      return () => { cutsceneCameraListeners.delete(listener); };
+    },
     dispose: () => {
       for (const ref of refs) app.workspace.offref(ref);
       for (const stop of stops.splice(0)) stop();
       session = null;
       handOver();
       api = null;
+      cutscenes = null;
+      emitTo(cutsceneListeners);
       listeners.clear();
       cameraListeners.clear();
+      cutsceneListeners.clear();
+      cutsceneCameraListeners.clear();
     },
   };
 }

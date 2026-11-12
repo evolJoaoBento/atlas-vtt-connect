@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 import { isArTable } from '../tools/arTable';
 
@@ -106,4 +106,37 @@ export function isBoardPart(message: Fields): boolean {
   return Number.isSafeInteger(message.seq) && (message.seq as number) >= 1
     && Number.isSafeInteger(message.parts) && (message.parts as number) >= 1 && (message.parts as number) <= BOARD_PART_LIMITS.parts
     && Number.isSafeInteger(message.part) && (message.part as number) >= 0 && (message.part as number) < (message.parts as number);
+}
+
+const isRunId = (value: unknown): value is string => typeof value === 'string' && CUTSCENE_LIMITS.runId.test(value);
+const isCutsceneKey = (value: unknown): value is string => typeof value === 'string' && CUTSCENE_LIMITS.key.test(value);
+const isFar = (value: unknown): boolean => isNumber(value) && Math.abs(value) <= CUTSCENE_LIMITS.coordinate;
+const isPose3 = (value: unknown): boolean => isFields(value) && isFar(value.x) && isFar(value.y) && isFar(value.z);
+
+/** The run's id, for the cutscene messages. */
+export const isCutsceneRunId = isRunId;
+/** A run-local map key (`k1`, `k2`, …). */
+export const isCutsceneKeyName = isCutsceneKey;
+/** The pose of a live cutscene camera. */
+export const isCutscenePose = isPose3;
+
+function isShot(value: unknown): boolean {
+  return isFields(value) && isCutsceneKey(value.key) && isPose3(value.eye) && isPose3(value.target)
+    && isNumber(value.at) && value.at >= 0 && value.at <= CUTSCENE_LIMITS.at && typeof value.keyframe === 'boolean'
+    && (value.transition === 'fade' || value.transition === 'cut' || value.transition === 'move');
+}
+
+/** A running cutscene as Tabletop's `readBoardCutscene` reads it. */
+export function isBoardCutscene(value: unknown): value is BoardCutscene {
+  if (!isFields(value) || !isRunId(value.runId) || !isCutsceneKey(value.key)) return false;
+  if (value.mode !== 'prepared' && value.mode !== 'live') return false;
+  const { look, step, shots } = value;
+  if (!isFields(look) || !isNumber(look.fadeMs) || look.fadeMs < CUTSCENE_LIMITS.fadeMs[0] || look.fadeMs > CUTSCENE_LIMITS.fadeMs[1]) return false;
+  if (look.bars !== null && !(isNumber(look.bars) && CUTSCENE_LIMITS.bars.includes(look.bars))) return false;
+  if (!isFields(step) || !Number.isSafeInteger(step.seq) || (step.seq as number) < 1 || !Number.isSafeInteger(step.shot)) return false;
+  if (!Array.isArray(shots) || shots.length > CUTSCENE_LIMITS.shots || !shots.every(isShot)) return false;
+  if (value.mode === 'live') return shots.length === 0 && step.shot === 0;
+  if (shots.length === 0 || (step.shot as number) < 0 || (step.shot as number) >= shots.length) return false;
+  const rest = shots[step.shot as number] as { keyframe: boolean };
+  return !rest.keyframe || step.shot === 0 || step.shot === shots.length - 1;
 }

@@ -28,6 +28,7 @@ function world() {
     projection,
     handouts: { current: () => handout, subscribe: (listener) => { handoutListeners.add(listener); return () => handoutListeners.delete(listener); } },
     coneAngle: () => 53,
+    cutscenes: true,
   });
   const templates = new TemplateHost({ session, projection, board: hub });
   hub.useTemplates(templates);

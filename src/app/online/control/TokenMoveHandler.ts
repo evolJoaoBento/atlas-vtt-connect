@@ -32,6 +32,8 @@ export interface TokenMoveHandlerOptions {
   tokens: Pick<TokensApi, 'move'>;
   /** Whether the GM lets players move only on their turn (Atlas's "Players move only on their turn"); asked at each move. Without it they may move at any time. */
   movesOnTurn?: () => boolean;
+  /** While a cutscene runs, players' tokens do not move; without it they move as ever. */
+  cutscene?: { running(): boolean };
 }
 
 /** At most `MOVES_PER_SECOND` moves per player in any one-second window; refused ones count. */
@@ -71,6 +73,8 @@ export class TokenMoveHandler implements SessionHandler {
   /** Whether the move passed every check and Atlas wrote it. */
   private apply(playerId: string, move: TokenMove): boolean {
     const { control, projection, tokens } = this.options;
+    // The players' tokens stand still for the length of a cutscene.
+    if (this.options.cutscene?.running()) return false;
     if (!control.controls(playerId, move.tokenId)) return false;
     const slot = projection.slotOf(playerId);
     const scene = slot?.lastSent;

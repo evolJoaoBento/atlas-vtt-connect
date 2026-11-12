@@ -25,6 +25,8 @@ export interface AssetServerOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'onSlotChange'>;
   /** Verified file reads (the registry): null when a file cannot be served. */
   files: { read(id: string): Promise<AssetFile | null> };
+  /** The files of a running cutscene's scenes a ready player may fetch, until the run ends; without it none. */
+  cutscene?: { assetsFor(playerId: string): ReadonlySet<string>; onAssetsChange(listener: () => void): () => void };
 }
 
 interface Transfer {
@@ -61,6 +63,7 @@ export class AssetServer implements SessionHandler {
   start(): void {
     const { session, projection } = this.options;
     this.stops.push(session.use(this), projection.onSlotChange(() => this.scenesChanged()));
+    if (this.options.cutscene) this.stops.push(this.options.cutscene.onAssetsChange(() => this.scenesChanged()));
   }
 
   /**
@@ -68,6 +71,12 @@ export class AssetServer implements SessionHandler {
    * Tabletop's 3D board (made by the same rules of what players see); none without a scene.
    */
   allowedFor(playerId: string): ReadonlySet<string> {
+    const own = this.ownAllowedFor(playerId);
+    const cutscene = this.options.cutscene?.assetsFor(playerId);
+    return cutscene && cutscene.size > 0 ? new Set([...own, ...cutscene]) : own;
+  }
+
+  private ownAllowedFor(playerId: string): ReadonlySet<string> {
     const slot = this.options.projection.slotOf(playerId);
     const scene = slot?.lastSent ?? null;
     if (!scene) return new Set();

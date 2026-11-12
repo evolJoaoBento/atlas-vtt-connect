@@ -20,6 +20,8 @@ export interface TokenControlHostOptions {
   tokens: Pick<TokensApi, 'move'>;
   /** Whether players move only on their turn (`TokenMoveHandler`); without it they move at any time. */
   movesOnTurn?: () => boolean;
+  /** Whether a cutscene runs (`TokenMoveHandler`). */
+  cutscene?: { running(): boolean };
 }
 
 /** What the GM reads when this Atlas cannot land players' moves (no `tokens` capability): nobody can drag. */

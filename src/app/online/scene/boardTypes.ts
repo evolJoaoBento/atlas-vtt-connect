@@ -152,3 +152,35 @@ export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights:
 export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048 });
 
 export const BOARD_PART_LIMITS = Object.freeze({ walls: 1500, lights: 1000, props: 1000, materials: 200, maps: 8, parts: 64, text: 200 });
+
+/** One shot of a running cutscene, as a player's board plays it (a copy of Tabletop's `BoardCutsceneShot`; `key` names its map for this run only). */
+export interface BoardCutsceneShot {
+  key: string;
+  eye: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  /** Milliseconds from the start of the run. */
+  at: number;
+  keyframe: boolean;
+  transition: 'fade' | 'cut' | 'move';
+}
+
+/** A cutscene running for players (a copy of Tabletop's `BoardCutscene`); `null` is sent when it ends. */
+export interface BoardCutscene {
+  runId: string;
+  mode: 'prepared' | 'live';
+  look: { bars: number | null; fadeMs: number };
+  shots: BoardCutsceneShot[];
+  step: { shot: number; seq: number };
+  key: string;
+}
+
+/** The limits both sides check (Tabletop's `readBoardCutscene` and `isBoardCutscene`). */
+export const CUTSCENE_LIMITS = Object.freeze({
+  shots: 200,
+  runId: /^[A-Za-z0-9_-]{1,64}$/,
+  key: /^k[0-9]{1,4}$/,
+  at: 3_600_000,
+  coordinate: 1e7,
+  fadeMs: [100, 3000] as readonly [number, number],
+  bars: [1.85, 2, 2.39] as readonly number[],
+});

@@ -36,6 +36,22 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it('refuses a move while a cutscene runs, and accepts it again after the end', async () => {
+    let running = true;
+    const w = controlWorld({ cutscene: { running: () => running } });
+    const a = await withHero(w);
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
+    expect(w.undoSteps()).toBe(0);
+    running = false;
+    await vi.advanceTimersByTimeAsync(1100);
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 315, y: 175 });
+    w.finish();
+  });
+
   it('refuses a move of a token the player does not control', async () => {
     const w = controlWorld();
     const a = await withHero(w);
