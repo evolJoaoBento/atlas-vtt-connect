@@ -2044,3 +2044,15 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-spellcard .atlas-tabletop-spellabout__name { padding-right: 30px; }
 .atlas-tabletop-spellcard.is-folded { width: auto; max-height: none; overflow: visible; padding: 2px; border-radius: 10px; }
 .atlas-tabletop-spellcard.is-folded .atlas-tabletop-spellcard__toggle { float: none; margin: 0; height: 32px; padding: 0 10px; font-weight: 500; }
+
+/* A cast spell's card by the pointer, with Ctrl over it (board.ts): as a creature's stat block on hover. */
+.atlas-tabletop-spellcard.is-hover { position: absolute; top: 0; left: 0; z-index: 9; pointer-events: none; max-width: min(360px, calc(100% - 16px)); max-height: 60%; overflow: hidden; }
+
+/* The Materials tab's Defaults (gallery.ts): the material each kind of wall wears when none is painted on it. */
+.atlas-tabletop-defaults { margin: 4px 0 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 6px 10px; }
+.atlas-tabletop-defaults > summary { cursor: pointer; font-weight: 600; }
+.atlas-tabletop-defaults__rows { display: grid; gap: 6px; margin-top: 6px; }
+.atlas-tabletop-defaults__row { display: grid; grid-template-columns: 28px 1fr minmax(0, 1.4fr); align-items: center; gap: 8px; }
+.atlas-tabletop-defaults__thumb { width: 28px; height: 28px; border-radius: 4px; overflow: hidden; background: var(--background-secondary); }
+.atlas-tabletop-defaults__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.atlas-tabletop-defaults__row select { min-width: 0; width: 100%; }
