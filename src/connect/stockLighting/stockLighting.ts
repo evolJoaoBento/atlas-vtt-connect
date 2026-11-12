@@ -40,7 +40,7 @@ export interface LightingScene {
   exploredMask?: string | null | undefined;
   exploredEdits?: number | undefined;
   lighting: { enabled: boolean; exploredMemory?: boolean | undefined };
-  objects: { tokens: Record<string, unknown>; fog?: unknown; walls?: unknown; lights?: unknown };
+  objects: { tokens: Record<string, unknown>; fog?: unknown; walls?: unknown; rooms?: unknown; lights?: unknown };
 }
 
 export interface LightingView {
@@ -321,7 +321,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
         const controller = switchedControllerOf(view);
         const lighting = controller?.renderer;
         return [
-          state.lighting, state.mapLoaded, state.isMapLoading, state.objects.fog, state.objects.walls, state.objects.lights, state.exploredEdits, state.exploredMask, deps.dynamicLighting(),
+          state.lighting, state.mapLoaded, state.isMapLoading, state.objects.fog, state.objects.walls, state.objects.rooms, state.objects.lights, state.exploredEdits, state.exploredMask, deps.dynamicLighting(),
           controller, lighting?.isEnabled(), lighting?.sightIsCurrent(), lighting?.currentSight(), lighting?.lightReaches(), lighting?.ambientLight(),
         ];
       };
