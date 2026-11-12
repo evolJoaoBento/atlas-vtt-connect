@@ -513,7 +513,11 @@ export class SceneSwitch implements SceneViewport {
   eyesChanged(): void { this.showEyes(); }
   receivePing(ping: PlayerPing): void { this.view.receivePing(ping); }
   receiveLaser(laser: PlayerLaser): void { this.view.receiveLaser(laser); }
-  refresh(): void { this.view.refresh(); }
+  refresh(): void {
+    this.view.refresh();
+    // The board made for a run (the 2D map is kept under it) waits for its scene's files too: a map seen only in the cutscene.
+    this.stage?.handoffBoard?.refresh();
+  }
   measure(): void {
     // The 2D map kept under a cutscene's board has no size to measure; the board has.
     if (this.stage?.hidesMap) this.stage.handoffBoard?.measure();

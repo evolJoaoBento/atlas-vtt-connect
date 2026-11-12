@@ -621,6 +621,15 @@ describe('cutscenes in the player tab', () => {
     expect(t.ready).toEqual([true, false]);
   });
 
+  it('files that arrive during a run reach the handed-back board, so a scene waiting for its map image is drawn', async () => {
+    const t = await playing();
+    t.sink.cutscene?.(cutscene);
+    await vi.advanceTimersByTimeAsync(600);
+    const before = t.given!.calls.filter((call) => call === 'refresh').length;
+    t.sink.images();
+    expect(t.given!.calls.filter((call) => call === 'refresh').length).toBe(before + 1);
+  });
+
   it('the view does not change during the run and is chosen anew after it', async () => {
     const t = await playing();
     t.sink.cutscene?.(cutscene);

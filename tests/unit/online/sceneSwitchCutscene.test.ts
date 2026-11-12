@@ -88,6 +88,16 @@ describe('SceneSwitch and a cutscene', () => {
     expect(p.canvas.hidden).toBe(false);
   });
 
+  it('files that arrive during a run reach the board made for it, so a scene waiting for its map image is drawn', async () => {
+    const p = page({ factoryNow: true });
+    p.sw.boardOffer(false);
+    p.sw.cutscene(run);
+    await vi.advanceTimersByTimeAsync(600);
+    const before = p.boardCalls.filter((call) => call === 'refresh').length;
+    p.sw.refresh();
+    expect(p.boardCalls.filter((call) => call === 'refresh').length).toBe(before + 1);
+  });
+
   it('with the board already here the run is played at once, and the chunk is not asked for twice', async () => {
     const p = page({ factoryNow: true });
     p.sw.boardOffer(false);

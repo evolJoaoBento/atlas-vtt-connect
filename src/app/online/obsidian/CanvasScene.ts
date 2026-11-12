@@ -393,6 +393,8 @@ export class CanvasScene implements OnlineSceneSink {
   images(): void {
     this.chooseView();
     this.map?.refresh();
+    // The board made for a run (the 2D map is kept under it) waits for its scene's files too: a map seen only in the cutscene.
+    this.stage.handoffBoard?.refresh();
   }
 
   close(): void {
