@@ -61,4 +61,25 @@ describe('projectCutscene', () => {
     expect(sent.drawings).toEqual({});
     expect(sceneBytes(sent)).toBeLessThanOrEqual(CUTSCENE_SCENE_BYTES);
   });
+
+  it('keeps shedding until the scene fits: drawings, texts, pins, panels, and last the tokens', () => {
+    const texts = { t: { id: 't', kind: 'text', x: 50, y: 50, text: 'x'.repeat(200), fontSize: 12, fontFamily: 'serif', color: '#000000' } };
+    const drawings = { d: { id: 'd', kind: 'drawing', timestamp: 1, type: 'pen', points: [{ x: 1, y: 1 }, { x: 5, y: 5 }], color: '#000000', width: 2, opacity: 1 } };
+    const snapshot = scene({}, { texts, drawings });
+    const whole = project(snapshot);
+    expect(whole.fits).toBe(true);
+    expect(Object.keys(whole.scene.texts)).toEqual(['t']);
+    const run = (limit: number) => projectCutscene(snapshot, options(), null, 'cutscene:r:k1', createProjectionMemo(), limit);
+    const bare = run(0).scene;
+    const noDrawings = run(whole.sceneText.length - 1).scene;
+    expect(noDrawings.drawings).toEqual({});
+    expect(Object.keys(noDrawings.texts)).toEqual(['t']);
+    expect(run(JSON.stringify(noDrawings).length - 1).scene.texts).toEqual({});
+    // Nothing fits: everything is shed, the bare map is still returned, and it says it does not fit.
+    expect(run(0).fits).toBe(false);
+    expect(bare.tokens).toEqual({});
+    expect(bare.map).toEqual(whole.scene.map);
+    // Extras still know the tokens' lights.
+    expect(run(0).extras.sceneId).toBe('cutscene:r:k1');
+  });
 });

@@ -42,6 +42,19 @@ describe('cutscene messages', () => {
     expect(cutscene(prepared({ key: 'k/1' })).kind).toBe('invalid');
   });
 
+  it('keeps to the limits of the time, the coordinates, the fade and the bars', () => {
+    expect(cutscene(prepared({ shots: [shot('k1', { at: 3_600_000 })] })).kind).toBe('message');
+    expect(cutscene(prepared({ shots: [shot('k1', { at: 3_600_001 })] })).kind).toBe('invalid');
+    expect(cutscene(prepared({ shots: [shot('k1', { eye: { x: 1e7, y: 0, z: 0 } })] })).kind).toBe('message');
+    expect(cutscene(prepared({ shots: [shot('k1', { eye: { x: 1e7 + 1, y: 0, z: 0 } })] })).kind).toBe('invalid');
+    expect(cutscene(prepared({ shots: [shot('k1', { target: { x: 0, y: -1e8, z: 0 } })] })).kind).toBe('invalid');
+    expect(cutscene(prepared({ look: { bars: 2.39, fadeMs: 99 } })).kind).toBe('invalid');
+    expect(cutscene(prepared({ look: { bars: 2.39, fadeMs: 3001 } })).kind).toBe('invalid');
+    expect(cutscene(prepared({ look: { bars: 2.39, fadeMs: 3000 } })).kind).toBe('message');
+    expect(cutscene(prepared({ look: { bars: 1.5, fadeMs: 600 } })).kind).toBe('invalid');
+    for (const bars of [null, 1.85, 2, 2.39]) expect(cutscene(prepared({ look: { bars, fadeMs: 600 } })).kind).toBe('message');
+  });
+
   it('accepts a live run with no shots and refuses a prepared one with none', () => {
     expect(cutscene(live()).kind).toBe('message');
     expect(cutscene(prepared({ shots: [] })).kind).toBe('invalid');

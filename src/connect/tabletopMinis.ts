@@ -11,7 +11,7 @@ import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
 import type { BoardLook, GmCutscene } from '../app/online/scene/sceneContracts';
-import { isBoardCutscene } from '../app/online/scene/boardValidation';
+import { isBoardCutscene, isCutsceneKeyName } from '../app/online/scene/boardValidation';
 import type { BoardSession } from '../app/online/tools/BoardSessionHub';
 import { asPlayerBoardFactory, type PlayerBoardFactory } from '../app/online/obsidian/playerBoardContract';
 
@@ -198,7 +198,15 @@ function cleanCutscene(raw: unknown): GmCutscene | null {
   const { runId, mode, look, shots, step, key } = given.cutscene;
   const maps: Record<string, string> = {};
   if (typeof given.maps === 'object' && given.maps !== null) {
-    for (const [name, path] of Object.entries(given.maps)) if (typeof path === 'string') Object.defineProperty(maps, name, { value: path, enumerable: true });
+    for (const [name, path] of Object.entries(given.maps)) {
+      if (typeof path !== 'string') continue;
+      // A key outside the pattern would make players' decoders refuse its scene: the whole run is dropped.
+      if (!isCutsceneKeyName(name)) {
+        console.warn('[Atlas VTT Connect] Tabletop published a cutscene with a map key that is not valid; players are not sent it.');
+        return null;
+      }
+      Object.defineProperty(maps, name, { value: path, enumerable: true });
+    }
   }
   return {
     cutscene: {

@@ -25,15 +25,38 @@ export const CUTSCENE_SCENE_BYTES = MAX_CONTROL_MESSAGE_BYTES - 8 * 1024;
 const SHOWS_ALL: Shows = Object.freeze({ shows: () => true });
 const encoder = new TextEncoder();
 
-/** UTF-8 bytes of `scene` as JSON, measured exactly only when it could be near the cap. */
+/** UTF-8 bytes of some JSON text, measured exactly only when it could be near `limit`. */
+export function textBytes(text: string, limit = CUTSCENE_SCENE_BYTES): number {
+  return text.length * 3 <= limit ? text.length : encoder.encode(text).length;
+}
+
+/** UTF-8 bytes of `scene` as JSON. */
 export function sceneBytes(scene: PlayerScene): number {
-  const text = JSON.stringify(scene);
-  return text.length * 3 <= CUTSCENE_SCENE_BYTES ? text.length : encoder.encode(text).length;
+  return textBytes(JSON.stringify(scene));
+}
+
+/** What is given up, in order, when the scene is too heavy for one message: the least needed to draw the shot first. */
+const SHEDDING: ReadonlyArray<(scene: PlayerScene) => PlayerScene> = [
+  (scene) => ({ ...scene, drawings: {} }),
+  (scene) => ({ ...scene, texts: {} }),
+  (scene) => ({ ...scene, pins: [] }),
+  (scene) => ({ ...scene, widgets: [], initiative: null, handout: null }),
+  (scene) => ({ ...scene, tokens: {} }),
+];
+
+export interface ProjectedCutscene {
+  scene: PlayerScene;
+  /** `scene` as JSON, serialised once. */
+  sceneText: string;
+  extras: BoardExtras;
+  /** Whether the scene fits one message; false only when even the bare map does not. */
+  fits: boolean;
 }
 
 export function projectCutscene(
   snapshot: SceneSnapshot, options: CutsceneProjectionOptions, look: BoardLook | null, sceneId: string, memo: ProjectionMemo,
-): { scene: PlayerScene; extras: BoardExtras } {
+  limit = CUTSCENE_SCENE_BYTES,
+): ProjectedCutscene {
   const projected = projectForPlayers(snapshot, {
     sceneId,
     rules: { ...options.settings.getLocalPlayerViewSettings(), curtain: false },
@@ -43,9 +66,13 @@ export function projectCutscene(
     ...sceneContext(snapshot, options),
   }, memo);
   let scene: PlayerScene = { ...projected, fog: {} };
-  // Too heavy for one message: drawings go first, then texts.
-  if (sceneBytes(scene) > CUTSCENE_SCENE_BYTES) scene = { ...scene, drawings: {} };
-  if (sceneBytes(scene) > CUTSCENE_SCENE_BYTES) scene = { ...scene, texts: {} };
-  const extras = projectBoard(snapshot, sceneId, SHOWS_ALL, scene.tokens, look, options.assets);
-  return { scene, extras };
+  let sceneText = JSON.stringify(scene);
+  // Too heavy for one message: shed until it fits, so the player always gets a scene to draw.
+  for (const shed of SHEDDING) {
+    if (textBytes(sceneText, limit) <= limit) break;
+    scene = shed(scene);
+    sceneText = JSON.stringify(scene);
+  }
+  const extras = projectBoard(snapshot, sceneId, SHOWS_ALL, projected.tokens, look, options.assets);
+  return { scene, sceneText, extras, fits: textBytes(sceneText, limit) <= limit };
 }

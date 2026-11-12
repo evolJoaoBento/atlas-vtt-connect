@@ -127,6 +127,120 @@ describe('tabletopBoard', () => {
     expect(attached).toHaveLength(2);
   });
 
+  describe('the cutscene Tabletop publishes', () => {
+    const pose = { x: 1, y: 2, z: 3 };
+    const goodRun = (extra: Record<string, unknown> = {}) => ({
+      cutscene: {
+        runId: 'r1', mode: 'prepared', look: { bars: 2.39, fadeMs: 600 }, key: 'k1', step: { shot: 0, seq: 1 },
+        shots: [{ key: 'k1', eye: pose, target: pose, at: 0, keyframe: false, transition: 'fade', secret: 'x' }],
+      },
+      maps: { k1: 'maps/crypt.atlasmap' },
+      ...extra,
+    });
+    function withCutscene(initial: unknown) {
+      const { app, plugins, trigger } = fakeApp();
+      let run = initial;
+      const changes = new Set<() => void>();
+      const cameras = new Set<() => void>();
+      let pose3: unknown = { eye: pose, target: pose };
+      const tabletop = fakeTabletop({
+        cutscene: {
+          current: () => { if (run === 'throw') throw new Error('boom'); return run; },
+          onChange: (listener: () => void) => { changes.add(listener); return () => { changes.delete(listener); }; },
+          camera: () => pose3,
+          onCamera: (listener: () => void) => { cameras.add(listener); return () => { cameras.delete(listener); }; },
+        },
+      });
+      plugins['atlas-vtt-tabletop'] = { api: tabletop.api };
+      const board = tabletopBoard(app);
+      return {
+        app, plugins, trigger, board, tabletop, changes, cameras,
+        set: (next: unknown) => { run = next; for (const listener of [...changes]) listener(); },
+        setCamera: (next: unknown) => { pose3 = next; },
+      };
+    }
+
+    it('reads a run field by field, without what the wire does not carry', () => {
+      const w = withCutscene(goodRun());
+      const read = w.board.cutscene?.();
+      expect(read?.maps).toEqual({ k1: 'maps/crypt.atlasmap' });
+      expect(read?.cutscene.shots[0]).toEqual({ key: 'k1', eye: pose, target: pose, at: 0, keyframe: false, transition: 'fade' });
+      expect(JSON.stringify(read?.cutscene)).not.toContain('atlasmap');
+    });
+
+    it('reads a malformed run as none: 201 shots, a bad key, a bad map key, a camera at 1e8', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const run = goodRun();
+      const shot = run.cutscene.shots[0]!;
+      const w = withCutscene({ ...run, cutscene: { ...run.cutscene, shots: Array.from({ length: 201 }, () => shot) } });
+      expect(w.board.cutscene?.()).toBeNull();
+      w.set({ ...run, cutscene: { ...run.cutscene, key: 'k/1' } });
+      expect(w.board.cutscene?.()).toBeNull();
+      w.set({ ...run, maps: { 'k/1': 'maps/a.atlasmap' } });
+      expect(w.board.cutscene?.()).toBeNull();
+      w.set({ ...run, maps: { __proto__x: 'p' } });
+      expect(w.board.cutscene?.()).toBeNull();
+      w.set(run);
+      expect(w.board.cutscene?.()).not.toBeNull();
+      w.setCamera({ eye: { x: 1e400, y: 0, z: 0 }, target: pose });
+      expect(w.board.cutsceneCamera?.()).toBeNull();
+      warn.mockRestore();
+    });
+
+    it('a map name like __proto__ does not pollute', () => {
+      const w = withCutscene(goodRun({ maps: JSON.parse('{"__proto__":"x","k1":"maps/crypt.atlasmap"}') as Record<string, string> }));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      expect(w.board.cutscene?.()).toBeNull();
+      expect(({} as Record<string, unknown>).x).toBeUndefined();
+      warn.mockRestore();
+    });
+
+    it('tells when the run changes and when its camera moves; a throwing current() is none', () => {
+      const w = withCutscene(goodRun());
+      const heard = vi.fn();
+      const moved = vi.fn();
+      w.board.subscribeCutscene?.(heard);
+      w.board.subscribeCutsceneCamera?.(moved);
+      w.set(goodRun());
+      expect(heard).toHaveBeenCalledTimes(1);
+      for (const listener of [...w.cameras]) listener();
+      expect(moved).toHaveBeenCalledTimes(1);
+      expect(w.board.cutsceneCamera?.()).toEqual({ eye: pose, target: pose });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      w.set('throw');
+      expect(w.board.cutscene?.()).toBeNull();
+      warn.mockRestore();
+    });
+
+    it('api.cutscene going away, or Tabletop unloading, ends the run: the listeners hear and cutscene() is null', () => {
+      const w = withCutscene(goodRun());
+      const heard = vi.fn();
+      w.board.subscribeCutscene?.(heard);
+      expect(w.board.cutscene?.()).not.toBeNull();
+      // Tabletop reloads without a cutscene member.
+      const other = fakeTabletop();
+      w.plugins['atlas-vtt-tabletop'] = { api: other.api };
+      w.trigger('atlas-vtt-tabletop:api-ready', other.api);
+      expect(heard).toHaveBeenCalled();
+      expect(w.board.cutscene?.()).toBeNull();
+      expect(w.changes.size).toBe(0);
+      // And disposing ends it too.
+      const again = withCutscene(goodRun());
+      const heardAgain = vi.fn();
+      again.board.subscribeCutscene?.(heardAgain);
+      again.board.dispose();
+      expect(heardAgain).toHaveBeenCalled();
+      expect(again.board.cutscene?.()).toBeNull();
+      expect(again.changes.size + again.cameras.size).toBe(0);
+    });
+
+    it('a Tabletop without api.cutscene has no run', () => {
+      const { app, plugins } = fakeApp();
+      plugins['atlas-vtt-tabletop'] = { api: fakeTabletop().api };
+      expect(tabletopBoard(app).cutscene?.()).toBeNull();
+    });
+  });
+
   it('finds Tabletop under its new id and hears its new event, as under the old', () => {
     const { app, plugins, trigger } = fakeApp();
     const board = tabletopBoard(app);

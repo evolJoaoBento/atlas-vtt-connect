@@ -164,6 +164,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   let current: GmSession | null = null;
   // The scene hub, once made; the session tells it of player changes.
   let hubRef: SceneHub | null = null;
+  // The cutscene sender, once made: a kicked player is no longer ready for the reveal.
+  let cutsceneRef: CutsceneSender | null = null;
   const requests = new HostIdentity({
     desk: table && env.people ? new IdentityDesk({ people: env.people, table }) : null,
     session: () => current,
@@ -191,6 +193,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
       log.event('players', { players: players.map((player) => `${player.name}: ${player.status}`).join(', ') });
       // The hub first: a kicked player's assignment and scene go before the parts and the store hear of it.
       hubRef?.playersChanged(players);
+      cutsceneRef?.playersChanged(players);
       for (const part of parts) part.playersChanged?.(players);
       onlineSessionStore.setState({ players, error: null });
     },
@@ -222,7 +225,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const colors = new PlayerColors(scenes);
   colors.start();
   // Tabletop's cutscenes to players: made here so the guards of the moves and templates can ask it; started after the board.
-  const cutsceneSender = new CutsceneSender({ session: scenes, tabs, board: env.scene.board ?? null, sceneOptions, assets: registry });
+  const cutsceneSender = new CutsceneSender({ session: scenes, tabs, board: env.scene.board ?? null, sceneOptions, assets: registry, notify });
+  cutsceneRef = cutsceneSender;
   const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}), colors, cutscene: cutsceneSender };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });

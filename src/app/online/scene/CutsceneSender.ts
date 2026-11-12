@@ -14,7 +14,8 @@ import type { ControlMessage } from '../protocol';
 import type { TabScenes, TabInfo } from '../atlas/tabScenes';
 import { boardParts } from './BoardSender';
 import type { BoardExtras } from './boardTypes';
-import { projectCutscene, sceneBytes, CUTSCENE_SCENE_BYTES, type CutsceneProjectionOptions } from './projectCutscene';
+import { isBoardCutscene, isCutsceneKeyName } from './boardValidation';
+import { projectCutscene, CUTSCENE_SCENE_BYTES, type CutsceneProjectionOptions } from './projectCutscene';
 import { createProjectionMemo, type ProjectionMemo } from './projectRecords';
 import type { GmCutscene } from './sceneContracts';
 import type { BoardSource, SceneSession } from './sceneSources';
@@ -24,8 +25,16 @@ import type { PlayerScene } from './sceneTypes';
 export const CAMERA_INTERVAL_MS = 100;
 /** The scenes of a run are projected again at most this often. */
 export const SCENE_INTERVAL_MS = 200;
+/** How long a ready player may wait for the scene of the step shown before the run is ended for players. */
+export const STEP_WAIT_MS = 3000;
+
+export const CUTSCENE_ENDED_NOTICE = 'A cutscene scene could not be sent to players, so the cutscene was ended for them.';
 
 export interface CutsceneSenderOptions {
+  /** Tells the GM something (an Obsidian notice); without it the GM is told nothing. */
+  notify?: (message: string) => void;
+  /** The most one scene may weigh as JSON; tests lower it. */
+  sceneBytes?: number;
   session: SceneSession;
   /** The GM's scene tabs; without them there is no live snapshot of a map, and no scene is sent. */
   tabs: TabScenes | null;
@@ -72,6 +81,10 @@ export class CutsceneSender implements SessionHandler {
   private sceneDirty = false;
   private cameraCooldown: number | null = null;
   private cameraDirty = false;
+  /** The run ended for players because it could not be carried; Tabletop's run goes on, ignored until it is a new one. */
+  private aborted: string | null = null;
+  private invalidRun: string | null = null;
+  private stepTimer: number | null = null;
 
   constructor(private readonly options: CutsceneSenderOptions) {}
 
@@ -123,6 +136,7 @@ export class CutsceneSender implements SessionHandler {
       this.ready.set(player.playerId, { scenes: new Map(), extras: new Map(), camera: '' });
       this.sendAll(player.playerId);
       this.assetsChanged();
+      this.guardStep();
     } else if (message.type === 'scene-resync' && this.ready.has(player.playerId)) {
       this.ready.set(player.playerId, { scenes: new Map(), extras: new Map(), camera: '' });
       this.sendAll(player.playerId);
@@ -130,18 +144,54 @@ export class CutsceneSender implements SessionHandler {
   }
 
   onGone(player: SessionPlayer): void {
-    this.ready.delete(player.playerId);
+    if (this.ready.delete(player.playerId)) this.assetsChanged();
+  }
+
+  /** The session's players changed (a kick reaches no handler): a player no longer admitted is no longer ready. */
+  playersChanged(players: readonly SessionPlayer[]): void {
+    const admitted = new Set(players.filter((player) => player.status === 'admitted').map((player) => player.playerId));
+    let pruned = false;
+    for (const playerId of [...this.ready.keys()]) {
+      if (admitted.has(playerId)) continue;
+      this.ready.delete(playerId);
+      pruned = true;
+    }
+    if (pruned) this.assetsChanged();
+  }
+
+  /** Tabletop's run, when it is well formed: a run with a map key outside the pattern would make players' decoders refuse it. */
+  private published(): GmCutscene | null {
+    const given = this.options.board?.cutscene?.() ?? null;
+    if (!given) return null;
+    const { runId } = given.cutscene;
+    if (isBoardCutscene(given.cutscene) && Object.keys(given.maps).every(isCutsceneKeyName)) return given;
+    if (this.invalidRun !== runId) {
+      this.invalidRun = runId;
+      console.warn('[Atlas VTT Connect] Tabletop published a cutscene that is not well formed; players are not sent it.');
+    }
+    return null;
   }
 
   /** Tabletop published (or ended) the run. */
   private changed(): void {
-    const next = this.options.board?.cutscene?.() ?? null;
+    const next = this.published();
     if (!next) {
+      this.aborted = null;
       this.end();
       return;
     }
+    if (this.aborted === next.cutscene.runId) return;
     if (this.run && this.run.cutscene.runId !== next.cutscene.runId) this.finish();
     this.run = next;
+    // `maps` covers this publication only: what the run no longer names is dropped, and sent again if it returns.
+    for (const key of [...this.entries.keys()]) {
+      if (Object.hasOwn(next.maps, key)) continue;
+      this.entries.delete(key);
+      for (const sent of this.ready.values()) {
+        sent.scenes.delete(key);
+        sent.extras.delete(key);
+      }
+    }
     const text = JSON.stringify(next.cutscene);
     // Tabletop may publish one change twice: told once.
     if (text !== this.runText) {
@@ -153,6 +203,27 @@ export class CutsceneSender implements SessionHandler {
     if (Object.keys(next.maps).some((key) => !this.entries.has(key))) this.refresh();
     else this.refreshSoon();
     this.cameraMoved();
+    if (this.stepTimer !== null) window.clearTimeout(this.stepTimer);
+    this.stepTimer = null;
+    this.guardStep();
+  }
+
+  /** Ready players wait at most `STEP_WAIT_MS` for the scene of the step shown; after that the run ends for them, never on black. */
+  private guardStep(): void {
+    const run = this.run;
+    if (!run || this.stepTimer !== null || this.ready.size === 0 || this.entries.has(run.cutscene.key)) return;
+    this.stepTimer = window.setTimeout(() => {
+      this.stepTimer = null;
+      if (this.run && this.ready.size > 0 && !this.entries.has(this.run.cutscene.key)) this.abort();
+    }, STEP_WAIT_MS);
+  }
+
+  /** The run cannot be carried: players are told it ended (they unlock and return to their own view) and the GM is told why. */
+  private abort(): void {
+    const runId = this.run?.cutscene.runId ?? null;
+    this.end();
+    this.aborted = runId;
+    this.options.notify?.(CUTSCENE_ENDED_NOTICE);
   }
 
   /** The run ended: players are told, and everything of it is dropped. */
@@ -174,7 +245,8 @@ export class CutsceneSender implements SessionHandler {
     }
     if (this.sceneCooldown !== null) window.clearTimeout(this.sceneCooldown);
     if (this.cameraCooldown !== null) window.clearTimeout(this.cameraCooldown);
-    this.sceneCooldown = this.cameraCooldown = null;
+    if (this.stepTimer !== null) window.clearTimeout(this.stepTimer);
+    this.sceneCooldown = this.cameraCooldown = this.stepTimer = null;
     this.sceneDirty = this.cameraDirty = false;
     if (hadRun) this.assetsChanged();
   }
@@ -251,23 +323,34 @@ export class CutsceneSender implements SessionHandler {
       } catch (error) {
         console.error('[Atlas VTT Connect] Could not project a cutscene scene:', error);
       }
+      // A scene that cannot be sent at all ended the run.
+      if (this.run !== run) return;
     }
   }
 
   private project(run: GmCutscene, key: string, path: string, snapshot: SceneSnapshot, look: ReturnType<BoardSource['lookFor']>): void {
-    let entry = this.entries.get(key);
-    if (!entry || entry.path !== path) {
-      entry = { path, memo: createProjectionMemo(), scene: null, sceneText: '', extras: null, extrasText: '', parts: [], seq: 0, ids: new Set() };
-      this.entries.set(key, entry);
-    }
+    const known = this.entries.get(key);
+    const memo = known && known.path === path ? known.memo : createProjectionMemo();
     const sceneId = `cutscene:${run.cutscene.runId}:${key}`;
-    const { scene, extras } = projectCutscene(snapshot, { ...this.options.sceneOptions, assets: this.options.assets }, look, sceneId, entry.memo);
-    if (sceneBytes(scene) > CUTSCENE_SCENE_BYTES) {
-      console.warn('[Atlas VTT Connect] A cutscene scene is too large to send to players.');
+    const { scene, sceneText, extras, fits } = projectCutscene(
+      snapshot, { ...this.options.sceneOptions, assets: this.options.assets }, look, sceneId, memo, this.options.sceneBytes ?? CUTSCENE_SCENE_BYTES,
+    );
+    if (!fits) {
+      // Even the bare map is too heavy for one message: nothing can be drawn, so the run ends for players.
+      console.warn('[Atlas VTT Connect] A cutscene scene is too large to send to players; ending the cutscene for them.');
+      this.abort();
       return;
     }
-    const sceneText = JSON.stringify(scene);
     const extrasText = JSON.stringify(extras);
+    let entry = known;
+    if (!entry || entry.path !== path) {
+      entry = { path, memo, scene: null, sceneText: '', extras: null, extrasText: '', parts: [], seq: 0, ids: new Set() };
+      this.entries.set(key, entry);
+    }
+    if (key === run.cutscene.key && this.stepTimer !== null) {
+      window.clearTimeout(this.stepTimer);
+      this.stepTimer = null;
+    }
     if (sceneText === entry.sceneText && extrasText === entry.extrasText) return;
     if (extrasText !== entry.extrasText) {
       entry.seq = ++this.seq;
