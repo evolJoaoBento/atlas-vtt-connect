@@ -496,6 +496,13 @@ describe('token height and speed, and the movement rules (Atlas 0.15)', () => {
     expect(scene.measurement.movement).toEqual({ steps, countPerTurn: true });
   });
 
+  it("sends the speed of a player character Atlas knows as one, whatever it holds itself (no side, no vision)", () => {
+    const pc = hero({ id: 'pc' });
+    const known = { ...movement(), isPlayers: (token: unknown) => (token as { id?: string }).id === 'pc' };
+    expect(projectForPlayers(withTokens({ pc }), context({ movement: known })).tokens.pc?.speed).toBe(30);
+    expect(projectForPlayers(withTokens({ pc }), context({ movement: movement() })).tokens.pc).not.toHaveProperty('speed');
+  });
+
   it('sends no height that is none, and no speed that is none', () => {
     for (const elevation of ['x', Number.NaN, 0]) {
       const scene = projectForPlayers(withTokens({ hero: party({ elevation } as Partial<Character>) }), context({ movement: movement() }));
@@ -514,9 +521,15 @@ describe('token height and speed, and the movement rules (Atlas 0.15)', () => {
     expect(projectForPlayers(withTokens({ hero: party() }), context()).measurement).not.toHaveProperty('movement');
   });
 
-  it("carries the GM's choice of when a drag shows its distance", () => {
-    const combat = projectForPlayers(withTokens({}), context({ rules: { ...ALL_ON, dragDistance: 'combat' } }));
-    expect(combat.measurement.dragDistance).toBe('combat');
+  it("carries the GM's choice of when a drag shows its distance, settled by whether a fight runs", () => {
+    // 'Only in a fight' is the GM's to decide (Atlas asks whether a fight runs): players may be sent no initiative list.
+    const inFight = (isActive: boolean) => ({ ...gmState(), initiative: { ...createDefaultInitiativeState(), isActive } }) as SceneSnapshot;
+    const calm = projectForPlayers(inFight(false), context({ rules: { ...ALL_ON, dragDistance: 'combat' } }));
+    expect(calm.measurement.dragDistance).toBe('never');
+    const fighting = projectForPlayers(inFight(true), context({ rules: { ...ALL_OFF, dragDistance: 'combat' } }));
+    expect(fighting.initiative).toBeNull();
+    expect(fighting.measurement).not.toHaveProperty('dragDistance');
+    expect(projectForPlayers(inFight(true), context({ rules: { ...ALL_ON, dragDistance: 'never' } })).measurement.dragDistance).toBe('never');
     expect(projectForPlayers(withTokens({}), context()).measurement).not.toHaveProperty('dragDistance');
     expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'never' }).dragDistance).toBe('never');
     expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'sometimes' as never })).not.toHaveProperty('dragDistance');

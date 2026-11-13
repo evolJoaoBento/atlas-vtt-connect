@@ -8,6 +8,7 @@ import type { DiceRollResult } from '@atlas-vtt/api-types';
 import { randomId } from '../ids';
 import { dieTagOf } from './diceTags';
 import { meetsReroll, readThrownTerms, type RerollRule } from './diceRerolls';
+import { explodingFaces, getDiceCrit } from '../../../../packages/atlas-shared/src/index';
 import { DICE_LIMITS, isOfferedDiceRules, playerRollFormula, type OfferedDiceRules, type PhysicalDie, type PhysicalRoll } from './toolMessages';
 
 /** Atlas's defaults: what a map outside every collection rolls by. */
@@ -33,40 +34,26 @@ function defaultDieOf(rules: OfferedDiceRules): string | null {
 }
 
 /**
- * Whether a die showing `value` explodes: one of its `highFaces` highest faces rolls again and adds ('up'), one of its
- * `lowFaces` lowest rolls again and subtracts ('down'). `isDefault`: a die of the default roll's kind; `fromExplosion`:
- * thrown for an explosion, so it explodes only if the rule repeats.
+ * Whether a die showing `value` explodes, by Atlas's own rules (`tools/diceExplosion.ts`): one of its `highFaces`
+ * highest faces rolls again and adds ('up'), one of its `lowFaces` lowest rolls again and subtracts ('down'), and at
+ * least one face never explodes. `isDefault`: a die of the default roll's kind. A die thrown for an explosion explodes
+ * only if the rule repeats, and then with a high face only (a chain never turns around).
  */
 function explosion(rules: OfferedDiceRules, die: PhysicalDie, isDefault: boolean): 'up' | 'down' | null {
   const rule = rules.explode;
   if (!rule || (rule.dice === 'default' && !isDefault) || (die.exploded && !rule.repeats)) return null;
-  if (rule.highFaces > 0 && die.value > SIDES[die.die] - rule.highFaces) return 'up';
-  if (rule.lowFaces > 0 && die.value <= rule.lowFaces) return 'down';
-  return null;
+  const { high, low } = explodingFaces(SIDES[die.die], rule.highFaces, rule.lowFaces);
+  if (die.value > SIDES[die.die] - high) return 'up';
+  return !die.exploded && die.value <= low ? 'down' : null;
 }
 
-/** The roll's critical result, from its default dice that count: not dropped, not rerolled, not thrown for an explosion. */
+/**
+ * The roll's critical result, by Atlas's own rule (`tools/diceCrit.ts`, as Tabletop's board reads it): from the first
+ * dice of each group the rules roll that count (not dropped, not rerolled, not thrown for an explosion, not subtracted).
+ */
 export function critOf(rules: OfferedDiceRules, rolls: readonly CountedDie[]): 'success' | 'failure' | undefined {
-  const kind = defaultDieOf(rules);
-  const dice = rolls.filter((roll) => roll.die === kind && !roll.dropped && !roll.rerolled && !roll.exploded && !roll.negative);
-  if (dice.length === 0) return undefined;
-  switch (rules.crit) {
-    case 'natural':
-      if (dice.some((roll) => roll.value === roll.max)) return 'success';
-      return dice.some((roll) => roll.value === 1) ? 'failure' : undefined;
-    case 'roll-under':
-      if (dice.some((roll) => roll.value === 1)) return 'success';
-      return dice.some((roll) => roll.value === roll.max) ? 'failure' : undefined;
-    case 'doubles':
-      return dice.length > 1 && dice.every((roll) => roll.value === dice[0]!.value) ? 'success' : undefined;
-    case 'high-total': {
-      const sum = dice.reduce((acc, roll) => acc + roll.value, 0);
-      const highest = dice.reduce((acc, roll) => acc + roll.max, 0);
-      return sum >= highest - 1 ? 'success' : undefined;
-    }
-    default:
-      return undefined;
-  }
+  const crit = getDiceCrit(rolls, { defaultRoll: rules.defaultRoll, crit: rules.crit });
+  return crit === 'high' ? 'success' : crit === 'low' ? 'failure' : undefined;
 }
 
 /** The dice that count (not dropped, not rerolled), a negative one subtracting, and the modifier. */

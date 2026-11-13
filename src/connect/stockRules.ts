@@ -24,6 +24,7 @@ import {
 } from '../../packages/atlas-shared/src/index';
 import { isDieType } from '@atlas-vtt/shared/rules';
 import { isBuiltInSide, readRuleSides, type RuleSide } from '../app/online/scene/initiativeSides';
+import { libraryTokenOf, type LibraryToken, type PlacedToken } from './stockParty/partyLinks';
 
 /** A map view as the rules read it. */
 export interface RulesView {
@@ -242,10 +243,43 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
   });
 }
 
-/** A map's movement as Connect reads it: the rules, and each token's speed in game units (null without one). */
+/**
+ * A map's movement as Connect reads it: the rules, each token's speed in game units (null without one), and whether a
+ * token is one of the players' characters as Atlas knows them (placed from a library token marked a player character).
+ */
 export interface MapMovement {
   readonly rules: MovementRules;
   speedOf(token: unknown): number | null;
+  isPlayers(token: unknown): boolean;
+}
+
+/**
+ * Whether a placed token is a player character, by Atlas's rule (`characters/playerCharacters.ts`): the library token it
+ * was placed from (its `assetId`, else its art) is marked `playerCharacter`. The library is Atlas's running asset index.
+ * A campaign's given tokens are not read (no campaign is checked in this phase).
+ */
+function playerCharacterOf(views: readonly RulesView[]): (token: unknown) => boolean {
+  let library: readonly LibraryToken[] | null = null;
+  const read = (): readonly LibraryToken[] => {
+    if (library) return library;
+    for (const view of views) {
+      const assets = call(call(view.serviceManager, 'getAssetService'), 'loadedTokenAssets');
+      if (Array.isArray(assets)) {
+        library = assets.filter((asset): asset is LibraryToken => isObject(asset) && typeof asset.id === 'string' && typeof asset.imagePath === 'string');
+        return library;
+      }
+    }
+    library = [];
+    return library;
+  };
+  return (token) => {
+    if (!isObject(token)) return false;
+    const placed: PlacedToken = {
+      ...(typeof token.assetId === 'string' ? { assetId: token.assetId } : {}),
+      ...(typeof token.imagePath === 'string' ? { imagePath: token.imagePath } : {}),
+    };
+    return libraryTokenOf(placed, read())?.playerCharacter === true;
+  };
 }
 
 /** A speed as Atlas allows one: above 0, no more than `MAX_MOVEMENT_SPEED`. */
@@ -263,13 +297,22 @@ export function stockMovement(views: readonly RulesView[], mapPath: string | nul
   const movement = isObject(ruler) ? ruler.movement : undefined;
   if (isObject(movement)) {
     const rules = parseMovementRules(call(movement, 'rules'));
-    if (rules) return Object.freeze({ rules, speedOf: (token: unknown) => speedOrNull(call(movement, 'speedOf', token)) });
+    // A statblock's speed is known once Atlas read it: it is asked for first (`prepare`), as Atlas's canvas does on a
+    // press; until the read is done the token moves without steps, and the next projection has it.
+    if (rules) {
+      return Object.freeze({
+        rules,
+        speedOf: (token: unknown) => { call(movement, 'prepare', [token]); return speedOrNull(call(movement, 'speedOf', token)); },
+        isPlayers: playerCharacterOf(views),
+      });
+    }
   }
   const stored = storedSettings(views, mapPath);
   if (!stored) return null;
   const rules = parseMovementRules(stored.settings.movement) ?? NO_MOVEMENT_RULES;
   return Object.freeze({
     rules,
+    isPlayers: playerCharacterOf(views),
     // Without the view, Atlas's statblock index is not asked: a linked statblock's speed is unknown, so it moves without steps.
     speedOf: (token: unknown) => {
       const own = isObject(token) ? speedOrNull(token.speed) : null;

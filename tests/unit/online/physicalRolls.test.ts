@@ -24,6 +24,11 @@ describe('critOf and totalOf', () => {
     expect(critOf({ defaultRoll: '1d20', crit: 'none' }, [rolled('d20', 20, 20)])).toBeUndefined();
   });
 
+  it("reads the default dice as Atlas does: the first of each group the rules roll, so Tabletop's board and the GM's log agree", () => {
+    expect(critOf(D20, [rolled('d20', 5, 20), rolled('d20', 20, 20)])).toBeUndefined();
+    expect(critOf({ defaultRoll: '2d10', crit: 'doubles' }, [rolled('d10', 7, 10)])).toBeUndefined();
+  });
+
   it('adds the dice that count, subtracting negative ones, and the modifier', () => {
     expect(totalOf([rolled('d6', 4, 6), rolled('d6', 2, 6, { negative: true }), rolled('d6', 6, 6, { dropped: true })], 3)).toBe(5);
   });
@@ -111,6 +116,15 @@ describe('physicalRollResult', () => {
     it('a die dropped by advantage earns no explosion, and a dropped die marked exploded is refused', () => {
       expect(() => physicalRollResult(roll([die('d6', 6, { dropped: true }), die('d6', 4), die('d6', 2, { exploded: true })]), SAVAGE, 'Anna')).toThrow();
       expect(() => physicalRollResult(roll([die('d6', 6), die('d6', 2, { exploded: true, dropped: true }), die('d6', 3)]), SAVAGE, 'Anna')).toThrow();
+    });
+
+    it("takes Atlas's exploding faces: one face never explodes, and a die thrown for a chain goes on with a high face only", () => {
+      const EVERY: OfferedDiceRules = { defaultRoll: '1d6', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 6, lowFaces: 0 } };
+      expect(() => physicalRollResult(roll([die('d6', 1), die('d6', 3, { exploded: true })]), EVERY, 'Anna')).toThrow();
+      expect(physicalRollResult(roll([die('d6', 2), die('d6', 3, { exploded: true })]), EVERY, 'Anna').total).toBe(5);
+      const BOTH: OfferedDiceRules = { defaultRoll: '1d10', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 1, lowFaces: 1 } };
+      // The chain's die shows 1: it does not explode down again.
+      expect(() => physicalRollResult(roll([die('d10', 10), die('d10', 1, { exploded: true }), die('d10', 4, { exploded: true, negative: true })]), BOTH, 'Anna')).toThrow();
     });
 
     it('does not ask for an explosion the throw never added (a roll stops adding dice at 20)', () => {

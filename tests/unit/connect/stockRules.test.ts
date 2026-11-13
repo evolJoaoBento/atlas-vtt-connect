@@ -201,6 +201,28 @@ describe("a stock Atlas map's movement rules and token speeds (Atlas 0.15)", () 
     expect(stockMovement([view(MAP, { dragRuler: { movement: junk } })], MAP)?.rules.steps).toEqual([]);
   });
 
+  it("asks Atlas to read a token's statblock speed before asking its speed, as Atlas's canvas does", () => {
+    const asked: string[] = [];
+    const movement = {
+      rules: () => ({ steps, countPerTurn: false }),
+      prepare: (tokens: Iterable<{ id: string }>) => { for (const token of tokens) asked.push(`prepare:${token.id}`); },
+      speedOf: (token: { id: string }) => { asked.push(`speed:${token.id}`); return 30; },
+    };
+    const read = stockMovement([view(MAP, { dragRuler: { movement } })], MAP);
+    expect(read?.speedOf({ id: 'gob' })).toBe(30);
+    expect(asked).toEqual(['prepare:gob', 'speed:gob']);
+  });
+
+  it("knows the players' characters as Atlas does: a token placed from a library token marked a player character", () => {
+    const library = [{ id: 'a-pc', type: 'token', imagePath: 'art/anna.png', playerCharacter: true }, { id: 'a-gob', type: 'token', imagePath: 'art/gob.png' }];
+    const index = { ...assets({ movement: { steps, countPerTurn: false } }), loadedTokenAssets: () => library };
+    const read = stockMovement([view('other.md', { assets: index })], MAP);
+    expect(read?.isPlayers({ id: 't1', assetId: 'a-pc', imagePath: 'x.png' })).toBe(true);
+    expect(read?.isPlayers({ id: 't2', imagePath: 'art/anna.png' })).toBe(true);
+    expect(read?.isPlayers({ id: 't3', imagePath: 'art/gob.png' })).toBe(false);
+    expect(read?.isPlayers({ id: 't4', imagePath: 'unknown.png' })).toBe(false);
+  });
+
   it("reads the collection's stored rules for a map no view shows: a token's own speed, else the rules' for one without a statblock", () => {
     const read = stockMovement([view('other.md', { assets: assets({ movement: { steps, countPerTurn: false, speed: 30 } }) })], MAP);
     expect(read?.rules.steps).toEqual(steps);
