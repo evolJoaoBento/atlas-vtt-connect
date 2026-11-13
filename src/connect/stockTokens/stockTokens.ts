@@ -13,7 +13,6 @@
 import type { Point, TokenMove, TokenMoveOptions, TokenMoveResult, TokensApi } from '@atlas-vtt/api-types';
 import { movementWalls } from './ported/movementWalls';
 import { stopAtWalls } from './ported/wallCollision';
-import { withRoomWalls } from '../stockRooms/stockRooms';
 import { wallList } from './ported/walls';
 import { objectsOnLevel } from '../stockLevels';
 
@@ -37,8 +36,6 @@ interface TokenScene {
   objects: {
     tokens: Readonly<Record<string, { x: number; y: number; size?: number | undefined; isHidden?: boolean | undefined } | undefined>>;
     walls?: unknown;
-    /** Atlas 0.14's rooms: their outline stops a token too. */
-    rooms?: unknown;
   };
   /** Atlas 0.10's levels (floors) and the one this view shows: only that floor's walls stop a token. */
   levels?: unknown;
@@ -170,7 +167,7 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi {
       const lit = state.lighting.enabled === true && deps.dynamicLighting() !== false;
       let walls: ReturnType<typeof movementWalls> | null = null;
       try {
-        const floorWalls = withRoomWalls(objectsOnLevel(state.objects, state.levels, state.viewedLevel)).walls;
+        const floorWalls = objectsOnLevel(state.objects, state.levels, state.viewedLevel).walls;
         walls = lit && isObject(floorWalls) ? movementWalls(wallList(floorWalls), map.width > 0 && map.height > 0 ? map : null) : null;
       } catch {
         // Walls that cannot be read stop nothing: a lit scene refuses the move instead.

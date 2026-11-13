@@ -12,7 +12,6 @@
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
  */
 import { tabletopBoardViews } from './tabletopMinis';
-import { withRoomWalls } from './stockRooms/stockRooms';
 import { backgroundOfLevel, levelHeld, objectsOnLevel, shownLevel } from './stockLevels';
 import { effectiveAlignment } from '../app/online/scene/mapPlacement';
 import { normalizePath, TFile, type App, type Plugin } from 'obsidian';
@@ -218,8 +217,8 @@ function snapshot(view: StockView, presented: StockPresentedScene | null): Scene
     // How Atlas aligned that floor's map image (the grid's stretch, or the level's own alignment): players draw it so.
     mapAlignment: effectiveAlignment(state.grid, state.levelAlignments, shownLevel(state.levels, state.viewedLevel)),
     grid: state.grid,
-    // Atlas 0.14's rooms: their outline stands among the walls, as Atlas's `blockingWalls` has it.
-    objects: withRoomWalls(objectsOnLevel(state.objects, state.levels, state.viewedLevel)),
+    // Atlas 0.15's rooms are walls among the others: nothing to add for them.
+    objects: objectsOnLevel(state.objects, state.levels, state.viewedLevel),
     widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
