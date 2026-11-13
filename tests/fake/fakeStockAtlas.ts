@@ -63,7 +63,7 @@ export function setupStockAtlas() {
     getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false }),
     onChange: (listener: () => void) => { settingsListeners.add(listener); return () => { settingsListeners.delete(listener); }; },
   };
-  const atlas = { presentedScene: presented, settingsService };
+  const atlas = { presentedScene: presented, settingsService, manifest: { version: '0.15.0' } };
   plugins['atlas-vtt'] = atlas as never;
   return { app, plugins, atlas, a, presented, leaves };
 }

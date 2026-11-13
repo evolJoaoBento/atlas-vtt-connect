@@ -27,7 +27,7 @@ import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
-import { loadDeferredLeaves, wakeAtlasForHosting } from './stockWake';
+import { loadDeferredLeaves, wakeAtlasForHosting } from '../../packages/atlas-host/src/index';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
@@ -372,7 +372,7 @@ function trackedView(app: App, viewId: string): StockView | null {
 /** How long a woken Atlas tab is waited for to become a map view. */
 const WAKE_VIEW_MS = 5_000;
 
-/** Atlas's map views with their map loaded, or soon: loads a deferred Atlas tab (`stockWake.ts`) and waits for it. */
+/** Atlas's map views with their map loaded, or soon: loads a deferred Atlas tab (`atlas-host`) and waits for it. */
 async function waitForLoadedView(app: App, ms: number): Promise<boolean> {
   const deadline = Date.now() + ms;
   for (;;) {
@@ -397,21 +397,12 @@ async function wokenView(app: App, viewId: string, tabId: string | undefined): P
 }
 
 /**
- * After waking Atlas's tab for hosting: players get a scene. The presented one (Atlas keeps it across restarts) is made
- * the view's tab when it is not; with none presented, the view's tab is presented. Atlas's leaf is never made active, so
- * the GM stays on their tab (Tabletop's board).
+ * After waking Atlas's tab for hosting: with nothing presented, the view's tab is presented, so players get a scene. A
+ * scene presented before (Atlas keeps it across restarts) stays the presented one, and Atlas's tab is left where it is:
+ * Connect never moves the host on its own. The GM's board brings its map up, or the GM presents from Atlas.
  */
 async function ensurePresented(app: App, presented: StockPresentedScene): Promise<void> {
-  const scene = presented.get();
-  const views = mapViews(app);
-  if (scene) {
-    const owner = views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.id === scene.tabId))
-      ?? views.find((view) => view.tabMetaStore.getState().tabs.some((tab) => tab.filePath === scene.filePath));
-    const tab = owner?.tabMetaStore.getState().tabs.find((entry) => entry.id === scene.tabId)
-      ?? owner?.tabMetaStore.getState().tabs.find((entry) => entry.filePath === scene.filePath);
-    if (owner && tab && owner.tabMetaStore.getState().activeTabId !== tab.id) await owner.switchToTab(tab.id);
-    return;
-  }
+  if (presented.get()) return;
   const view = activeMapView(app);
   const tabId = view ? loadedTabId(view) : null;
   const tab = tabId === null ? undefined : view?.tabMetaStore.getState().tabs.find((entry) => entry.id === tabId);

@@ -1,5 +1,6 @@
 import { Notice, type Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
+import { atlasFloor, floorNotice } from '../../packages/atlas-host/src/index';
 import { canShimStockAtlas, stockAtlasApi } from './stockAtlas';
 
 /**
@@ -40,6 +41,8 @@ export class AtlasLink {
   private stop: Disposer | null = null;
   private warnedMissing = false;
   private warnedVersion = false;
+  /** The Atlas versions below the floor already told of: one notice each. */
+  private readonly warnedFloor = new Set<string>();
   private atlasSeen = false;
   /** The "missing" notice while it is showing: it goes away the moment Atlas's API arrives. */
   private missingNotice: Notice | null = null;
@@ -50,6 +53,8 @@ export class AtlasLink {
   private release: (() => void) | null = null;
   /** The stock Atlas plugin object stood in for, while it is the connection. */
   private stockAtlas: unknown = null;
+  /** The stand-in is being attached: its floor was checked already. */
+  private attachingStock = false;
 
   constructor(
     private readonly plugin: Plugin,
@@ -92,18 +97,39 @@ export class AtlasLink {
     this.plugin.register(() => this.stopGrace());
   }
 
+  /**
+   * Whether the Atlas that is loaded may be used: 0.15 or later. An older one is named in a notice, once per version.
+   * `strict` is the stock stand-in, which reads Atlas's own stores and so needs a version it can read; an Atlas that
+   * publishes an extension API is refused only when its manifest says it is older.
+   */
+  private floorOk(strict: boolean): boolean {
+    const floor = atlasFloor(this.plugin.app);
+    if (floor.state === 'ok') return true;
+    if (floor.state === 'missing' || (!strict && floor.version === 'unknown')) return !strict;
+    if (!this.warnedFloor.has(floor.version)) {
+      this.warnedFloor.add(floor.version);
+      this.notify(floorNotice('Connect', floor.version));
+    }
+    return false;
+  }
+
   /** A stock Atlas has no API, but its views, settings and presented scene can be read: stand in for the API. */
   private useStockAtlas(): boolean {
     if (this.extension || this.atlasSeen) return false;
     const atlas = this.plugin.app.plugins?.plugins['atlas-vtt'];
-    if (!atlas || !canShimStockAtlas(atlas)) return false;
+    if (!atlas || !canShimStockAtlas(atlas) || !this.floorOk(true)) return false;
     console.warn('Connect for Atlas VTT: this Atlas has no extension API; using the stock Atlas stand-in.');
     this.attachStock(atlas);
     return true;
   }
 
   private attachStock(atlas: unknown): void {
-    this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    this.attachingStock = true;
+    try {
+      this.attach(stockAtlasApi(this.plugin.app, atlas as Parameters<typeof stockAtlasApi>[1]));
+    } finally {
+      this.attachingStock = false;
+    }
     this.stockAtlas = atlas;
   }
 
@@ -121,7 +147,7 @@ export class AtlasLink {
       this.stockAtlas = null;
       this.detach();
     }
-    if (atlas && canShimStockAtlas(atlas)) {
+    if (atlas && canShimStockAtlas(atlas) && this.floorOk(true)) {
       console.warn('Connect for Atlas VTT: Atlas was reloaded; standing in for it again.');
       this.attachStock(atlas);
     }
@@ -140,12 +166,15 @@ export class AtlasLink {
     this.warnedMissing = true;
     // Atlas loaded but offering no API (an Atlas without the extension API) is not the same as Atlas missing or disabled.
     if (this.useStockAtlas()) return;
+    // An Atlas below the floor was named already.
+    if (atlasFloor(this.plugin.app).state === 'old' && this.warnedFloor.size > 0) return;
     const shown = this.notify(this.plugin.app.plugins?.plugins['atlas-vtt'] ? NO_API_NOTICE : MISSING_ATLAS_NOTICE);
     this.missingNotice = shown instanceof Notice ? shown : null;
   }
 
   private attach(value: unknown): void {
     if (!isAtlasApi(value)) return;
+    if (this.stockAtlas === null && !this.attachingStock && !this.floorOk(false)) return;
     const major = Number(value.version.split('.')[0]);
     this.atlasSeen = true;
     this.stopGrace();

@@ -158,6 +158,22 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
   });
 
+  it("never switches Atlas's tab on its own: a presented scene whose tab is not the loaded one is left for the GM's board to bring up", async () => {
+    const { connect, a, presented, leaves } = stockHosting();
+    presented.set({ tabId: 't2', filePath: 'maps/two.atlasmap' });
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); },
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(a.view.switchToTab).not.toHaveBeenCalled();
+    expect(a.tabMeta.getState().activeTabId).toBe('t1');
+    expect(presented.get()).toEqual({ tabId: 't2', filePath: 'maps/two.atlasmap' });
+  });
+
   it('presents the woken tab when nothing was presented before', async () => {
     const { connect, join, a, presented, leaves } = stockHosting();
     a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
@@ -198,7 +214,7 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     const { connect, join, a, presented, atlas } = hosting;
     // Atlas 0.9.1 has no lighting experiment: asked about it, it says off whatever the scene. Before, it was switched on.
     (atlas.settingsService as unknown as { isExperimentalOn: (id: string) => boolean }).isExperimentalOn = (id) => !atlas091 && id === 'dynamicLighting';
-    if (atlas091) Object.assign(atlas, { manifest: { version: '0.9.1' } });
+    if (atlas091) Object.assign(atlas, { manifest: { version: '0.15.0' } });
     const controller = new FakeController({ enabled: true, current: true, sight: structuredClone(REAL.sight), ambient: structuredClone(REAL.ambient), reaches: structuredClone(REAL.reaches) });
     Object.assign(a.view.renderer, {
       ...(atlas091 ? { lighting: controller } : { lightingFeature: { controller } }),
@@ -222,7 +238,7 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toHaveLength(1);
   });
 
-  it("on Atlas 0.9.1 (lighting standard, no experiment) still sends only the tokens the players' frame shows of a lit scene", async () => {
+  it("on an Atlas whose lighting is standard (0.9.1 and later: no experiment) still sends only the tokens the players' frame shows of a lit scene", async () => {
     const ids = Object.keys(realScene.objects.tokens);
     const { received } = await litHosting({ [ids[0]!]: 'seen', [ids[1]!]: 'unseen' }, true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot');
