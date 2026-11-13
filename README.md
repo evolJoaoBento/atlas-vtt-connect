@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.4.0 (the same fusion release).
+**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.5.0 (the same fusion release).
 
 Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
@@ -52,6 +52,8 @@ Players see the scene you present, as Atlas's own player window shows it: hidden
 ![Hide a token](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/09-hide-token.gif)
 
 **Dynamic lighting:** with Atlas's dynamic lighting experiment on, players see only what their tokens see, plus the places they explored.
+
+**Token height and movement (Atlas 0.15):** players see each token's height, and on Tabletop's board it stands that high. Where your collection has movement steps, a player dragging one of the party's tokens reads the move against its speed, "20 / 30ft", in the colour of the step it lies in, as your Atlas reads it (its own speed, its statblock's or the collection's). Other tokens' speeds are never sent. The drag shows its distance only when your Atlas setting says so (always, only in a fight, never). What a token already moved this turn is not added yet.
 
 **Tabletop's 3D board:** with the [Tabletop for Atlas](https://github.com/evolJoaoBento/atlas-vtt-tabletop) plugin, players in Obsidian can see the scene on its 3D board: walls, doors (hung as you turned them with Rotate 180° or Mirror), lights, props, your daylight tint, and the other scenes stacked with it (Tabletop's elevation layers: each floor with its walls, doors, lights and props, at its height and place). Players never get what is on a stacked scene (tokens, pins, notes, fog), and a stacked scene is not hidden by its own fog; **Show layers to Connect players** in Tabletop's settings turns it off. Both plugins should be updated together.
 
