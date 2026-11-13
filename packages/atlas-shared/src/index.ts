@@ -147,6 +147,12 @@ export { activeSides, enterSideRound, fightSideIds, rollSides, roundTurns } from
 export { combatantDefeated, defeatedCombatants } from './app/initiative/defeated';
 export * as initiativeSideRules from './app/gameSystems/initiativeSideRules';
 export * as diceRules from './app/gameSystems/diceRules';
+
+// ── Dice: critical results and exploding faces ───────────────────────────────
+export { defaultDiceOf, getDiceCrit, type DiceCrit } from './app/tools/diceCrit';
+export { explodingFaces, MAX_EXPLOSIONS } from './app/tools/diceExplosion';
+export { rollingRules } from './app/gameSystems/diceSets';
+export type { RollingDice } from './app/types/diceSetTypes';
 export type * from './app/types/initiativeRulesTypes';
 export type * from './app/types/initiativeTypes';
 

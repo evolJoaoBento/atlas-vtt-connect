@@ -4,6 +4,7 @@ export const ATLAS_TAG = '0.15.0';
 export const FILES = [
   'characters/playerTokens.ts',
   'gameSystems/diceRules.ts',
+  'gameSystems/diceSets.ts',
   'gameSystems/initiativeSideRules.ts',
   'grid/cellNumbering.ts',
   'grid/gridDistance.ts',
@@ -35,9 +36,13 @@ export const FILES = [
   'resources/resourceTypes.ts',
   'resources/resourceValues.ts',
   'resources/visibleResources.ts',
+  'tools/diceCrit.ts',
+  'tools/diceExplosion.ts',
   'tools/laserPointerSettings.ts',
   'tools/pinLabels.ts',
   'types/collectionSettingsTypes.ts',
+  'types/diceRulesTypes.ts',
+  'types/diceSetTypes.ts',
   'types/gridTypes.ts',
   'types/initiativeRulesTypes.ts',
   'types/initiativeTypes.ts',
@@ -54,6 +59,10 @@ export const FILES = [
 export const STUB_TYPES = {
   // Atlas: `(object: object) => boolean`; its file's run-time closure is 31 files of map stretching.
   'grid/mapStretchObjects.ts': { MovesWithMap: '(object: any) => boolean' },
+  // Atlas: one die of a roll; its file is the formula parser. The stand-in has the fields the dice files read and write.
+  'tools/diceFormula.ts': {
+    RolledDie: "Record<'die', string> & Record<'value' | 'max', number> & Partial<Record<'negative' | 'exploded' | 'rerolled' | 'dropped' | 'advantage', true>>",
+  },
 };
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  cellsByRule, flatCells, formatDistance, isDefeated, pathLengthInCells, resolveLevel, resolveMeasurementSettings, riseInCells, showsDragDistance, snapTokenCenter,
+  cellsByRule, explodingFaces, flatCells, formatDistance, getDiceCrit, isDefeated, pathLengthInCells, resolveLevel, resolveMeasurementSettings, riseInCells, showsDragDistance, snapTokenCenter,
   tokenHeight, type DiagonalRule, type GridGeometry,
 } from '../../../packages/atlas-shared/src/index';
 
@@ -77,5 +77,26 @@ describe('atlas-shared: Atlas 0.15.0 units', () => {
   it('formats metres and feet as Atlas does', () => {
     expect(formatDistance(1.4142, resolveMeasurementSettings({ measurementMode: 'metric', unitType: 'meters', unitDistance: 1.5 }, undefined))).toBe('2.1m');
     expect(formatDistance(6, resolveMeasurementSettings({ measurementMode: 'metric', unitType: 'feet', unitDistance: 5 }, undefined))).toBe('30ft');
+  });
+});
+
+describe('atlas-shared: Atlas 0.15.0 dice', () => {
+  const d20 = (value: number, extra: object = {}) => ({ value, max: 20, ...extra });
+
+  it('calls a roll critical on its default dice only, as each rule reads them', () => {
+    expect(getDiceCrit([d20(20)], { defaultRoll: '1d20', crit: 'natural' })).toBe('high');
+    expect(getDiceCrit([d20(1)], { defaultRoll: '1d20', crit: 'natural' })).toBe('low');
+    expect(getDiceCrit([d20(1)], { defaultRoll: '1d20', crit: 'roll-under' })).toBe('high');
+    // The die a keep rule dropped is no default die; the kept one is.
+    expect(getDiceCrit([d20(20, { dropped: true }), d20(7)], { defaultRoll: '1d20', crit: 'natural' })).toBe(null);
+    // Fewer default dice than the rules roll: none is critical.
+    expect(getDiceCrit([d20(20)], { defaultRoll: '2d20', crit: 'doubles' })).toBe(null);
+    expect(getDiceCrit([d20(20)], { defaultRoll: '1d20', crit: 'none' })).toBe(null);
+  });
+
+  it('never lets every face of a die explode', () => {
+    expect(explodingFaces(2, 2, 0)).toEqual({ high: 1, low: 0 });
+    expect(explodingFaces(6, 1, 1)).toEqual({ high: 1, low: 1 });
+    expect(explodingFaces(3, 1, 5)).toEqual({ high: 1, low: 1 });
   });
 });
