@@ -232,6 +232,38 @@ describe('the Atlas host', () => {
     expect(user.workspace.getLeavesOfType('atlas-vtt')).toEqual([opened.leaf]);
   });
 
+  it('a tab the user has brought to the front is theirs: the last release leaves it open', async () => {
+    const s = setup();
+    const release = s.host.claim();
+    const following = s.host.follow(A, asLeaf(s.board));
+    await tick();
+    s.workspace.atlasView()?.loaded();
+    await following;
+    const leaf = s.workspace.getLeavesOfType('atlas-vtt')[0] as FakeLeaf;
+    const mark = (leaf as unknown as Record<string, HostMark>)[HOST_MARK];
+    expect(mark?.openedBy).toBe('tabletop-for-atlas');
+    // Atlas sends every scene the user opens to its one tab and brings it forward: the user works there now.
+    s.workspace.setActiveLeaf(leaf);
+    expect(mark?.openedBy).toBeNull();
+    s.workspace.setActiveLeaf(s.board);
+    release();
+    expect(s.workspace.getLeavesOfType('atlas-vtt')).toEqual([leaf]);
+    expect(s.host.closedByUser()).toBe(false);
+  });
+
+  it('the front made active again by the recipe does not hand the tab to the user', async () => {
+    const s = setup();
+    const release = s.host.claim();
+    const following = s.host.follow(A, asLeaf(s.board));
+    await tick();
+    s.workspace.atlasView()?.loaded();
+    await following;
+    // The board is active again and again (each press on it): the tab stays the plugin's.
+    s.workspace.setActiveLeaf(s.board);
+    release();
+    expect(s.workspace.getLeavesOfType('atlas-vtt')).toHaveLength(0);
+  });
+
   it('closedByUser after the leaf is detached while claimed, cleared by the next follow', async () => {
     const s = setup();
     const heard: string[] = [];

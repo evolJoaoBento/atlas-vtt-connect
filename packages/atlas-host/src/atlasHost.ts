@@ -59,6 +59,7 @@ export class AtlasHost {
   private readonly wait: (ms: number) => Promise<void>;
   private readonly listeners = new Set<() => void>();
   private readonly layoutRef: EventRef;
+  private readonly activeRef: EventRef;
   private leaf: WorkspaceLeaf | null = null;
   private unsubscribe: (() => void) | null = null;
   private claims = 0;
@@ -73,7 +74,18 @@ export class AtlasHost {
     this.pluginId = options.pluginId;
     this.wait = options.wait ?? ((ms) => new Promise((resolve) => { window.setTimeout(resolve, ms); }));
     this.layoutRef = app.workspace.on('layout-change', () => this.bind());
+    this.activeRef = app.workspace.on('active-leaf-change', (leaf) => this.adopted(leaf));
     this.bind();
+  }
+
+  /**
+   * The Atlas tab came to the front, and not by this host's doing: the user works in it now (Atlas sends every scene
+   * they open to its one tab and brings it forward). It is theirs from here on, and no plugin closes it.
+   */
+  private adopted(leaf: WorkspaceLeaf | null): void {
+    const active = leaf ?? (this.app.workspace as unknown as { activeLeaf?: WorkspaceLeaf | null }).activeLeaf ?? null;
+    if (active === null || active !== this.hostLeaf() || this.inFlight !== null) return;
+    this.markOf(active).openedBy = null;
   }
 
   /** The Atlas leaf, loaded or deferred: the first in the workspace, as Atlas keeps one. */
@@ -314,6 +326,7 @@ export class AtlasHost {
 
   dispose(): void {
     this.app.workspace.offref(this.layoutRef);
+    this.app.workspace.offref(this.activeRef);
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.run += 1;

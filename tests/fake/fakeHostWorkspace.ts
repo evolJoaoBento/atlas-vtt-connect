@@ -165,7 +165,8 @@ export class FakeWorkspace {
     this.handlers.get(name)?.delete(handler);
   };
   fire(name: string): void {
-    for (const handler of [...(this.handlers.get(name) ?? [])]) handler();
+    // `active-leaf-change` hands over the leaf made active, as Obsidian does.
+    for (const handler of [...(this.handlers.get(name) ?? [])]) handler(...(name === 'active-leaf-change' ? [this.activeLeaf] : []));
   }
 }
 

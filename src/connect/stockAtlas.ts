@@ -26,7 +26,8 @@ import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
-import { loadDeferredLeaves, wakeAtlasForHosting } from '../../packages/atlas-host/src/index';
+import { AtlasHost, loadDeferredLeaves, wakeAtlasForHosting } from '../../packages/atlas-host/src/index';
+import { claimHostWhileHosting } from './hostClaim';
 import { stockLasersApi } from './stockLasers/stockLasers';
 import { stockTokensApi } from './stockTokens/stockTokens';
 import { stockUi } from './stockUi/stockUi';
@@ -697,6 +698,11 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
       disposers.add(watchViews(app, events));
       // Online play needs Atlas's map view: a tab still deferred since Obsidian started is loaded when hosting starts and
       // when a player comes in, and Start online session then makes sure a scene is presented.
+      // A hosted session needs Atlas's one view (players are sent its scene): Connect claims it while it hosts, so a
+      // tab Tabletop opened behind a board stays when that board closes.
+      const host = new AtlasHost(app, { pluginId: 'atlas-vtt-connect' });
+      disposers.add(() => host.dispose());
+      disposers.add(claimHostWhileHosting(host, { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) }));
       disposers.add(wakeAtlasForHosting({
         state: () => onlineSessionStore.getState(),
         subscribe: (listener) => onlineSessionStore.subscribe(listener),
