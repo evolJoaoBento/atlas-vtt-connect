@@ -140,7 +140,7 @@ describe('a split party in the risky windows', () => {
     const link = await w.network.client().connect('gm');
     const frames: RawFrame[] = [];
     link.onMessage((channel, data) => frames.push({ channel, data }));
-    link.send('control', encodeControl({ v: 1, type: 'join', name: 'ben', playerKey: 'ben', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: 'ben', playerKey: 'ben', client: { kind: 'web', version: '1' } }));
     assetClient({ key: 'ben', playerId: ben.playerId, received: [], frames, link }).request(Object.keys(IMAGES));
     await vi.advanceTimersByTimeAsync(200);
     const scenes = frames.flatMap((frame) => {

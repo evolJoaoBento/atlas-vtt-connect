@@ -20,6 +20,7 @@ import { presentToMenu, type PresentToMenu, type SplitActions, type SplitView } 
 import { NO_PLAYERS_ROW } from '../split/splitCopy';
 import type { AssignResult } from '../split/SceneAssignments';
 import type { TabKey } from '../split/tabKey';
+import { FUSION_PROTOCOL } from '../scene/boardTypes';
 
 type Point = { x: number; y: number };
 
@@ -58,6 +59,8 @@ export interface BoardOverlay {
 
 /** What Tabletop reads of the session (its `connectContract.ts` keeps the same shape). */
 export interface BoardSession {
+  /** The fusion step this Connect is a build of (`FUSION_PROTOCOL`): Tabletop takes only a session of its own step. */
+  readonly fusion: number;
   hosting(): boolean;
   /** Carries cutscenes to players; absent from a session that cannot (no scene tabs). */
   readonly cutscenes?: true;
@@ -190,6 +193,7 @@ export interface BoardSessionHubOptions {
 export class BoardSessionHub implements BoardSession, BoardSessionSink {
   /** Set only when the session carries cutscenes. */
   readonly cutscenes?: true;
+  readonly fusion = FUSION_PROTOCOL;
   private readonly changes = new Set<() => void>();
   private readonly marks = new Set<(mark: BoardMark) => void>();
   private readonly viewers = new Set<(viewer: BoardViewer) => void>();

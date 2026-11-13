@@ -241,8 +241,8 @@ export class MapView {
   }
 
   /** The GM refused a move of this token. */
-  moveRefused(tokenId: string): void {
-    this.moves.refused(tokenId);
+  moveRefused(tokenId: string, reason?: 'not-held'): void {
+    this.moves.refused(tokenId, reason);
   }
 
   /** The scene is paused (the GM is on another scene) or live again: the move notice shows the paused banner while paused. */

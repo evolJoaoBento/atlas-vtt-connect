@@ -72,6 +72,8 @@ export interface ControlPlayer {
   /** A `token-move` on the player's current link, for the scene players have unless `sceneId` is given. */
   move(tokenId: string, x: number, y: number, sceneId?: string): void;
   refusals(): string[];
+  /** The reason of each refusal, in order: undefined where the GM gave none. */
+  refusalReasons(): Array<string | undefined>;
   controlLists(): string[][];
 }
 
@@ -120,6 +122,7 @@ export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () =
         link?.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId, x, y }));
       },
       refusals: () => received.flatMap((message) => (message.type === 'token-move-refused' ? [message.tokenId] : [])),
+      refusalReasons: () => received.flatMap((message) => (message.type === 'token-move-refused' ? [message.reason] : [])),
       controlLists: () => received.flatMap((message) => (message.type === 'token-control' ? [message.tokenIds] : [])),
     };
     players.push(player);

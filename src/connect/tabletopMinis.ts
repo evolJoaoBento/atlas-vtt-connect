@@ -6,7 +6,9 @@
  * or with an API this does not understand, no token has a mini and none is drawn. Everything is checked before use
  * and nothing throws.
  */
-import type { App, EventRef } from 'obsidian';
+import { Notice, type App, type EventRef } from 'obsidian';
+import { pairingNotice } from '../../packages/atlas-host/src/index';
+import { FUSION_PROTOCOL } from '../app/online/scene/boardTypes';
 import type { MiniPlacement } from '../app/online/scene/projectForPlayers';
 import type { BoardPose, BoardSource, MiniSource } from '../app/online/scene/sceneSources';
 import type { MiniPainter } from '../app/online/view/minis/miniLayer';
@@ -25,6 +27,8 @@ const NONE: Readonly<Record<string, MiniPlacement>> = Object.freeze({});
 
 interface TabletopApi {
   version: number;
+  /** The fusion step Tabletop is a build of: it must be Connect's own. */
+  fusion: number;
   placementsFor(mapPath: string): unknown;
   onChange(listener: (mapPath: string | null) => void): () => void;
 }
@@ -35,11 +39,33 @@ function isTabletopApi(value: unknown): value is TabletopApi {
   return api.version === 1 && typeof api.placementsFor === 'function' && typeof api.onChange === 'function';
 }
 
-function tabletopApi(app: App): TabletopApi | null {
-  const plugins = (app as unknown as { plugins?: { plugins?: Record<string, { api?: unknown } | undefined> } }).plugins?.plugins;
+export type PairingNotify = (message: string) => unknown;
+const showNotice: PairingNotify = (message) => new Notice(message, 0);
+/** The Tabletop versions already said not to match, so the notice shows once for each. */
+const toldOf = new WeakMap<App, Set<string>>();
+
+/**
+ * Tabletop's API, when it is a build of Connect's own fusion step. One of another step (or from before there was one)
+ * is not used at all, since the two would exchange things the other reads wrongly, and a notice names both versions.
+ */
+function tabletopApi(app: App, notify: PairingNotify = showNotice): TabletopApi | null {
+  const all = (app as unknown as { plugins?: { plugins?: Record<string, { api?: unknown } | undefined>; manifests?: Record<string, { version?: unknown } | undefined> } }).plugins;
   for (const id of PLUGIN_IDS) {
-    const api = plugins?.[id]?.api;
-    if (isTabletopApi(api)) return api;
+    const api = all?.plugins?.[id]?.api;
+    if (!isTabletopApi(api)) continue;
+    if (api.fusion === FUSION_PROTOCOL) return api;
+    const version = (name: string): string | null => {
+      const found = all?.manifests?.[name]?.version;
+      return typeof found === 'string' ? found : null;
+    };
+    const told = toldOf.get(app) ?? new Set<string>();
+    toldOf.set(app, told);
+    const key = `${id}@${version(id) ?? 'unknown'}`;
+    if (!told.has(key)) {
+      told.add(key);
+      notify(pairingNotice(version(id), version('atlas-vtt-connect')));
+    }
+    return null;
   }
   return null;
 }
@@ -170,8 +196,8 @@ interface TabletopBoardApi {
   gmCamera: { camera(mapPath: string): unknown; onChange(listener: () => void): () => void };
 }
 
-function boardApi(app: App): TabletopBoardApi | null {
-  const api = tabletopApi(app) as Partial<TabletopBoardApi> | null;
+function boardApi(app: App, notify?: PairingNotify): TabletopBoardApi | null {
+  const api = tabletopApi(app, notify) as Partial<TabletopBoardApi> | null;
   const camera = api?.gmCamera as Partial<TabletopBoardApi['gmCamera']> | undefined;
   return api && typeof api.boardLook === 'function' && typeof api.onBoardChange === 'function'
     && camera && typeof camera.camera === 'function' && typeof camera.onChange === 'function' ? api as TabletopBoardApi : null;
@@ -227,7 +253,7 @@ const isPoint3 = (value: unknown): value is { x: number; y: number; z: number } 
   return typeof point === 'object' && point !== null && [point.x, point.y, point.z].every((n) => typeof n === 'number' && Number.isFinite(n));
 };
 
-export function tabletopBoard(app: App): TabletopBoard {
+export function tabletopBoard(app: App, notify?: PairingNotify): TabletopBoard {
   const listeners = new Set<() => void>();
   const cameraListeners = new Set<() => void>();
   const cutsceneListeners = new Set<() => void>();
@@ -261,7 +287,7 @@ export function tabletopBoard(app: App): TabletopBoard {
   };
   const emit = (): void => emitTo(listeners);
   const bind = (): void => {
-    const next = boardApi(app);
+    const next = boardApi(app, notify);
     if (next === api) return;
     for (const stop of stops.splice(0)) stop();
     api = next;

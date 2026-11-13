@@ -29,7 +29,7 @@ describe('join links with a table', () => {
 
 describe('identity fields on the wire', () => {
   const join = (device: unknown): string => JSON.stringify({
-    v: 1, type: 'join', name: 'Ana', playerKey: 'k', client: { kind: 'obsidian', version: '1' }, ...(device === undefined ? {} : { device }),
+    v: 1, type: 'join', fusion: 1, name: 'Ana', playerKey: 'k', client: { kind: 'obsidian', version: '1' }, ...(device === undefined ? {} : { device }),
   });
 
   it('accept a join with or without a well-formed device proof', () => {

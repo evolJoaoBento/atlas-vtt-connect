@@ -46,7 +46,7 @@ function world() {
       const decoded = channel === 'control' && typeof data === 'string' ? decodeControl(data) : null;
       if (decoded?.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Raw', playerKey: `k${requests.length}`, client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: 'Raw', playerKey: `k${requests.length}`, client: { kind: 'web', version: '1' } }));
     gm.allow(requests.at(-1)!.playerId);
     return received;
   };

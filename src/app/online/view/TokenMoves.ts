@@ -16,10 +16,13 @@ import type { TokenOverlay } from './layers/layerTypes';
 import { controlledTokenAt } from './tokenHit';
 import { toolGridOf } from './tools/toolGrid';
 import type { TokenGrab } from './ViewInput';
+import { NOT_HELD_TEXT } from '../page/pageScreen';
 
 export const CONFIRM_TIMEOUT_MS = 2000;
 export const REFUSED_NOTICE_MS = 3000;
 export const MOVE_REFUSED_TEXT = 'Move not allowed.';
+/** The notice of a refused move: the reason's own text where the GM gave one. */
+export const refusedText = (reason?: 'not-held'): string => (reason === 'not-held' ? NOT_HELD_TEXT : MOVE_REFUSED_TEXT);
 
 export interface TokenMovesOptions {
   /** A canvas point (CSS pixels from its top left) in world units, with the camera of now. */
@@ -102,13 +105,13 @@ export class TokenMoves implements TokenGrab {
   }
 
   /** The GM refused a move: the token shows its scene position, and the notice shows (not while paused: the banner says why). */
-  refused(tokenId: string): void {
+  refused(tokenId: string, reason?: 'not-held'): void {
     this.settle(tokenId);
     if (this.paused) {
       this.options.onChange();
       return;
     }
-    this.noticeText = MOVE_REFUSED_TEXT;
+    this.noticeText = refusedText(reason);
     if (this.noticeTimer !== null) window.clearTimeout(this.noticeTimer);
     this.noticeTimer = window.setTimeout(() => {
       this.noticeTimer = null;

@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { FUSION_PROTOCOL } from '../../../src/app/online/scene/boardTypes';
 import { tabletopBoard } from '../../../src/connect/tabletopMinis';
 
 function fakeApp() {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
   const plugins: Record<string, { api?: unknown }> = {};
+  const manifests: Record<string, { version: string }> = { 'atlas-vtt-tabletop': { version: '1.3.0' }, 'tabletop-for-atlas': { version: '1.3.0' }, 'atlas-vtt-connect': { version: '0.9.0' } };
   const app = {
-    plugins: { plugins },
+    plugins: { plugins, manifests },
     workspace: {
       on: (name: string, handler: (...args: unknown[]) => void) => {
         const set = handlers.get(name) ?? new Set();
@@ -33,6 +37,7 @@ function fakeTabletop(overrides: Record<string, unknown> = {}) {
   return {
     api: {
       version: 1,
+      fusion: 1,
       placementsFor: () => ({}),
       onChange: () => () => undefined,
       boardLook: (mapPath: string) => (mapPath === 'm.atlasmap' ? LOOK : { ...LOOK, fogHeight: 3 }),
@@ -60,6 +65,31 @@ describe('tabletopBoard', () => {
     expect(board.available()).toBe(false);
     expect(board.lookFor('m.atlasmap')).toBeNull();
     expect(board.camera('m.atlasmap')).toBeNull();
+  });
+
+  it('pairs only with a Tabletop of the same fusion step, and says once when it is not', () => {
+    expect(FUSION_PROTOCOL).toBe(1);
+    const notices: string[] = [];
+    const paired = fakeApp();
+    paired.plugins['atlas-vtt-tabletop'] = { api: fakeTabletop().api };
+    expect(tabletopBoard(paired.app, (message) => notices.push(message)).available()).toBe(true);
+    expect(notices).toEqual([]);
+    for (const fusion of [undefined, 2]) {
+      const { app, plugins } = fakeApp();
+      plugins['atlas-vtt-tabletop'] = { api: fakeTabletop({ fusion }).api };
+      const heard: string[] = [];
+      const board = tabletopBoard(app, (message) => heard.push(message));
+      expect(board.available()).toBe(false);
+      expect(board.lookFor('m.atlasmap')).toBeNull();
+      expect(board.available()).toBe(false);
+      expect(heard).toEqual(['Tabletop for Atlas VTT 1.3.0 and Connect for Atlas VTT 0.9.0 do not match: update both to the same release.']);
+    }
+  });
+
+  it('the wire contract Tabletop is generated from imports nothing', () => {
+    const source = readFileSync(path.resolve(__dirname, '../../../src/app/online/scene/boardTypes.ts'), 'utf8');
+    expect(source).not.toMatch(/^\s*import\s/m);
+    expect(source).not.toMatch(/\bfrom\s+['"]/);
   });
 
   it('a Tabletop without the board members (an older one) is not available', () => {

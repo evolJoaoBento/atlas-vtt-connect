@@ -151,7 +151,7 @@ export class BoardSceneView implements SceneViewport {
   }
 
   setConnected(connected: boolean): void { this.board.setConnected(connected); }
-  moveRefused(tokenId: string): void { this.board.moveRefused(tokenId); }
+  moveRefused(tokenId: string, reason?: 'not-held'): void { this.board.moveRefused(tokenId, reason); }
   setPaused(paused: boolean): void { this.board.setPaused(paused); }
   selectTool(tool: PlayerTool): void { this.board.selectTool(tool); }
   followGm(): void { this.board.followGm(); }

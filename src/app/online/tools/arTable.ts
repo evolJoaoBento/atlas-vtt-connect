@@ -11,26 +11,13 @@
  * outline (`w` × `h`, about its middle) for the GM to see.
  */
 
-export interface ArTableGroup {
-  group: string;
-  x: number;
-  y: number;
-  heading: number;
-  w: number;
-  h: number;
-}
+import type { ArTable, ArTableGroup } from '../scene/boardTypes';
+
+// The two shapes players are sent live in `boardTypes.ts`, the wire contract, which imports nothing.
+export type { ArTable, ArTableGroup };
 
 /** A phone's survey: the groups in its own frame (the first sheet it saw is the origin), and its square size. */
 export interface ArSurvey {
-  squareMm: number;
-  groups: ArTableGroup[];
-}
-
-/**
- * The table as the GM placed it, for the phones: the groups in the map's frame (millimetres from the map's top left,
- * x right and y down as the map reads), and how long a square of the map is on the table.
- */
-export interface ArTable {
   squareMm: number;
   groups: ArTableGroup[];
 }

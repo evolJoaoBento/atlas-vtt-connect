@@ -71,7 +71,8 @@ export interface PlayerBoardHandle {
   setControlled(tokenIds: readonly string[]): void;
   setConnected(connected: boolean): void;
   setPaused(paused: boolean): void;
-  moveRefused(tokenId: string): void;
+  /** `reason`: `not-held` when the GM's Atlas is on another map just now (a board that does not know it shows its plain refusal). */
+  moveRefused(tokenId: string, reason?: 'not-held'): void;
   setPlayers(order: readonly string[], self: string | null): void;
   selectTool(tool: PlayerBoardTool): void;
   selectShape(shape: 'line' | 'circle' | 'cone'): void;

@@ -18,7 +18,7 @@ export interface OnlineSceneSink {
   scene(scene: PlayerScene | null): void;
   camera(camera: SceneCamera): void;
   control(tokenIds: readonly string[]): void;
-  moveRefused(tokenId: string): void;
+  moveRefused(tokenId: string, reason?: 'not-held'): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   paused?(paused: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null: the player's own look shows. */

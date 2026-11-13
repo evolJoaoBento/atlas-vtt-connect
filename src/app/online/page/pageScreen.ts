@@ -20,13 +20,18 @@ export const INCOMPLETE_LINK_TEXT = 'This link is incomplete. Ask your GM for th
 export const NAME_PROBLEM_TEXT = 'Enter a name of up to 40 characters.';
 export const NO_CANVAS_TEXT = "This browser can't draw the map. Try another browser.";
 
+/** A page or player that is not a build of the GM's fusion step. */
+export const STALE_PAGE_TEXT = 'This table needs the updated player page';
+/** A move refused because the GM's Atlas holds another map just now. */
+export const NOT_HELD_TEXT = "The GM's Atlas is on another map; try again in a moment.";
+
 const DENIED_TEXT = 'The GM did not let you in.';
 const UNREACHABLE_TEXT = "Couldn't connect. Check the link, or your GM may need to add a relay server in Atlas settings.";
 const REASONS: Record<string, string> = {
   denied: DENIED_TEXT,
   kicked: 'The GM removed you from the session.',
   full: 'The session is full.',
-  version: 'This page is out of date for your GM\'s Atlas. Ask them for a new link.',
+  version: STALE_PAGE_TEXT,
   ended: 'The session ended.',
   replaced: 'You joined from another tab.',
   unreachable: UNREACHABLE_TEXT,

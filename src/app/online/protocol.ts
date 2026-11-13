@@ -81,8 +81,12 @@ export interface SceneStateMessage { v: 1; type: 'scene-state'; sceneId: string;
  */
 export interface SceneLookMessage { v: 1; type: 'scene-look'; sceneId: string; look: string | null }
 
+/** Why a move was refused, where the GM says: the map the player is on is not the one the GM's Atlas holds. */
+export type MoveRefusedReason = 'not-held';
+
 export type ControlMessage =
-  | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
+  /** `fusion`: the fusion step the page or player is a build of (`FUSION_PROTOCOL`); the GM refuses one that is missing or not its own. */
+  | { v: 1; type: 'join'; fusion?: number; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
   | { v: 1; type: 'admitted'; playerId: string; session: { title: string }; table?: TableProof }
   | { v: 1; type: 'denied'; reason: DenyReason }
   | { v: 1; type: 'presence'; players: PresencePlayer[] }
@@ -106,7 +110,8 @@ export type ControlMessage =
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
   | { v: 1; type: 'token-move'; sceneId: string; tokenId: string; x: number; y: number }
   /** GM to the player who sent the move: it failed a check, so the token stays where the scene has it. */
-  | { v: 1; type: 'token-move-refused'; tokenId: string }
+  /** `reason`: given only where the player can do something about it: `not-held`, the GM's Atlas is on another map just now. */
+  | { v: 1; type: 'token-move-refused'; tokenId: string; reason?: MoveRefusedReason }
   /** Player to GM: a roll from the dice tray, rolled on the GM's side; with `advantage`, on the side the player chose (a lone d20). */
   | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number; advantage?: AdvantageSide }
   /** Player to GM: dice thrown on Tabletop's board, every die as it landed; sent only when the GM offered `diceResults`. */
@@ -201,7 +206,8 @@ function isTableProof(value: unknown): value is TableProof {
 const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   join: (m) => isString(m.name, 200) && isString(m.playerKey, 64) && m.playerKey.length > 0
     && isRecord(m.client) && (m.client.kind === 'web' || m.client.kind === 'obsidian') && isString(m.client.version, 32)
-    && (m.device === undefined || isDeviceProof(m.device)),
+    && (m.device === undefined || isDeviceProof(m.device))
+    && (m.fusion === undefined || (typeof m.fusion === 'number' && Number.isSafeInteger(m.fusion))),
   admitted: (m) => isString(m.playerId, 64) && isRecord(m.session) && isString(m.session.title, 200)
     && (m.table === undefined || isTableProof(m.table)),
   denied: (m) => DENY_REASONS.includes(m.reason as DenyReason),
@@ -225,7 +231,7 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
-  'token-move-refused': (m) => isSceneId(m.tokenId),
+  'token-move-refused': (m) => isSceneId(m.tokenId) && (m.reason === undefined || m.reason === 'not-held'),
   'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier) && (m.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(m.advantage)),
   'dice-result': (m) => isPhysicalRoll(m),
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',

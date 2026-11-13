@@ -27,6 +27,7 @@ function fakeTabletop(placements: Record<string, Record<string, unknown>>) {
   return {
     api: {
       version: 1,
+      fusion: 1,
       placementsFor: (mapPath: string) => placements[mapPath] ?? {},
       onChange: (listener: (mapPath: string | null) => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     },

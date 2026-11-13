@@ -317,8 +317,8 @@ export class CanvasScene implements OnlineSceneSink {
     this.showEyes();
   }
 
-  moveRefused(tokenId: string): void {
-    this.map?.moveRefused(tokenId);
+  moveRefused(tokenId: string, reason?: 'not-held'): void {
+    this.map?.moveRefused(tokenId, reason);
   }
 
   /** The paused banner shows over the map in the move notice, as on the join page. */

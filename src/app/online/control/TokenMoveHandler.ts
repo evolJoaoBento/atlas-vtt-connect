@@ -5,13 +5,14 @@
  * the sender's projection (not hidden, not under fog) and the coordinates are finite. The point is clamped to the
  * scene the sender sees, then Atlas's `tokens.move` on that scene's view snaps it as the GM's drag snaps, keeps it on
  * the map and writes it as one undo step. A move that fails a check, or that Atlas refuses, gets
- * `token-move-refused`; more than `MOVES_PER_SECOND` from one player in a second are ignored. A `GmSession` handler;
+ * `token-move-refused`, with the reason `not-held` when all that stood in its way is that the GM's Atlas holds another
+ * map just now (Atlas holds one map at a time, and nothing is ever written to a map it does not hold); more than `MOVES_PER_SECOND` from one player in a second are ignored. A `GmSession` handler;
  * `GmSession` delivers only admitted players' messages.
  */
 import type { TokensApi } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import { sceneWorldBounds, type PreviewRect } from '../preview/previewLayout';
-import type { ControlMessage } from '../protocol';
+import type { ControlMessage, MoveRefusedReason } from '../protocol';
 import { RateLimit } from '../rateLimit';
 import type { SceneSession } from '../scene/sceneSources';
 import type { ScenePoint } from '../scene/sceneTypes';
@@ -60,9 +61,10 @@ export class TokenMoveHandler implements SessionHandler {
 
   onMessage(player: SessionPlayer, message: ControlMessage): void {
     if (message.type !== 'token-move' || !this.limit.allow(player.playerId, Date.now())) return;
-    if (this.apply(player.playerId, message)) return;
-    // Only the id the player sent: a refusal says nothing about why, or about other tokens.
-    this.options.session.send(player.playerId, { v: 1, type: 'token-move-refused', tokenId: message.tokenId });
+    const result = this.apply(player.playerId, message);
+    if (result === true) return;
+    // Only the id the player sent: a refusal says nothing about other tokens, and why only where the player can wait it out.
+    this.options.session.send(player.playerId, { v: 1, type: 'token-move-refused', tokenId: message.tokenId, ...(result === false ? {} : { reason: result }) });
   }
 
   /** Drops the windows of players who left the session: a reconnect must not reset one. */
@@ -70,8 +72,8 @@ export class TokenMoveHandler implements SessionHandler {
     this.limit.retain(known);
   }
 
-  /** Whether the move passed every check and Atlas wrote it. */
-  private apply(playerId: string, move: TokenMove): boolean {
+  /** Whether the move passed every check and Atlas wrote it: true, false, or why not where the player is told. */
+  private apply(playerId: string, move: TokenMove): boolean | MoveRefusedReason {
     const { control, projection, tokens } = this.options;
     // The players' tokens stand still for the length of a cutscene.
     if (this.options.cutscene?.running()) return false;
@@ -86,7 +88,9 @@ export class TokenMoveHandler implements SessionHandler {
     const { x, y } = clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene));
     // Read right before the move: the GM may have switched tabs since the player's scene was read (P2).
     const snapshot = projection.shownSnapshot(slot.sceneId);
-    if (!snapshot || !Object.hasOwn(scene.tokens, move.tokenId) || !Object.hasOwn(snapshot.objects.tokens, move.tokenId)) return false;
+    // The player's own token on the scene they have, and Atlas shows another map or is still loading this one.
+    if (!snapshot) return Object.hasOwn(scene.tokens, move.tokenId) ? 'not-held' : false;
+    if (!Object.hasOwn(scene.tokens, move.tokenId) || !Object.hasOwn(snapshot.objects.tokens, move.tokenId)) return false;
     // Atlas refuses a hidden token itself (no `allowHidden`), also one hidden since the hub's last tick.
     return tokens.move(slot.tab.viewId, [{ tokenId: move.tokenId, x, y }], { snap: true, clampToMap: true }).ok;
   }

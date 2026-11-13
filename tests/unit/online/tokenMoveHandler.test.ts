@@ -52,6 +52,15 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it('gives no reason for a refusal that is not about the map Atlas holds', async () => {
+    const w = controlWorld();
+    const a = await withHero(w);
+    a.move('ally', 300, 150);
+    expect(a.refusals()).toEqual(['ally']);
+    expect(a.refusalReasons()).toEqual([undefined]);
+    w.finish();
+  });
+
   it('refuses a move of a token the player does not control', async () => {
     const w = controlWorld();
     const a = await withHero(w);
@@ -117,6 +126,8 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     expect(w.broadcaster.currentProjection()?.sceneId).toBe(sceneId);
     a.move('hero', 300, 150, sceneId);
     expect(a.refusals()).toEqual(['hero']);
+    // The GM's Atlas holds another map: the player is told so, and may try again.
+    expect(a.refusalReasons()).toEqual(['not-held']);
     expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
     expect(w.undoSteps()).toBe(0);
     w.finish();
@@ -128,6 +139,7 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     w.store.setState({ isMapLoading: true });
     a.move('hero', 300, 150);
     expect(a.refusals()).toEqual(['hero']);
+    expect(a.refusalReasons()).toEqual(['not-held']);
     w.finish();
   });
 
@@ -263,7 +275,7 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
     const sceneId = w.broadcaster.currentProjection()!.sceneId;
     link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId: 'hero', x: 300, y: 150 }));
     expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });

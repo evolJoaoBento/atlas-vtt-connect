@@ -22,6 +22,7 @@ import type { ArPose } from './tools/arViews';
 import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
+import { FUSION_PROTOCOL } from './scene/boardTypes';
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -70,8 +71,8 @@ export interface PlayerSessionOptions {
   onCamera?(camera: SceneCamera): void;
   /** The tokens this player may move: the GM's latest `token-control` list; empty once the session is over. */
   onControl?(tokenIds: readonly string[]): void;
-  /** The GM refused this player's move of the token. */
-  onMoveRefused?(tokenId: string): void;
+  /** The GM refused this player's move of the token; `reason` where the GM gave one (`not-held`: its Atlas is on another map). */
+  onMoveRefused?(tokenId: string, reason?: 'not-held'): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
@@ -338,7 +339,7 @@ export class PlayerSession {
       if (this.link === link) { this.link = null; this.endCutscene(); this.dropped(); }
     });
     link.send('control', encodeControl({
-      v: 1, type: 'join', name: this.options.name, playerKey: this.options.playerKey,
+      v: 1, type: 'join', fusion: FUSION_PROTOCOL, name: this.options.name, playerKey: this.options.playerKey,
       client: { kind: this.options.clientKind ?? 'web', version: this.options.clientVersion },
       ...(this.options.device ? { device: this.options.device } : {}),
     }));
@@ -391,7 +392,7 @@ export class PlayerSession {
         this.setControlled(message.tokenIds);
         break;
       case 'token-move-refused':
-        this.options.onMoveRefused?.(message.tokenId);
+        this.options.onMoveRefused?.(message.tokenId, message.reason);
         break;
       case 'dice-log':
         this.options.onDiceLog?.(message.entries, message.replay);

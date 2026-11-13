@@ -493,7 +493,7 @@ export class SceneSwitch implements SceneViewport {
     else this.choose();
   }
 
-  moveRefused(tokenId: string): void { this.view.moveRefused(tokenId); }
+  moveRefused(tokenId: string, reason?: 'not-held'): void { this.view.moveRefused(tokenId, reason); }
   setPaused(paused: boolean): void { this.paused = paused; this.view.setPaused(paused); }
   selectTool(tool: PlayerTool): void { this.view.selectTool(tool); }
   followGm(): void { this.view.followGm(); }

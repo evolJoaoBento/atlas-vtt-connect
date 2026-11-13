@@ -140,7 +140,7 @@ export async function splitWorld(options: { lighting?: boolean; visibility?: Pla
         const decoded = decodeControl(data);
         if (decoded.kind === 'message') received.push(decoded.message);
       });
-      link.send('control', encodeControl({ v: 1, type: 'join', name: key, playerKey: key, client: { kind: 'web', version: '1' } }));
+      link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: key, playerKey: key, client: { kind: 'web', version: '1' } }));
       const request = requests.at(-1)!;
       if (request.status !== 'admitted') gm.allow(request.playerId);
       await vi.advanceTimersByTimeAsync(0);

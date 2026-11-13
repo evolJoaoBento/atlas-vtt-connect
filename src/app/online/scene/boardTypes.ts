@@ -4,7 +4,31 @@
  * Sent only to players who asked (`board-request`). Shared with the web player page, so this file imports nothing.
  * Heights are in grid squares, as Tabletop keeps them; null is the board's default (the fog's height).
  */
-import type { ArTable } from '../tools/arTable';
+/**
+ * The fusion step both plugins and the player page are builds of: Tabletop's API, Connect's board session and a player's
+ * join each carry it, and a missing or different number is refused. It is the number of the Atlas fusion phase, raised
+ * by each phase's first change to what the three exchange.
+ */
+export const FUSION_PROTOCOL = 1;
+
+/** A sheet the AR markers are fixed on, as it lies on the table (see `tools/arTable.ts`): millimetres, x right and y down, with its heading in radians and its outline. */
+export interface ArTableGroup {
+  group: string;
+  x: number;
+  y: number;
+  heading: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The table as the GM placed it, for the phones: the groups in the map's frame (millimetres from the map's top left,
+ * x right and y down as the map reads), and how long a square of the map is on the table.
+ */
+export interface ArTable {
+  squareMm: number;
+  groups: ArTableGroup[];
+}
 
 export interface BoardPoint { x: number; y: number }
 /** A point of the board's world. */

@@ -107,7 +107,7 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.control = tokenIds;
       host.sink()?.control(tokenIds);
     },
-    onMoveRefused: (tokenId) => { if (current()) host.sink()?.moveRefused(tokenId); },
+    onMoveRefused: (tokenId, reason) => { if (current()) host.sink()?.moveRefused(tokenId, reason); },
     onSceneState: (paused) => {
       if (!current()) return;
       joined.paused = paused;

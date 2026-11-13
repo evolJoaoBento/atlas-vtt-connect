@@ -419,9 +419,9 @@ if (!target) {
         log.event('control', { tokens: tokenIds.length });
         map.setControlled(tokenIds);
       },
-      onMoveRefused: (tokenId) => {
-        log.event('move refused', { tokenId });
-        map.moveRefused(tokenId);
+      onMoveRefused: (tokenId, reason) => {
+        log.event('move refused', { tokenId, reason: reason ?? null });
+        map.moveRefused(tokenId, reason);
       },
       onSceneState: (paused) => {
         log.event('scene state', { paused });
