@@ -13,7 +13,7 @@ const shared = flag >= 0 && process.argv[flag + 1] ? path.resolve(process.argv[f
 const source = JSON.parse(readFileSync(path.join(shared, 'SOURCE.json'), 'utf8'));
 
 const problems = [];
-const known = { ...source.files, ...source.stubs };
+const known = { ...source.files, ...source.stubs, ...(source.boundaries ?? {}) };
 for (const [file, hash] of Object.entries(known)) {
   const full = path.join(shared, file);
   if (!existsSync(full)) problems.push(`missing: ${file}`);

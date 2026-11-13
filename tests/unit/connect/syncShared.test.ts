@@ -42,8 +42,27 @@ describe('check-shared', () => {
     expect(run.stdout + run.stderr).toContain('stub has code');
   });
 
-  it('copies only what the list names', () => {
+  it("stands in for Atlas's texts with a generated boundary, listed apart from the copies", () => {
+    const source = JSON.parse(readFileSync(path.join(ROOT, 'packages/atlas-shared/SOURCE.json'), 'utf8')) as { files: Record<string, string>; boundaries: Record<string, string> };
+    expect(Object.keys(source.boundaries)).toEqual(['src/app/i18n/index.ts']);
+    expect(source.files).not.toHaveProperty('src/app/i18n/index.ts');
+    const text = readFileSync(path.join(ROOT, 'packages/atlas-shared/src/app/i18n/index.ts'), 'utf8');
+    expect(text).toContain('Generated boundary stand-in');
+    expect(text).toMatch(/export const t = /);
+  });
+
+  it('fails when the boundary stand-in was changed, or holds more than the stand-in', () => {
+    const dir = copy();
+    const file = path.join(dir, 'src/app/i18n/index.ts');
+    writeFileSync(file, `${readFileSync(file, 'utf8')}\nexport const leaked = document.title;\n`);
+    const run = check(dir);
+    expect(run.status).toBe(1);
+    expect(run.stdout + run.stderr).toContain('changed: src/app/i18n/index.ts');
+  });
+
+  it('copies no file of Atlas\'s texts', () => {
     const app = path.join(ROOT, 'packages/atlas-shared/src/app');
-    expect(readdirSync(app).sort()).toEqual(['grid', 'measure', 'resources', 'statblocks', 'types'].sort());
+    expect(readdirSync(path.join(app, 'i18n'))).toEqual(['index.ts']);
+    expect(readdirSync(app)).toContain('levels');
   });
 });

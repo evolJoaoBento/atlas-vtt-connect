@@ -13,8 +13,8 @@ export function isTypeOnly(head) {
 /** The names a type-only import brings in (`A`, and `B` of `B as C`). */
 export const typeNamesOf = (head) => (/\{([^}]*)\}/.exec(head)?.[1] ?? '').split(',').map((part) => part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0]).filter(Boolean);
 
-/** Whether a stub holds only comments, blank lines and `export type Name = any;` lines. */
+/** Whether a stub holds only comments, blank lines and one-line type aliases (`export type Name = any;`, or a shape from `STUB_TYPES`): no code, no object bodies. */
 export function stubIsClean(text) {
   const body = text.replace(/\/\*[\s\S]*?\*\//g, '');
-  return body.split(/\r?\n/).every((line) => /^\s*(\/\/.*)?$/.test(line) || /^export type [\w$]+ = any;\s*$/.test(line));
+  return body.split(/\r?\n/).every((line) => /^\s*(\/\/.*)?$/.test(line) || /^export type [\w$]+ = [^;{}]+;\s*$/.test(line));
 }

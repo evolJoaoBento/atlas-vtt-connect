@@ -24,7 +24,7 @@ async function player(network: MemoryNetwork, key: string, device?: DeviceProof)
     const decoded = decodeControl(data);
     if (channel === 'control' && decoded.kind === 'message') received.push(decoded.message);
   });
-  link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: 'Ana', playerKey: key, client: { kind: 'obsidian', version: '1' }, ...(device ? { device } : {}) }));
+  link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Ana', playerKey: key, client: { kind: 'obsidian', version: '1' }, ...(device ? { device } : {}) }));
   return { link, received };
 }
 

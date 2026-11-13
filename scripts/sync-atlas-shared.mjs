@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ATLAS_TAG, FILES } from '../packages/atlas-shared/files.mjs';
+import { ATLAS_TAG, BOUNDARIES, FILES, STUB_TYPES } from '../packages/atlas-shared/files.mjs';
 import { IMPORT, isTypeOnly, typeNamesOf } from './sharedImports.mjs';
 import { hashFile } from './vendorHash.mjs';
 
@@ -35,6 +35,7 @@ function resolveImport(file, spec) {
 }
 
 const stubs = new Map();
+const boundaries = new Set();
 for (const file of FILES) {
   const source = readFileSync(path.join(app, file), 'utf8');
   if (/\bimport\(\s*['"]/.test(source)) throw new Error(`${file} imports on demand; list what it needs`);
@@ -44,6 +45,8 @@ for (const file of FILES) {
     if (!spec.startsWith('.')) throw new Error(`${file} imports the package ${spec}`);
     const target = resolveImport(file, spec);
     if (listed.has(target)) continue;
+    // Stood in for, whatever is imported from it.
+    if (Object.hasOwn(BOUNDARIES, target)) { boundaries.add(target); continue; }
     if (!isTypeOnly(head)) throw new Error(`${file} imports ${spec} at run time; list it`);
     const names = stubs.get(target) ?? new Set();
     for (const name of typeNamesOf(head)) names.add(name);
@@ -52,7 +55,7 @@ for (const file of FILES) {
 }
 
 rmSync(out, { recursive: true, force: true });
-const record = { repository: 'atlas-vtt/atlas-vtt', tag: ATLAS_TAG, commit, files: {}, stubs: {} };
+const record = { repository: 'atlas-vtt/atlas-vtt', tag: ATLAS_TAG, commit, files: {}, stubs: {}, boundaries: {} };
 for (const file of [...FILES].sort()) {
   const to = path.join(out, file);
   mkdirSync(path.dirname(to), { recursive: true });
@@ -62,9 +65,16 @@ for (const file of [...FILES].sort()) {
 for (const file of [...stubs.keys()].sort()) {
   const to = path.join(out, file);
   mkdirSync(path.dirname(to), { recursive: true });
-  const lines = [...stubs.get(file)].sort().map((name) => `export type ${name} = any;`);
+  const lines = [...stubs.get(file)].sort().map((name) => `export type ${name} = ${STUB_TYPES[file]?.[name] ?? 'any'};`);
   writeFileSync(to, `// Generated type stub (scripts/sync-atlas-shared.mjs). Atlas's ${file} is not copied: only its type names are needed.\n${lines.join('\n')}\n`);
   record.stubs[`src/app/${file}`] = hashFile(to);
 }
+for (const file of [...boundaries].sort()) {
+  if (stubs.has(file)) throw new Error(`${file} is a boundary and cannot also be stubbed`);
+  const to = path.join(out, file);
+  mkdirSync(path.dirname(to), { recursive: true });
+  writeFileSync(to, BOUNDARIES[file]);
+  record.boundaries[`src/app/${file}`] = hashFile(to);
+}
 writeFileSync(path.join(shared, 'SOURCE.json'), `${JSON.stringify(record, null, 2)}\n`);
-console.log(`packages/atlas-shared: ${FILES.length} files and ${stubs.size} stubs from Atlas ${ATLAS_TAG} (${commit.slice(0, 7)})`);
+console.log(`packages/atlas-shared: ${FILES.length} files, ${stubs.size} stubs and ${boundaries.size} boundaries from Atlas ${ATLAS_TAG} (${commit.slice(0, 7)})`);

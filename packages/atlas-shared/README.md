@@ -11,6 +11,10 @@ and commit named in `SOURCE.json`, by `scripts/sync-atlas-shared.mjs`. The list 
 A copied file may import the type of an Atlas file that is not copied. Each such file gets a generated stub at the same
 path, holding only `export type Name = any;` lines. `SOURCE.json` lists the stubs apart from the copies.
 
+A few copied files name a label with Atlas's `t`. Atlas's texts (about 110 files, in every language) are not rules and are not copied: `src/app/i18n/index.ts` is a generated stand-in whose `t` gives the key back, listed under `boundaries` in `SOURCE.json`. Nothing the package exports may show a label made that way.
+
+One stubbed type is given a shape instead of `any` (`STUB_TYPES` in `files.mjs`), where a copied file passes a function and its parameter would otherwise have no type.
+
 `src/index.ts` is ours: it names what the plugins may import.
 
 ## Do not edit by hand

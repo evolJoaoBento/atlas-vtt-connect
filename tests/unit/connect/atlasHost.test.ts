@@ -190,6 +190,22 @@ describe('the Atlas host', () => {
     expect(s.host.holds(B)).toBe(true);
   });
 
+  it('whenHeld and follow end at once when the view switches to another map by itself', async () => {
+    const s = setup();
+    const { view } = s.workspace.addAtlas();
+    s.workspace.fire('layout-change');
+    const following = s.host.follow(A, asLeaf(s.board));
+    await tick();
+    const waits = [s.host.whenHeld(A), s.host.whenHeld(A)];
+    // Atlas goes to B by another road (the GM presents it, or switches the scene tab): no follow of this host.
+    await view.onLoadFile({ path: B });
+    view.loaded();
+    await tick();
+    await expect(Promise.all(waits)).resolves.toEqual([null, null]);
+    await expect(following).resolves.toBe('superseded');
+    expect(s.waits.length).toBeGreaterThan(0);
+  });
+
   it('whenHeld gives up after HOST_LOAD_MS', async () => {
     const s = setup();
     s.workspace.addAtlas();

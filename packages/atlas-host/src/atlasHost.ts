@@ -206,9 +206,15 @@ export class AtlasHost {
         stop();
         resolve(result);
       };
+      // Atlas was seen loading, and came to rest on another map: it went elsewhere by another road (the GM presented a
+      // scene, or switched its tab). This follow is over, and what waited on it is answered now, not at the timeout.
+      let sawLoading = this.status().kind === 'loading';
       const check = (): void => {
+        const status = this.status();
+        if (status.kind === 'loading') sawLoading = true;
         if (run !== this.run) finish('superseded');
         else if (this.holds(mapPath)) finish('held');
+        else if (sawLoading && status.kind === 'held') finish('superseded');
       };
       const stop = this.onChange(check);
       void this.wait(HOST_LOAD_MS).then(() => finish(run !== this.run ? 'superseded' : this.holds(mapPath) ? 'held' : 'timeout'));

@@ -275,7 +275,7 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 1, name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
     const sceneId = w.broadcaster.currentProjection()!.sceneId;
     link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId: 'hero', x: 300, y: 150 }));
     expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
