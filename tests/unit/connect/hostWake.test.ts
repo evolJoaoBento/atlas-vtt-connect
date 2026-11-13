@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
-import { loadDeferredLeaves, wakeAtlasForHosting, type HostingWakeDeps } from '../../../src/connect/stockWake';
+import { loadDeferredLeaves, wakeAtlasForHosting, type HostingWakeDeps } from '../../../packages/atlas-host/src/index';
 
 function workspace(leaves: Array<{ isDeferred?: boolean; loadIfDeferred?: () => Promise<void> }>, recent: unknown) {
   let active = recent;
