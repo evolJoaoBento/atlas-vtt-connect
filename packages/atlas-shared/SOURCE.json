@@ -1,0 +1,30 @@
+{
+  "repository": "atlas-vtt/atlas-vtt",
+  "tag": "0.15.0",
+  "commit": "1a858783e6a81acbd78145251db8448a5b3b628b",
+  "files": {
+    "src/app/grid/gridDistance.ts": "0d78a641af4a7a5f162a65c4db18ff3d38c62d33a2b321f92127d79e8d6e6cb6",
+    "src/app/grid/hexGeometry.ts": "32d247d264d6febe2500cef5b407e07d53b1b462f52f49a915ac0235c210cd96",
+    "src/app/grid/measurementFormat.ts": "7999298276f850227f9bbbfd37c09a9cb7e9beb9dff315fbacd23f7d85302aa5",
+    "src/app/measure/areaRules.ts": "2bbc7006f84c0971fe7d3393abcbe10e81284ea3a8ca0e36e1d5b24bfefcacb1",
+    "src/app/types/collectionSettingsTypes.ts": "a4c022ddf1af886f6501616e8428eeb8f6f038099b7a149aff9284b4cae4d288",
+    "src/app/types/gridTypes.ts": "02a511275e32be6f21b82afd15029216dd9941e38b47a30edd925094f4c415c1"
+  },
+  "stubs": {
+    "src/app/grid/GridSystem.ts": "6cdc61f8fa12bbb463641f088c5b94cb8535a40e8e6b116351098a64bc20b8f8",
+    "src/app/grid/cellNumbering.ts": "4ae69cc0eb41b66acf96a01f5f91bb0299872f70d9ae9627a133d209e1918955",
+    "src/app/grid/mapStretch.ts": "5e982d1f5ab4a502bad1a8fb7055f475cc50374e3c08cf948461f6d19edf0755",
+    "src/app/measure/movementRules.ts": "6690f972c702b1445b67d9d89be24475b856f54a776798477745f2580be5f760",
+    "src/app/resources/resourceTypes.ts": "c7aabd8db4a719a374f5e956fcc37623ce3294a5706faa8c3c46138f257750be",
+    "src/app/statblocks/model/roleTypes.ts": "ae2355672c404cc867b28f8736db2c9234455d3d14771efc35e775b93d1f4c97",
+    "src/app/types/creatureFilterTypes.ts": "839a3b59efc9027e5d6e8e54edd020727c3f40445ce266ba2224e0541d0d5339",
+    "src/app/types/diceRulesTypes.ts": "a2df40c9b9dc1456d738a4fda490981ff0bbf4bdf347e37f81b400b0fc11da5b",
+    "src/app/types/initiativeRulesTypes.ts": "94cc928a3c8def2918bf4c2ec126a4061c472f0e715b1d59880565ca908170bd",
+    "src/app/types/lightPresetTypes.ts": "98829dbea2aa32983d196a77145a96b6d6c8005a69a8bf2ec988be3c08bf49ce",
+    "src/app/types/lightingTypes.ts": "a1e9d0bae6c42c220ce1734bafd39541f475eee57f909388c3f13477eba42cd1",
+    "src/app/types/randomTableTypes.ts": "df9e414fdb36a9ec40efcf3709c5a7c19ece6269c10762472c49117a93ffc1e9",
+    "src/app/types/senseTypes.ts": "18ae64731dcb216f0a0a5b540715c9aef06bd5460aa065d8dc3fad7bc679a9d4",
+    "src/app/types/widgetIcons.ts": "82d7de8c4fa5ab408e10015f3f6235ff625d148890647512a0624283ce118d53",
+    "src/app/types/widgetTypes.ts": "f5f3f1bf858e266d7cdddc7e2a64bb46862b159e8cee19e774247ed768c42aa8"
+  }
+}

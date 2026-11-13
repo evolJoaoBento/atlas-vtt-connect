@@ -14,7 +14,9 @@
     "test": "vitest",
     "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json && eslint -c eslint.tests.config.mjs --max-warnings 0 tests scripts",
     "check:vendor": "node scripts/check-vendor.mjs",
+    "check:shared": "node scripts/check-shared.mjs",
     "sync:atlas": "node scripts/sync-atlas.mjs",
+    "sync:shared": "node scripts/sync-atlas-shared.mjs",
     "inventory": "node scripts/test-inventory.mjs"
   },
   "dependencies": {
