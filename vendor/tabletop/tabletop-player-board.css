@@ -1496,6 +1496,16 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-scene-tabs { position: absolute; top: 0; left: 0; right: 0; height: 0; z-index: 7; pointer-events: none; }
 .atlas-tabletop-scene-tabs[hidden] { display: none; }
 .atlas-tabletop-scene-tabs .atlas-scene-tab-bar { pointer-events: auto; }
+/* The layer a scene stands on ("+2"), in the tab's label beside its name. */
+.atlas-tabletop-scene-tabs .atlas-tabletop-scene-tab__layer {
+  flex: none;
+  padding: 0 4px;
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+}
 /* The banner and the handout sit below the tabs. */
 .atlas-tabletop-banner, .atlas-tabletop-handout { top: 52px; }
 
@@ -1915,6 +1925,9 @@ body.atlas-tabletop-player-window .view-header {
 
 /* The board's modes: a tool of the other mode is not on the bar. */
 .atlas-tabletop-off-mode { display: none !important; }
+/* Cinematic mode: the bar keeps the mode switch and, in the end slot, the live toggle. */
+.atlas-tabletop-bar--cinematic > :not(.atlas-tabletop-modes):not(.atlas-tabletop-extensions) { display: none !important; }
+.atlas-tabletop-bar--cinematic .atlas-tabletop-extensions > :not(.atlas-tabletop-cinema-tools) { display: none !important; }
 /* The paint tool's materials. */
 .atlas-tabletop-paint-options { width: 300px; max-height: 360px; overflow-y: auto; padding: 8px; }
 .atlas-tabletop-paint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -2291,3 +2304,10 @@ body.atlas-tabletop-player-window .view-header {
 .tabletop-menu__item:hover:not(:disabled) { background: var(--background-modifier-hover); }
 .tabletop-menu__item:disabled { opacity: 0.45; cursor: not-allowed; }
 .tabletop-menu__tick { width: 16px; text-align: center; }
+
+/*
+ * The ported Atlas UI follows Atlas 0.14 and is styled by 0.14's stylesheet (dialog header row, import list, labelled
+ * switch). The palette's options are a plain scrolling column as in 0.14: that one rule is Atlas's own there, restated
+ * so a 0.13 Atlas (which wrapped them in its overlay scroll) still scrolls them.
+ */
+.atlas-vtt-plugin .atlas-command-palette-options { flex: 1; min-height: 0; overflow-y: auto; }
