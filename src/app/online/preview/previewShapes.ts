@@ -1,7 +1,7 @@
 /**
  * What the join page's map view takes from the preview: grid lines and fog shapes, in world coordinates.
  */
-import { axialToPixel, createHexLayout, hexVertices, isHexGridType, pixelToAxial } from '@atlas-vtt/shared/grid';
+import { axialToPixel, createHexLayout, hexVertices, isHexGridType, pixelToAxial } from '../../../../packages/atlas-shared/src/index';
 import { sortedByOrder, type PlayerFogOp, type PlayerGrid, type ScenePoint } from '../scene/sceneTypes';
 import type { PreviewRect } from './previewLayout';
 

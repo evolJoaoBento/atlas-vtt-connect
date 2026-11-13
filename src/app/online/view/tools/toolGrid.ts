@@ -7,9 +7,9 @@
  * grid, distances count squares of the map's cell size. Distances are labelled with the GM's measurement
  * settings, as Atlas's ruler labels them, and cones open by the GM's cone angle. Shared with the web page.
  */
-import { cellCenterAt, type GridGeometry } from '@atlas-vtt/shared/grid';
-import { snapTokenCenter } from '@atlas-vtt/shared/grid';
-import { formatDistance, pathLengthInCells, type GridGeometry as AtlasGeometry } from '../../../../../packages/atlas-shared/src/index';
+// The grid's shape as the page's drawing code (the older Atlas bundle) types it; the rules below are Atlas 0.15's own.
+import type { GridGeometry } from '@atlas-vtt/shared/grid';
+import { cellCentreAt, formatDistance, pathLengthInCells, snapTokenCenter, type GridGeometry as AtlasGeometry } from '../../../../../packages/atlas-shared/src/index';
 import { snapGridOf } from '../../scene/snapGrid';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 
@@ -27,6 +27,9 @@ export interface ToolGrid {
   coneOpening: number;
 }
 
+/** The centre of the cell a point lies in, by Atlas (whose own point type is not carried by the shared package). */
+const centreOf = (grid: GridGeometry, point: ScenePoint): ScenePoint => cellCentreAt(grid as AtlasGeometry, point) as ScenePoint;
+
 export function toolGridOf(scene: PlayerScene): ToolGrid {
   const grid = scene.grid;
   const snapGrid = snapGridOf(scene);
@@ -34,14 +37,14 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     ?? (grid ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY } : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 });
   return {
     geometry,
-    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? centreOf(geometry, point) : { x: point.x, y: point.y }),
     snapCorner: (point) => {
       if (!scene.measurement.snapToGrid || !(grid || snapGrid) || geometry.type !== 'square' || !(geometry.size > 0)) return { x: point.x, y: point.y };
       const corner = (value: number, offset: number): number => offset + Math.round((value - offset) / geometry.size) * geometry.size;
       return { x: corner(point.x, geometry.offsetX ?? 0), y: corner(point.y, geometry.offsetY ?? 0) };
     },
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
-      ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
+      ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => centreOf(snapGrid, cell))
       : { x: point.x, y: point.y }),
     // Atlas 0.15's own distance and label: the diagonal rule (Manhattan too) and the unit's name as the GM typed it.
     label: (points) => formatDistance(pathLengthInCells(geometry as AtlasGeometry, points, scene.measurement.diagonalRule), scene.measurement),

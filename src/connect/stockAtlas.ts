@@ -19,7 +19,7 @@ import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
   MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
 } from '@atlas-vtt/api-types';
-import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
+import { resolveMeasurementSettings } from '../../packages/atlas-shared/src/index';
 import { stockLightingApi } from './stockLighting/stockLighting';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
@@ -266,7 +266,8 @@ function defaultRules(): MapRules {
   return Object.freeze({
     collectionId: null,
     gridDefaults: null,
-    measurement: Object.freeze({ ...resolveMeasurementSettings(undefined, null), coneAngle: 90 }),
+    // Atlas 0.15's settings; the extension API's type is older (it knows no Manhattan rule).
+    measurement: Object.freeze({ ...resolveMeasurementSettings(undefined, null), coneAngle: 90 }) as unknown as MapRules['measurement'],
     resources: Object.freeze([]),
     conditions: Object.freeze([]),
     initiative: Object.freeze({ mode: 'turn-order' as const, roll: '1d20', firstSide: 'players' as const }),

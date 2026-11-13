@@ -12,7 +12,7 @@ import {
   arcPoints, coneGeometry, MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW,
   measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '@atlas-vtt/shared/draw';
-import { DEFAULT_LASER_POINTER_SETTINGS } from '@atlas-vtt/shared/rules';
+import { DEFAULT_LASER_POINTER_SETTINGS } from '../../../../../packages/atlas-shared/src/index';
 import type { ScenePoint } from '../../scene/sceneTypes';
 import type { OverlayLayer } from '../layers/layerTypes';
 import { cssColor } from '../layers/tokenUiDrawing';

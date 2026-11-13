@@ -2,7 +2,8 @@
  * The widget bar and initiative tracker as players receive them, following the
  * same rules as `PlayerWidgetBar` and `PlayerInitiativePanel` in the local window.
  */
-import { DEFAULT_INITIATIVE_RULES, listedBySides, sideOf } from '@atlas-vtt/shared/rules';
+import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
+import { listedBySides, sideOf } from '../../../../packages/atlas-shared/src/index';
 import type { InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity } from '@atlas-vtt/api-types';
 import { isSteppedWidget, readCounterValue } from '../../utils/counterWidget';
 import { isWidgetOn } from '../../utils/widgetActivation';
@@ -98,7 +99,7 @@ export function withCombatantSides(
   if (!initiative?.sides) return result;
   for (const { tokenId, sideId } of initiative.entries) {
     // A named side reads as the opponents' to an older page, which knows no other (the entry carries the real one).
-    if (Object.hasOwn(result, tokenId) && source && Object.hasOwn(source, tokenId)) setOwn(result, tokenId, { ...result[tokenId]!, side: sideId !== undefined ? 'opponents' : sideOf(source[tokenId]) });
+    if (Object.hasOwn(result, tokenId) && source && Object.hasOwn(source, tokenId)) setOwn(result, tokenId, { ...result[tokenId]!, side: sideId !== undefined ? 'opponents' : sideOf(source[tokenId] as never) });
   }
   return result;
 }

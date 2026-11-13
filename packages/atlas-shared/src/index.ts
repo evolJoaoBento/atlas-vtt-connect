@@ -151,9 +151,12 @@ export type * from './app/types/initiativeRulesTypes';
 export type * from './app/types/initiativeTypes';
 
 // ── Settings and constants ────────────────────────────────────────────────────
+import { LASER_COLOR_SWATCHES } from './app/tools/laserPointerSettings';
+
+/** Atlas's laser colours, in its order. Their names are Atlas's texts, which this package does not carry. */
+export const LASER_COLORS: readonly string[] = LASER_COLOR_SWATCHES.map((swatch) => swatch.value);
 export {
   DEFAULT_LASER_POINTER_SETTINGS,
-  LASER_COLOR_SWATCHES,
   LASER_FADE_TIME,
   LASER_SIZE_MAX,
   LASER_SIZE_MIN,

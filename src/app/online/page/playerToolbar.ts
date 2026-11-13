@@ -5,7 +5,9 @@
  * or tray hangs from it, never move. Shared with the web page; the DOM is
  * `online-client/toolbar.mts`.
  */
-import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES, LASER_SIZE_MAX, LASER_SIZE_MIN } from '@atlas-vtt/shared/rules';
+// The swatches' names and the hint are Atlas's texts: they come from the older bundle, which carries them in English.
+import { LASER_COLOR_HINT, LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
+import { LASER_SIZE_MAX, LASER_SIZE_MIN } from '../../../../packages/atlas-shared/src/index';
 import { overflowingToolbarItems, type ToolbarFitLayout } from '../../packages/components/toolbar/toolbarFit';
 import type { MeasureChoice } from '../view/tools/MeasureTool';
 import type { PlayerTool } from '../view/tools/PlayerTools';

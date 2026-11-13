@@ -1,5 +1,8 @@
 // Ported unchanged from Atlas VTT src/app/online/movement/movementWalls.ts (0.8.0; identical in 0.7.1). AGPL-3.0, like this plugin. Only imports were rewritten.
-import { BASE_TEXEL, fieldMargin, wallRadius, worldTexel } from './lightingConstants';
+import { lightingConstants } from '../../../../packages/atlas-shared/src/index';
+
+// Atlas 0.15's own lighting constants: a token stops where Atlas's light does.
+const { BASE_TEXEL, fieldMargin, wallRadius, worldTexel } = lightingConstants;
 import { sealedWalls } from './sealWalls';
 import { blocksNothing, segOf } from './segments';
 import type { WallSegment } from './types';

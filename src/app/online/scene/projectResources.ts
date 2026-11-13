@@ -11,7 +11,7 @@
  * players see. `visibleResources` stays the one place that picks the resources and their sockets, so a rule the
  * window follows is followed here.
  */
-import { isDefeated, isSpent, resourceColor, shapeOf } from '@atlas-vtt/shared/rules';
+import { isDefeated, isSpent, resourceColor, shapeOf } from '../../../../packages/atlas-shared/src/index';
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '@atlas-vtt/api-types';
 import { finiteOr } from './coerce';
 import { collectionShow, type ResourceShow } from './resourceVisibility';

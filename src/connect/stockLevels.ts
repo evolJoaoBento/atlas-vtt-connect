@@ -3,7 +3,12 @@
  * record with a level tag, and a view shows one level; players must be sent that level only, never the tokens, walls
  * and lights of the floors above and below. Atlas's own rule (`levels/sceneLevels.ts`): an object with no level, or one
  * the scene does not have, stands on the first level, and walls and lights may stand on several (`levels`, or `'all'`).
+ *
+ * The rules are Atlas's own code (`packages/atlas-shared`: `resolveLevel`, `onLevel`). What is here checks what a
+ * store of unknown shape holds before handing it over, and cuts a scene's records to one level.
  */
+import { onLevel as atlasOnLevel, resolveLevel, type SceneLevels } from '../../packages/atlas-shared/src/index';
+
 export interface StockLevel {
   readonly id: string;
   readonly background?: string | null;
@@ -20,22 +25,13 @@ export function hasLevels(levels: unknown): levels is readonly StockLevel[] {
 /** The level a view shows: its own when the scene has it, else the first; null for a scene without levels. */
 export function shownLevel(levels: unknown, viewed: unknown): string | null {
   if (!hasLevels(levels)) return null;
-  return typeof viewed === 'string' && levels.some((level) => level.id === viewed) ? viewed : (levels[0]?.id ?? null);
+  return resolveLevel(levels as unknown as SceneLevels, viewed);
 }
 
 function onLevel(entry: unknown, levelId: string, levels: readonly StockLevel[]): boolean {
-  const first = levels[0]?.id;
-  if (!isObj(entry)) return levelId === first;
-  const known = (id: unknown): id is string => typeof id === 'string' && levels.some((level) => level.id === id);
-  const { levels: set, level } = entry;
-  if (set === 'all') return true;
-  if (Array.isArray(set)) {
-    const ids = set.filter(known);
-    if (ids.length > 0) return ids.includes(levelId);
-  } else if (known(level)) {
-    return level === levelId;
-  }
-  return levelId === first;
+  // An entry that is no object stands where unset objects do: on the first level.
+  if (!isObj(entry)) return levelId === levels[0]?.id;
+  return atlasOnLevel(entry, levelId, levels as unknown as SceneLevels);
 }
 
 /** `objects` with every record cut to the entries on the shown level; `objects` itself for a scene without levels. */

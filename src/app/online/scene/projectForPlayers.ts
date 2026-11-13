@@ -6,7 +6,7 @@
  * fields a later Atlas adds, is left out.
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
-import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle } from '@atlas-vtt/shared/grid';
+import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle } from '../../../../packages/atlas-shared/src/index';
 import { readUnitName, resolveMeasurementSettings } from '../../../../packages/atlas-shared/src/index';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
 import { resolvePinIcon } from '../view/pinIcons';

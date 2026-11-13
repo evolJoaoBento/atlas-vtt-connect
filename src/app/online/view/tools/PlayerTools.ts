@@ -13,7 +13,7 @@
  */
 import { laserPointSpacing } from '@atlas-vtt/shared/draw';
 import { RemoteLasers, type RemoteLaserFrame } from '@atlas-vtt/shared/draw';
-import { DEFAULT_LASER_POINTER_SETTINGS, LASER_SIZE_MAX, LASER_SIZE_MIN } from '@atlas-vtt/shared/rules';
+import { DEFAULT_LASER_POINTER_SETTINGS, LASER_SIZE_MAX, LASER_SIZE_MIN } from '../../../../../packages/atlas-shared/src/index';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 import { laserColor, swatchLaserColor } from '../../tools/laserColors';
 import type { PlayerLaser } from '../../tools/toolMessages';

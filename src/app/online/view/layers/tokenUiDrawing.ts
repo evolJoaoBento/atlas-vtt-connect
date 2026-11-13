@@ -7,7 +7,7 @@
  */
 import { badgePositions, CONDITION_BADGE, fitBadges } from '@atlas-vtt/shared/draw';
 import { restingTokenUIScale } from '@atlas-vtt/shared/draw';
-import { BAR_SLOTS } from '@atlas-vtt/shared/rules';
+import { BAR_SLOTS } from '../../../../../packages/atlas-shared/src/index';
 import {
   BAR_BORDER, BAR_STYLE, barFillRect, barInnerRect, barStackRects, barTickXs, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect,
   type UiRect,

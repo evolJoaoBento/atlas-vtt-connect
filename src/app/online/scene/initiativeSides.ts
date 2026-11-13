@@ -7,6 +7,7 @@
  * Atlas's data is read as untrusted: a side id may be any text up to 64 characters, `__proto__` included, so sides are
  * held in arrays and rolls in maps, never in records keyed by id.
  */
+import { initiativeSideRules, roundTurns, type SidesFight } from '../../../../packages/atlas-shared/src/index';
 import { PLAYER_SIDES, type PlayerInitiative, type PlayerInitiativeEntry, type PlayerSide, type PlayerToken } from './sceneTypes';
 
 /** Atlas's limits: at most eight sides, an id up to 64 characters, a name up to 40. */
@@ -30,12 +31,11 @@ export interface SideRow {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
-export const isBuiltInSide = (id: unknown): id is PlayerSide => (PLAYER_SIDES as readonly unknown[]).includes(id);
+/** Atlas's own (`gameSystems/initiativeSideRules.ts`), asked with what a wire or a file holds. */
+export const isBuiltInSide = (id: unknown): id is PlayerSide => typeof id === 'string' && initiativeSideRules.isBuiltInSide(id);
 
-const otherSide = (side: PlayerSide): PlayerSide => (side === 'players' ? 'opponents' : 'players');
-
-/** `Gbe`: the two built-in sides, `first` first. */
-export const defaultSides = (first: PlayerSide): RuleSide[] => [{ id: first }, { id: otherSide(first) }];
+/** Atlas's own: the two built-in sides, `first` first. */
+export const defaultSides = (first: PlayerSide): RuleSide[] => initiativeSideRules.defaultSides(first);
 
 /** What the player window calls a side (`gG`). */
 export function sideName(side: RuleSide): string {
@@ -95,15 +95,10 @@ function readRolls(fight: Record<string, unknown>, round: number): Map<string, n
  * roll acts first, a side with no roll last, and sides with an equal roll act together.
  */
 export function actingGroups(order: readonly string[], rolls: ReadonlyMap<string, number> | undefined): string[][] {
-  if (!rolls) return order.map((id) => [id]);
-  const rolled = (id: string): number => rolls.get(id) ?? -Infinity;
-  const groups: string[][] = [];
-  for (const id of [...order].sort((a, b) => rolled(b) - rolled(a))) {
-    const last = groups[groups.length - 1];
-    if (last && rolled(last[0]!) === rolled(id) && Number.isFinite(rolled(id))) last.push(id);
-    else groups.push([id]);
-  }
-  return groups;
+  // Atlas's own `roundTurns` (`initiative/sideOrder.ts`), handed the order and this round's rolls as a fight holds them.
+  // The rolls go in a record with no prototype: a side may be named `constructor`.
+  const fight = { first: 'players', order: order.map((id) => ({ id })), ...(rolls ? { roll: '1d20', rolls: { 1: Object.assign(Object.create(null) as Record<string, number>, Object.fromEntries(rolls)) } } : {}) };
+  return roundTurns(fight as unknown as SidesFight, 1);
 }
 
 export interface SideRowsInput {
@@ -173,7 +168,7 @@ export function sidesNext(initiative: Pick<PlayerInitiative, 'sides' | 'sideList
   const rows = initiative.sideList;
   if (!rows) {
     const active = initiative.sides?.active;
-    return active ? new Set([otherSide(active)]) : null;
+    return active ? new Set([initiativeSideRules.otherSide(active)]) : null;
   }
   const last = rows.map((row) => row.turn === true).lastIndexOf(true);
   if (last === -1) return null;

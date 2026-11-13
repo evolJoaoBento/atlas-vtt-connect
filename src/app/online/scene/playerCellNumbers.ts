@@ -3,7 +3,7 @@
  * any grid, or from a GM before Atlas 0.5.1 the older `hexNumbers`, which numbered hex grids only.
  * Shared with the web page.
  */
-import { type CellNumberStyle, DEFAULT_CELL_NUMBER_OPACITY, isHexGridType } from '@atlas-vtt/shared/grid';
+import { type CellNumberStyle, DEFAULT_CELL_NUMBER_OPACITY, isHexGridType } from '../../../../packages/atlas-shared/src/index';
 import type { PlayerGrid } from './sceneTypes';
 
 export function playerCellNumbers(grid: PlayerGrid): CellNumberStyle | null {
