@@ -17,7 +17,7 @@ import type { PlayerScene } from './sceneTypes';
 import { sceneContext, type SceneProjectionOptions } from './sceneSources';
 
 /** What the projection reads of the session's options. */
-export type CutsceneProjectionOptions = Pick<SceneProjectionOptions, 'settings' | 'assets' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis'>;
+export type CutsceneProjectionOptions = Pick<SceneProjectionOptions, 'settings' | 'assets' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis' | 'movement'>;
 
 /** The scene's JSON may weigh this much: its message also carries an envelope. */
 export const CUTSCENE_SCENE_BYTES = MAX_CONTROL_MESSAGE_BYTES - 8 * 1024;

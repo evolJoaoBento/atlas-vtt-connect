@@ -282,7 +282,7 @@ export class PlayerTools implements TokenGrab {
     if (this.current === 'move') {
       if (!this.options.moves.grab(point)) return false;
       const dragged = this.options.moves.dragged();
-      if (dragged) this.ruler.begin(dragged.origin, grid, kind, this.tokenSize(dragged.tokenId));
+      if (dragged) this.ruler.begin(dragged.origin, grid, kind, this.tokenSize(dragged.tokenId), this.tokenSpeed(dragged.tokenId));
     } else if (this.current === 'measure') {
       this.measure.begin(this.options.toWorld(point), grid);
     } else if (this.current === 'template') {
@@ -374,6 +374,12 @@ export class PlayerTools implements TokenGrab {
   private tokenSize(tokenId: string): number {
     const tokens = this.scene?.tokens;
     return (tokens && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.size : undefined) || 1;
+  }
+
+  /** The speed the GM's Atlas gives the token (sent for the players' tokens only); null without one. */
+  private tokenSpeed(tokenId: string): number | null {
+    const tokens = this.scene?.tokens;
+    return (tokens && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.speed : undefined) ?? null;
   }
 
   /** A template's points land as a measurement's do; a square's on the corners of the grid's cells. */

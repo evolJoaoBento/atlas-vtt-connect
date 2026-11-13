@@ -19,11 +19,11 @@ import type {
   AtlasApi, AtlasCapability, AtlasEvents, AtlasExtension, AtlasSettingKey, AtlasSettingsView, ConnectingPlugin, Disposer,
   MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
 } from '@atlas-vtt/api-types';
-import { resolveMeasurementSettings } from '../../packages/atlas-shared/src/index';
+import { readDragDistance, resolveMeasurementSettings } from '../../packages/atlas-shared/src/index';
 import { stockLightingApi } from './stockLighting/stockLighting';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
-import { stockMapRules } from './stockRules';
+import { stockMapRules, stockMovement } from './stockRules';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
 import { AtlasHost, loadDeferredLeaves, wakeAtlasForHosting } from '../../packages/atlas-host/src/index';
@@ -110,6 +110,8 @@ interface StockSettings {
   getLocalPlayerViewSettings(): Record<string, unknown>;
   /** What the initiative tracker does as the turn moves on (`movesOnTurn`: players move only on their turn); absent on an Atlas without it. */
   initiativeTurnOptions?(): { movesOnTurn?: unknown };
+  /** Atlas 0.15: when a dragged token shows its distance (`always`, `combat`, `never`); absent on an older Atlas. */
+  getDragDistance?(): unknown;
   /** Whether an experimental feature is switched on (`dynamicLighting`); absent on an Atlas without them. */
   isExperimentalOn?(id: string): unknown;
   onChange(listener: () => void): () => void;
@@ -300,6 +302,8 @@ function settingsView(service: StockSettings): AtlasSettingsView {
       ...Object.fromEntries(PLAYER_VIEW_KEYS.map((key) => [key, key === 'showGrid' ? player[key] !== false : player[key] === true])),
       showDiceRolls: player.showDiceRolls === true,
       movesOnTurn: turnOptions(service).movesOnTurn === true,
+      // Atlas 0.15: when a dragged token shows its distance; players' rulers follow it.
+      dragDistance: readDragDistance(typeof service.getDragDistance === 'function' ? service.getDragDistance() : undefined),
     } as unknown as AtlasSettingsView['playerView'],
   };
 }
@@ -837,6 +841,16 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
             } catch (error) {
               console.warn('[Atlas VTT Connect] Could not read the rules of a stock Atlas map; using the defaults:', error);
               return defaultRules();
+            }
+          },
+          // Atlas 0.15's movement: what the GM's own drag ruler reads (`stockMovement`). The extension API has none.
+          movementFor: (mapPath: string | null) => {
+            try {
+              const views = mapViews(app).map((view) => ({ mapPath: () => view.atlasStore.getState().mapPath, serviceManager: view.serviceManager }));
+              return stockMovement(views, mapPath);
+            } catch (error) {
+              console.warn('[Atlas VTT Connect] Could not read the movement rules of a stock Atlas map:', error);
+              return null;
             }
           },
         }),

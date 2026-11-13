@@ -43,6 +43,9 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     // Where the list by sides files the combatant (`sideOf`); sent only for combatants while the list is by sides. A named
     // side (`sideId`, from the combatant's entry) wins: the token's own `side` reads `opponents` for an older page.
     ...((sideId ?? token.side) && { side: (sideId ?? token.side) as NonNullable<TokenEntity['side']> }),
+    // Atlas 0.15: the token stands at its height, and its own drag ruler reads its speed (the extension API's types know neither).
+    ...(token.elevation !== undefined && { elevation: token.elevation }),
+    ...(token.speed !== undefined && { speed: token.speed }),
   };
   const bars = atlasBars(token);
   if (token.name === null && bars === null) {

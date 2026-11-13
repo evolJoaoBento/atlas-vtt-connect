@@ -187,6 +187,14 @@ export interface PlayerToken {
   ringScale?: number;
   /** The 3D mini standing on the token; sent only for a token that has one. An older player ignores it. */
   mini?: PlayerMini;
+  /** How high the token stands over its level's floor, in game units (Atlas 0.15's `elevation`, read with `tokenHeight`); sent only when not 0. */
+  elevation?: number;
+  /**
+   * How far the token moves in one move, in game units, as the GM's Atlas reads it (`tokenSpeed`). Sent only for a
+   * token on the players' side (Atlas's `sideOf`), and only where the measurement carries movement steps: Atlas shows
+   * players the reading against a speed for their own tokens only.
+   */
+  speed?: number;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */
@@ -309,6 +317,26 @@ export const PLAYER_UNIT_TYPES = ['feet', 'yards', 'meters', 'units', 'custom'] 
 /** Atlas's diagonal rules. `manhattan` (every diagonal counts 2) is Atlas 0.15's. */
 export const PLAYER_DIAGONAL_RULES = ['equidistant', 'alternating', 'euclidean', 'manhattan'] as const;
 
+/** When a dragged token shows its distance (Atlas 0.15's `dragDistance` setting): always, only while a fight runs, or never. */
+export const PLAYER_DRAG_DISTANCES = ['always', 'combat', 'never'] as const;
+export type PlayerDragDistance = typeof PLAYER_DRAG_DISTANCES[number];
+
+/** One movement step of the collection's rules (Atlas 0.15's `MovementStep`). */
+export interface PlayerMovementStep {
+  name: string;
+  /** How many times the token's speed the step reaches. */
+  multiple: number;
+  /** `#rrggbb`. */
+  color: string;
+}
+
+/** The collection's movement rules as a drag reads them (Atlas 0.15's `MovementRules`, without the speed: each token carries its own). */
+export interface PlayerMovement {
+  steps: PlayerMovementStep[];
+  /** Whether what a token moves adds up over a turn while a fight runs. */
+  countPerTurn: boolean;
+}
+
 export interface PlayerRangeBand {
   name: string;
   /** The band covers distances up to this many squares. */
@@ -348,6 +376,10 @@ export interface PlayerMeasurement {
    * grid, so nothing snaps. Absent from a GM before Atlas 0.5.1-beta.5.
    */
   snapGrid?: PlayerSnapGrid | null;
+  /** The collection's movement steps; sent only where it names one. A drag of a token with a speed reads against them. */
+  movement?: PlayerMovement;
+  /** When a drag shows its distance; sent only when it is not `always`. */
+  dragDistance?: PlayerDragDistance;
 }
 
 export interface PlayerScene {

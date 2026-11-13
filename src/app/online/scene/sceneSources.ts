@@ -8,7 +8,7 @@ import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import { readAlignment } from './mapPlacement';
 import type { PlayerViewRules } from './playerViewRules';
-import type { MiniPlacement, ProjectionContext } from './projectForPlayers';
+import type { MiniPlacement, ProjectedMovement, ProjectionContext } from './projectForPlayers';
 import type { ResourceVisibilitySource } from './resourceVisibility';
 import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import type { SceneSession } from './sceneContracts';
@@ -46,6 +46,8 @@ export interface SceneProjectionOptions {
   conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   /** The initiative rules of the collection holding the map at `mapPath`, which say whether the list is by sides before a fight; without it the list is in turn order. */
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
+  /** The movement of the map at `mapPath` (Atlas 0.15): its rules and each token's speed, as the GM's Atlas reads them; without it drags read as plain distances. */
+  movement?: (mapPath: string | null) => ProjectedMovement | null;
   /** Calls `listener` when a collection's rules change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of each scene's collection, sent to its players; without it (an Atlas before API 1.18) none is sent. */
@@ -160,8 +162,8 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis'>,
-): Pick<ProjectionContext, 'mapSize' | 'mapAlignment' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis' | 'movement'>,
+): Pick<ProjectionContext, 'mapSize' | 'mapAlignment' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis' | 'movement'> {
   const { mapPath } = snapshot;
   const mapAlignment = readAlignment((snapshot as { mapAlignment?: unknown }).mapAlignment);
   const coneAngle = options.coneAngle?.(mapPath);
@@ -177,5 +179,6 @@ export function sceneContext(
     ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),
     ...(options.minis ? { minis: options.minis.forMap(mapPath) } : {}),
+    ...(options.movement ? { movement: options.movement(mapPath) } : {}),
   };
 }

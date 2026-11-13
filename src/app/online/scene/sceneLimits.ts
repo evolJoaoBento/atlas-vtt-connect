@@ -38,6 +38,9 @@ export const SCENE_LIMITS = {
   widgets: 64,
   initiativeEntries: 200,
   rangeBands: 32,
+  /** Atlas 0.15's `MAX_MOVEMENT_STEPS` and `MAX_STEP_NAME`. */
+  movementSteps: 4,
+  stepName: 24,
 } as const;
 
 type Range = readonly [min: number, max: number];
@@ -70,4 +73,10 @@ export const SCENE_RANGES = {
   miniScale: [0.2, 4],
   /** A mini's turn on its token, in degrees. */
   miniTurn: [0, 360],
+  /** A token's height in game units (Atlas 0.15's `MAX_TOKEN_HEIGHT` either way). */
+  elevation: [-100_000, 100_000],
+  /** A token's speed in game units, above 0 (Atlas 0.15's `MAX_MOVEMENT_SPEED`). */
+  speed: [0, 100_000],
+  /** A movement step's multiple of the speed, above 0 (Atlas 0.15's `MAX_STEP_MULTIPLE`). */
+  stepMultiple: [0, 100],
 } as const satisfies Record<string, Range>;

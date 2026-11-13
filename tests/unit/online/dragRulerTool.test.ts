@@ -93,3 +93,37 @@ describe('DragRulerTool', () => {
     expect(label({ unitDistance: 10, ruleDistance: 5 })).toBe('20ft');
   });
 });
+
+describe('the drag ruler under the movement rules (Atlas 0.15)', () => {
+  const steps = [{ name: 'Move', multiple: 1, color: '#22c55e' }, { name: 'Dash', multiple: 2, color: '#eab308' }];
+  const sceneWith = (measurement: object = {}, extra: object = {}) => {
+    const scene = playerScene(extra);
+    return { ...scene, measurement: { ...scene.measurement, movement: { steps, countPerTurn: false }, ...measurement } };
+  };
+  const drag = (grid: ReturnType<typeof toolGridOf>, cells: number, speed: number | null) => {
+    const ruler = new DragRulerTool(() => {});
+    ruler.begin({ x: 105, y: 105 }, grid, 'mouse', 1, speed);
+    ruler.update({ x: 105 + 70 * cells, y: 105 }, { x: 0, y: 0 });
+    return ruler.overlay();
+  };
+
+  it("reads a move against the token's speed, in its step's colour, as Atlas words it", () => {
+    const grid = toolGridOf(sceneWith());
+    expect(drag(grid, 4, 30)).toMatchObject({ label: '20 / 30ft', color: '#22c55e' });
+    expect(drag(grid, 8, 30)).toMatchObject({ label: '40 / 60ft', color: '#eab308' });
+    expect(drag(grid, 13, 30)).toMatchObject({ label: '65 / 60ft', color: 'beyond' });
+  });
+
+  it('reads a plain distance without a speed, or without steps', () => {
+    const plain = drag(toolGridOf(sceneWith()), 4, null);
+    expect(plain).toMatchObject({ label: '20ft' });
+    expect(plain).not.toHaveProperty('color');
+    expect(drag(toolGridOf(playerScene()), 4, 30)).not.toHaveProperty('color');
+  });
+
+  it("shows no ruler where the GM's choice hides it: never, or in a fight only", () => {
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'never' })), 4, 30)).toBeNull();
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'combat' }, { initiative: null })), 4, 30)).toBeNull();
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'combat' })), 4, 30)).toMatchObject({ label: '20 / 30ft' });
+  });
+});

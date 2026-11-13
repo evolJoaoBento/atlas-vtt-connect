@@ -481,3 +481,45 @@ describe('the player view rules with a curtain', () => {
     expect(samePlayerViewRules(pickPlayerViewRules(ALL_ON), pickPlayerViewRules({ ...ALL_ON, curtain: false }))).toBe(true);
   });
 });
+
+describe('token height and speed, and the movement rules (Atlas 0.15)', () => {
+  const steps = [{ name: 'Move', multiple: 1, color: '#22c55e' }, { name: 'Dash', multiple: 2, color: '#eab308' }];
+  const movement = (speedOf: (token: unknown) => number | null = () => 30, ruleSteps: typeof steps = steps) => ({ rules: { steps: ruleSteps, countPerTurn: true, speed: 30 }, speedOf });
+  const party = (overrides: Partial<Character> = {}): Character => hero({ vision: { enabled: true }, ...overrides } as Partial<Character>);
+
+  it("sends every token's height, and a speed only for a token on the players' side, where the rules name steps", () => {
+    const tokens = { hero: party({ elevation: 10 } as Partial<Character>), goblin: hero({ id: 'goblin', x: 300, elevation: -5 } as Partial<Character>) };
+    const scene = projectForPlayers(withTokens(tokens), context({ movement: movement() }));
+    expect(scene.tokens.hero).toMatchObject({ elevation: 10, speed: 30 });
+    expect(scene.tokens.goblin?.elevation).toBe(-5);
+    expect(scene.tokens.goblin).not.toHaveProperty('speed');
+    expect(scene.measurement.movement).toEqual({ steps, countPerTurn: true });
+  });
+
+  it('sends no height that is none, and no speed that is none', () => {
+    for (const elevation of ['x', Number.NaN, 0]) {
+      const scene = projectForPlayers(withTokens({ hero: party({ elevation } as Partial<Character>) }), context({ movement: movement() }));
+      expect(scene.tokens.hero, String(elevation)).not.toHaveProperty('elevation');
+    }
+    for (const speed of [-5, 0, Number.NaN, null]) {
+      const scene = projectForPlayers(withTokens({ hero: party() }), context({ movement: movement(() => speed) }));
+      expect(scene.tokens.hero, String(speed)).not.toHaveProperty('speed');
+    }
+  });
+
+  it('sends no steps and no speed where the rules name no step', () => {
+    const scene = projectForPlayers(withTokens({ hero: party() }), context({ movement: movement(() => 30, []) }));
+    expect(scene.measurement).not.toHaveProperty('movement');
+    expect(scene.tokens.hero).not.toHaveProperty('speed');
+    expect(projectForPlayers(withTokens({ hero: party() }), context()).measurement).not.toHaveProperty('movement');
+  });
+
+  it("carries the GM's choice of when a drag shows its distance", () => {
+    const combat = projectForPlayers(withTokens({}), context({ rules: { ...ALL_ON, dragDistance: 'combat' } }));
+    expect(combat.measurement.dragDistance).toBe('combat');
+    expect(projectForPlayers(withTokens({}), context()).measurement).not.toHaveProperty('dragDistance');
+    expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'never' }).dragDistance).toBe('never');
+    expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'sometimes' as never })).not.toHaveProperty('dragDistance');
+    expect(samePlayerViewRules(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'never' }), pickPlayerViewRules(ALL_ON))).toBe(false);
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MapRules } from '@atlas-vtt/api-types';
-import { stockMapRules, type RulesView } from '../../../src/connect/stockRules';
+import { stockMapRules, stockMovement, type RulesView } from '../../../src/connect/stockRules';
 
 const DEFAULTS = Object.freeze({
   collectionId: null, gridDefaults: null, measurement: {} as MapRules['measurement'],
@@ -12,11 +12,11 @@ const DEFAULTS = Object.freeze({
 const HP = { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true, slot: 0 };
 const FRIGHTENED = { id: 'c1', name: 'Frightened', color: '#ff0000', valued: true, effect: 'none' };
 
-function view(mapPath: string | null, parts: { sync?: unknown; assets?: unknown } = {}): RulesView {
+function view(mapPath: string | null, parts: { sync?: unknown; assets?: unknown; dragRuler?: unknown } = {}): RulesView {
   return {
     mapPath: () => mapPath,
     serviceManager: {
-      getRendererService: () => ({ getRenderer: () => ({ getTokenRenderer: () => ({ collectionSync: parts.sync }) }) }),
+      getRendererService: () => ({ getRenderer: () => ({ getTokenRenderer: () => ({ collectionSync: parts.sync, dragRuler: parts.dragRuler }) }) }),
       getAssetService: () => parts.assets,
     },
   };
@@ -173,5 +173,41 @@ describe("how a stock Atlas map measures (the collection's grid defaults)", () =
 
   it("leaves a map outside every collection to Atlas's defaults and the map's own grid", () => {
     expect(stockMapRules([view(MAP, { assets: assets({ gridDefaults: FIVE_E }) })], 'loose/map.atlasmap', DEFAULTS).gridDefaults).toBeNull();
+  });
+});
+
+describe("a stock Atlas map's movement rules and token speeds (Atlas 0.15)", () => {
+  const MAP = 'atlas-vtt/collections/Main/maps/cave.md';
+  const steps = [{ name: 'Move', multiple: 1, color: '#22c55e' }, { name: 'Dash', multiple: 2, color: '#eab308' }];
+
+  it("reads the rules and each token's speed from Atlas's own drag ruler, where a view shows the map", () => {
+    const movement = { rules: () => ({ steps, countPerTurn: true, speed: 30 }), speedOf: (token: { id: string }) => (token.id === 'hero' ? 25 : null) };
+    const read = stockMovement([view(MAP, { dragRuler: { movement }, assets: assets({}) })], MAP);
+    expect(read?.rules).toEqual({ steps, countPerTurn: true, speed: 30 });
+    expect(read?.speedOf({ id: 'hero' })).toBe(25);
+    expect(read?.speedOf({ id: 'goblin' })).toBeNull();
+  });
+
+  it('drops what Atlas would: a fifth step, a multiple of 0, a colour that is no hex, a speed that is none', () => {
+    const raw = {
+      steps: [...steps, { name: 'Run', multiple: 3, color: '#ef4444' }, { name: 'Sprint', multiple: 4, color: '#3b82f6' }, { name: 'Fly', multiple: 5, color: '#a855f7' }],
+      countPerTurn: false,
+    };
+    const movement = { rules: () => raw, speedOf: () => -5 };
+    const read = stockMovement([view(MAP, { dragRuler: { movement } })], MAP);
+    expect(read?.rules.steps.map((step) => step.name)).toEqual(['Move', 'Dash', 'Run', 'Sprint']);
+    expect(read?.speedOf({ id: 'hero' })).toBeNull();
+    const junk = { rules: () => ({ steps: [{ name: 'Zero', multiple: 0, color: '#22c55e' }, { name: 'Red', multiple: 1, color: 'red' }], countPerTurn: false }), speedOf: () => Number.NaN };
+    expect(stockMovement([view(MAP, { dragRuler: { movement: junk } })], MAP)?.rules.steps).toEqual([]);
+  });
+
+  it("reads the collection's stored rules for a map no view shows: a token's own speed, else the rules' for one without a statblock", () => {
+    const read = stockMovement([view('other.md', { assets: assets({ movement: { steps, countPerTurn: false, speed: 30 } }) })], MAP);
+    expect(read?.rules.steps).toEqual(steps);
+    expect(read?.speedOf({ id: 'a', speed: 40 })).toBe(40);
+    expect(read?.speedOf({ id: 'b' })).toBe(30);
+    expect(read?.speedOf({ id: 'c', statblockPath: 'goblin.md' })).toBeNull();
+    expect(stockMovement([view('other.md', { assets: assets(null) })], 'outside.md')).toBeNull();
+    expect(stockMovement([], null)).toBeNull();
   });
 });

@@ -12,7 +12,7 @@ import {
   arcPoints, coneGeometry, MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW,
   measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '@atlas-vtt/shared/draw';
-import { DEFAULT_LASER_POINTER_SETTINGS } from '../../../../../packages/atlas-shared/src/index';
+import { BEYOND_SPEED, DEFAULT_LASER_POINTER_SETTINGS } from '../../../../../packages/atlas-shared/src/index';
 import type { ScenePoint } from '../../scene/sceneTypes';
 import type { OverlayLayer } from '../layers/layerTypes';
 import { cssColor } from '../layers/tokenUiDrawing';
@@ -25,6 +25,8 @@ import { templateLabelAt, templateOutline } from '../../tools/templates';
 
 /** The join page's accent (`--accent` in `style.css`), standing in for the GM's Obsidian accent. */
 export const MEASURE_ACCENT = '#7c5cff';
+/** A move past the last movement step: Atlas draws it in the theme's error red (Obsidian's dark theme's). */
+export const MOVE_BEYOND_COLOR = '#fb464c';
 const LABEL_FONT_FAMILY = 'sans-serif';
 /** A label's height per unit of font size, about one line as PIXI measures it. */
 const LABEL_LINE_HEIGHT = 1.2;
@@ -50,9 +52,11 @@ export function drawTools(surface: ViewSurface, overlay: ToolOverlay, zoom: numb
   if (overlay.measure) drawMeasurement(surface, overlay.measure, zoom, dark);
   const ruler = overlay.ruler;
   if (ruler) {
-    drawPath(surface, ruler.points);
+    // The line takes the colour of the movement step the drag lies in (Atlas 0.15), else the accent.
+    const ink = ruler.color === undefined ? MEASURE_ACCENT : ruler.color === BEYOND_SPEED ? MOVE_BEYOND_COLOR : ruler.color;
+    drawPath(surface, ruler.points, ink);
     // The dragged token covers the end; the start and waypoints stay marked.
-    for (const point of ruler.points.slice(0, -1)) drawPoint(surface, point);
+    for (const point of ruler.points.slice(0, -1)) drawPoint(surface, point, ink);
     const middle = pathMidpoint(ruler.points);
     if (middle) drawLabel(surface, ruler.label, middle, zoom, dark);
   }

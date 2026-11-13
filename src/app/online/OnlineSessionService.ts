@@ -15,6 +15,7 @@ import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
 import type { DiceLookSource, BoardSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
+import type { ProjectedMovement } from './scene/projectForPlayers';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
@@ -54,6 +55,8 @@ export interface Deps extends OptionalParts {
   lighting?: LightingSource;
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
   coneAngle?: (mapPath: string | null) => number;
+  /** The movement of each map (Atlas 0.15): its rules and each token's speed, as the GM's Atlas reads them. */
+  movement?: (mapPath: string | null) => ProjectedMovement | null;
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
@@ -159,6 +162,7 @@ export class OnlineSessionService {
           ...(deps.lighting ? { lighting: deps.lighting } : {}),
           ...(deps.collectionGrid ? { collectionGrid: deps.collectionGrid } : {}),
           ...(deps.coneAngle ? { coneAngle: deps.coneAngle } : {}),
+          ...(deps.movement ? { movement: deps.movement } : {}),
           ...(deps.resources ? { resources: deps.resources } : {}),
           ...(deps.conditions ? { conditions: deps.conditions } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),

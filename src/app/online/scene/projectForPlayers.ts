@@ -7,7 +7,7 @@
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle } from '../../../../packages/atlas-shared/src/index';
-import { readUnitName, resolveMeasurementSettings } from '../../../../packages/atlas-shared/src/index';
+import { readUnitName, resolveMeasurementSettings, sideOf, tokenHeight, type MovementRules } from '../../../../packages/atlas-shared/src/index';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
 import { resolvePinIcon } from '../view/pinIcons';
 import type { AssetIds } from './sceneContracts';
@@ -80,6 +80,14 @@ export interface ProjectionContext {
   initiativeRules?: InitiativeRules;
   /** The minis standing on the map's tokens (the Tabletop extension's), by token id; without it no token carries one. */
   minis?: Readonly<Record<string, MiniPlacement>>;
+  /** The map's movement (Atlas 0.15): the collection's rules and each token's speed, as the GM's Atlas reads them; without it a drag reads as a plain distance. */
+  movement?: ProjectedMovement | null;
+}
+
+/** A map's movement as the GM's Atlas reads it: its rules, and a token's speed in game units (null without one). */
+export interface ProjectedMovement {
+  readonly rules: MovementRules;
+  speedOf(token: unknown): number | null;
 }
 
 /** A mini on a token as the Tabletop extension places it: its GLB's vault path (never sent), size and turn. */
@@ -137,7 +145,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     drawings: closed ? {} : projectDrawings(objects?.drawings, visible, memo),
     widgets: curtained ? [] : projectWidgets(state, context.rules),
     initiative: curtained ? null : initiative,
-    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
+    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle, context.movement?.rules, context.rules),
     // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
     ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
     ...(context.handout !== undefined ? { handout: context.handout && !curtained ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
@@ -298,7 +306,7 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
  * The settings Atlas's ruler and measure tool use for this map, field by field. A scene's own distance per cell
  * (`unitDistanceOverride`) is in `unitDistance`; the collection's stays as `ruleDistance`.
  */
-function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number): PlayerMeasurement {
+function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number, movement?: MovementRules, rules?: PlayerViewRules): PlayerMeasurement {
   // Atlas 0.15's own reading: the extension API's types are older, and know neither `manhattan` nor a unit's name.
   const settings = resolveMeasurementSettings((collection ?? undefined), grid);
   const unitName = readUnitName(settings.unitName);
@@ -320,6 +328,9 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };
     }),
+    // Atlas 0.15: the steps a drag reads against (only where the rules name one), and when a drag shows its distance.
+    ...(movement && movement.steps.length > 0 ? { movement: { steps: movement.steps.map(({ name, multiple, color }) => ({ name, multiple, color })), countPerTurn: movement.countPerTurn } } : {}),
+    ...(rules?.dragDistance && rules.dragDistance !== 'always' ? { dragDistance: rules.dragDistance } : {}),
   };
 }
 
@@ -381,7 +392,21 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
     ...projectMini(context.minis?.[id], context),
+    ...projectMovement(token, context),
   };
+}
+
+/**
+ * A token's height (Atlas 0.15's `tokenHeight`, sent when not 0) and its speed: only for a token on the players' side
+ * (Atlas's `sideOf`) and only where the rules name steps, since Atlas shows players the reading against a speed for
+ * their own tokens only, and a speed is no use without steps.
+ */
+function projectMovement(token: TokenEntity, context: ProjectionContext): Pick<PlayerToken, 'elevation' | 'speed'> {
+  const height = tokenHeight(token as { elevation?: unknown });
+  const movement = context.movement;
+  const counted = movement && movement.rules.steps.length > 0 && sideOf(token as never) === 'players' ? movement.speedOf(token) : null;
+  const speed = counted !== null && Number.isFinite(counted) && counted > 0 ? Math.min(counted, SCENE_RANGES.speed[1]) : null;
+  return { ...(height !== 0 ? { elevation: height } : {}), ...(speed !== null ? { speed } : {}) };
 }
 
 /** A token's mini, for a token players are sent (a hidden or fogged one never is); the GLB goes by its fingerprint only. */

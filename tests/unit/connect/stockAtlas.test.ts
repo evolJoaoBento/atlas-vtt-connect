@@ -201,8 +201,14 @@ describe('stock Atlas stand-in', () => {
     const plugin = fakeConnectPlugin(app);
     const extension = stockAtlasApi(app, atlas).connect(plugin);
     // The GM's rolls stay private unless the GM shares them (`showDiceRolls`, off by default in Atlas).
-    expect(extension.settings.get('playerView')).toEqual({ showGrid: true, showTokenNameplates: false, showWidgets: false, showInitiative: false, showDiceRolls: false, movesOnTurn: false });
+    expect(extension.settings.get('playerView')).toEqual({ showGrid: true, showTokenNameplates: false, showWidgets: false, showInitiative: false, showDiceRolls: false, movesOnTurn: false, dragDistance: 'always' });
     expect(extension.rules.forMap('maps/one.atlasmap').collectionId).toBeNull();
+    // Atlas 0.15: the GM's drag-distance choice, and each map's movement (none here: no view, no index).
+    (atlas.settingsService as { getDragDistance?: () => unknown }).getDragDistance = () => 'combat';
+    expect(extension.settings.get('playerView')).toMatchObject({ dragDistance: 'combat' });
+    (atlas.settingsService as { getDragDistance?: () => unknown }).getDragDistance = () => 'sometimes';
+    expect(extension.settings.get('playerView')).toMatchObject({ dragDistance: 'always' });
+    expect((extension.rules as { movementFor?: (path: string) => unknown }).movementFor?.('maps/one.atlasmap')).toBeNull();
     extension.presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
     plugin.unload();
     expect(atlas.presentedScene.elsewhere()).toBe(0);

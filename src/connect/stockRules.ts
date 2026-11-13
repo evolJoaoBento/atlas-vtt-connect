@@ -11,10 +11,17 @@
  * Dice rules read first from the dice tool of a view showing the map (`getToolController().getDiceTool().getDiceRules()`:
  * the dice set Atlas's own toolbar rolls there), else the collection's stored `dice`, else the defaults.
  *
+ * Movement (Atlas 0.15) reads first from the drag ruler of a view showing the map (`getTokenRenderer().dragRuler.movement`:
+ * the rules with the game system's applied, and each token's speed as Atlas reads it, statblocks too), else the
+ * collection's stored `movement` (a token's own speed, else the rules' for a token without a statblock).
+ *
  * Everything read is checked and copied: a stock Atlas's objects are its own, never handed on.
  */
 import type { CollectionGridDefaults, ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
-import { readUnitName, resolveMeasurementSettings, type CollectionGridDefaults as AtlasGridDefaults } from '../../packages/atlas-shared/src/index';
+import {
+  isMovementSpeed, NO_MOVEMENT_RULES, parseMovementRules, readUnitName, resolveMeasurementSettings, type CollectionGridDefaults as AtlasGridDefaults,
+  type MovementRules,
+} from '../../packages/atlas-shared/src/index';
 import { isDieType } from '@atlas-vtt/shared/rules';
 import { isBuiltInSide, readRuleSides, type RuleSide } from '../app/online/scene/initiativeSides';
 
@@ -180,11 +187,15 @@ function toolDice(view: RulesView): unknown {
   return call(call(call(view.serviceManager, 'getToolController'), 'getDiceTool'), 'getDiceRules');
 }
 
+/** A view's token renderer, unchecked beyond being an object. */
+function tokenRendererOf(view: RulesView): Rec | null {
+  const tokens = call(call(call(view.serviceManager, 'getRendererService'), 'getRenderer'), 'getTokenRenderer');
+  return isObject(tokens) ? tokens : null;
+}
+
 /** The collection sync of a view's token renderer: Atlas's own resources and conditions for the map it shows. */
 function collectionSyncOf(view: RulesView): Rec | null {
-  const renderer = call(call(view.serviceManager, 'getRendererService'), 'getRenderer');
-  const tokens = call(renderer, 'getTokenRenderer');
-  const sync = isObject(tokens) ? tokens.collectionSync : undefined;
+  const sync = tokenRendererOf(view)?.collectionSync;
   return isObject(sync) ? sync : null;
 }
 
@@ -228,5 +239,42 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
     conditions: conditions ?? defaults.conditions,
     initiative: initiative ?? defaults.initiative,
     dice: dice ?? defaults.dice,
+  });
+}
+
+/** A map's movement as Connect reads it: the rules, and each token's speed in game units (null without one). */
+export interface MapMovement {
+  readonly rules: MovementRules;
+  speedOf(token: unknown): number | null;
+}
+
+/** A speed as Atlas allows one: above 0, no more than `MAX_MOVEMENT_SPEED`. */
+const speedOrNull = (value: unknown): number | null => (isMovementSpeed(value) && Number.isFinite(value) ? value : null);
+
+/**
+ * The movement of the map at `mapPath` (Atlas 0.15): from Atlas's own drag ruler where a view shows it, else the
+ * collection's stored rules; null where neither says anything (no view, no index, a map outside every collection).
+ * Rules are read with Atlas's `parseMovementRules`, so what Atlas drops is dropped here.
+ */
+export function stockMovement(views: readonly RulesView[], mapPath: string | null): MapMovement | null {
+  if (!mapPath) return null;
+  const showing = views.find((view) => view.mapPath() === mapPath);
+  const ruler = showing ? tokenRendererOf(showing)?.dragRuler : undefined;
+  const movement = isObject(ruler) ? ruler.movement : undefined;
+  if (isObject(movement)) {
+    const rules = parseMovementRules(call(movement, 'rules'));
+    if (rules) return Object.freeze({ rules, speedOf: (token: unknown) => speedOrNull(call(movement, 'speedOf', token)) });
+  }
+  const stored = storedSettings(views, mapPath);
+  if (!stored) return null;
+  const rules = parseMovementRules(stored.settings.movement) ?? NO_MOVEMENT_RULES;
+  return Object.freeze({
+    rules,
+    // Without the view, Atlas's statblock index is not asked: a linked statblock's speed is unknown, so it moves without steps.
+    speedOf: (token: unknown) => {
+      const own = isObject(token) ? speedOrNull(token.speed) : null;
+      if (own !== null) return own;
+      return isObject(token) && typeof token.statblockPath === 'string' && token.statblockPath !== '' ? null : rules.speed ?? null;
+    },
   });
 }

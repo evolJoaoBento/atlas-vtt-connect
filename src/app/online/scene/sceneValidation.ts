@@ -5,7 +5,7 @@
  * patch can never reach an object's prototype.
  */
 import {
-  PLAYER_DIAGONAL_RULES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
+  PLAYER_DIAGONAL_RULES, PLAYER_DRAG_DISTANCES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
   PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
@@ -182,7 +182,18 @@ function isPlayerToken(value: unknown): boolean {
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
     && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
     && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)
-    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale) && optional(isPlayerMini)(value.mini);
+    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale) && optional(isPlayerMini)(value.mini)
+    && optional(inRange(SCENE_RANGES.elevation))(value.elevation) && optional(isSpeed)(value.speed);
+}
+
+/** A speed or a step's multiple: above 0, within its range. */
+const isSpeed = (value: unknown): boolean => inRange(SCENE_RANGES.speed)(value) && value > 0;
+const isStepMultiple = (value: unknown): boolean => inRange(SCENE_RANGES.stepMultiple)(value) && value > 0;
+
+function isPlayerMovement(value: unknown): boolean {
+  return isFields(value) && isBoolean(value.countPerTurn) && Array.isArray(value.steps) && value.steps.length <= SCENE_LIMITS.movementSteps
+    && value.steps.every((step) => isFields(step) && isText(step.name, SCENE_LIMITS.stepName) && step.name !== ''
+      && isStepMultiple(step.multiple) && typeof step.color === 'string' && HEX_COLOR.test(step.color));
 }
 
 function isPlayerMini(value: unknown): boolean {
@@ -281,7 +292,9 @@ function isPlayerMeasurement(value: unknown): boolean {
     // A GM before extension API 1.14.0 sends no rules square; the mirror fills in the distance per cell.
     && (!Object.hasOwn(value, 'ruleDistance') || inRange(SCENE_RANGES.unitDistance)(value.ruleDistance))
     // An older GM sends no snap grid; the players then snap to the grid they see.
-    && optional(nullable(isSnapGrid))(value.snapGrid);
+    && optional(nullable(isSnapGrid))(value.snapGrid)
+    // Atlas 0.15: the movement steps and when a drag shows its distance, both absent from an older GM.
+    && optional(isPlayerMovement)(value.movement) && optional(oneOf(PLAYER_DRAG_DISTANCES))(value.dragDistance);
 }
 
 function isPlayerPins(value: unknown): boolean {
