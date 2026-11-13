@@ -306,7 +306,8 @@ export interface PlayerInitiative {
 
 export const PLAYER_MEASUREMENT_MODES = ['metric', 'abstract'] as const;
 export const PLAYER_UNIT_TYPES = ['feet', 'yards', 'meters', 'units', 'custom'] as const;
-export const PLAYER_DIAGONAL_RULES = ['equidistant', 'alternating', 'euclidean'] as const;
+/** Atlas's diagonal rules. `manhattan` (every diagonal counts 2) is Atlas 0.15's. */
+export const PLAYER_DIAGONAL_RULES = ['equidistant', 'alternating', 'euclidean', 'manhattan'] as const;
 
 export interface PlayerRangeBand {
   name: string;
@@ -334,6 +335,8 @@ export interface PlayerMeasurement {
    */
   ruleDistance: number;
   diagonalRule: typeof PLAYER_DIAGONAL_RULES[number];
+  /** The unit's name as the GM typed it ("mi"), shown after a distance in place of the unit type's own: the scene's, else the collection's for a custom unit. Absent: the unit type's. */
+  unitName?: string;
   rangeBands: PlayerRangeBand[];
   /** The GM's snap-to-grid: the drag ruler snaps to cell centres only when it is on. */
   snapToGrid: boolean;

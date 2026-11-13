@@ -9,6 +9,7 @@ import {
   PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
+import { MAX_UNIT_NAME } from '../../../../packages/atlas-shared/src/index';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { SIDE_LIMITS } from './initiativeSides';
 import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
@@ -273,6 +274,8 @@ function isPlayerMeasurement(value: unknown): boolean {
     && Array.isArray(value.rangeBands) && value.rangeBands.length <= SCENE_LIMITS.rangeBands
     && value.rangeBands.every((band) => isRangeBand(band))
     // An older GM sends no snap flag and no cone angle; the mirror fills them in.
+    // A unit's name is absent, or as long as Atlas lets the GM type one.
+    && (!Object.hasOwn(value, 'unitName') || (typeof value.unitName === 'string' && value.unitName.length >= 1 && value.unitName.length <= MAX_UNIT_NAME))
     && (!Object.hasOwn(value, 'snapToGrid') || isBoolean(value.snapToGrid))
     && (!Object.hasOwn(value, 'coneAngle') || isConeAngle(value.coneAngle))
     // A GM before extension API 1.14.0 sends no rules square; the mirror fills in the distance per cell.

@@ -14,7 +14,7 @@
  * Everything read is checked and copied: a stock Atlas's objects are its own, never handed on.
  */
 import type { CollectionGridDefaults, ConditionDefinition, DiceRules, InitiativeRules, MapRules, ResourceDefinition } from '@atlas-vtt/api-types';
-import { resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
+import { readUnitName, resolveMeasurementSettings, type CollectionGridDefaults as AtlasGridDefaults } from '../../packages/atlas-shared/src/index';
 import { isDieType } from '@atlas-vtt/shared/rules';
 import { isBuiltInSide, readRuleSides, type RuleSide } from '../app/online/scene/initiativeSides';
 
@@ -100,7 +100,7 @@ const isPlainSides = (sides: readonly RuleSide[]): boolean => sides.length === 2
 
 const UNIT_TYPES: readonly unknown[] = ['feet', 'yards', 'meters', 'units', 'custom'];
 const MEASUREMENT_MODES: readonly unknown[] = ['metric', 'abstract'];
-const DIAGONAL_RULES: readonly unknown[] = ['equidistant', 'alternating', 'euclidean'];
+const DIAGONAL_RULES: readonly unknown[] = ['equidistant', 'alternating', 'euclidean', 'manhattan'];
 const MAX_RANGE_BANDS = 12;
 const MAX_BAND_NAME = 40;
 /** The most a distance per square may be: far past any game, short of anything that overflows a label. */
@@ -111,7 +111,8 @@ const isPositive = (value: unknown, max: number): value is number => typeof valu
  * A collection's measurement rules (`gridDefaults`: the unit, the distance per square, metric or range bands, the
  * diagonal rule, the cone angle), checked field by field as Atlas reads them: null where the unit, the distance or the
  * mode is not one it knows (the map's own grid then decides, as Atlas does for a map outside a collection). A diagonal
- * rule or cone angle it cannot read is left unset, which means `equidistant` and 90 degrees.
+ * rule or cone angle it cannot read is left unset, which means `equidistant` and 90 degrees. The name of a custom unit
+ * (Atlas 0.15, "mi") is kept as Atlas reads it (`readUnitName`): trimmed, and dropped when empty or too long.
  */
 function readGridDefaults(value: unknown): CollectionGridDefaults | null {
   if (!isObject(value) || !UNIT_TYPES.includes(value.unitType) || !MEASUREMENT_MODES.includes(value.measurementMode) || !isPositive(value.unitDistance, MAX_UNIT_DISTANCE)) return null;
@@ -119,8 +120,11 @@ function readGridDefaults(value: unknown): CollectionGridDefaults | null {
     ? value.abstractRangeBands.flatMap((band: unknown) => (isObject(band) && typeof band.name === 'string' && isPositive(band.maxSquares, MAX_UNIT_DISTANCE)
       ? [{ name: band.name.slice(0, MAX_BAND_NAME), maxSquares: band.maxSquares }] : [])).slice(0, MAX_RANGE_BANDS)
     : [];
+  const unitName = value.unitType === 'custom' ? readUnitName(value.unitName) : undefined;
+  // The extension API's type is older than Atlas 0.15: it knows neither `manhattan` nor `unitName`, which are kept all the same.
   return Object.freeze({
     unitType: value.unitType as CollectionGridDefaults['unitType'],
+    ...(unitName !== undefined ? { unitName } : {}),
     unitDistance: value.unitDistance,
     measurementMode: value.measurementMode as CollectionGridDefaults['measurementMode'],
     ...(bands.length > 0 ? { abstractRangeBands: Object.freeze(bands) as unknown as NonNullable<CollectionGridDefaults['abstractRangeBands']> } : {}),
@@ -218,7 +222,7 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
     collectionId: stored?.collectionId ?? null,
     ...(gridDefaults ? {
       gridDefaults,
-      measurement: Object.freeze({ ...resolveMeasurementSettings(gridDefaults, null), coneAngle: gridDefaults.coneAngle ?? defaults.measurement.coneAngle }),
+      measurement: Object.freeze({ ...resolveMeasurementSettings(gridDefaults as unknown as AtlasGridDefaults, null), coneAngle: gridDefaults.coneAngle ?? defaults.measurement.coneAngle }) as unknown as MapRules['measurement'],
     } : {}),
     resources: resources ?? defaults.resources,
     conditions: conditions ?? defaults.conditions,

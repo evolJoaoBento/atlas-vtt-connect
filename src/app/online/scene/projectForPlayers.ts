@@ -6,7 +6,8 @@
  * fields a later Atlas adds, is left out.
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
-import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
+import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle } from '@atlas-vtt/shared/grid';
+import { readUnitName, resolveMeasurementSettings } from '../../../../packages/atlas-shared/src/index';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
 import { resolvePinIcon } from '../view/pinIcons';
 import type { AssetIds } from './sceneContracts';
@@ -298,7 +299,9 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
  * (`unitDistanceOverride`) is in `unitDistance`; the collection's stays as `ruleDistance`.
  */
 function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number): PlayerMeasurement {
-  const settings = resolveMeasurementSettings(collection ?? undefined, grid);
+  // Atlas 0.15's own reading: the extension API's types are older, and know neither `manhattan` nor a unit's name.
+  const settings = resolveMeasurementSettings((collection ?? undefined), grid);
+  const unitName = readUnitName(settings.unitName);
   // `mapConeAngle` gives only valid angles; one the page would refuse (from a share's raw grid defaults) opens a quarter circle.
   const cone = coneAngle ?? settings.coneAngle;
   const rangeBands: unknown = settings.rangeBands;
@@ -309,6 +312,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     unitDistance: finiteOr(settings.unitDistance, 5, SCENE_RANGES.unitDistance),
     ruleDistance: finiteOr(settings.ruleDistance, 5, SCENE_RANGES.unitDistance),
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
+    ...(unitName !== undefined ? { unitName } : {}),
     snapToGrid: grid?.snapToGrid ?? true,
     coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,
     snapGrid: projectSnapGrid(grid),

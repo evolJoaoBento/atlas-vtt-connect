@@ -69,6 +69,18 @@ describe('DragRulerTool', () => {
     expect(ruler.overlay()?.points).toEqual([{ x: 140, y: 140 }, { x: 210, y: 70 }]);
   });
 
+  it('labels a path by the Manhattan rule and with a custom unit name, as Atlas 0.15 does', () => {
+    const scene = playerScene();
+    const size = scene.grid?.size ?? scene.map.cellSize;
+    const at = (cx: number, cy: number) => ({ x: size / 2 + size * cx, y: size / 2 + size * cy });
+    const path = [at(0, 0), at(3, 3), at(5, 3)];
+    const label = (measurement: Partial<typeof scene.measurement>): string => toolGridOf({ ...scene, measurement: { ...scene.measurement, ...measurement } }).label(path);
+    expect(label({ diagonalRule: 'manhattan', unitType: 'feet', unitDistance: 5 })).toBe('40ft');
+    expect(label({ diagonalRule: 'manhattan', unitType: 'custom', unitName: 'mi', unitDistance: 1 })).toBe('8 mi');
+    expect(label({ diagonalRule: 'equidistant', unitType: 'feet', unitDistance: 5 })).toBe('25ft');
+    expect(label({ diagonalRule: 'alternating', unitType: 'feet', unitDistance: 5 })).toBe('30ft');
+  });
+
   it("labels distances with a scene's own distance per cell, not the collection's rules square", () => {
     const scene = playerScene();
     const label = (measurement: Partial<typeof scene.measurement>): string | undefined => {

@@ -270,6 +270,14 @@ describe('projectForPlayers', () => {
     });
   });
 
+  it('sends the Manhattan rule and the name of a custom unit, the scene\'s own name first', () => {
+    const collectionGrid = { unitType: 'custom' as const, unitName: ' mi ', unitDistance: 1, measurementMode: 'metric' as const, diagonalRule: 'manhattan' } as never;
+    expect(projectForPlayers(gmState(), context({ collectionGrid })).measurement).toMatchObject({ diagonalRule: 'manhattan', unitName: 'mi', unitType: 'custom' });
+    const grid = { ...gmState().grid!, unitNameOverride: 'ly' };
+    expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement.unitName).toBe('ly');
+    expect(projectForPlayers(gmState(), context()).measurement).not.toHaveProperty('unitName');
+  });
+
   it("sends a scene's own distance per cell, keeping the collection's as the rules square", () => {
     const collectionGrid = { unitType: 'feet' as const, unitDistance: 5, measurementMode: 'metric' as const };
     const grid = { ...gmState().grid!, unitDistanceOverride: 10 };

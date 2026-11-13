@@ -165,6 +165,13 @@ describe('scene value bounds', () => {
     const withMeasurement = (overrides: object): unknown => ({ ...body, measurement: { ...body.measurement, ...overrides } });
     expect(valid(snapshot(withMeasurement({ unitDistance: 1_000_000 })))).toBe(true);
     expect(valid(snapshot(withMeasurement({ unitDistance: -1 })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ diagonalRule: 'manhattan' })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ diagonalRule: 'taxicab' })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitType: 'custom', unitName: 'mi' })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ unitName: 'x'.repeat(12) })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ unitName: 'x'.repeat(13) })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitName: '' })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitName: 5 })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ ruleDistance: -1 })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ ruleDistance: '5' })))).toBe(false);
     const { ruleDistance: _rule, ...noRule } = body.measurement;

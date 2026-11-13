@@ -9,7 +9,7 @@
  */
 import { cellCenterAt, type GridGeometry } from '@atlas-vtt/shared/grid';
 import { snapTokenCenter } from '@atlas-vtt/shared/grid';
-import { dragRulerLabel } from '@atlas-vtt/shared/draw';
+import { formatDistance, pathLengthInCells, type GridGeometry as AtlasGeometry } from '../../../../../packages/atlas-shared/src/index';
 import { snapGridOf } from '../../scene/snapGrid';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 
@@ -43,7 +43,8 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),
-    label: (points) => dragRulerLabel(geometry, points, scene.measurement),
+    // Atlas 0.15's own distance and label: the diagonal rule (Manhattan too) and the unit's name as the GM typed it.
+    label: (points) => formatDistance(pathLengthInCells(geometry as AtlasGeometry, points, scene.measurement.diagonalRule), scene.measurement),
     coneOpening: (scene.measurement.coneAngle * Math.PI) / 180,
   };
 }

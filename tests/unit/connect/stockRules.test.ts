@@ -128,6 +128,16 @@ describe("how a stock Atlas map measures (the collection's grid defaults)", () =
   const FIVE_E = { unitType: 'feet', unitDistance: 5, measurementMode: 'metric', diagonalRule: 'equidistant', coneAngle: 53.13, abstractRangeBands: [] };
   const rulesOf = (gridDefaults: unknown) => stockMapRules([view(MAP, { assets: assets({ conditions: [], gridDefaults }) })], MAP, { ...DEFAULTS, measurement: { mode: 'abstract', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 } as unknown as MapRules['measurement'] });
 
+  it('reads the Manhattan rule and a custom unit name, as Atlas 0.15 saves them', () => {
+    const rules = rulesOf({ unitType: 'custom', unitName: ' mi ', measurementMode: 'metric', unitDistance: 1, diagonalRule: 'manhattan' });
+    expect(rules.gridDefaults).toEqual({ unitType: 'custom', unitName: 'mi', unitDistance: 1, measurementMode: 'metric', diagonalRule: 'manhattan' });
+    expect(rules.measurement).toMatchObject({ unitType: 'custom', unitName: 'mi', diagonalRule: 'manhattan' });
+    // A name is only a custom unit's, and never longer than Atlas takes.
+    expect(rulesOf({ ...FIVE_E, unitName: 'mi' }).gridDefaults).not.toHaveProperty('unitName');
+    expect(rulesOf({ unitType: 'custom', unitName: 'x'.repeat(13), measurementMode: 'metric', unitDistance: 1 }).gridDefaults).toMatchObject({ unitName: 'x'.repeat(12) });
+    expect(rulesOf({ unitType: 'custom', unitName: '   ', measurementMode: 'metric', unitDistance: 1 }).gridDefaults).not.toHaveProperty('unitName');
+  });
+
   it("reads the collection's measurement rules, which players' rulers and cones then follow", () => {
     const rules = rulesOf(FIVE_E);
     expect(rules.gridDefaults).toEqual({ unitType: 'feet', unitDistance: 5, measurementMode: 'metric', diagonalRule: 'equidistant', coneAngle: 53.13 });
@@ -148,7 +158,7 @@ describe("how a stock Atlas map measures (the collection's grid defaults)", () =
       expect(rules.gridDefaults).toBeNull();
       expect(rules.measurement).toMatchObject({ mode: 'abstract', coneAngle: 90 });
     }
-    const odd = rulesOf({ ...FIVE_E, diagonalRule: 'manhattan', coneAngle: 400 });
+    const odd = rulesOf({ ...FIVE_E, diagonalRule: 'taxicab', coneAngle: 400 });
     expect(odd.gridDefaults).toEqual({ unitType: 'feet', unitDistance: 5, measurementMode: 'metric' });
     expect(odd.measurement).toMatchObject({ mode: 'metric', diagonalRule: 'equidistant', coneAngle: 90 });
     expect(rulesOf({ ...FIVE_E, coneAngle: 0 }).gridDefaults?.coneAngle).toBeUndefined();
