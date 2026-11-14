@@ -8,8 +8,8 @@ import type { OfferedDiceRules } from '../tools/toolMessages';
 import { LaserRelay } from '../tools/LaserRelay';
 import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
-import { TemplateHost } from '../tools/TemplateHost';
-import type { MapTemplate } from '../tools/templates';
+import { MeasureHost } from '../tools/MeasureHost';
+import type { StockMeasures } from '../../../connect/stockMeasures';
 import type { SheetCard } from '../tools/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
@@ -112,16 +112,12 @@ export function pingRelayPart(lasers: LasersApi | null): NonNullable<OptionalPar
   });
 }
 
-/** Draws a scene's templates on a view's map: Connect's stock Atlas stand-in adds it to `lasers` (an Atlas API has none). */
-type TemplateShowing = { showTemplates?: (viewId: ViewId, templates: readonly MapTemplate[], coneAngle: number, erase?: (id: string) => void) => void };
-
-/** Players' lasting templates, kept per scene and drawn in the GM's view where the lasers can draw. */
-export function templateHostPart(lasers: LasersApi | null, coneAngle: (mapPath: string | null) => number): NonNullable<OptionalParts['templates']> {
-  const showTemplates = lasers ? (lasers as unknown as TemplateShowing).showTemplates : undefined;
-  return ({ session, projection, board, colors, cutscene }) => new TemplateHost({
-    session, projection, ...(board ? { board } : {}), ...(colors ? { colors } : {}), ...(cutscene ? { cutscene } : {}),
-    ...(typeof showTemplates === 'function'
-      ? { show: (viewId: ViewId, templates: readonly MapTemplate[], mapPath: string, erase: (id: string) => void) => showTemplates.call(lasers, viewId, templates, coneAngle(mapPath || null), erase) }
-      : {}),
+/**
+ * Players' templates and spells, written to Atlas's own measures (`measures`: a stock Atlas 0.15's store; null where
+ * this Atlas has none, and every request is then refused). Atlas draws them in the GM's view, as its own.
+ */
+export function measureHostPart(measures: StockMeasures | null): NonNullable<OptionalParts['templates']> {
+  return ({ session, projection, board, colors, cutscene }) => new MeasureHost({
+    session, projection, measures, ...(board ? { board } : {}), ...(colors ? { colors } : {}), ...(cutscene ? { cutscene } : {}),
   });
 }

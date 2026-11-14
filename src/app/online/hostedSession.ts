@@ -24,7 +24,7 @@ import type { HandoutSource } from './handouts';
 
 /** No handout source: nothing is ever shown. */
 const NO_HANDOUT: HandoutSource = { current: () => null, subscribe: () => () => undefined };
-import { TemplateHost } from './tools/TemplateHost';
+import { MeasureHost } from './tools/MeasureHost';
 import { CameraSender } from './scene/CameraSender';
 import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
@@ -93,7 +93,7 @@ export interface OptionalParts {
   laser?: (context: HostedContext) => HostedPart;
   /** Players' pings, relayed to their scene and shown in the GM's view where Connect can draw on it. */
   pings?: (context: HostedContext) => HostedPart;
-  /** Players' lasting templates, kept per scene and shown in the GM's view where Connect can draw on it. */
+  /** Players' templates and spells, kept in Atlas's own measures. */
   templates?: (context: HostedContext) => HostedPart & { clear(): void; hasAny(): boolean };
   /** The notes of readable pins, sent to a player who opens one. Without it opening a pin shows nothing. */
   notes?: (context: HostedContext) => HostedPart;
@@ -245,9 +245,9 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const templates = env.templates?.(context) ?? null;
   // Players in augmented reality, as eyes on Tabletop's board: only where there is one.
   const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub, colorOf: (playerId) => colors.colorOf(playerId) }) : null;
-  boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
+  boardHub?.useTemplates(templates instanceof MeasureHost ? templates : null);
   // The GM asks a token's players for a spell: they are its controllers, and the GM hears how they answer.
-  if (templates instanceof TemplateHost) {
+  if (templates instanceof MeasureHost) {
     templates.useAsks(tokenControl ? { controls: (playerId, tokenId) => tokenControl.control.controls(playerId, tokenId), notify } : null);
   }
   // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.

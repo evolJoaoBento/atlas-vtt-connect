@@ -3,7 +3,7 @@ import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSe
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { BoardSessionHub } from '../../../src/app/online/tools/BoardSessionHub';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
-import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
+import { MeasureHost } from '../../../src/app/online/tools/MeasureHost';
 import type { SlotChange, SlotView } from '../../../src/app/online/scene/slotViews';
 
 const who = (playerId: string): SessionPlayer => ({ playerId, name: playerId, status: 'admitted' });
@@ -30,7 +30,8 @@ function world() {
     coneAngle: () => 53,
     cutscenes: true,
   });
-  const templates = new TemplateHost({ session, projection, board: hub });
+  // No Atlas store here: the hub's part is the asks, the flashes and the marks.
+  const templates = new MeasureHost({ session, projection, board: hub, measures: null });
   hub.useTemplates(templates);
   templates.start();
   hub.start();
@@ -48,34 +49,30 @@ describe('BoardSessionHub', () => {
     expect(w.hub.hosting()).toBe(false);
   });
 
-  it('a player\'s template shows on the GM\'s board of that map, with the cone angle', () => {
+  it("gives each map's cone angle; templates and kept spells are no part of the session (they are Atlas's measures)", () => {
     const w = world();
-    const changed = vi.fn();
-    w.hub.onChange(changed);
-    w.playerSends('anna', { v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 70, y: 0 } } });
-    expect(changed).toHaveBeenCalled();
     const overlay = w.hub.overlay('maps/a.atlasmap');
-    expect(overlay.templates).toEqual([expect.objectContaining({ owner: 'anna', shape: 'circle' })]);
     expect(overlay.coneAngle).toBeCloseTo((53 * Math.PI) / 180);
-    expect(w.hub.overlay('maps/other.atlasmap').templates).toEqual([]);
+    expect(overlay).not.toHaveProperty('templates');
+    expect(overlay).not.toHaveProperty('spells');
+    expect(w.hub).not.toHaveProperty('addTemplate');
+    expect(w.hub).not.toHaveProperty('castSpell');
   });
 
-  it('the GM places a template from the board, and erases any; every player is told', () => {
+  it("the GM's instantaneous spell is flashed to the scene's players, and a player's reaches the board as a mark", () => {
     const w = world();
-    expect(w.hub.addTemplate('maps/a.atlasmap', { shape: 'square', start: { x: 0, y: 0 }, end: { x: 140, y: 140 } })).toBe(true);
-    const [placed] = w.hub.overlay('maps/a.atlasmap').templates;
-    expect(placed).toMatchObject({ owner: 'gm', shape: 'square', color: '#ff0059' });
-    const lists = () => w.sent.filter(([, message]) => message.type === 'map-templates');
-    expect(lists().map(([playerId]) => playerId)).toEqual(['anna', 'ben']);
-    w.playerSends('anna', { v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'line', start: { x: 0, y: 0 }, end: { x: 70, y: 70 } } });
-    const annas = w.hub.overlay('maps/a.atlasmap').templates.find((template) => template.owner === 'anna')!;
-    w.hub.eraseTemplate('maps/a.atlasmap', annas.id);
-    expect(w.hub.overlay('maps/a.atlasmap').templates.map((template) => template.owner)).toEqual(['gm']);
-    const last = lists().at(-1)![1] as Extract<ControlMessage, { type: 'map-templates' }>;
-    expect(last.templates.map((template) => template.owner)).toEqual(['gm']);
-    w.hub.clearTemplates('maps/a.atlasmap');
-    expect(w.hub.overlay('maps/a.atlasmap').templates).toEqual([]);
-    expect(w.hub.addTemplate('maps/nowhere.atlasmap', { shape: 'line', start: { x: 0, y: 0 }, end: { x: 1, y: 1 } })).toBe(false);
+    const spell = { shape: 'sphere' as const, from: 'point' as const, at: { x: 0, y: 0, h: 0 }, yaw: 0, pitch: 0, roll: 0, size: 70, length: 0, angle: 0.9 };
+    expect(w.hub.flashSpell('maps/a.atlasmap', spell, { push: 10 }, { name: 'Thunderwave' })).toBe(true);
+    const flashes = w.sent.filter(([, message]) => message.type === 'spell-flash');
+    expect(flashes.map(([playerId]) => playerId)).toEqual(['anna', 'ben']);
+    expect((flashes[0]![1] as Extract<ControlMessage, { type: 'spell-flash' }>).cast).toMatchObject({ owner: 'gm', name: 'Thunderwave', rules: { push: 10 }, spell: { shape: 'sphere' } });
+    expect(w.hub.flashSpell('maps/nowhere.atlasmap', spell)).toBe(false);
+    expect(w.hub.flashSpell('maps/a.atlasmap', { ...spell, shape: 'blob' } as never)).toBe(false);
+    const marks: unknown[] = [];
+    w.hub.onMark((mark) => marks.push(mark));
+    const instant = { line: 'x', properties: [['Duration', 'Instantaneous']] as Array<[string, string]>, text: 'Boom.' };
+    w.playerSends('anna', { v: 1, type: 'map-spell', sceneId: 's1', add: spell, name: 'Fireball', about: instant });
+    expect(marks).toEqual([{ kind: 'spell', mapPath: 'maps/a.atlasmap', cast: expect.objectContaining({ owner: 'anna', name: 'Fireball' }) }]);
   });
 
   it('pings and lasers players send reach the GM\'s board as marks of their map', () => {

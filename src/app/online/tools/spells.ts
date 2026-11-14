@@ -125,6 +125,33 @@ export interface CastWords {
   about?: SpellAbout;
 }
 
+/**
+ * The words a cast keeps: shorter than an ask's (its text to `text`, each property to `value`), as every kept cast of a
+ * scene reaches its players in the scene itself, which must stay under a message's bytes.
+ */
+export const CAST_WORDS = { text: 600, value: 120 } as const;
+
+/** A cast's name and words, only those well formed (none: nothing), the words cut to `CAST_WORDS`. */
+export function cutCastWords(words: { name?: unknown; about?: unknown } | undefined): { name?: string; about?: SpellAbout } {
+  if (!words || !isCastName(words.name)) return {};
+  if (!words.about || !isSpellAbout(words.about)) return { name: words.name.trim() };
+  const cut = (text: string, most: number): string => (text.length > most ? `${text.slice(0, most - 1)}…` : text);
+  return {
+    name: words.name.trim(),
+    about: { line: words.about.line, properties: words.about.properties.map(([label, value]) => [label, cut(value, CAST_WORDS.value)] as [string, string]), text: cut(words.about.text, CAST_WORDS.text) },
+  };
+}
+
+/**
+ * Whether a spell is instantaneous, as its words say (Duration: Instantaneous, like Fireball): it goes off and is gone,
+ * so it is flashed to the boards and kept nowhere. One with a duration, or without words, is kept until it is removed.
+ */
+export function isInstantaneous(about: unknown): boolean {
+  if (!isSpellAbout(about)) return false;
+  const duration = about.properties.find(([label]) => label.trim().toLowerCase() === 'duration')?.[1];
+  return duration !== undefined && /^\s*instantaneous\s*$/i.test(duration);
+}
+
 export const isCastName = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= SPELL_NAME_LENGTH;
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e7;

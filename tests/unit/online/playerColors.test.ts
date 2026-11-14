@@ -3,7 +3,7 @@ import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSe
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { LASER_PALETTE, laserColor } from '../../../src/app/online/tools/laserColors';
 import { PlayerColors } from '../../../src/app/online/tools/playerColors';
-import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
+import { ANA as WORLD_ANA, measureWorld } from './measureWorld';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
@@ -16,19 +16,8 @@ function world() {
   const session = { use: (h: SessionHandler) => { handlers.push(h); return () => undefined; }, send: (id: string, m: ControlMessage) => { sent.push([id, m]); }, getPlayers: () => [ANA, BEN] };
   const colors = new PlayerColors(session as never);
   colors.start();
-  const templates = new TemplateHost({
-    session: session as never,
-    projection: {
-      slotOf: () => ({ sceneId: 's1', lastSent: {}, tab: { viewId: 'v1' }, mapPath: 'm' }),
-      audience: () => ['p1', 'p2'],
-      shownSlot: () => null,
-      onSlotChange: () => () => undefined,
-    } as never,
-    colors,
-  });
-  templates.start();
   const send = (player: SessionPlayer, message: ControlMessage): void => { for (const handler of handlers) handler.onMessage?.(player, message); };
-  return { colors, templates, sent, send };
+  return { colors, sent, send };
 }
 
 describe('players\' own colours', () => {
@@ -49,15 +38,16 @@ describe('players\' own colours', () => {
     expect(w.colors.colorOf('p1', ['p2'])).toBe(laserColor('p1', ['p2']));
   });
 
-  it('templates and spells take the colour picked, and are recoloured when it changes', () => {
-    const w = world();
-    w.send(ANA, { v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } } });
-    w.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', add: { shape: 'sphere', from: 'point', at: { x: 0, y: 0, h: 0 }, yaw: 0, pitch: 0, roll: 0, size: 70, length: 0, angle: 0.9 } });
-    w.send(ANA, { v: 1, type: 'player-color', color: picked });
-    expect(w.templates.listFor('s1')[0]?.color).toBe(picked);
-    expect(w.templates.spellsFor('s1')[0]?.color).toBe(picked);
-    const lastSpells = w.sent.filter(([, m]) => m.type === 'map-spells').at(-1)?.[1] as Extract<ControlMessage, { type: 'map-spells' }>;
-    expect(lastSpells.spells[0]?.color).toBe(picked);
+  it("templates and spells take the colour picked, and are recoloured in Atlas's store when it changes", () => {
+    const w = measureWorld({ colors: true });
+    w.send(WORLD_ANA, { v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } } });
+    w.send(WORLD_ANA, { v: 1, type: 'map-spell', sceneId: 's1', add: { shape: 'sphere', from: 'point', at: { x: 0, y: 0, h: 0 }, yaw: 0, pitch: 0, roll: 0, size: 70, length: 0, angle: 0.9 } });
+    expect(w.list().map((measure) => measure.color)).not.toContain(picked);
+    w.send(WORLD_ANA, { v: 1, type: 'player-color', color: picked });
+    expect(w.list().map((measure) => measure.color)).toEqual([picked, picked]);
+    // What they make next is in the colour picked.
+    w.send(WORLD_ANA, { v: 1, type: 'map-template', sceneId: 's1', add: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 10, y: 0 } } });
+    expect(w.list().at(-1)?.color).toBe(picked);
   });
 
   it('the message carries a colour; an older GM ignores it', () => {

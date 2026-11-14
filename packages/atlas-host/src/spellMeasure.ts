@@ -92,7 +92,7 @@ export interface TabletopExtra {
 }
 
 /** Kept spells per player and per scene (checked by the GM before writing), Atlas's own cap per level, and the longest words. */
-export const MEASURE_LIMITS = { perPlayer: 10, perScene: 40, perLevel: 256, about: 4000, name: 60, id: 200 } as const;
+export const MEASURE_LIMITS = { perPlayer: 10, perScene: 40, perLevel: 256, about: 4000, name: 60, id: 200, by: 128 } as const;
 /** The largest a spell's size may be, map pixels (Tabletop's `SPELL_MAX_SIZE`). */
 const MAX_SIZE = 20000;
 

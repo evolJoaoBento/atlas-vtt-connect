@@ -4,10 +4,11 @@ import type { Deps } from '../OnlineSessionService';
 import { liveLighting } from '../scene/sceneLighting';
 import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
+import type { StockMeasures } from '../../../connect/stockMeasures';
 import type { ProjectedMovement } from '../scene/projectForPlayers';
 import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, gmRollsShared, laserRelayPart, movesOnTurn, offeredRulesOf, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, gmRollsShared, laserRelayPart, movesOnTurn, offeredRulesOf, pingRelayPart, sheetHostPart, measureHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
 
@@ -86,7 +87,8 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
     ...(dice ? { dice: diceHostPart(dice, diceRules, () => gmRollsShared(atlas.settings)), diceRules } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
-    templates: templateHostPart(lasers, (mapPath) => atlas.rules.forMap(mapPath).measurement.coneAngle),
+    // Atlas's kept measures hold players' templates and spells: a stock Atlas 0.15 offers its store (`stockAtlas.ts`).
+    templates: measureHostPart((atlas as { measures?: StockMeasures }).measures ?? null),
     handout: handouts,
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
     // One per hosted session, disposed with it.

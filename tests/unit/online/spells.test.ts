@@ -1,102 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSession';
+import { describe, expect, it } from 'vitest';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
-import { TemplateHost } from '../../../src/app/online/tools/TemplateHost';
-import { cleanSpell, isSpell, SPELL_LIMITS, type MapSpell, type Spell } from '../../../src/app/online/tools/spells';
+import { cleanSpell, isSpell, SPELL_LIMITS, type Spell } from '../../../src/app/online/tools/spells';
 
-const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
-const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
 const cone: Spell = { shape: 'cone', from: 'self', at: { x: 385, y: 385, h: 40 }, yaw: -1.57, pitch: -0.1, roll: 0, size: 280, length: 0, angle: 0.93, caster: 'mine' };
 const cast = (spell: Spell = cone) => ({ v: 1 as const, type: 'map-spell' as const, sceneId: 's1', add: spell });
 
-function world() {
-  const sent: Array<[string, ControlMessage]> = [];
-  let handler: SessionHandler | null = null;
-  const board = { templatesChanged: vi.fn() };
-  let now = 0;
-  vi.spyOn(Date, 'now').mockImplementation(() => now);
-  const host = new TemplateHost({
-    session: { use: (h: SessionHandler) => { handler = h; return () => undefined; }, send: (id: string, m: ControlMessage) => { sent.push([id, m]); }, getPlayers: () => [ANA, BEN] } as never,
-    projection: {
-      slotOf: () => ({ sceneId: 's1', lastSent: {}, tab: { viewId: 'v1' }, mapPath: 'm' }),
-      audience: () => ['p1', 'p2'],
-      shownSlot: () => ({ sceneId: 's1', tab: { viewId: 'v1' }, mapPath: 'm' }),
-      onSlotChange: () => () => undefined,
-    } as never,
-    board,
-  });
-  host.start();
-  const last = (playerId: string): MapSpell[] => {
-    const message = sent.filter(([to, m]) => to === playerId && m.type === 'map-spells').at(-1)?.[1] as Extract<ControlMessage, { type: 'map-spells' }> | undefined;
-    return message?.spells ?? [];
-  };
-  return { host, board, sent, last, send: (player: SessionPlayer, message: ControlMessage) => handler!.onMessage?.(player, message), tick: () => { now += 1000; } };
-}
-
-describe('spells cast through a token\'s eyes', () => {
-  it('are kept per scene with their caster and colour, sent to everyone on it, and the GM\'s board is told', () => {
-    const w = world();
-    w.send(ANA, cast());
-    expect(w.last('p2')).toEqual([{ id: 's1', owner: 'p1', color: expect.stringMatching(/^#[0-9a-f]{6}$/i), spell: cone }]);
-    expect(w.last('p1')).toHaveLength(1);
-    expect(w.board.templatesChanged).toHaveBeenCalled();
-    expect(w.host.spellsFor('s1')).toHaveLength(1);
-  });
-
-  it('can be taken off only by their caster, all of theirs at once, or by the GM', () => {
-    const w = world();
-    w.send(ANA, cast());
-    w.send(ANA, cast({ ...cone, shape: 'sphere' }));
-    w.send(BEN, { v: 1, type: 'map-spell', sceneId: 's1', remove: 's1' });
-    expect(w.last('p1')).toHaveLength(2);
-    w.tick();
-    w.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', remove: 's1' });
-    expect(w.last('p1').map((spell) => spell.id)).toEqual(['s2']);
-    w.host.eraseSpell('s1', 's2');
-    expect(w.last('p2')).toEqual([]);
-    w.tick();
-    w.send(ANA, cast());
-    w.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', clear: true });
-    expect(w.last('p2')).toEqual([]);
-  });
-
-  it('are limited per player and per second, and go with a player who leaves', () => {
-    const w = world();
-    for (let i = 0; i < SPELL_LIMITS.perPlayer + 3; i++) { w.tick(); w.send(ANA, cast()); }
-    expect(w.last('p1')).toHaveLength(SPELL_LIMITS.perPlayer);
-    for (let i = 0; i < 10; i++) w.send(BEN, cast());
-    expect(w.last('p1').filter((spell) => spell.owner === 'p2')).toHaveLength(SPELL_LIMITS.perSecond);
-    w.host.playersChanged([BEN]);
-    expect(w.last('p2').every((spell) => spell.owner === 'p2')).toBe(true);
-  });
-
-  it('the GM casts in its own colour, to everyone on the scene, and its spells stay when players come and go', () => {
-    const w = world();
-    expect(w.host.castGm('s1', { ...cone, effect: 'fire' })).toBe(true);
-    expect(w.last('p1')).toEqual([{ id: 's1', owner: 'gm', color: expect.stringMatching(/^#[0-9a-f]{6}$/i), spell: { ...cone, effect: 'fire' } }]);
-    w.host.playersChanged([BEN]);
-    expect(w.host.spellsFor('s1')).toHaveLength(1);
-    w.host.eraseSpell('s1', 's1');
-    expect(w.last('p2')).toEqual([]);
-  });
-
-  it('the GM\'s clear takes spells off with the templates', () => {
-    const w = world();
-    w.send(ANA, cast());
-    expect(w.host.hasAny()).toBe(true);
-    w.host.clear();
-    expect(w.last('p1')).toEqual([]);
-    expect(w.host.hasAny()).toBe(false);
-  });
-
-  it('a newly admitted player is sent the scene\'s spells', () => {
-    const w = world();
-    w.send(ANA, cast());
-    w.host.onAdmitted(BEN);
-    expect(w.sent.at(-1)).toEqual(['p2', expect.objectContaining({ type: 'map-spells', spells: [expect.objectContaining({ id: 's1' })] })]);
-  });
-});
-
+// How casts are kept (in Atlas's measures) is pinned by measureHost.test.ts.
 describe('spell messages', () => {
   it('a spell may carry one of the damage types, kept as cast; an unknown one does not decode', () => {
     expect(isSpell({ ...cone, effect: 'fire' })).toBe(true);
@@ -124,7 +33,7 @@ describe('spell messages', () => {
   });
 
   it('an older page, which knows no spells, ignores them', () => {
-    const list = encodeControl({ v: 1, type: 'map-spells', sceneId: 's1', spells: [] });
+    const list = encodeControl({ v: 1, type: 'spell-asks', sceneId: 's1', asks: [] });
     expect(decodeControl(list, new Set(['map-templates'])).kind).toBe('ignored');
   });
 });

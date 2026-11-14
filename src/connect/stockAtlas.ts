@@ -24,6 +24,7 @@ import { stockLightingApi } from './stockLighting/stockLighting';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules, stockMovement } from './stockRules';
+import { stockMeasuresApi } from './stockMeasures';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
 import { AtlasHost, loadDeferredLeaves, wakeAtlasForHosting } from '../../packages/atlas-host/src/index';
@@ -879,6 +880,9 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
             return () => { disposers.delete(dispose); dispose(); };
           },
         }),
+        // Atlas 0.15's kept measures, written through its own store: where players' templates and spells are kept. The
+        // extension API has no such namespace.
+        measures: stockMeasuresApi({ view: (viewId) => trackedView(app, viewId) }),
         tokens: stockTokensApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,

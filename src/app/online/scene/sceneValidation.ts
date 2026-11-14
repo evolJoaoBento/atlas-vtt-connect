@@ -6,7 +6,7 @@
  */
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_DRAG_DISTANCES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
-  PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
+  PLAYER_MEASUREMENT_MODES, PLAYER_MEASURE_EFFECTS, PLAYER_MEASURE_SHAPES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
 import { MAX_UNIT_NAME } from '../../../../packages/atlas-shared/src/index';
@@ -14,6 +14,8 @@ import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { SIDE_LIMITS } from './initiativeSides';
 import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
 import { isAssetId } from '../assets/assetIds';
+import { readExtra } from '../../../../packages/atlas-host/src/spellMeasure';
+import { isSpellAbout, isSpellRules } from '../tools/spells';
 
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => boolean;
@@ -318,7 +320,29 @@ const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   pins: isPlayerPins,
   handout: nullable(isPlayerHandout),
 };
+/** A measure's `tabletop` field: one `readExtra` reads, of a bounded size, its rules and words well formed. */
+function isMeasureExtra(value: unknown): boolean {
+  const extra = readExtra({ tabletop: value });
+  if (!extra || JSON.stringify(value).length > SCENE_LIMITS.measureExtraBytes) return false;
+  return (extra.rules === undefined || isSpellRules(extra.rules)) && (extra.about === undefined || isSpellAbout(extra.about));
+}
+
+function isPlayerMeasure(value: unknown): boolean {
+  if (!isFields(value) || !oneOf(PLAYER_MEASURE_SHAPES)(value.shape) || !Array.isArray(value.points)) return false;
+  const most = value.shape === 'ruler' ? SCENE_LIMITS.measurePoints : 2;
+  if (value.points.length < 2 || value.points.length > most || !value.points.every((point) => isPoint(point))) return false;
+  const above = (range: readonly [number, number]) => (n: unknown): boolean => inRange(range)(n) && n > 0;
+  return optional(above(SCENE_RANGES.lineWidth))(value.width)
+    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color)
+    && optional((walls: unknown) => walls === false)(value.walls)
+    && optional(oneOf(PLAYER_MEASURE_EFFECTS))(value.effect)
+    && optional((owner: unknown) => isText(owner, SCENE_LIMITS.idLength) && owner !== '')(value.owner)
+    && optional((aura: unknown) => isFields(aura) && isSceneId(aura.token) && above(SCENE_RANGES.auraReach)(aura.reach))(value.aura)
+    && optional(isMeasureExtra)(value.tabletop);
+}
+
 const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
+  measures: isPlayerMeasure,
   tokens: isPlayerToken,
   fog: isPlayerFogOp,
   texts: isPlayerText,
@@ -330,7 +354,9 @@ export function isPlayerSceneBody(value: unknown): boolean {
   return isFields(value) && isSceneId(value.sceneId)
     // An older GM sends no measurement; the mirror fills it in.
     && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins' || key === 'handout'))
-    && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText);
+    && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText)
+    // Absent from a body made before measures were sent: the mirror then has none.
+    && optional((measures: unknown) => isRecordOf(measures, isPlayerMeasure))(value.measures);
 }
 
 export function isFogRecords(value: unknown): boolean {

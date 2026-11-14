@@ -1,17 +1,15 @@
 /**
  * The online session as Tabletop's 3D board on the GM's side shows it (`BoardSession`, handed to Tabletop's
- * `api.attachSession`): whether the GM is hosting, the presented map, each map's lasting templates (with the cone
- * angle they open by) and the handout shown, and the pings and lasers players send, as marks of their map. The GM
- * places templates from the board and erases any of them; every player of that scene hears of it as from Connect's own
- * view. The relays hand it what they accept (`PingRelay`, `LaserRelay`, `TemplateHost`), so the board shows exactly what
- * players see.
+ * `api.attachSession`): whether the GM is hosting, the presented map, the cone angle of each map and the handout shown,
+ * and the pings, lasers and instantaneous spells players send, as marks of their map. Templates and kept spells are no
+ * part of it: they are Atlas's measures, which the board reads from Atlas's store as it reads tokens. The relays hand
+ * it what they accept (`PingRelay`, `LaserRelay`, `MeasureHost`), so the board shows exactly what players see.
  */
 import type { TokenControl } from '../control/TokenControl';
 import type { SessionPlayer } from '../GmSession';
 import type { HandoutSource } from '../handouts';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
-import type { TemplateHost } from './TemplateHost';
-import type { MapTemplate, TemplateShape } from './templates';
+import type { MeasureHost } from './MeasureHost';
 import { type CastWords, isSpellRules, type SpellRules, isSpell, isSpellAsk, type MapSpell, type Spell, type SpellAsk } from './spells';
 import type { ArPose } from './arViews';
 import type { ArSurvey } from './arTable';
@@ -26,7 +24,9 @@ type Point = { x: number; y: number };
 
 export type BoardMark =
   | { kind: 'ping'; mapPath: string; x: number; y: number; color: string }
-  | { kind: 'laser'; mapPath: string; from: string; points: Point[]; lifted: boolean; color: string };
+  | { kind: 'laser'; mapPath: string; from: string; points: Point[]; lifted: boolean; color: string }
+  /** A player's instantaneous spell: cast now, kept nowhere; the board shows it go off and applies what it does. */
+  | { kind: 'spell'; mapPath: string; cast: MapSpell };
 
 /**
  * A player's phone in augmented reality over a map, for the GM's board (an eye where its camera is): its pose in board
@@ -49,9 +49,6 @@ export interface BoardSurvey {
 }
 
 export interface BoardOverlay {
-  templates: readonly MapTemplate[];
-  /** Spells players cast through their tokens' eyes on the map's scene (`spells.ts`). */
-  spells: readonly MapSpell[];
   /** Radians a cone opens by on this map. */
   coneAngle: number;
   handout: { path: string; title: string } | null;
@@ -72,9 +69,6 @@ export interface BoardSession {
   onViewer(listener: (viewer: BoardViewer) => void): () => void;
   /** Players' surveys of the table's marker sheets (a Tabletop that places them listens). */
   onSurvey(listener: (survey: BoardSurvey) => void): () => void;
-  addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean;
-  eraseTemplate(mapPath: string, id: string): void;
-  clearTemplates(mapPath: string): void;
   /**
    * Asks the players of `tokenId` to cast `ask` from it (they aim it; the rest is the GM's). The number of its players
    * on the map's scene now; null when no session hands out tokens. Absent from an older Connect.
@@ -83,11 +77,11 @@ export interface BoardSession {
   /** The ask waiting for `tokenId` on the map's scene, or null. */
   spellRequest?(mapPath: string, tokenId: string): SpellAsk | null;
   cancelSpellRequest?(mapPath: string, tokenId: string): void;
-  /** The GM casts a spell on the map's scene (through a token's eyes), in the GM's colour; false when it cannot. */
-  castSpell?(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean;
-  /** Takes a player's spell off the map's scene, or all of them. */
-  eraseSpell(mapPath: string, id: string): void;
-  clearSpells(mapPath: string): void;
+  /**
+   * The GM's instantaneous spell (cast on Tabletop's board): shown to the players of the map's scene, kept nowhere. A
+   * kept spell is never sent here: the board writes it to Atlas's measures, and players get it in the scene.
+   */
+  flashSpell?(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean;
   /**
    * Tabletop moves tokens from the map `from` to the stacked map `to` (each to `newId`, the same id unless `to` had
    * one): told before it moves them. Their players keep them, and are shown `to`.
@@ -172,6 +166,8 @@ function isMove(value: unknown): value is TokensMoved {
 /** What relays tell the board. */
 export interface BoardSessionSink {
   templatesChanged(): void;
+  /** A player's instantaneous spell on the map the GM's view shows. */
+  flash(mapPath: string, cast: MapSpell): void;
   ping(mapPath: string, x: number, y: number, color: string): void;
   laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void;
   viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void;
@@ -201,7 +197,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   private readonly stops: Array<() => void> = [];
   /** The scene in use of each map, as the hub last told of it. */
   private readonly scenes = new Map<string, string>();
-  private templates: TemplateHost | null = null;
+  private templates: MeasureHost | null = null;
   private moves: ((move: TokensMoved) => void) | null = null;
   private control: { control: TokenControl; players: () => readonly SessionPlayer[] } | null = null;
   private split: BoardSplitSource | null = null;
@@ -212,7 +208,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     if (options.cutscenes) this.cutscenes = true;
   }
 
-  useTemplates(templates: TemplateHost | null): void {
+  useTemplates(templates: MeasureHost | null): void {
     this.templates = templates;
   }
 
@@ -353,10 +349,7 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
   }
 
   overlay(mapPath: string): BoardOverlay {
-    const sceneId = this.sceneOf(mapPath);
     return {
-      templates: sceneId && this.templates ? this.templates.listFor(sceneId) : [],
-      spells: sceneId && this.templates ? this.templates.spellsFor(sceneId) : [],
       coneAngle: (this.options.coneAngle(mapPath) * Math.PI) / 180,
       handout: this.started ? this.options.handouts.current() : null,
     };
@@ -382,35 +375,11 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
     return () => { this.surveys.delete(listener); };
   }
 
-  addTemplate(mapPath: string, add: { shape: TemplateShape; start: Point; end: Point }): boolean {
-    const sceneId = this.sceneOf(mapPath);
-    return sceneId !== null && this.templates !== null && this.templates.addGm(sceneId, add);
-  }
-
-  eraseTemplate(mapPath: string, id: string): void {
-    const sceneId = this.sceneOf(mapPath);
-    if (sceneId) this.templates?.erase(sceneId, id);
-  }
-
-  clearTemplates(mapPath: string): void {
-    const sceneId = this.sceneOf(mapPath);
-    if (sceneId) this.templates?.clearScene(sceneId);
-  }
-
-  eraseSpell(mapPath: string, id: string): void {
-    const sceneId = this.sceneOf(mapPath);
-    if (sceneId) this.templates?.eraseSpell(sceneId, id);
-  }
-
-  clearSpells(mapPath: string): void {
-    const sceneId = this.sceneOf(mapPath);
-    if (sceneId) this.templates?.clearSpells(sceneId);
-  }
-
-  castSpell(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean {
+  flashSpell(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean {
     const sceneId = this.sceneOf(mapPath);
     if (!sceneId || !this.templates || !isSpell(spell)) return false;
-    return this.templates.castGm(sceneId, spell, rules !== undefined && isSpellRules(rules) ? rules : undefined, words);
+    this.templates.flashGm(sceneId, spell, rules !== undefined && isSpellRules(rules) ? rules : undefined, words);
+    return true;
   }
 
   requestSpell(mapPath: string, tokenId: string, ask: SpellAsk): number | null {
@@ -431,6 +400,10 @@ export class BoardSessionHub implements BoardSession, BoardSessionSink {
 
   templatesChanged(): void {
     this.emit();
+  }
+
+  flash(mapPath: string, cast: MapSpell): void {
+    this.mark({ kind: 'spell', mapPath, cast });
   }
 
   ping(mapPath: string, x: number, y: number, color: string): void {

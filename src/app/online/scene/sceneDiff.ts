@@ -47,7 +47,8 @@ export function diffScenes(previous: PlayerScene, next: PlayerScene): ScenePatch
     changed = true;
   }
   for (const key of SCENE_RECORD_KEYS) {
-    const { upsert, remove } = diffRecord(previous[key], next[key]);
+    // A scene from before a record existed (measures) has none of it.
+    const { upsert, remove } = diffRecord((previous[key] ?? {}), (next[key] ?? {}));
     if (Object.keys(upsert).length > 0) {
       (patch.upsert as AnyRecord)[key] = upsert;
       changed = true;
@@ -72,7 +73,7 @@ export function applyPatch(scene: PlayerScene, patch: ScenePatchBody): PlayerSce
     if (!upsert && removeList.length === 0) continue;
     // Build a new record object safely to prevent prototype pollution.
     const record: AnyRecord = {};
-    const currentRecord = next[key] as AnyRecord;
+    const currentRecord = (next[key] ?? {}) as AnyRecord;
     const removeSet = new Set(removeList);
     // Copy existing records, excluding removed ids.
     for (const id of Object.keys(currentRecord)) {

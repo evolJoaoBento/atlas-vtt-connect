@@ -1,8 +1,10 @@
 /**
  * What online players receive of the presented scene. Shared with the web
- * player page, so this file imports nothing. Every field is `T | null`, never
+ * player page, so this file imports nothing but a type. Every field is `T | null`, never
  * optional: JSON drops `undefined`, and both sides compare by value.
  */
+import type { TabletopExtra } from '../../../../packages/atlas-host/src/spellMeasure';
+
 export interface ScenePoint {
   x: number;
   y: number;
@@ -394,10 +396,41 @@ export interface PlayerScene {
   widgets: PlayerWidget[];
   initiative: PlayerInitiative | null;
   measurement: PlayerMeasurement;
+  /**
+   * Atlas's kept measures players see (areas, rulers, auras, and the spells and templates kept there), by Atlas's ids,
+   * in the order they were made. The only place a spell or a template reaches players from.
+   */
+  measures: Record<string, PlayerMeasure>;
   /** The map pins the GM made readable, where players see them; absent from an older GM. */
   pins?: PlayerPin[];
   /** The image the GM shows players, or null; absent from an older GM. */
   handout?: PlayerHandout | null;
+}
+
+export const PLAYER_MEASURE_SHAPES = ['ruler', 'circle', 'cone', 'square', 'line'] as const;
+/** Atlas's looks of an area (`MeasureEffect`). */
+export const PLAYER_MEASURE_EFFECTS = ['fire', 'frost', 'lightning', 'mist', 'radiance', 'shadow'] as const;
+
+/**
+ * One of Atlas's kept measures as players get it (`projectMeasures`): what draws it, and no more. A ruler runs through
+ * its points; an area lies from its first point to its second, as Atlas shapes it (`shapedArea`).
+ */
+export interface PlayerMeasure {
+  shape: typeof PLAYER_MEASURE_SHAPES[number];
+  points: ScenePoint[];
+  /** A line's width, map pixels; one cell without it. */
+  width?: number;
+  /** `#rrggbb`; the accent without it. */
+  color?: string;
+  /** An area walls do not stop. */
+  walls?: false;
+  effect?: typeof PLAYER_MEASURE_EFFECTS[number];
+  /** The player who made it (their session id); absent: the GM, or nobody known. */
+  owner?: string;
+  /** A circle that follows a token players are sent: how far it reaches from the edge of the token's space, game units. */
+  aura?: { token: string; reach: number };
+  /** A spell's 3D shape and words, or a template's mark (`spellMeasure.ts`): known keys only. */
+  tabletop?: TabletopExtra;
 }
 
 /** The image the GM shows players: its asset (null while the GM is still reading it) and its title. */
@@ -426,7 +459,7 @@ export interface PlayerPin {
 export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 
 /** Fields diffed per record, by id. */
-export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
+export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings', 'measures'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
 export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout'] as const;

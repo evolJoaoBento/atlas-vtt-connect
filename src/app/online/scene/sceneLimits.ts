@@ -38,6 +38,11 @@ export const SCENE_LIMITS = {
   widgets: 64,
   initiativeEntries: 200,
   rangeBands: 32,
+  /** Atlas's `MAX_MEASURES` (per level) and `MAX_RULER_POINTS`. */
+  measures: 256,
+  measurePoints: 64,
+  /** The most a measure's `tabletop` field may take, as JSON. */
+  measureExtraBytes: 8 * 1024,
   /** Atlas 0.15's `MAX_MOVEMENT_STEPS` and `MAX_STEP_NAME`. */
   movementSteps: 4,
   stepName: 24,
@@ -73,6 +78,10 @@ export const SCENE_RANGES = {
   miniScale: [0.2, 4],
   /** A mini's turn on its token, in degrees. */
   miniTurn: [0, 360],
+  /** A line measure's width, map pixels, above 0. */
+  lineWidth: [0, 100_000],
+  /** How far an aura reaches, game units, above 0 (Atlas's `MAX_AURA`). */
+  auraReach: [0, 100_000],
   /** A token's height in game units (Atlas 0.15's `MAX_TOKEN_HEIGHT` either way). */
   elevation: [-100_000, 100_000],
   /** A token's speed in game units, above 0 (Atlas 0.15's `MAX_MOVEMENT_SPEED`). */

@@ -139,6 +139,12 @@ export type ControlMessage =
    * theirs off, clear theirs, or turn down an ask (`decline`) (`tools/spells.ts`).
    */
   | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; request?: string; remove?: string; clear?: true; decline?: string; rules?: SpellRules; name?: string; about?: SpellAbout }
+  /** GM to the players of a token: the spells the GM asks of the tokens they control on the scene (`MeasureHost.requestSpell`). */
+  | { v: 1; type: 'spell-asks'; sceneId: string; asks: SpellRequest[]; askWords?: SpellWords[]; askRules?: AskRules[] }
+  /** GM to a scene's players: an instantaneous spell, cast now and kept nowhere. */
+  | { v: 1; type: 'spell-flash'; sceneId: string; cast: MapSpell }
+  /** GM to a player: their template or spell was not kept, and why. */
+  | { v: 1; type: 'map-refused'; what: 'template' | 'spell'; reason: MeasureRefusal }
   /** Player to GM, on admission and when they pick another: their own colour (`tools/playerColors.ts`), one of the laser swatches. */
   | { v: 1; type: 'player-color'; color: string }
   /** GM to players: every spell on the scene, whenever they change. */
@@ -172,6 +178,10 @@ export type ControlMessage =
   | { v: 1; type: 'cutscene-extras'; runId: string; key: string; seq: number; part: number; parts: number; extras: BoardExtras }
   /** GM to a ready player, live runs only: the GM's camera, at most every 100 ms. */
   | { v: 1; type: 'cutscene-camera'; runId: string; eye: Vec3; target: Vec3 };
+
+/** Why a template or a spell was not kept: the GM's Atlas holds another map, the player or the scene has as many as it may, or the level holds no more. */
+export type MeasureRefusal = 'not-held' | 'limit' | 'full';
+export const MEASURE_REFUSALS: readonly MeasureRefusal[] = ['not-held', 'limit', 'full'];
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -251,6 +261,9 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && (m.rules === undefined || (m.add !== undefined && isSpellRules(m.rules)))
     && (m.name === undefined || (m.add !== undefined && isCastName(m.name))) && (m.about === undefined || (m.add !== undefined && isSpellAbout(m.about))),
   'map-spells': (m) => isSceneId(m.sceneId) && isMapSpells(m.spells) && (m.asks === undefined || isSpellRequests(m.asks)) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
+  'spell-asks': (m) => isSceneId(m.sceneId) && isSpellRequests(m.asks) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
+  'spell-flash': (m) => isSceneId(m.sceneId) && isMapSpells([m.cast]),
+  'map-refused': (m) => (m.what === 'template' || m.what === 'spell') && (MEASURE_REFUSALS as readonly unknown[]).includes(m.reason),
   'player-color': (m) => isLaserColor(m.color),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),

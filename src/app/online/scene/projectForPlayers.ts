@@ -16,6 +16,7 @@ import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr }
 import type { FogCoverage, Shows } from './FogCoverage';
 import { mapMatrix, type MapAlignment } from './mapPlacement';
 import { projectLiquids } from './projectLiquids';
+import { projectMeasures } from './projectMeasures';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -145,6 +146,8 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
     texts: closed ? {} : projectTexts(objects?.texts, visible),
     drawings: closed ? {} : projectDrawings(objects?.drawings, visible, memo),
+    // Atlas's kept measures (areas, rulers, auras, kept spells and templates), as Atlas's players' picture shows them.
+    measures: projectMeasures((objects as { measures?: unknown } | undefined)?.measures, { closed, seen: (tokenId) => Object.hasOwn(tokens, tokenId) }),
     widgets: curtained ? [] : projectWidgets(state, context.rules),
     initiative: curtained ? null : initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle, context.movement?.rules, context.rules, state.initiative?.isActive === true),
