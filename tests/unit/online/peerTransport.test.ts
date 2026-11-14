@@ -70,7 +70,7 @@ class FakePeer extends FakeEmitter {
 
 vi.mock('peerjs', () => ({ Peer: FakePeer }));
 
-const { createPeerHost, createPeerClient, LINK_OPEN_TIMEOUT_MS, FLUSH_CAP_MS, FLUSH_GRACE_MS, FLUSH_POLL_MS } = await import('../../../src/app/online/transport/PeerTransport');
+const { createPeerHost, createPeerClient, DATA_LINK_TIMEOUT_MS, LINK_OPEN_TIMEOUT_MS, FLUSH_CAP_MS, FLUSH_GRACE_MS, FLUSH_POLL_MS } = await import('../../../src/app/online/transport/PeerTransport');
 const { peerHostId, peerOptions, PEER_ID_PATTERN } = await import('../../../src/app/online/transport/peerOptions');
 
 afterEach(() => { peers.length = 0; vi.useRealTimers(); });
@@ -147,10 +147,10 @@ describe('PeerTransport', () => {
   it('rejects a client whose data connections never open', async () => {
     vi.useFakeTimers();
     const pending = createPeerClient({ iceServers: [] }).connect('gm-id');
-    const outcome = expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    const outcome = expect(pending).rejects.toMatchObject({ code: 'direct-timeout' });
     const peer = peers[0]!;
     peer.emit('open', 'me');
-    await vi.advanceTimersByTimeAsync(LINK_OPEN_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(DATA_LINK_TIMEOUT_MS);
     await outcome;
     expect(peer.destroyed).toBe(true);
     expect(peer.connections.every((c) => c.closed)).toBe(true);
@@ -159,7 +159,7 @@ describe('PeerTransport', () => {
   it('rejects a client when the signaling server never answers', async () => {
     vi.useFakeTimers();
     const pending = createPeerClient({ iceServers: [] }).connect('gm-id');
-    const outcome = expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    const outcome = expect(pending).rejects.toMatchObject({ code: 'signaling-timeout' });
     await vi.advanceTimersByTimeAsync(LINK_OPEN_TIMEOUT_MS);
     await outcome;
     expect(peers[0]!.destroyed).toBe(true);
@@ -175,7 +175,7 @@ describe('PeerTransport', () => {
     peer.emit('connection', control);
     peer.emit('connection', assets);
     control.emit('open');
-    await vi.advanceTimersByTimeAsync(LINK_OPEN_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(DATA_LINK_TIMEOUT_MS);
     expect(control.closed).toBe(true);
     expect(assets.closed).toBe(true); // asked to close although it never opened
     assets.emit('open');
@@ -487,5 +487,27 @@ describe('PeerTransport pacing', () => {
     (assets as unknown as { dataChannel: unknown }).dataChannel = { bufferedAmount: 7 };
     expect(link.bufferedAmount('assets')).toBe(7);
     expect(() => link.onDrain('assets', 1, () => {})()).not.toThrow();
+  });
+});
+
+
+describe('residential network connection budgets', () => {
+  it('starts a fresh ICE budget after signaling, and distinguishes a configured relay timeout', async () => {
+    vi.useFakeTimers();
+    const pending = createPeerClient({ iceServers: [{ urls: 'turns:relay.example:443', username: 'user', credential: 'secret' }] }).connect('gm');
+    const outcome = expect(pending).rejects.toMatchObject({ code: 'relay-timeout' });
+    await vi.advanceTimersByTimeAsync(LINK_OPEN_TIMEOUT_MS - 1);
+    const peer = peers[0]!; peer.emit('open', 'me');
+    await vi.advanceTimersByTimeAsync(DATA_LINK_TIMEOUT_MS - 1);
+    expect(peer.destroyed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1); await outcome;
+    expect(peer.connections.every((connection) => connection.closed)).toBe(true);
+  });
+  it('does not create duplicate channel pairs on repeated signaling open events', async () => {
+    const pending = createPeerClient({ iceServers: [] }).connect('gm');
+    const peer = peers[0]!; peer.emit('open', 'me'); peer.emit('open', 'me');
+    expect(peer.connections).toHaveLength(2);
+    peer.connections.forEach((connection) => connection.emit('open'));
+    const link = await pending; link.close();
   });
 });

@@ -31,6 +31,7 @@ import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
 import { MapView } from './mapView.mts';
+import { TurnOrderView } from './turnOrderView.mts';
 import { Menu } from './menu.mts';
 import { PageToolbar } from './toolbar.mts';
 
@@ -55,7 +56,31 @@ const canvas = element<HTMLCanvasElement>('map');
 
 const cache = new AssetCache({ keep: rememberedKeep(), openStore: openIndexedDbImageStore });
 const panel = new AssetsPanel(cache);
-new Menu(element<HTMLButtonElement>('menu-button'), element<HTMLElement>('menu'), element<HTMLButtonElement>('menu-close'));
+const menu = new Menu(element<HTMLButtonElement>('menu-button'), element<HTMLElement>('menu'), element<HTMLButtonElement>('menu-close'));
+function showTokenTab(selected: boolean): void {
+  element('token-panel').hidden = !selected;
+  element('token-panel').dataset.inactive = String(!selected);
+  element('general-panel').hidden = selected;
+  element('token-tab').setAttribute('aria-pressed', String(selected));
+  element('general-tab').setAttribute('aria-pressed', String(!selected));
+}
+element('general-tab').addEventListener('click', () => showTokenTab(false));
+element('token-tab').addEventListener('click', () => showTokenTab(true));
+let controlledTokens: readonly string[] = [];
+const turns = new TurnOrderView(element('turn-order'), element('turn-order-button'), (name, value) => session?.sendTurn(name, value) ?? false, (id) => session?.removeTurn(id) ?? false);
+function updateTokenChoices(): void {
+  const list = element('owned-tokens'); list.replaceChildren();
+  for (const id of controlledTokens) {
+    if (!scene?.tokens[id]) continue;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'secondary';
+    button.textContent = `Selecionar: ${scene.tokens[id]?.name ?? 'Personagem'}`;
+    button.addEventListener('click', () => map?.selectToken(id)); list.append(button);
+  }
+  turns.update(scene, controlledTokens);
+}
+const editorKey=new URLSearchParams(location.hash.slice(1)).get('edit');
+const canEditMap=editorKey!==null&&/^[A-Za-z0-9_-]{43}$/.test(editorKey);
+element('map-edit-button').hidden=!canEditMap;
 const surface = createCanvasSurface(canvas);
 /** Set once the player joins; until then a drop, a laser or a roll has nowhere to go. */
 let session: PlayerSession | null = null;
@@ -63,10 +88,13 @@ let session: PlayerSession | null = null;
 // it asks the loader every time, so a released image is never drawn.
 const map = surface
   ? new MapView({
+    ...(canEditMap ? {mapEdit:{button:element<HTMLButtonElement>('map-edit-button'),send:(matrix:import('../src/app/online/control/mapEdits').EditMatrix)=>session?.sendMapEdit(editorKey,matrix)??false}} : {}),
+    tokenPanel: element('token-panel'), onTokenSelected: () => { element('token-tab').hidden = false; showTokenTab(true); menu.setOpen(true); },
     canvas, surface, images: (id) => loader.image(id),
     viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendCopy: (tokenId) => session?.sendTokenCopy(tokenId) ?? false,
+    sendEdit: (tokenId, edit) => session?.sendTokenEdit(tokenId, edit) ?? false,
     sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
     sendTemplate: (change) => session?.sendTemplate(change) ?? false,
@@ -220,7 +248,11 @@ function show(view: PageScreen): void {
   tableShown = view.kind === 'table';
 }
 
+document.getElementById('retry-connection')?.addEventListener('click', () => location.reload());
+
 function render(state: PlayerSessionState): void {
+  const retry = document.getElementById('retry-connection');
+  if (retry) retry.hidden = state.status !== 'lost' || state.reason === 'ended' || state.reason === 'replaced';
   log.event('status', { status: state.status, reason: state.reason, players: state.players.length });
   sessionState = state;
   // Only an admitted player drags tokens and uses the tools: reconnecting or ended cancels a gesture.
@@ -252,6 +284,7 @@ function renderScene(): void {
   if (shown !== shownScene) {
     shownScene = shown;
     map?.setScene(shown);
+    updateTokenChoices();
   }
   fillList(widgetList, shown ? widgetLines(shown.widgets) : []);
   // Read-only, for checking in the developer tools what this page received.
@@ -292,7 +325,7 @@ if (!target) {
       hostId: target.hostId,
       name,
       // One key per GM session, so different GMs cannot recognise or pose as the same player.
-      playerKey: playerKeyFor(target.hostId),
+      playerKey: playerKeyFor(target.hostId + (canEditMap ? ':map-editor' : '')),
       clientVersion: VERSION,
       transport: createPeerClient(target.server),
       onChange: render,
@@ -306,9 +339,11 @@ if (!target) {
         map.setGmCamera(camera);
       },
       onControl: (tokenIds) => {
+        controlledTokens = tokenIds; updateTokenChoices();
         log.event('control', { tokens: tokenIds.length });
         map.setControlled(tokenIds);
       },
+      onMapEditResult: (sceneId,accepted) => map.mapEditResult(sceneId,accepted),
       onMoveRefused: (tokenId) => {
         log.event('move refused', { tokenId });
         map.moveRefused(tokenId);

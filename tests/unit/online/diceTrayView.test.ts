@@ -92,19 +92,19 @@ describe('rolling with advantage or disadvantage from the tray', () => {
     const choices = [...root.querySelectorAll<HTMLButtonElement>('.tray-side')];
     expect(choices.map((choice) => choice.textContent)).toEqual(['Normal', 'Advantage', 'Disadvantage']);
     // Off with an empty tray, with a d6, with two d20 and with a d20 beside another die.
-    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    expect(choices.every((choice) => !choice.disabled)).toBe(true);
     die('d6').click();
-    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    expect(choices.every((choice) => !choice.disabled)).toBe(true);
     root.querySelector<HTMLButtonElement>('.tray-clear')!.click();
     die('d20').click();
     expect(choices.every((choice) => !choice.disabled)).toBe(true);
     expect(sideButton(root, 'Normal').getAttribute('aria-pressed')).toBe('true');
     die('d20').click();
-    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    expect(choices.every((choice) => !choice.disabled)).toBe(true);
     root.querySelector<HTMLButtonElement>('.tray-clear')!.click();
     die('d20').click();
     die('d4').click();
-    expect(choices.every((choice) => choice.disabled)).toBe(true);
+    expect(choices.every((choice) => !choice.disabled)).toBe(true);
   });
 
   it('sends the side the player chose with a roll of one d20, and nothing for Normal', () => {

@@ -270,3 +270,15 @@ describe('MapView', () => {
     expect(t.canvas.dataset.tool).toBe('move');
   });
 });
+
+it('opens the right panel on a single click and clears it when switching scenes', () => {
+  const panel = document.createElement('section'); document.body.append(panel);
+  const selected = vi.fn(); const edit = vi.fn(() => true);
+  const t = setup({ tokenPanel: panel, onTokenSelected: selected, sendEdit: edit });
+  withToken(t);
+  t.canvas.dispatchEvent(new MouseEvent('click', { clientX: 116, clientY: 87, bubbles: true }));
+  expect(selected).toHaveBeenCalledOnce();
+  expect(panel.querySelector('input[aria-label="HP atual"]')).not.toBeNull();
+  expect(document.querySelector('dialog')).toBeNull();
+  t.view.setScene(null); expect(panel.hidden).toBe(true); t.view.dispose();
+});

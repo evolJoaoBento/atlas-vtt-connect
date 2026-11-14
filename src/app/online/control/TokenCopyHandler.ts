@@ -1,3 +1,5 @@
+import type { EditMatrix } from './mapEdits';
+import type { TokenEdit } from './tokenEdits';
 import type { TokensApi } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { SceneSession } from '../scene/sceneSources';
@@ -8,10 +10,10 @@ import { heldOffTurn } from './turnHold';
 import type { TokenControl } from './TokenControl';
 
 /** Optional Connect operation on stock Atlas; API hosts without it refuse copies. */
-export type CopyableTokens = Pick<TokensApi, 'move'> & { duplicate?(viewId: string, tokenId: string): string | null };
+export type CopyableTokens = Pick<TokensApi, 'move'> & { duplicate?(viewId: string, tokenId: string): string | null; editMap?(viewId: string, matrix: EditMatrix): boolean; removeTurn?(viewId: string, entryId: string): boolean; addTurn?(viewId: string, name: string, value: number): boolean; edit?(viewId: string, tokenId: string, edit: TokenEdit): boolean };
 
 export interface TokenCopyHandlerOptions {
-  session: SceneSession;
+  session: SceneSession & { canEditMap?(key: string): boolean };
   projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot'>;
   control: TokenControl;
   tokens: CopyableTokens;

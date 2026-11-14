@@ -76,7 +76,7 @@ export interface ControlPlayer {
   controlLists(): string[][];
 }
 
-export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean; duplicate?: CopyableTokens['duplicate'] } = {}) {
+export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean; duplicate?: CopyableTokens['duplicate']; edit?: CopyableTokens['edit'] } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let host: TokenControlHost | null = null;
@@ -88,7 +88,7 @@ export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () =
   gm.start();
   const scene = presentedScene(gm, options.scene ?? {});
   const { tokens } = scene.presented.extension;
-  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens: { ...tokens, ...(options.duplicate ? { duplicate: options.duplicate } : {}) }, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}) });
+  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens: { ...tokens, ...(options.edit ? { edit: options.edit } : {}), ...(options.duplicate ? { duplicate: options.duplicate } : {}) }, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}) });
   host = controlHost;
   controlHost.start();
   const players: ControlPlayer[] = [];

@@ -1,7 +1,8 @@
 import {
   Notice, PluginSettingTab, Setting, type App, type Plugin, type SettingDefinitionItem, type TextComponent, type ToggleComponent,
 } from 'obsidian';
-import { DEFAULT_ONLINE_SETTINGS, formatTurnServers, parseTurnServers, type OnlineSettings } from '../app/online/onlineSettings';
+import { DEFAULT_ONLINE_SETTINGS, formatTurnServers, parseTurnServers, peerServerOptions, type OnlineSettings } from '../app/online/onlineSettings';
+import { iceProbeText, probeIceServers } from '../app/online/transport/iceProbe';
 import { NEW_TABLE_KEY_LABEL, newTableKey } from './newTableKey';
 import type { ConnectSettingsStore } from './settingsStore';
 
@@ -69,9 +70,26 @@ export class ConnectSettingTab extends PluginSettingTab {
   private rows(): SettingRow[] {
     const notice = this.sharingNotice();
     return [
-      this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(), this.tableKeyRow(),
+      this.localRelayRow(), this.signalingRow(), this.addressRow(), this.keyRow(), this.relayRow(), this.pageRow(), this.tableKeyRow(),
       ...(notice ? [this.sharingRow(notice)] : []), this.propertiesRow(), this.imagesRow(), this.logRow(),
     ];
+  }
+
+  private localRelayRow(): SettingRow {
+    return {
+      name: 'Local WebSocket relay',
+      desc: 'Servidor gratuito no computador do mestre. Execute o iniciador em RPG/Servidores/atlas-local. Deixe o endereço vazio para voltar ao modo WebRTC. A chave privada nunca entra no link dos jogadores.',
+      aliases: ['local', 'websocket', 'servidor'],
+      render: (setting) => {
+        const update = (url: string, adminKey: string): void => this.settings.set({ localRelay: url.trim() ? { url: url.trim(), adminKey } : null });
+        setting.setClass(WRAP_CLASS).setClass(BELOW_CLASS)
+          .addText((text) => text.setPlaceholder('http://127.0.0.1:8787/').setValue(this.settings.get().localRelay?.url ?? '').onChange((url) => update(url, this.settings.get().localRelay?.adminKey ?? '')))
+          .addText((text) => {
+            text.inputEl.type = 'password'; text.inputEl.setAttribute('aria-label', 'Chave privada do servidor local');
+            text.setValue(this.settings.get().localRelay?.adminKey ?? '').onChange((key) => update(this.settings.get().localRelay?.url ?? '', key));
+          });
+      },
+    };
   }
 
   private signaling(): Signaling {
@@ -163,13 +181,19 @@ export class ConnectSettingTab extends PluginSettingTab {
   private relayRow(): SettingRow {
     return {
       name: 'Relay (TURN) servers',
-      desc: 'For players whose network blocks direct connections. One per line: turn:host:port username password. Players receive these in the join link.',
+      desc: 'Para conectar redes diferentes, inclusive duas casas. Cole o JSON iceServers do provedor ou até 8 linhas: turn:host:port usuário senha. Os jogadores recebem estas credenciais no link. Após alterar, encerre e inicie a sessão para gerar um link atualizado.',
       aliases: ['turn', 'relay', 'nat', 'firewall'],
       render: (setting) => {
         setting.setClass(WRAP_CLASS).setClass(BELOW_CLASS).addTextArea((area) => area
           .setPlaceholder(formatTurnServers([{ urls: 'turn:relay.example.org:3478', username: 'user', credential: 'password' }]))
           .setValue(formatTurnServers(this.settings.get().turnServers))
           .onChange((text) => this.settings.set({ turnServers: parseTurnServers(text) })));
+        setting.addButton((button) => button.setButtonText('Testar servidores').onClick(() => {
+          button.setDisabled(true);
+          void probeIceServers(peerServerOptions(this.settings.get()).iceServers)
+            .then((result) => { new Notice(iceProbeText(result), 15000); })
+            .finally(() => button.setDisabled(false));
+        }));
       },
     };
   }

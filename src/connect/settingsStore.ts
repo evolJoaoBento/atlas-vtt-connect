@@ -39,7 +39,7 @@ export const FORK_PLAYER_PAGE_URL = 'https://evoljoaobento.github.io/atlas-vtt/'
 
 /** Connect's own player page in place of the fork's old default; any other address is kept. */
 export function movedPlayerPage(url: string): string {
-  return url === FORK_PLAYER_PAGE_URL || url === FORK_PLAYER_PAGE_URL.slice(0, -1) ? DEFAULT_ONLINE_SETTINGS.playerPageUrl : url;
+  return url === 'https://evoljoaobento.github.io/atlas-vtt-connect/' || url === 'https://evoljoaobento.github.io/atlas-vtt-connect' || url === FORK_PLAYER_PAGE_URL || url === FORK_PLAYER_PAGE_URL.slice(0, -1) ? DEFAULT_ONLINE_SETTINGS.playerPageUrl : url;
 }
 
 const isForkStep = (value: unknown): value is ForkStep => (FORK_STEPS as readonly unknown[]).includes(value);

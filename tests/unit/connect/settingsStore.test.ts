@@ -12,7 +12,7 @@ describe('ConnectSettingsStore', () => {
     const store = await ConnectSettingsStore.load(plugin, memoryKeyValueStore());
     expect(store.get().playerPageUrl).toBe('https://my.example/page/');
     const fresh = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
-    expect(fresh.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    expect(fresh.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
     store.set({ playerName: 'GM' });
     expect(plugin.saved).toHaveLength(0);
     vi.advanceTimersByTime(500);
@@ -21,7 +21,7 @@ describe('ConnectSettingsStore', () => {
 
   it("moves the fork's old default player page to Connect's", async () => {
     const store = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt/' } }), memoryKeyValueStore());
-    expect(store.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    expect(store.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
   });
 
   it('knows which settings changed while the settings step is not done, and moves the old default page with or without its slash', async () => {
@@ -30,7 +30,7 @@ describe('ConnectSettingsStore', () => {
     store.set({ playerName: 'GM', keepImages: false });
     expect([...store.changedSinceLoad]).toEqual(['playerName', 'keepImages']);
     const slashless = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt' } }), memoryKeyValueStore());
-    expect(slashless.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    expect(slashless.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
     const lookalike = await ConnectSettingsStore.load(fakeDataPlugin({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-x/' } }), memoryKeyValueStore());
     expect(lookalike.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-x/');
     expect(FORK_PLAYER_PAGE_URL).toBe('https://evoljoaobento.github.io/atlas-vtt/');
@@ -115,4 +115,11 @@ describe('ConnectSettingsStore', () => {
     await store.flush();
     expect(plugin.saved).toHaveLength(1);
   });
+});
+
+it('migrates the previous GitHub player page to the users own published fork', async () => {
+  for(const playerPageUrl of ['https://evoljoaobento.github.io/atlas-vtt-connect/','https://evoljoaobento.github.io/atlas-vtt-connect']) {
+    const store=await ConnectSettingsStore.load(fakeDataPlugin({online:{playerPageUrl}}),memoryKeyValueStore());
+    expect(store.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
+  }
 });

@@ -55,6 +55,7 @@ function sendDetails(playerId: string, message: ControlMessage): LogDetails {
 /** The session the broadcaster and the camera sender send through, logging every message. */
 export function loggedSession(session: SceneSession, log: OnlineLog): SceneSession {
   return {
+    ...(session.canEditMap ? {canEditMap:(key:string)=>session.canEditMap?.(key)??false} : {}),
     use: (handler) => session.use(handler),
     getPlayers: () => session.getPlayers(),
     send: (playerId, message) => {

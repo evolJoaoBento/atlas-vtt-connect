@@ -2,6 +2,8 @@
  * How the online sessions reach each other. The sessions only know these
  * interfaces; PeerJS (PeerTransport) and tests (MemoryTransport) provide them.
  */
+import type { RelayTarget } from './relayWire';
+
 export type Channel = 'control' | 'assets';
 export type Unsubscribe = () => void;
 
@@ -30,6 +32,7 @@ export interface PeerLink {
 }
 
 export interface HostTransport {
+  readonly relay?: RelayTarget;
   readonly id: string;
   onConnection(cb: (link: PeerLink) => void): Unsubscribe;
   onError(cb: (error: TransportError) => void): Unsubscribe;

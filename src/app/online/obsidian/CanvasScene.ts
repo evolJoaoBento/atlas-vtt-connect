@@ -34,7 +34,7 @@ import { sheetThrow } from './onlineDice';
 import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 
-export type CanvasSceneService = Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
+export type CanvasSceneService = Partial<Pick<OnlineJoinService, 'sendTokenEdit'>> & Pick<OnlineJoinService, 'attach' | 'image' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser' | 'sendSheetRoll' | 'sendPing' | 'sendTemplate'>
   & Partial<Pick<OnlineJoinService, 'sendNoteRequest' | 'model' | 'miniPainter' | 'boardPainter' | 'wantBoard' | 'images' | 'sendDiceResult'>>;
 
 export interface CanvasSceneOptions {
@@ -305,6 +305,7 @@ export class CanvasScene implements OnlineSceneSink {
         minis: createMiniLayer({ painter: () => service.miniPainter?.() ?? null, canvas: () => dom.canvas.cloneNode(false) as HTMLCanvasElement }),
         viewButtons: dom.viewButtons, followButton: dom.followButton, fitButton: dom.fitButton,
         sendMove: (tokenId, x, y) => service.sendTokenMove(tokenId, x, y),
+        ...(service.sendTokenEdit ? { sendEdit: (tokenId: string, edit: import('../control/tokenEdits').TokenEdit) => service.sendTokenEdit?.(tokenId, edit) ?? false } : {}),
         sendLaser: (points, lifted, dt, color, size) => service.sendLaser(points, lifted, dt, color, size),
         sendPing: (x, y) => service.sendPing(x, y),
         sendTemplate: (change) => service.sendTemplate(change),

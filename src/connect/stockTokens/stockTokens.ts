@@ -1,3 +1,7 @@
+import { isEditMatrix, type EditMatrix } from '../../app/online/control/mapEdits';
+import { backgroundOfLevel } from '../stockLevels';
+import { isTurnName, isTurnValue } from '../../app/online/control/manualTurns';
+import { isTokenEdit, type TokenEdit } from '../../app/online/control/tokenEdits';
 /**
  * `tokens` on a stock Atlas VTT, which has no extension API: where a dropped token lands and moving tokens for
  * players, with the contract of the API (`TokensApi`).
@@ -41,7 +45,15 @@ interface TokenScene {
   /** Atlas 0.10's levels (floors) and the one this view shows: only that floor's walls stop a token. */
   levels?: unknown;
   viewedLevel?: unknown;
+  background?: string | null;
+  setGrid?: (grid: Record<string, unknown>) => void;
   dropTokens?: (positions: readonly TokenPlace[]) => void;
+  updateToken?: (id: string, changes: Record<string, unknown>) => void;
+  initiative?: { entries: { id: string; tokenId: string }[] };
+  setInitiativeTrackerOpen?: (open: boolean) => void;
+  updateInitiativeEntry?: (id: string, updates: Record<string, unknown>) => void;
+  removeFromInitiative?: (id: string) => void;
+  addToInitiative?: (entry: Record<string, unknown>) => string;
   addTokens?: (entries: Record<string, unknown>[]) => string[];
 }
 
@@ -132,6 +144,56 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableToken
   const snaps = (state: TokenScene): boolean => state.grid != null && (state.grid.snapToGrid ?? true);
 
   return Object.freeze({
+    edit: (viewId: string, tokenId: string, edit: TokenEdit): boolean => {
+      const state = deps.view(viewId)?.atlasStore.getState();
+      if (!isTokenEdit(edit) || !state || !state.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.updateToken) return false;
+      const token = tokenOf(state, tokenId) as (Record<string, unknown> & { isHidden?: boolean }) | null;
+      if (!token || token.isHidden) return false;
+      const { hp, initiative, ...changes } = edit;
+      if (initiative !== undefined) {
+        const entry = state.initiative?.entries.find((candidate) => candidate.tokenId === tokenId);
+        if (entry) {
+          if (!state.updateInitiativeEntry) return false;
+          state.updateInitiativeEntry(entry.id, { initiative });
+        } else {
+          if (!state.addToInitiative || !state.updateInitiativeEntry) return false;
+          // Native add does not sort; updating a different seed applies its configured sorting.
+          const id = state.addToInitiative({ tokenId, name: typeof token.name === 'string' ? token.name : 'Personagem', imagePath: typeof token.imagePath === 'string' ? token.imagePath : '', initiative: initiative === 0 ? 1 : 0, initiativeModifier: 0, isNPC: token.isNPC === true });
+          state.updateInitiativeEntry(id, { initiative });
+        }
+      }
+      const updates: Record<string, unknown> = { ...changes };
+      if (hp) {
+        updates.resources = { ...(isObject(token.resources) ? token.resources : {}), hp: { ...hp } };
+        updates.overriddenMax = [...new Set([...(Array.isArray(token.overriddenMax) ? (token.overriddenMax as unknown[]).filter((key): key is string => typeof key === 'string') : []), 'hp'])];
+      }
+      if (Object.keys(updates).length) state.updateToken(tokenId, updates);
+      return true;
+    },
+    editMap: (viewId: string, matrix: EditMatrix): boolean => {
+      const state = deps.view(viewId)?.atlasStore.getState();
+      if (!isEditMatrix(matrix) || !state?.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.setGrid || !state.grid) return false;
+      const path = backgroundOfLevel(state.background ?? null,state.levels,state.viewedLevel);
+      if (!path) return false;
+      const grid = state.grid as Record<string, unknown>;
+      const layouts = isObject(grid.rpgMapLayouts) ? grid.rpgMapLayouts : {};
+      state.setGrid({...grid,rpgMapLayouts:{...layouts,[path]:[...matrix]}});
+      return true;
+    },
+    removeTurn: (viewId: string, entryId: string): boolean => {
+      const state = deps.view(viewId)?.atlasStore.getState();
+      if (!state?.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.removeFromInitiative || !state.initiative?.entries.some(entry => entry.id === entryId)) return false;
+      state.removeFromInitiative(entryId);
+      return true;
+    },
+    addTurn: (viewId: string, name: string, value: number): boolean => {
+      const state = deps.view(viewId)?.atlasStore.getState();
+      if (!isTurnName(name) || !isTurnValue(value) || !state?.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.addToInitiative || !state.updateInitiativeEntry || (state.initiative?.entries.length ?? 0) >= 64) return false;
+      const id = state.addToInitiative({ tokenId: `rpg-turn-${crypto.randomUUID()}`, name: name.trim(), imagePath: '', initiative: value === 0 ? 1 : 0, initiativeModifier: 0, isNPC: true });
+      state.updateInitiativeEntry(id, { initiative: value });
+      state.setInitiativeTrackerOpen?.(true);
+      return true;
+    },
     duplicate: (viewId: string, tokenId: string): string | null => {
       const state = deps.view(viewId)?.atlasStore.getState();
       if (!state || !state.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.addTokens) return null;

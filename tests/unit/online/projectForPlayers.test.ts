@@ -61,7 +61,7 @@ describe('projectForPlayers', () => {
     const scene = projectForPlayers(withTokens({ hero: hero() }), context());
     expect(scene.tokens.hero).toEqual({
       x: 140, y: 140, size: 1, rotation: 0, layer: 0, image: expect.any(String), ring: '#3366ff',
-      conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: null, stress: null,
+      conditionChoices: [], conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: null, stress: null,
       resources: [{ color: '#22c55e', share: 0.7, spent: false, current: 7, max: 10 }, { color: '#a855f7', share: 0.33, spent: false, current: 2, max: 6 }], downed: false,
     });
     expect(scene.tokens.hero?.image).not.toContain('hero');
@@ -337,7 +337,7 @@ describe('projectForPlayers fix round 1', () => {
       { id: 'scared', name: 'Scared', color: '#123456', icon: 'terror' }, { id: 'weird', name: 'Weird', color: '#123456', icon: 'not-an-icon' },
     ] as never;
     expect(projectForPlayers(withTokens({ hero: named }), context({ conditions })).tokens.hero?.conditions).toEqual([
-      { id: 'prone', value: 2, name: 'Prone', color: '#AA3300' },
+      { id: 'prone', value: 2, name: 'Caído', color: '#AA3300' },
       { id: 'scared', value: null, name: 'Scared', color: '#123456', icon: 'terror' },
     ]);
     // A collection not known yet: every id, unnamed.
@@ -459,4 +459,27 @@ describe('the player view rules with a curtain', () => {
     expect(samePlayerViewRules(pickPlayerViewRules({ ...ALL_ON, curtain: true }), pickPlayerViewRules(ALL_ON))).toBe(false);
     expect(samePlayerViewRules(pickPlayerViewRules(ALL_ON), pickPlayerViewRules({ ...ALL_ON, curtain: false }))).toBe(true);
   });
+});
+
+
+describe('explicit token HP bar and status', () => {
+  it('broadcasts HP only when shown, suppresses duplicate collection bars, and never leaks hidden HP', () => {
+    const shown = hero({ showHpBar: true, statusText: 'Ferido' } as Partial<Character>);
+    const visible = projectForPlayers(withTokens({ hero: shown }), context());
+    expect(visible.tokens.hero).toMatchObject({ hp: { current: 7, max: 10 }, showHpBar: true, statusText: 'Ferido' });
+    expect(visible.tokens.hero?.resources).toHaveLength(1);
+    expect(isPlayerSceneBody(visible)).toBe(true);
+    const hidden = projectForPlayers(withTokens({ hero: hero({ showHpBar: false } as Partial<Character>) }), context());
+    expect(hidden.tokens.hero?.hp).toBeNull();
+    expect(hidden.tokens.hero?.resources).toHaveLength(1);
+    const legacy = projectForPlayers(withTokens({ hero: hero() }), context());
+    expect(legacy.tokens.hero?.resources).toHaveLength(2);
+  });
+});
+
+it('shares persisted web map layout and hides it behind the curtain',()=>{
+ const initial=gmState();const matrix=[1200,0,0,600,-100,50];
+ const state={...initial,grid:{...initial.grid!,rpgMapLayouts:{'atlas-vtt/assets/lair.png':matrix}} as unknown as NonNullable<SceneSnapshot['grid']>};
+ expect(projectForPlayers(state,context()).map.matrix).toEqual(matrix);
+ expect(projectForPlayers(state,context({rules:{...ALL_ON,curtain:true}})).map.matrix).toBeUndefined();
 });

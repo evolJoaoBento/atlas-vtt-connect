@@ -1,3 +1,4 @@
+import { applyLocalServerSettings } from './src/app/online/localServerSettings';
 import { Notice, Plugin } from 'obsidian';
 import './styles/main.scss';
 import { CanvasSceneView } from './src/app/online/obsidian/CanvasSceneView';
@@ -23,6 +24,7 @@ export default class AtlasVttConnectPlugin extends Plugin {
 
   async onload(): Promise<void> {
     this.settings = await ConnectSettingsStore.load(this, obsidianLocalStore(this.app), (message) => { new Notice(message); });
+    try { await applyLocalServerSettings(this.app, this.settings); } catch { new Notice('Servidor local sem configuração válida. Execute o inicializador.'); }
     if (this.settings.takeKeyMoved()) new Notice(KEY_MOVED_NOTICE);
     registerNewTableKey(this, this.settings);
     // Registered at load, so a scene tab Obsidian restores at startup exists and closes itself cleanly.

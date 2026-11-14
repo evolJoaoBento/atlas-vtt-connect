@@ -1,4 +1,6 @@
 import { Peer, type DataConnection } from 'peerjs';
+import { createWebSocketClient, createWebSocketHost } from './WebSocketTransport';
+import { hasTurnServer } from './connectionFailure';
 import { randomId } from '../ids';
 import { FLUSH_CAP_MS, Inbox, listen, PeerJsLink } from './peerLink';
 import { asError, peerHostId, peerOptions, TransportFailure, type PeerServerOptions } from './peerOptions';
@@ -8,6 +10,8 @@ export type { PeerServerOptions };
 export { FLUSH_CAP_MS, FLUSH_GRACE_MS, FLUSH_POLL_MS } from './peerLink';
 
 export const LINK_OPEN_TIMEOUT_MS = 15_000;
+/** ICE negotiation across residential networks needs its own budget, after signaling opens. */
+export const DATA_LINK_TIMEOUT_MS = 45_000;
 /** Pending (unpaired) links a host tolerates at once. */
 const MAX_PENDING_LINKS = 32;
 /** Delays before re-registering with a signaling server that dropped us; the last repeats. */
@@ -26,6 +30,10 @@ function refuse(connection: DataConnection): void {
  * any other failure before the id opens rejects.
  */
 export async function createPeerHost(options: PeerServerOptions): Promise<HostTransport> {
+  if (options.relay) {
+    if (!('adminKey' in options.relay)) throw new TransportFailure('relay-auth', 'Chave do servidor local ausente.');
+    return createWebSocketHost(options.relay);
+  }
   try {
     return await openHost(options);
   } catch (error) {
@@ -151,7 +159,7 @@ function openHost(options: PeerServerOptions): Promise<HostTransport> {
       let half = halves.get(linkId);
       if (!half) {
         if (halves.size >= MAX_PENDING_LINKS) { refuse(connection); return; }
-        half = { arrived: {}, opened: new Set(), inbox: new Inbox(), timer: window.setTimeout(() => dropHalf(linkId), LINK_OPEN_TIMEOUT_MS) };
+        half = { arrived: {}, opened: new Set(), inbox: new Inbox(), timer: window.setTimeout(() => dropHalf(linkId), DATA_LINK_TIMEOUT_MS) };
         halves.set(linkId, half);
       }
       const pair = half;
@@ -185,8 +193,10 @@ function openHost(options: PeerServerOptions): Promise<HostTransport> {
 
 /** Joins hosts through PeerJS; each link has its own peer, destroyed when the link closes. */
 export function createPeerClient(options: PeerServerOptions): ClientTransport {
+  if (options.relay && 'token' in options.relay) return createWebSocketClient(options.relay);
   return {
     connect: (hostId: string): Promise<PeerLink> => new Promise((resolve, reject) => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) { reject(new TransportFailure('offline', 'Offline')); return; }
       const peer = new Peer(peerOptions(options));
       const connections: DataConnection[] = [];
       let settled = false;
@@ -199,10 +209,14 @@ export function createPeerClient(options: PeerServerOptions): ClientTransport {
         reject(error);
       };
       // Bounds every path: silent signaling server, or data connections that never open.
-      const timer = window.setTimeout(() => fail(new TransportFailure('timeout', 'Timed out connecting to the GM')), LINK_OPEN_TIMEOUT_MS);
+      let timer = window.setTimeout(() => fail(new TransportFailure('signaling-timeout', 'Signaling did not respond')), LINK_OPEN_TIMEOUT_MS);
+      let negotiating = false;
       peer.on('error', (error: unknown) => fail(asError(error)));
       peer.on('open', () => {
-        if (settled) return;
+        if (settled || negotiating) return;
+        negotiating = true;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => fail(new TransportFailure(hasTurnServer(options.iceServers) ? 'relay-timeout' : 'direct-timeout', 'Data channels did not open')), DATA_LINK_TIMEOUT_MS);
         const metadata = { linkId: randomId(12) };
         const inbox = new Inbox();
         const control = peer.connect(hostId, { label: 'control', metadata, reliable: true, serialization: 'raw' });

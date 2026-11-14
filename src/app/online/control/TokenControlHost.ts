@@ -1,3 +1,4 @@
+import { TokenEditHandler } from './TokenEditHandler';
 /**
  * Everything one online session needs to let players move their own tokens: the
  * assignments (`TokenControl`), each player's list (`ControlLists`, per scene while split), the moves
@@ -30,12 +31,14 @@ export class TokenControlHost {
   private readonly lists: ControlLists;
   private readonly moves: TokenMoveHandler;
   private readonly copies: TokenCopyHandler;
+  private readonly edits: TokenEditHandler;
   private stopWatching: (() => void) | null = null;
 
   constructor(private readonly options: TokenControlHostOptions) {
     this.lists = new ControlLists({ session: options.session, control: this.control, projection: options.projection });
     this.moves = new TokenMoveHandler({ ...options, control: this.control });
     this.copies = new TokenCopyHandler({ ...options, control: this.control });
+    this.edits = new TokenEditHandler({ ...options, control: this.control });
   }
 
   start(): void {
@@ -43,6 +46,7 @@ export class TokenControlHost {
     this.lists.start();
     this.moves.start();
     this.copies.start();
+    this.edits.start();
     this.stopWatching = watchDeletedTokens(this.options.projection, this.control);
   }
 
@@ -52,6 +56,7 @@ export class TokenControlHost {
     this.lists.stop();
     this.moves.stop();
     this.copies.stop();
+    this.edits.stop();
   }
 
   /** The session's players changed: a removed (kicked) player loses their tokens; one who is only gone keeps them. */
@@ -60,5 +65,6 @@ export class TokenControlHost {
     this.control.retainPlayers(known);
     this.moves.retainPlayers(known);
     this.copies.retainPlayers(known);
+    this.edits.retainPlayers(known);
   }
 }

@@ -61,6 +61,11 @@ export default defineConfig([
     rules: { "no-restricted-globals": "off", "obsidianmd/no-global-this": "off" },
   },
   {
+    // Shared relay transport also runs in a plain browser without Obsidian requestUrl.
+    files: ["src/app/online/transport/WebSocketTransport.ts"],
+    rules: { "no-restricted-globals": "off" },
+  },
+  {
     files: SCRIPT_FILES,
     languageOptions: {
       parserOptions: {

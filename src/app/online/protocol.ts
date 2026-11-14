@@ -1,8 +1,11 @@
+import { isTokenEdit, type TokenEdit } from './control/tokenEdits';
 /**
  * The online play wire format. Shared with the web player page, so this file
  * imports nothing but the scene wire format beside it: no Obsidian, no PIXI, no PeerJS.
  */
 import type { SceneCamera } from './scene/sceneCamera';
+import { isEditMatrix, type EditMatrix } from './control/mapEdits';
+import { isTurnName, isTurnValue } from './control/manualTurns';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
 import {
@@ -99,10 +102,15 @@ export type ControlMessage =
   | SceneStateMessage
   | SceneLookMessage
   /** GM to one player: the tokens that player may move, for this session. */
+  | { v: 1; type: 'turn-remove'; sceneId: string; entryId: string }
+  | { v: 1; type: 'map-edit-result'; sceneId: string; accepted: boolean }
+  | { v: 1; type: 'map-edit'; sceneId: string; key: string; matrix: EditMatrix }
+  | { v: 1; type: 'turn-add'; sceneId: string; name: string; value: number }
   | { v: 1; type: 'token-control'; tokenIds: string[] }
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
   | { v: 1; type: 'token-move'; sceneId: string; tokenId: string; x: number; y: number }
   | { v: 1; type: 'token-copy'; sceneId: string; tokenId: string }
+  | { v: 1; type: 'token-edit'; sceneId: string; tokenId: string; edit: TokenEdit }
   /** GM to the player who sent the move: it failed a check, so the token stays where the scene has it. */
   | { v: 1; type: 'token-move-refused'; tokenId: string }
   /** Player to GM: a roll from the dice tray, rolled on the GM's side; with `advantage`, on the side the player chose (a lone d20). */
@@ -142,7 +150,7 @@ export type ControlMessage =
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'token-copy', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
+  'map-edit', 'turn-remove', 'turn-add', 'scene-resync', 'token-move', 'token-copy', 'token-edit', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
 ]);
 
 export type Decoded =
@@ -191,11 +199,16 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'scene-camera': (m) => isSceneCamera(m),
   'scene-state': (m) => isSceneState(m),
   'scene-look': (m) => isSceneLook(m),
+  'turn-remove': (m) => isSceneId(m.sceneId) && isSceneId(m.entryId),
+  'map-edit-result': (m) => isSceneId(m.sceneId) && typeof m.accepted === 'boolean',
+  'map-edit': (m) => isSceneId(m.sceneId) && typeof m.key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(m.key) && isEditMatrix(m.matrix),
+  'turn-add': (m) => isSceneId(m.sceneId) && isTurnName(m.name) && isTurnValue(m.value),
   'token-control': (m) => Array.isArray(m.tokenIds) && m.tokenIds.length <= MAX_CONTROLLED_TOKENS
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
   'token-copy': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId),
+  'token-edit': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && isTokenEdit(m.edit),
   'token-move-refused': (m) => isSceneId(m.tokenId),
   'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier) && (m.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(m.advantage)),
   'dice-result': (m) => isPhysicalRoll(m),

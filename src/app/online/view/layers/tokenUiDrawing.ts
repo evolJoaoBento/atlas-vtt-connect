@@ -5,7 +5,7 @@
  * sends and no numbers; its wheels stand beside the token with theirs. Condition badges are Atlas's: a disc lit
  * from above in the condition's colour with its icon or initial, and its number in a pip.
  */
-import { badgePositions, CONDITION_BADGE, fitBadges } from '@atlas-vtt/shared/draw';
+import { badgePositions, CONDITION_BADGE, fitBadges, computeTokenPixelSize } from '@atlas-vtt/shared/draw';
 import { restingTokenUIScale } from '@atlas-vtt/shared/draw';
 import { BAR_SLOTS } from '@atlas-vtt/shared/rules';
 import {
@@ -85,6 +85,17 @@ export interface TokenUiLook {
 }
 
 export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: TokenUiGeometry, look: TokenUiLook = {}): void {
+  if (token.hp && token.showHpBar === true) {
+    const width = Math.max(30, geometry.size);
+    const height = Math.max(5, geometry.size * 0.09);
+    const x = token.x - width / 2;
+    const y = token.y - geometry.size / 2 - height - 8;
+    const share = token.hp.max > 0 ? Math.max(0, Math.min(1, token.hp.current / token.hp.max)) : 0;
+    surface.roundRect(x, y, width, height, 2, { fill: '#202124', alpha: 1 });
+    if (share > 0) surface.roundRect(x, y, width * share, height, 2, { fill: share <= 0.25 ? '#d64545' : '#359b58', alpha: 1 });
+    if ((look.numbers ?? 0) > 0) surface.text(`${token.hp.current}/${token.hp.max}`, token.x, y - 5, { font: '12px sans-serif', color: '#ffffff', outline: { color: '#202124', width: 3 }, align: 'center', alpha: 1 });
+  }
+  if (token.statusText) surface.text(token.statusText, token.x, token.y - geometry.size / 2 - (token.showHpBar ? 34 : 12), { font: '12px sans-serif', color: '#ffffff', outline: { color: '#202124', width: 3 }, align: 'center', alpha: 1 });
   const resting = restingTokenUIScale(geometry.cellSize);
   const scale = look.uiScale ?? resting;
   // The window draws the first two sockets as bars, and the others as wheels beside the token (`tokenWheels.ts`).
@@ -97,7 +108,7 @@ export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: 
     surface.pop();
   }
   drawWheels(surface, token, token.wheels ?? [], geometry.size, geometry.ringRadius, geometry.cellSize, scale);
-  if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, resting, look.badgeFrame ?? (() => ({ scale: 1, alpha: 1 })));
+  if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, resting * geometry.size / Math.max(1, computeTokenPixelSize(geometry.cellSize, 1)), look.badgeFrame ?? (() => ({ scale: 1, alpha: 1 })));
 }
 
 function drawBars(surface: ViewSurface, bars: readonly PlayerResource[], barFrame: BarFrameOf, numbers: number, aloneScale: number): void {

@@ -1,3 +1,4 @@
+import { matrixBounds } from '../control/mapEdits';
 /**
  * Where the join page's preview draws the scene. Shared with the web player
  * page, so it imports nothing from Obsidian.
@@ -23,7 +24,11 @@ export function tokenDiameter(size: number, cellSize: number): number {
 /** The world area to show: the map; without a map size the tokens plus a cell around them; else ten cells of grid. */
 export function sceneWorldBounds(scene: PlayerScene): PreviewRect | null {
   const { map } = scene;
-  if (map.width > 0 && map.height > 0) return { x: 0, y: 0, width: map.width, height: map.height };
+  if (map.width > 0 && map.height > 0) {
+    const box=map.matrix ? matrixBounds(map.matrix) : {x:0,y:0,width:map.width,height:map.height};
+    const x=Math.min(0,box.x),y=Math.min(0,box.y);
+    return {x,y,width:Math.max(map.width,box.x+box.width)-x,height:Math.max(map.height,box.y+box.height)-y};
+  }
   const cell = map.cellSize;
   let left = Infinity;
   let top = Infinity;

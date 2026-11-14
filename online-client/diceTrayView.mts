@@ -193,15 +193,15 @@ export class DiceTrayView {
     this.decrease.disabled = modifier <= -MAX_MODIFIER;
     this.increase.disabled = modifier >= MAX_MODIFIER;
     const formula = this.tray.formula();
-    this.formula.textContent = formula === '' ? EMPTY_TRAY_TEXT : formula;
+    this.formula.textContent = formula === '' ? EMPTY_TRAY_TEXT : this.tray.side ? `${formula} · ${SIDE_NAMES[this.tray.side]}` : formula;
     this.formula.classList.toggle('is-empty', formula === '');
     const applies = this.tray.canChooseSide();
-    const chosen = this.tray.side ?? 'normal';
-    this.sides.classList.toggle('is-off', !applies);
+    const chosen = this.tray.chosenSide ?? 'normal';
+    this.sides.setAttribute('aria-label', applies ? SIDE_LABEL : 'O modo escolhido será aplicado a uma rolagem de 1d20.');
     for (const [side, choice] of this.sideButtons) {
-      choice.disabled = !applies;
-      choice.setAttribute('aria-pressed', String(applies && side === chosen));
-      choice.classList.toggle('is-chosen', applies && side === chosen);
+      choice.disabled = false;
+      choice.setAttribute('aria-pressed', String(side === chosen));
+      choice.classList.toggle('is-chosen', side === chosen);
     }
     this.rollButton.disabled = formula === '';
     this.clearButton.hidden = this.tray.isEmpty();

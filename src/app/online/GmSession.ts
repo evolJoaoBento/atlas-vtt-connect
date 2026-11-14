@@ -1,3 +1,4 @@
+import { randomId } from './ids';
 import { admit, joinSession, type AdmissionHost } from './gmSessionAdmission';
 import { cancelReissue, playerView, presenceOf, sameName, setClient, type Entry, type LinkState } from './gmSessionEntries';
 import { SESSION_LIMITS, type Admission, type GmSessionOptions, type PlayerStatus, type SessionHandler, type SessionPlayer } from './gmSessionTypes';
@@ -13,6 +14,8 @@ export type { Admission, GmSessionOptions, PlayerStatus, SessionHandler, Session
  * for later pieces to send and receive game messages. It never learns about maps.
  */
 export class GmSession {
+  readonly mapEditorKey = randomId(32);
+  canEditMap(key: string): boolean { return key === this.mapEditorKey; }
   private readonly entries = new Map<string, Entry>();
   private readonly links = new Map<PeerLink, LinkState>();
   private readonly handlers = new Set<SessionHandler>();

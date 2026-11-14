@@ -47,6 +47,7 @@ export interface AssetIds {
 
 /** What the scene handlers need of the session: register a handler, send to a player, list the players. */
 export interface SceneSession {
+  canEditMap?(key: string): boolean;
   use(handler: SessionHandler): () => void;
   send(playerId: string, message: ControlMessage): void;
   getPlayers(): SessionPlayer[];

@@ -1,3 +1,5 @@
+import { isEditMatrix } from '../control/mapEdits';
+import { conditionName } from './conditionNames';
 /**
  * The only place that decides what leaves the GM's machine: the presented
  * scene as online players may see it, exactly what the local player window
@@ -125,9 +127,13 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
   const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state);
   const fog = projectFog(objects?.fog, memo);
+  const savedLayouts = (state.grid as { rpgMapLayouts?: Record<string,unknown> } | null)?.rpgMapLayouts;
+  const layout = state.background && savedLayouts && Object.hasOwn(savedLayouts,state.background) ? savedLayouts[state.background] : null;
+  const map = projectMap(curtained ? null : state.background, cellSize, context, curtained ? undefined : (objects as { liquids?: unknown } | undefined)?.liquids);
+  if (!curtained && map.asset && isEditMatrix(layout)) map.matrix = [...layout];
   return {
     sceneId: context.sceneId,
-    map: projectMap(curtained ? null : state.background, cellSize, context, curtained ? undefined : (objects as { liquids?: unknown } | undefined)?.liquids),
+    map,
     grid: curtained ? null : projectGrid(state.grid, context.rules),
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
@@ -345,12 +351,14 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
   const revealed = (at: { x: number; y: number; size: number }, cell: number): boolean => context.coverage.revealsSome(tokenBounds(at, cell), context.mapSize);
   const wire = { x: finiteOr(x, 0, SCENE_RANGES.coordinate), y: finiteOr(y, 0, SCENE_RANGES.coordinate), size: finiteOr(size, 1, SCENE_RANGES.tokenSize) };
   if (!revealed({ x, y, size }, cellSize) || !revealed(wire, wireCell)) return null;
+  const edits = token as TokenEntity & { showHpBar?: boolean; statusText?: string };
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
   const showOf = character ? (context.resourceShows ?? COLLECTION_SHOWS)(id, character) : null;
+  const visibleDefinitions = edits.showHpBar === undefined ? definitions : definitions.filter((definition) => definition.key !== 'hp');
   // Sent only when there are some, so a scene without wheels is what an older GM sent.
-  const wheels = character && showOf ? projectWheels(character, definitions, showOf) : [];
+  const wheels = character && showOf ? projectWheels(character, visibleDefinitions, showOf) : [];
   return {
     x: wire.x,
     y: wire.y,
@@ -360,11 +368,15 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
     image: context.assets.idFor(token.imagePath),
     ring: token.showRing === false ? null : textOr(token.ringColor, DEFAULT_RING),
     conditions: character ? projectConditions(token, context.conditions ?? []) : [],
+    conditionChoices: character ? projectConditions({ ...token, conditions: (context.conditions ?? []).map((entry) => entry.id) }, context.conditions ?? []) : [],
     name: character && rules.showTokenNameplates ? displayName(character) : null,
-    // Atlas 0.5 replaced HP and stress with the collection's resources; the old fields stay null for older players.
-    hp: null,
+    // Explicit HP bars use the legacy bounded value shape; collection bars retain their existing defaults.
+    hp: edits.showHpBar === true && token.resources?.hp
+      ? { current: finiteOr(token.resources.hp.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(token.resources.hp.max, 0, SCENE_RANGES.resourceValue) } : null,
+    ...(edits.showHpBar !== undefined ? { showHpBar: edits.showHpBar } : {}),
+    ...(edits.statusText ? { statusText: edits.statusText.slice(0, 120) } : {}),
     stress: null,
-    resources: character && showOf ? projectBars(character, definitions, showOf) : [],
+    resources: character && showOf ? projectBars(character, visibleDefinitions, showOf) : [],
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
     ...projectMini(context.minis?.[id], context),
@@ -448,7 +460,7 @@ function projectConditions(token: TokenEntity, definitions: readonly ConditionDe
       // Named, coloured and drawn as the GM's collection defines it, for the badge and the player's hover card.
       const definition = definitions.find((candidate) => candidate.id === id);
       const name = typeof definition?.name === 'string' ? definition.name.trim().slice(0, SCENE_LIMITS.conditionName) : '';
-      if (name) condition.name = name;
+      if (name) condition.name = conditionName(name);
       if (typeof definition?.color === 'string' && CONDITION_COLOR.test(definition.color)) condition.color = definition.color;
       if (typeof definition?.icon === 'string' && Object.hasOwn(WIDGET_ICON_PATHS, definition.icon)) condition.icon = definition.icon;
       return condition;

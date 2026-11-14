@@ -1,0 +1,22 @@
+/* Owned-token editor follows the player page's existing surfaces and touch targets. */
+.token-editor { --card: var(--background-primary, #fff); --text: var(--text-normal, #1f2328); --muted: var(--text-muted, #5a6068); --border: var(--background-modifier-border, #d8dbe0); --accent: var(--interactive-accent, #7c5cff); width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); }
+.token-editor::backdrop { background: rgb(0 0 0 / 45%); }
+.token-editor form { display: grid; gap: 12px; }
+.token-editor label { display: grid; gap: 4px; }
+.token-editor label:has(input[type="checkbox"]) { display: flex; align-items: center; }
+.token-editor input[type="checkbox"] { width: 20px; min-height: 20px; }
+.token-editor input { width: 100%; }
+.token-editor input[type="checkbox"] { width: 20px; }
+.token-editor__steps { display: flex; gap: 8px; }
+.token-editor__steps button { flex: 1; }
+.token-editor p { margin: 0; color: var(--muted); }
+.token-editor :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.token-editor button { min-height: 44px; padding: 10px 16px; border: 0; border-radius: 8px; background: var(--accent); color: var(--text-on-accent, #fff); font: inherit; font-weight: 600; cursor: pointer; }
+.token-editor button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+.token-editor input { min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+.token-editor input[type="checkbox"] { min-height: 20px; padding: 0; }
+
+#token-panel .token-editor { width: 100%; max-height: none; padding: 0; border: 0; border-radius: 0; }
+#token-panel { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.token-editor fieldset { min-width: 0; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 8px; }

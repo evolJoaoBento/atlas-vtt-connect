@@ -7,8 +7,7 @@ describe.each(HUB_PATHS)('token copy round trip, $atlas', ({ tabs }) => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
   it('broadcasts the host copy to both players and grants movement only to the copier', async () => {
-    let w: ControlWorld;
-    w = controlWorld({ duplicate: (_viewId, tokenId) => {
+    const w: ControlWorld = controlWorld({ duplicate: (_viewId, tokenId) => {
       const source = w.token(tokenId);
       if (!source) return null;
       w.store.setState((state) => ({ objects: { ...state.objects, tokens: { ...state.objects.tokens, copiedHero: { ...structuredClone(source), id: 'copiedHero' } } } }));

@@ -79,3 +79,14 @@ describe('online settings', () => {
     expect(resolveOnlineSettings({ shareableProperties: Array.from({ length: 80 }, (_, index) => `p${index}`) }).shareableProperties).toHaveLength(50);
   });
 });
+
+
+it('accepts provider ICE JSON, expands URL arrays, ignores STUN and caps relays to the join-link limit', () => {
+  const servers = parseTurnServers(JSON.stringify([
+    { urls: 'stun:stun.example:3478' },
+    { urls: ['turn:relay.example:3478', 'turns:relay.example:443?transport=tcp'], username: 'u', credential: 'p' },
+  ]));
+  expect(servers).toEqual([{ urls: 'turn:relay.example:3478', username: 'u', credential: 'p' }, { urls: 'turns:relay.example:443?transport=tcp', username: 'u', credential: 'p' }]);
+  expect(parseTurnServers('[broken')).toEqual([]);
+  expect(parseTurnServers(Array.from({ length: 10 }, (_, i) => `turn:relay${i}.example u p`).join('\n'))).toHaveLength(8);
+});

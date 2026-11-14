@@ -173,11 +173,14 @@ function isPlayerGrid(value: unknown): boolean {
 }
 
 function isPlayerToken(value: unknown): boolean {
-  return isFields(value) && isCoordinate(value.x) && isCoordinate(value.y) && inRange(SCENE_RANGES.tokenSize)(value.size)
+  return isFields(value) && optional(isBoolean)(value.showHpBar)
+    && optional((text) => typeof text === 'string' && text.length <= 120)(value.statusText)
+    && isCoordinate(value.x) && isCoordinate(value.y) && inRange(SCENE_RANGES.tokenSize)(value.size)
     && isNumber(value.rotation)
     && isNumber(value.layer) && nullable(isString)(value.image) && nullable(isString)(value.ring)
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
+    && optional((choices) => Array.isArray(choices) && choices.length <= SCENE_LIMITS.conditions && choices.every(isCondition))(value.conditionChoices)
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
     && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
     && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)

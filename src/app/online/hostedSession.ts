@@ -161,7 +161,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   let joinUrl: string;
   let linkWorks: boolean;
   try {
-    joinUrl = buildJoinUrl(online.playerPageUrl, host.id, online, identity?.id ?? null);
+    joinUrl = buildJoinUrl(online.playerPageUrl, host.id, online, identity?.id ?? null, host.relay);
     linkWorks = parseJoinFragment(new URL(joinUrl).hash) !== null;
   } catch {
     host.close();

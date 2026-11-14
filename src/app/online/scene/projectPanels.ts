@@ -1,3 +1,4 @@
+import { isManualTurn } from '../control/manualTurns';
 /**
  * The widget bar and initiative tracker as players receive them, following the
  * same rules as `PlayerWidgetBar` and `PlayerInitiativePanel` in the local window.
@@ -129,7 +130,7 @@ export function projectInitiative(
   const tokens = state.objects?.tokens ?? {};
   const listedUnder = new Set<string>();
   const entries = (Array.isArray(initiative.entries) ? initiative.entries : [])
-    .filter((entry) => typeof entry === 'object' && entry !== null && isSceneId(entry.id) && visibleTokenIds.has(entry.tokenId))
+    .filter((entry) => typeof entry === 'object' && entry !== null && isSceneId(entry.id) && (visibleTokenIds.has(entry.tokenId) || (typeof entry.tokenId === 'string' && isManualTurn(entry.tokenId) && !Object.hasOwn(tokens, entry.tokenId))))
     .sort((a, b) => finiteOr(a.order, 0) - finiteOr(b.order, 0))
     .slice(0, SCENE_LIMITS.initiativeEntries)
     .map((entry) => {
@@ -145,7 +146,7 @@ export function projectInitiative(
         id: entry.id,
         tokenId: entry.tokenId,
         initiative: sides ? 0 : finiteOr(byCards ? (entry as { card?: unknown }).card : entry.initiative, 0),
-        name: rules.showTokenNameplates ? textOrNull(entry.name) : null,
+        name: rules.showTokenNameplates || (isManualTurn(entry.tokenId) && !Object.hasOwn(tokens, entry.tokenId)) ? textOrNull(entry.name) : null,
         // Entries keep no HP since Atlas 0.5: the bar is the token's `hp` resource, as the player window draws it.
         hp: null,
         hpShare: hpShareOf(tokens, entry.tokenId, definitions, resourceShows),

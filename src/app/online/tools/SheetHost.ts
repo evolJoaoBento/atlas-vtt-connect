@@ -250,9 +250,14 @@ export class SheetHost implements SessionHandler {
     const entries: TokenSheet[] = [];
     for (const tokenId of controlled) {
       const token = scene.snapshot.objects.tokens[tokenId];
-      if (!Object.hasOwn(scene.shown, tokenId) || !isCharacter(token)) continue;
+      if (!Object.hasOwn(scene.shown, tokenId) || !token) continue;
+      if (!isCharacter(token)) {
+        if (token.resources?.hp) entries.push({ tokenId, name: null, resources: [], sheet: null, health: { current: token.resources.hp.current, max: token.resources.hp.max } });
+        if (entries.length >= SHEET_LIMITS.tokens) break;
+        continue;
+      }
       const card = this.cardOf(token);
-      entries.push({ tokenId, name: displayName(token), resources: resourcesOf(token, definitions), sheet: this.sheetOf(token), ...(card ? { card } : {}) });
+      entries.push({ ...(token.resources?.hp ? { health: { current: token.resources.hp.current, max: token.resources.hp.max } } : {}), tokenId, name: displayName(token), resources: resourcesOf(token, definitions), sheet: this.sheetOf(token), ...(card ? { card } : {}) });
       if (entries.length >= SHEET_LIMITS.tokens) break;
     }
     return fitSheets(entries);

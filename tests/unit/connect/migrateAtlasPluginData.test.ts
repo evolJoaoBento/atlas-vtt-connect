@@ -38,7 +38,7 @@ describe("migration from the fork's 0.6 plugin data", () => {
   it('works on a vault that started on 0.6, with only the plugin data, its table key taken by the first device', async () => {
     const { store, step } = await run({ [DATA]: JSON.stringify({ online: { playerName: 'GM', table: TABLE, playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt/' } }) });
     expect(step.result).toBe('copied');
-    expect(store.get()).toMatchObject({ playerName: 'GM', table: TABLE, playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-connect/' });
+    expect(store.get()).toMatchObject({ playerName: 'GM', table: TABLE, playerPageUrl: 'https://joaodlouro.github.io/atlas-vtt-connect/' });
     expect(store.takeKeyMoved()).toBe(true);
     // A second device, whose synced Connect data says the key was taken, makes its own table.
     const second = await run({ [DATA]: JSON.stringify({ online: { table: TABLE } }) }, { forkTableKeyTaken: TABLE.id });

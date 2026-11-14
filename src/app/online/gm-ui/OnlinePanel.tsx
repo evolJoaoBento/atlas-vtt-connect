@@ -17,7 +17,7 @@ import { useInJoinedSession, useOnlineSession, useViewTabsKey } from './useOnlin
 export const START_HELP = 'Start a session to get a link your players can open in a browser. You approve each player who joins.';
 
 export type PanelService = Pick<OnlineSessionService, 'start' | 'stop' | 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder'
-  | 'assign' | 'unassign' | 'everyoneBack' | 'wouldExceedCap'>;
+  | 'assign' | 'unassign' | 'everyoneBack' | 'wouldExceedCap'> & { readonly mapEditorLink?: string | null };
 
 /** What the panel needs besides the view it is open in. */
 export interface PanelEnv extends PresentingEnv {
@@ -89,6 +89,7 @@ function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: 
           </div>
         )}
       </section>
+      {env.service.mapEditorLink && <Button onClick={() => copyJoinLink(env.service.mapEditorLink!)}>Copiar acesso para editar mapa na web</Button>}
       <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={env.service} summaries={env.summaries} sceneChips={chips} />
       <OnlinePresenting env={env} ctx={ctx} actions={env.service} />
     </>

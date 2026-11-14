@@ -155,6 +155,8 @@ export interface PlayerMini {
 }
 
 export interface PlayerToken {
+  showHpBar?: boolean;
+  statusText?: string;
   x: number;
   y: number;
   /** Size in cells, as `BaseToken.size`. */
@@ -165,8 +167,9 @@ export interface PlayerToken {
   /** Ring colour; null when the token shows no ring. */
   ring: string | null;
   conditions: PlayerCondition[];
+  conditionChoices?: PlayerCondition[];
   name: string | null;
-  /** Always null since Atlas 0.5; older players still require the field. */
+  /** Exact HP only when the owner explicitly enables the public bar above the token. */
   hp: PlayerLegacyBar | null;
   /** Always null since Atlas 0.5; older players still require the field. */
   stress: PlayerLegacyBar | null;
@@ -248,7 +251,7 @@ export interface PlayerInitiativeEntry {
   tokenId: string;
   initiative: number;
   name: string | null;
-  /** Always null since Atlas 0.5; older players still require the field. */
+  /** Exact HP only when the owner explicitly enables the public bar above the token. */
   hp: PlayerLegacyBar | null;
   /** How full the bar after the name is (the token's `hp` resource, where players see it); null without one. Absent from an older GM. */
   hpShare?: number | null;

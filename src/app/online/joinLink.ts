@@ -3,7 +3,8 @@
  * fragment, which browsers never send to the page's host. Shared with the web
  * player page, so it imports no Obsidian code.
  */
-import { DEFAULT_STUN, peerServerOptions, validTurnServer, type OnlineSettings } from './onlineSettings';
+import { validRelayTarget, type RelayTarget } from './transport/relayWire';
+import { DEFAULT_STUN, MAX_TURN_SERVERS, peerServerOptions, validTurnServer, type OnlineSettings } from './onlineSettings';
 import { PEER_ID_PATTERN, type PeerServerOptions } from './transport/peerOptions';
 
 export interface JoinTarget {
@@ -15,14 +16,14 @@ export interface JoinTarget {
 
 const TABLE_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
-const MAX_RELAYS = 8;
+const MAX_RELAYS = MAX_TURN_SERVERS;
 
 /** A host id PeerJS accepts, short enough and free of spaces, so it is safe in a fragment. */
 function validHostId(id: string): boolean {
   return id.length <= 64 && !id.includes(' ') && PEER_ID_PATTERN.test(id);
 }
 
-type SignalOptions = Omit<PeerServerOptions, 'iceServers'>;
+type SignalOptions = Omit<PeerServerOptions, 'iceServers' | 'relay'>;
 
 function isString(value: unknown, max: number, min = 0): value is string {
   return typeof value === 'string' && value.length >= min && value.length <= max;
@@ -68,12 +69,17 @@ function fromBase64Url(text: string): unknown {
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
 }
 
-export function buildJoinUrl(pageUrl: string, hostId: string, settings: OnlineSettings, tableId: string | null = null): string {
+export function buildJoinUrl(pageUrl: string, hostId: string, settings: OnlineSettings, tableId: string | null = null, relay?: RelayTarget): string {
   if (!validHostId(hostId)) throw new Error('Invalid host id');
   const base = pageUrl.split('#')[0];
   const { iceServers, ...server } = peerServerOptions(settings);
+  delete server.relay;
   const params = [`id=${hostId}`];
   if (tableId && TABLE_ID_PATTERN.test(tableId)) params.push(`table=${tableId}`);
+  if (relay) {
+    if (!validRelayTarget(relay)) throw new Error('Invalid local relay');
+    params.push(`relay=${toBase64Url({ url: relay.url, token: relay.token })}`);
+  }
   if (Object.keys(server).length) params.push(`signal=${toBase64Url(server)}`);
   const relays = iceServers.filter((ice) => ice.urls !== DEFAULT_STUN);
   if (relays.length) params.push(`ice=${toBase64Url(relays)}`);
@@ -92,9 +98,12 @@ export function parseJoinFragment(hash: string): JoinTarget | null {
     const relays = ice ? validRelays(fromBase64Url(ice)) : [];
     if (!server || !relays) return null;
     const table = params.get('table');
+    const encodedRelay = params.get('relay');
+    const relay: unknown = encodedRelay ? fromBase64Url(encodedRelay) : undefined;
+    if (relay !== undefined && !validRelayTarget(relay)) return null;
     return {
       hostId,
-      server: { ...server, iceServers: [{ urls: DEFAULT_STUN }, ...relays] },
+      server: { ...server, iceServers: [{ urls: DEFAULT_STUN }, ...relays], ...(validRelayTarget(relay) ? { relay } : {}) },
       tableId: table && TABLE_ID_PATTERN.test(table) ? table : null,
     };
   } catch {

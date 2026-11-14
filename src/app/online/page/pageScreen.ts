@@ -25,7 +25,18 @@ const REASONS: Record<string, string> = {
   version: 'This page is out of date for your GM\'s Atlas. Ask them for a new link.',
   ended: 'The session ended.',
   replaced: 'You joined from another tab.',
+  'local-relay-unavailable': 'O servidor local do mestre está inacessível. Ele precisa manter o computador, o servidor e o túnel abertos e reenviar o link atual.',
+  'local-relay-auth': 'A configuração privada do servidor local está incompleta. O mestre deve executar o iniciador novamente.',
   unreachable: UNREACHABLE_TEXT,
+  'host-offline': 'Mestre não encontrado. Confira se o Obsidian e a sessão Online continuam abertos e peça um link novo.',
+  'invalid-link': 'O identificador da sessão é inválido. Peça ao mestre o link completo da sessão atual.',
+  offline: 'Este dispositivo está sem conexão de rede. Reconecte a internet e tente novamente.',
+  'browser-incompatible': 'Este navegador não oferece o WebRTC necessário. Abra o link no Chrome, Edge ou Firefox atualizado.',
+  'signaling-unavailable': 'Não foi possível alcançar o serviço que localiza a mesa. Confira a internet, bloqueios do navegador e a configuração do servidor de sinalização.',
+  'relay-needed': 'O serviço de conexão respondeu, mas a ligação com o mestre não abriu e o link não contém TURN. Entre redes de casas diferentes, configure um servidor TURN no Connect e gere um novo link.',
+  'relay-failed': 'A ligação com o mestre não abriu, mesmo com TURN configurado. O mestre deve testar os servidores no Connect, conferir as credenciais e reenviar o link atualizado.',
+  'webrtc-failed': 'A conexão WebRTC falhou. Confira as restrições de rede e teste um servidor TURN/TCP ou TURNS na porta 443.',
+
   'connection-lost': 'Lost the connection to your GM. Reload the page to try again.',
 };
 /** Why a session ended, as the join page says it. Own keys only: a reason from the network such as `constructor` must not reach the prototype. */

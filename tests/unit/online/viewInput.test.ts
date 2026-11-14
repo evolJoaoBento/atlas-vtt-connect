@@ -231,3 +231,15 @@ describe('ViewInput', () => {
     expect(moves).toEqual([{ pan: [30, 0] }]);
   });
 });
+
+it('selects from pointer release without needing a synthetic click; dragging never selects', () => {
+  const selected: ScreenPoint[] = [];
+  const grab: TokenGrab = { grab: () => true, move: () => {}, drop: () => {}, cancel: () => {} };
+  const input = new ViewInput({pan: () => {}, zoomAt: () => {}}, grab, undefined, point => selected.push(point));
+  input.down(mouse(20, 20)); input.up(mouse(20, 20));
+  expect(selected).toEqual([{x: 20, y: 20}]);
+  input.down(mouse(20, 20)); input.move(mouse(50, 20)); input.up(mouse(50, 20));
+  expect(selected).toHaveLength(1);
+  input.down(touch(2, 20, 20, 100)); input.up(touch(2, 20, 20, 150));
+  expect(selected).toHaveLength(2);
+});

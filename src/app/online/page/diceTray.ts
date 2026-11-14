@@ -28,6 +28,8 @@ export class DiceTray {
   private bonus = 0;
   private chosen: AdvantageSide | null = null;
 
+  get chosenSide(): AdvantageSide | null { return this.chosen; }
+
   get modifier(): number {
     return this.bonus;
   }

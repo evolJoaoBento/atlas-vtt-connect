@@ -1,3 +1,5 @@
+import type { LocalRelaySettings } from './WebSocketTransport';
+import type { RelayTarget } from './relayWire';
 import { randomId } from '../ids';
 import type { TransportError } from './types';
 
@@ -8,6 +10,7 @@ export interface PeerServerOptions {
   key?: string | undefined;
   secure?: boolean | undefined;
   iceServers: RTCIceServer[];
+  relay?: LocalRelaySettings | RelayTarget;
 }
 
 /** What is handed to PeerJS: only the keys that are set, so its cloud defaults stay in force. */
@@ -22,6 +25,7 @@ export interface PeerConstructorOptions {
 
 export function peerOptions(options: PeerServerOptions): PeerConstructorOptions {
   const { iceServers, ...server } = options;
+  delete server.relay;
   const defined = Object.fromEntries(Object.entries(server).filter(([, value]) => value !== undefined));
   return { ...defined, config: { iceServers } };
 }

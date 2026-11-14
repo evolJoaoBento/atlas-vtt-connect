@@ -1,3 +1,5 @@
+import { validRelayUrl } from './transport/relayWire';
+import type { LocalRelaySettings } from './transport/WebSocketTransport';
 import type { PeerServerOptions } from './transport/peerOptions';
 
 export interface TurnServer {
@@ -24,6 +26,7 @@ export function validStoredTable(value: unknown): StoredTable | null {
 }
 
 export interface OnlineSettings {
+  localRelay?: LocalRelaySettings | null;
   signaling: { mode: 'cloud' | 'custom'; host: string; port: number; path: string; key: string; secure: boolean };
   turnServers: TurnServer[];
   /** Where join links point: the published `online-client/` page. */
@@ -45,12 +48,14 @@ export interface OnlineSettings {
   shareableProperties: string[];
 }
 
+export const MAX_TURN_SERVERS = 8;
+
 export const DEFAULT_STUN = 'stun:stun.l.google.com:19302';
 
 export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   signaling: { mode: 'cloud', host: '', port: 443, path: '/', key: 'peerjs', secure: true },
   turnServers: [],
-  playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt-connect/',
+  playerPageUrl: 'https://joaodlouro.github.io/atlas-vtt-connect/',
   logEvents: false,
   playerName: '',
   rememberPlayerName: true,
@@ -61,6 +66,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
 
 /** PeerJS options for these settings: the PeerJS cloud unless a custom server is set. */
 export function peerServerOptions(settings: OnlineSettings): PeerServerOptions {
+  if (settings.localRelay) return { iceServers: [], relay: settings.localRelay };
   const iceServers: RTCIceServer[] = [{ urls: DEFAULT_STUN }, ...settings.turnServers.map((server) => ({ ...server }))];
   if (settings.signaling.mode !== 'custom' || !settings.signaling.host) return { iceServers };
   const { host, port, path, key, secure } = settings.signaling;
@@ -69,12 +75,23 @@ export function peerServerOptions(settings: OnlineSettings): PeerServerOptions {
 
 /** One relay per line: `turn:host:port username credential`. */
 export function parseTurnServers(text: string): TurnServer[] {
+  if (text.trim().startsWith('[')) {
+    try {
+      const entries: unknown = JSON.parse(text);
+      if (!Array.isArray(entries)) return [];
+      return (entries as unknown[]).flatMap((entry) => {
+        if (!isRecord(entry)) return [];
+        const urls: unknown[] = Array.isArray(entry.urls) ? entry.urls as unknown[] : [entry.urls];
+        return urls.flatMap((url) => validTurnServer({ urls: url, username: entry.username ?? '', credential: entry.credential ?? '' }) ?? []);
+      }).slice(0, MAX_TURN_SERVERS);
+    } catch { return []; }
+  }
   return text.split('\n')
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .map((line) => line.split(/\s+/))
     .filter(([urls]) => /^turns?:/i.test(urls ?? ''))
-    .map(([urls = '', username = '', credential = '']) => ({ urls, username, credential }));
+    .map(([urls = '', username = '', credential = '']) => ({ urls, username, credential })).slice(0, MAX_TURN_SERVERS);
 }
 
 export function formatTurnServers(servers: TurnServer[]): string {
@@ -102,6 +119,7 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
   const signaling = isRecord(source.signaling) ? source.signaling : {};
   const port = signaling.port;
   return {
+    ...(isRecord(source.localRelay) && validRelayUrl(source.localRelay.url) && typeof source.localRelay.adminKey === 'string' ? { localRelay: { url: source.localRelay.url, adminKey: source.localRelay.adminKey } } : {}),
     signaling: {
       mode: signaling.mode === 'custom' || signaling.mode === 'cloud' ? signaling.mode : defaults.signaling.mode,
       host: typeof signaling.host === 'string' ? signaling.host : defaults.signaling.host,
@@ -111,7 +129,7 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
       secure: typeof signaling.secure === 'boolean' ? signaling.secure : defaults.signaling.secure,
     },
     turnServers: Array.isArray(source.turnServers)
-      ? source.turnServers.flatMap((entry) => validTurnServer(entry) ?? [])
+      ? source.turnServers.flatMap((entry) => validTurnServer(entry) ?? []).slice(0, MAX_TURN_SERVERS)
       : [],
     playerPageUrl: typeof source.playerPageUrl === 'string' ? source.playerPageUrl : defaults.playerPageUrl,
     logEvents: source.logEvents === true,

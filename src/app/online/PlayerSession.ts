@@ -1,8 +1,12 @@
+import { connectionFailureReason } from './transport/connectionFailure';
+import { isTokenEdit, type TokenEdit } from './control/tokenEdits';
 /**
  * The player's side of an online session: join a GM, wait for approval, keep
  * the player list, and reconnect after a drop. Shared with the web player page,
  * so it imports nothing from Obsidian.
  */
+import { isEditMatrix, type EditMatrix } from './control/mapEdits';
+import { isTurnName, isTurnValue } from './control/manualTurns';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneInbox } from './playerSessionScene';
@@ -67,6 +71,7 @@ export interface PlayerSessionOptions {
   onControl?(tokenIds: readonly string[]): void;
   /** The GM refused this player's move of the token. */
   onMoveRefused?(tokenId: string): void;
+  onMapEditResult?(sceneId: string, accepted: boolean): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
@@ -160,6 +165,34 @@ export class PlayerSession {
     return true;
   }
 
+  sendMapEdit(key: string, matrix: EditMatrix): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused || !isEditMatrix(matrix) || !/^[A-Za-z0-9_-]{43}$/.test(key)) return false;
+    this.link.send('control', encodeControl({v:1,type:'map-edit',sceneId:scene.sceneId,key,matrix})); return true;
+  }
+
+  removeTurn(entryId: string): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused || !scene.initiative?.entries.some(entry => entry.id === entryId)) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'turn-remove', sceneId: scene.sceneId, entryId }));
+    return true;
+  }
+
+  sendTurn(name: string, value: number): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused || !isTurnName(name) || !isTurnValue(value)) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'turn-add', sceneId: scene.sceneId, name: name.trim(), value }));
+    return true;
+  }
+
+  sendTokenEdit(tokenId: string, edit: TokenEdit): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused
+      || !this.controlled.includes(tokenId) || !Object.hasOwn(scene.tokens, tokenId) || !isTokenEdit(edit)) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'token-edit', sceneId: scene.sceneId, tokenId, edit }));
+    return true;
+  }
+
   sendTokenMove(tokenId: string, x: number, y: number): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
@@ -246,8 +279,8 @@ export class PlayerSession {
     let link: PeerLink;
     try {
       link = await this.options.transport.connect(this.options.hostId);
-    } catch {
-      this.dropped();
+    } catch (error) {
+      this.dropped(connectionFailureReason(error));
       return;
     }
     if (this.finished) {
@@ -313,6 +346,9 @@ export class PlayerSession {
         break;
       case 'token-control':
         this.setControlled(message.tokenIds);
+        break;
+      case 'map-edit-result':
+        this.options.onMapEditResult?.(message.sceneId,message.accepted);
         break;
       case 'token-move-refused':
         this.options.onMoveRefused?.(message.tokenId);
@@ -385,10 +421,10 @@ export class PlayerSession {
   }
 
   /** The link closed or could not be made: retry if we were in, else stop. */
-  private dropped(): void {
+  private dropped(reason = 'unreachable'): void {
     if (this.finished) return;
     if (!this.wasAdmitted) {
-      this.finish('lost', 'unreachable');
+      this.finish('lost', reason);
       return;
     }
     if (this.attempt === 0) this.droppedAt = Date.now();

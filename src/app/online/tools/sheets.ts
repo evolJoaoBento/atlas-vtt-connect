@@ -80,6 +80,7 @@ export interface PlayerSheet {
 }
 
 export interface TokenSheet {
+  health?: { current: number; max: number };
   tokenId: string;
   /** The token's name as the GM's map shows it. */
   name: string | null;
@@ -461,6 +462,7 @@ export function isTokenSheets(value: unknown): value is TokenSheet[] {
   return Array.isArray(value) && value.length <= SHEET_LIMITS.tokens && value.every((entry) => isObject(entry)
     && isText(entry.tokenId, 128) && entry.tokenId.length > 0 && isTextOrNull(entry.name, SHEET_LIMITS.name)
     && Array.isArray(entry.resources) && entry.resources.length <= SHEET_LIMITS.resources && entry.resources.every(isSheetResource)
+    && (entry.health === undefined || (isObject(entry.health) && typeof entry.health.current === 'number' && Number.isFinite(entry.health.current) && typeof entry.health.max === 'number' && Number.isFinite(entry.health.max) && Math.abs(entry.health.current) <= 1000000 && Math.abs(entry.health.max) <= 1000000))
     && (entry.sheet === null || isPlayerSheet(entry.sheet)) && (entry.card === undefined || isSheetCard(entry.card)));
 }
 

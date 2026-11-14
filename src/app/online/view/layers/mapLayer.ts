@@ -1,3 +1,4 @@
+import { matrixBounds } from '../../control/mapEdits';
 /** Atlas's background: the map image at the map's size, a placeholder until it has loaded. */
 import { intersects } from '../camera';
 import type { ViewSurface } from '../ViewSurface';
@@ -30,7 +31,7 @@ export function createMapLayer(): PlayerLayer {
       playing = false;
       const { map } = frame.scene;
       if (!(map.width > 0) || !(map.height > 0)) return;
-      if (!intersects({ x: 0, y: 0, width: map.width, height: map.height }, frame.visible)) return;
+      if (!intersects(map.matrix ? matrixBounds(map.matrix) : { x: 0, y: 0, width: map.width, height: map.height }, frame.visible)) return;
       // An animated map plays where the view could load its video; until then (and everywhere else) its still shows.
       const clip = frame.images(map.video ?? null);
       const video = clip && 'videoWidth' in clip.image ? clip.image : null;

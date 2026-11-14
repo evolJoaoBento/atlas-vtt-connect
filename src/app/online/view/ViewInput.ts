@@ -67,7 +67,7 @@ export class ViewInput {
   private lastTap: { point: ScreenPoint; time: number } | null = null;
   private lastKind: PointerKind = 'mouse';
 
-  constructor(private readonly camera: CameraMoves, private readonly tokens: TokenGrab | null = null) {}
+  constructor(private readonly camera: CameraMoves, private readonly tokens: TokenGrab | null = null, private readonly editToken?: (point: ScreenPoint) => boolean, private readonly selectToken?: (point: ScreenPoint) => void) {}
 
   down(input: PointerInput): void {
     this.lastKind = input.kind;
@@ -121,6 +121,7 @@ export class ViewInput {
       else if (this.tokens?.tap) this.tokens.tap({ x: input.x, y: input.y });
       else this.tokens?.cancel();
     }
+    if (!this.dragging) this.selectToken?.({ x: input.x, y: input.y });
     if (!this.dragging && input.kind === 'touch') this.tap({ x: input.x, y: input.y }, input.time);
     this.start = null;
     this.dragging = false;
@@ -143,7 +144,7 @@ export class ViewInput {
   /** The browser's double-click; a touch double-tap is recognised from its taps instead, so it zooms once. */
   doubleClick(point: ScreenPoint): void {
     if (this.lastKind === 'touch') return;
-    this.camera.zoomAt(point, DOUBLE_ZOOM);
+    if (!this.editToken?.(point)) this.camera.zoomAt(point, DOUBLE_ZOOM);
   }
 
   private releaseToken(): void {
@@ -168,7 +169,7 @@ export class ViewInput {
     const last = this.lastTap;
     if (last && time - last.time <= DOUBLE_TAP_MS && distance(last.point, point) <= DOUBLE_TAP_DISTANCE) {
       this.lastTap = null;
-      this.camera.zoomAt(point, DOUBLE_ZOOM);
+      if (!this.editToken?.(point)) this.camera.zoomAt(point, DOUBLE_ZOOM);
       return;
     }
     this.lastTap = { point, time };

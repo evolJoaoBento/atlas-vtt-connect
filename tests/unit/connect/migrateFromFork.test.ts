@@ -48,7 +48,7 @@ describe('migrateFromFork', () => {
     const settings = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
     const report = await migrateFromFork(deps(app, settings));
     expect(report.settings).toBe('copied');
-    expect(settings.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    expect(settings.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
     expect(settings.get().playerName).toBe('GM');
     expect(settings.get().table).toEqual(TABLE);
     expect(settings.migratedFromFork).toBe(true);
@@ -61,7 +61,7 @@ describe('migrateFromFork', () => {
     const { app } = createInMemoryApp({ files: { [FORK_SETTINGS]: JSON.stringify({ online: { playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt' } }) } });
     const settings = await ConnectSettingsStore.load(fakeDataPlugin(null), memoryKeyValueStore());
     await migrateFromFork(deps(app, settings));
-    expect(settings.get().playerPageUrl).toBe('https://evoljoaobento.github.io/atlas-vtt-connect/');
+    expect(settings.get().playerPageUrl).toBe('https://joaodlouro.github.io/atlas-vtt-connect/');
   });
 
   it('keeps a custom player page address', async () => {
