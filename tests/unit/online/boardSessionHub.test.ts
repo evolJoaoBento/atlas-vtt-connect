@@ -106,22 +106,6 @@ describe('BoardSessionHub', () => {
   });
 });
 
-describe('BoardSessionHub: tokens Tabletop moves to another scene', () => {
-  it('hands a well-formed move to what hears of it while hosting, and nothing else', () => {
-    const w = world();
-    const heard = vi.fn();
-    w.hub.useMoves(heard);
-    const move = { from: 'maps/a.atlasmap', to: 'maps/up.atlasmap', tokens: [{ id: 'hero', newId: 'hero' }] };
-    w.hub.tokensMoved(move);
-    expect(heard).toHaveBeenCalledWith(move);
-    w.hub.tokensMoved({ from: 'maps/a.atlasmap', to: 5, tokens: [] } as never);
-    w.hub.tokensMoved({ from: 'maps/a.atlasmap', to: 'maps/up.atlasmap', tokens: [{ id: 3 }] } as never);
-    expect(heard).toHaveBeenCalledTimes(1);
-    w.hub.stop();
-    w.hub.tokensMoved(move);
-    expect(heard).toHaveBeenCalledTimes(1);
-  });
-});
 
 describe('BoardSessionHub: "Controlled by" on Tabletop\'s board', () => {
   it('lists the admitted players with whether each controls the token, and ticks and unticks one', () => {

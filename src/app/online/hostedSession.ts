@@ -19,7 +19,6 @@ import { AssetRegistry } from './scene/AssetRegistry';
 import { BoardSender } from './scene/BoardSender';
 import { CutsceneSender } from './scene/CutsceneSender';
 import { BoardSessionHub, type BoardSession } from './tools/BoardSessionHub';
-import { followMovedTokens } from './control/movedTokens';
 import type { HandoutSource } from './handouts';
 
 /** No handout source: nothing is ever shown. */
@@ -257,7 +256,6 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   boardHub?.useSplit(tabs ? { scenes: hub, players: () => session.getPlayers(), nameOf: (tab) => tabs.tab(tab)?.name ?? null } : null);
   // And "Players see" in Tabletop's token menu, as in Atlas's Edit Token dialog.
   boardHub?.useResourceShows(env.resourceShows ? (mapPath, tokenId) => env.resourceShows?.(mapPath, tokenId) ?? null : null);
-  boardHub?.useMoves(followMovedTokens({ control: tokenControl?.control ?? null, tabs, assign: (playerId, tab) => hub.assign(playerId, tab) }));
 
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;

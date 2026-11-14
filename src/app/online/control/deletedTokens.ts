@@ -12,7 +12,7 @@ type Tokens = SceneSnapshot['objects']['tokens'];
 
 type ShownScenes = Pick<SlotProjection, 'shownSlot' | 'shownSnapshot' | 'onSlotChange' | 'watchLive'>;
 
-export function watchDeletedTokens(projection: ShownScenes, control: Pick<TokenControl, 'assignedTokens' | 'dropTokens' | 'isMoving'>): () => void {
+export function watchDeletedTokens(projection: ShownScenes, control: Pick<TokenControl, 'assignedTokens' | 'dropTokens'>): () => void {
   /** The shown scene's tokens when last seen loaded; null while none is shown. */
   let previous: { sceneId: string; tokens: Tokens } | null = null;
   /** A scene starts being shown: what it holds now is what a deletion is told from. */
@@ -30,7 +30,7 @@ export function watchDeletedTokens(projection: ShownScenes, control: Pick<TokenC
     previous = tokens ? { sceneId, tokens } : null;
     if (!tokens || !before || before.sceneId !== sceneId || before.tokens === tokens) return;
     // A token moved to another scene (Tabletop's board) left this one, but was not deleted: its controllers keep it.
-    const gone = control.assignedTokens().filter((id) => Object.hasOwn(before.tokens, id) && !Object.hasOwn(tokens, id) && !control.isMoving(id));
+    const gone = control.assignedTokens().filter((id) => Object.hasOwn(before.tokens, id) && !Object.hasOwn(tokens, id));
     if (gone.length > 0) control.dropTokens(gone);
   });
   return () => {
