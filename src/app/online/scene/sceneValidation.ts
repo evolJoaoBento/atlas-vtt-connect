@@ -229,7 +229,9 @@ function isPlayerDrawing(value: unknown): boolean {
     // Atlas 0.16's looks: all optional, so a scene of an older Connect is well formed.
     && (value.fill === undefined || value.fill === 'solid' || value.fill === 'soft')
     && (value.holes === undefined || (Array.isArray(value.holes) && value.holes.length <= SCENE_LIMITS.holes && value.holes.every((ring) => isPoints(ring, 3))))
-    && (value.rotation === undefined || isNumber(value.rotation));
+    && (value.rotation === undefined || isNumber(value.rotation))
+    && (value.layer === undefined || value.layer === 'map')
+    && (value.stack === undefined || isNumber(value.stack));
 }
 
 function isPlayerWidget(value: unknown): boolean {

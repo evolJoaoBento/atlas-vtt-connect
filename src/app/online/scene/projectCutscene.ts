@@ -37,7 +37,8 @@ export function sceneBytes(scene: PlayerScene): number {
 
 /** What is given up, in order, when the scene is too heavy for one message: the least needed to draw the shot first. */
 const SHEDDING: ReadonlyArray<(scene: PlayerScene) => PlayerScene> = [
-  (scene) => ({ ...scene, drawings: {} }),
+  // A cutscene has no fog: a fill may be all that covers part of the map, so it is never shed; the other drawings go first.
+  (scene) => ({ ...scene, drawings: Object.fromEntries(Object.entries(scene.drawings).filter(([, drawing]) => drawing.fill !== undefined)) }),
   (scene) => ({ ...scene, texts: {} }),
   (scene) => ({ ...scene, pins: [] }),
   (scene) => ({ ...scene, widgets: [], initiative: null, handout: null }),

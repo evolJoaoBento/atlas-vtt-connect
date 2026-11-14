@@ -246,6 +246,10 @@ export interface PlayerDrawing {
   holes?: ScenePoint[][];
   /** Atlas 0.16: a stamp's turn, degrees clockwise on screen. */
   rotation?: number;
+  /** Atlas 0.16: its place in the one order of drawings (`order` there), before the time drawn; absent: 0. */
+  stack?: number;
+  /** Atlas 0.16: on the map's own layer, under the grid and the tokens; absent: above the tokens. */
+  layer?: 'map';
 }
 
 export const PLAYER_WIDGET_TYPES = ['counter', 'clock', 'timer'] as const;

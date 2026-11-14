@@ -13,6 +13,7 @@ import {
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { isSceneId } from './sceneValidation';
 import { finitePoints, wirePoints } from './simplifyPoints';
+import { annotationOrder } from '../../../../packages/atlas-shared/src/index';
 
 /**
  * Projections by GM record. Immer keeps unchanged records, so their projections
@@ -191,6 +192,7 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
     ...(fill ? { fill } : {}),
     ...(holes.length > 0 ? { holes } : {}),
     ...(rotation !== 0 ? { rotation: ((rotation % 360) + 360) % 360 } : {}),
+    ...((stroke as { layer?: unknown }).layer === 'map' ? { layer: 'map' as const } : {}),
   };
 }
 
@@ -199,10 +201,17 @@ export function projectDrawings(
   visible: Shows,
   memo: ProjectionMemo,
 ): Record<string, PlayerDrawing> {
-  // The drawing as players draw it (its simplified points, its clamped width) must be shown whole.
+  // The drawing as players draw it (its simplified points, its clamped width) must be shown whole; a fill is sent while
+  // any part of it is shown (leaving it out would show what it covers).
   return projectRecord(drawings, (stroke) => {
     if (hiddenFromPlayers(stroke)) return null;
     const drawing = memoized(memo.drawings, stroke, projectDrawingShape);
-    return drawing && visible.shows(drawingBounds(drawing)) ? drawing : null;
+    if (!drawing) return null;
+    const bounds = drawingBounds(drawing);
+    const shown = drawing.fill ? (visible.showsSome ?? visible.shows)(bounds) : visible.shows(bounds);
+    if (!shown) return null;
+    // Atlas 0.16 stacks drawings by `order` first (0 for one made before there was one), then by the time drawn.
+    const stack = annotationOrder(stroke);
+    return stack !== 0 ? { ...drawing, stack } : drawing;
   });
 }

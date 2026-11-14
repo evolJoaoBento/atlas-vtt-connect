@@ -3,6 +3,7 @@ import { intersects } from '../camera';
 import type { ViewSurface } from '../ViewSurface';
 import type { PlayerLiquid } from '../../scene/sceneTypes';
 import type { PlayerLayer } from './layerTypes';
+import { createMapDrawings } from './drawingsLayer';
 
 /** Shown where the map image goes until it has loaded. */
 export const MAP_PLACEHOLDER = '#26282c';
@@ -24,6 +25,8 @@ function drawLiquids(surface: ViewSurface, liquids: readonly PlayerLiquid[], cel
 export function createMapLayer(): PlayerLayer {
   /** Whether the last frame drew a video: the layer then asks to be drawn again, as the video moves on its own. */
   let playing = false;
+  // Atlas 0.16's drawings on the map's own layer: on the floor, under the grid and the tokens.
+  const mapDrawings = createMapDrawings();
   return {
     animating: () => playing,
     draw(surface, frame): void {
@@ -44,6 +47,7 @@ export function createMapLayer(): PlayerLayer {
       else if (art) surface.image(art.image, 0, 0, map.width, map.height, null);
       else surface.rect(0, 0, map.width, map.height, { fill: MAP_PLACEHOLDER });
       if (map.liquids && map.liquids.length > 0) drawLiquids(surface, map.liquids, map.cellSize);
+      mapDrawings(surface, frame);
     },
   };
 }

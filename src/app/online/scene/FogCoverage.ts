@@ -28,6 +28,11 @@ export interface WorldBounds {
 /** A positive check bound to one map: whether every part of `bounds` inside it is shown. */
 export interface Shows {
   shows(bounds: WorldBounds): boolean;
+  /**
+   * Whether players see any part of `bounds` (a fill that covers part of the map is sent so: leaving it out would
+   * show what it covers). Absent: as `shows`.
+   */
+  showsSome?(bounds: WorldBounds): boolean;
 }
 
 /** A replayed raster and, for `reveal`, its summed-area table of fogged cells. */
@@ -118,7 +123,7 @@ export class FogCoverage {
 
   /** `reveals` bound to one map, as texts, drawings and lit scenes are checked. */
   within(map: MapSize): Shows {
-    return { shows: (bounds) => this.reveals(bounds, map) };
+    return { shows: (bounds) => this.reveals(bounds, map), showsSome: (bounds) => this.revealsSome(bounds, map) };
   }
 
   /** True when every cell under `bounds` is surely fogged; anything reaching outside the fogged area is not covered. Never decides what is sent. */

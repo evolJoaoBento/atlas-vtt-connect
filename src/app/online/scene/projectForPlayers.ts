@@ -263,7 +263,8 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
  * every cell of their in-map part (`LightingFrame.shows`, ruling L-POS) and the fog proves every cell revealed (F-POS).
  */
 function darkCovers(fog: Shows, lighting: LightingFrame): Shows {
-  return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds) };
+  // A fill is sent where any part of it is out of the fog, dark or not: the players' darkness is drawn over it.
+  return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds), showsSome: (bounds) => (fog.showsSome ?? fog.shows)(bounds) };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext, liquidRecord: unknown): PlayerMap {

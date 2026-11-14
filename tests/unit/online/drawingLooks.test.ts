@@ -31,7 +31,7 @@ describe("Atlas 0.16's drawings as players get them", () => {
     expect(isDrawingRecords({ a: drawing({ rotation: 'x' } as never) })).toBe(false);
   });
 
-  it("a player's view draws a fill with its holes cut out, under its line; a pin stamp turned; a line of no width is no line", () => {
+  it("a player's view draws a fill with its holes cut out (wound against the outline, as Atlas's nonzero fill needs), under its line; a pin stamp turned; a line of no width is no line", () => {
     const surface = new RecordingSurface();
     const drawings: Record<string, PlayerDrawing> = {
       box: { type: 'rectangle', order: 1, points: square, color: '#000000', width: 0, opacity: 1, icon: null, fill: 'solid', holes: [hole] },
@@ -40,8 +40,8 @@ describe("Atlas 0.16's drawings as players get them", () => {
     };
     createDrawingsLayer().draw(surface, frame(playerScene({ drawings })));
     expect(surface.calls).toEqual([
-      { op: 'paths', paths: [square, hole], closed: true, style: { fill: '#000000', alpha: 1, evenOdd: true } },
-      { op: 'paths', paths: [square, []].slice(0, 1), closed: true, style: { fill: '#ff0000', alpha: 0.2, evenOdd: true } },
+      { op: 'paths', paths: [square, [...square].slice(0, 0).concat([...hole].reverse())], closed: true, style: { fill: '#000000', alpha: 1 } },
+      { op: 'paths', paths: [square], closed: true, style: { fill: '#ff0000', alpha: 0.2 } },
       { op: 'paths', paths: [square], closed: false, style: { stroke: '#ff0000', lineWidth: 4, alpha: 0.8, round: true } },
       { op: 'push', x: 50, y: 50, rotation: Math.PI / 2, scale: 1 },
       { op: 'pinGlyph', name: 'pin', x: 0, y: 0, size: 70, color: '#00ff00' },
