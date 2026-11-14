@@ -74,6 +74,8 @@ export interface PlayerSessionOptions {
   onMapEditResult?(sceneId: string, accepted: boolean): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
+  /** The host's table-wide dynamic light setting. */
+  onDynamicLightState?(enabled: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
   onDiceLook?(look: string | null): void;
   /** Dice log entries from the GM, newest first; `replay` replaces the log (sent on every admission). */
@@ -190,6 +192,20 @@ export class PlayerSession {
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused
       || !this.controlled.includes(tokenId) || !Object.hasOwn(scene.tokens, tokenId) || !isTokenEdit(edit)) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'token-edit', sceneId: scene.sceneId, tokenId, edit }));
+    return true;
+  }
+
+  sendTokenLightFlash(tokenId: string): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene || this.paused
+      || !this.controlled.includes(tokenId) || !Object.hasOwn(scene.tokens, tokenId)) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'token-light-flash', sceneId: scene.sceneId, tokenId }));
+    return true;
+  }
+
+  sendDynamicLightToggle(enabled: boolean): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'dynamic-light-toggle', enabled }));
     return true;
   }
 
@@ -346,6 +362,9 @@ export class PlayerSession {
         break;
       case 'token-control':
         this.setControlled(message.tokenIds);
+        break;
+      case 'dynamic-light-state':
+        this.options.onDynamicLightState?.(message.enabled);
         break;
       case 'map-edit-result':
         this.options.onMapEditResult?.(message.sceneId,message.accepted);

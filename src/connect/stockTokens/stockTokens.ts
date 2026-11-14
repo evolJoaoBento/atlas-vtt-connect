@@ -1,7 +1,7 @@
 import { isEditMatrix, type EditMatrix } from '../../app/online/control/mapEdits';
 import { backgroundOfLevel } from '../stockLevels';
 import { isTurnName, isTurnValue } from '../../app/online/control/manualTurns';
-import { isTokenEdit, type TokenEdit } from '../../app/online/control/tokenEdits';
+import { isTokenEdit, lightEmission, type TokenEdit } from '../../app/online/control/tokenEdits';
 /**
  * `tokens` on a stock Atlas VTT, which has no extension API: where a dropped token lands and moving tokens for
  * players, with the contract of the API (`TokensApi`).
@@ -149,7 +149,7 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableToken
       if (!isTokenEdit(edit) || !state || !state.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.updateToken) return false;
       const token = tokenOf(state, tokenId) as (Record<string, unknown> & { isHidden?: boolean }) | null;
       if (!token || token.isHidden) return false;
-      const { hp, initiative, ...changes } = edit;
+      const { hp, initiative, light, ...changes } = edit;
       if (initiative !== undefined) {
         const entry = state.initiative?.entries.find((candidate) => candidate.tokenId === tokenId);
         if (entry) {
@@ -163,6 +163,7 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableToken
         }
       }
       const updates: Record<string, unknown> = { ...changes };
+      if (light !== undefined) updates.light = lightEmission(light);
       if (hp) {
         updates.resources = { ...(isObject(token.resources) ? token.resources : {}), hp: { ...hp } };
         updates.overriddenMax = [...new Set([...(Array.isArray(token.overriddenMax) ? (token.overriddenMax as unknown[]).filter((key): key is string => typeof key === 'string') : []), 'hp'])];

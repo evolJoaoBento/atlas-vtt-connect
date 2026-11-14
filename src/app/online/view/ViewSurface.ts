@@ -57,6 +57,8 @@ export interface RasterImage {
   height: number;
 }
 
+export interface DynamicLightImage { image: SurfaceImage; width: number; height: number }
+
 /** A circle an image is clipped to, in the current frame. */
 export interface ImageClip {
   x: number;
@@ -100,6 +102,7 @@ export interface ViewSurface {
   glyph(name: string, x: number, y: number, size: number, color: string, alpha: number): void;
   /** `image` stretched over the rectangle, as an image is: pixels worked out in code, such as the laser's glow. */
   raster(image: RasterImage, x: number, y: number, width: number, height: number): void;
+  dynamicLight(image: DynamicLightImage, x: number, y: number, width: number, height: number): void;
   /** The image's mean luminance (0–255) from a small overview, as Atlas reads a map's for the grid colour; null when unreadable. */
   meanLuminance(image: SurfaceImage): number | null;
   /** One of Atlas's pin icons (`PIN_ICON_PATHS`), filled, `size` wide and centred on (x, y); an unknown name draws nothing. */

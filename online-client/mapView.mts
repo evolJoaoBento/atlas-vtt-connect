@@ -77,6 +77,7 @@ export interface MapViewOptions {
   sendMove(tokenId: string, x: number, y: number): boolean;
   sendCopy?(tokenId: string): boolean;
   sendEdit?(tokenId: string, edit: TokenEdit): boolean;
+  sendLightFlash?(tokenId: string): boolean;
   /** Sends new points of the player's laser; false when they could not be sent. */
   sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   /** Sends a ping at a world point; false when it could not go. */
@@ -657,7 +658,8 @@ export class MapView {
     panel.replaceChildren();
     if (!this.controlled.has(id) || !this.connected) { panel.textContent = `${token.name ?? 'Token'} — somente leitura. O mestre precisa conceder controle.`; return; }
     const sceneId = this.scene?.sceneId;
-    openTokenEditor(panel.ownerDocument, token, this.sheets.get(id), (edit) => this.connected && !this.paused && this.scene?.sceneId === sceneId && this.controlled.has(id) && (this.options.sendEdit?.(id, edit) ?? false), panel, true);
+    openTokenEditor(panel.ownerDocument, token, this.sheets.get(id), (edit) => this.connected && !this.paused && this.scene?.sceneId === sceneId && this.controlled.has(id) && (this.options.sendEdit?.(id, edit) ?? false), panel, true,
+      () => this.connected && !this.paused && this.scene?.sceneId === sceneId && this.controlled.has(id) && (this.options.sendLightFlash?.(id) ?? false));
   }
 
   private editAt(point: ScreenPoint): boolean {
@@ -687,7 +689,8 @@ export class MapView {
     const sceneId = this.scene?.sceneId;
     this.closeEditor = openTokenEditor(this.options.canvas.ownerDocument, token, this.sheets.get(id), (edit) =>
       this.connected && !this.paused && this.scene?.sceneId === sceneId && this.controlled.has(id)
-        && (this.options.sendEdit?.(id, edit) ?? false));
+        && (this.options.sendEdit?.(id, edit) ?? false), this.options.canvas.ownerDocument.body, false,
+      () => this.connected && !this.paused && this.scene?.sceneId === sceneId && this.controlled.has(id) && (this.options.sendLightFlash?.(id) ?? false));
     return true;
   }
 

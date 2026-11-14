@@ -155,6 +155,8 @@ export interface PlayerMini {
 }
 
 export interface PlayerToken {
+  /** A visual light preset chosen by this token's controller; no wall geometry is sent with it. */
+  light?: 'none' | 'torch' | 'light' | 'continual-flame';
   showHpBar?: boolean;
   statusText?: string;
   x: number;
@@ -353,6 +355,9 @@ export interface PlayerMeasurement {
 export interface PlayerScene {
   /** Random per presentation: a new presentation or scene gets a new id. */
   sceneId: string;
+  /** One rendered light mask for the current scene; walls and light geometry stay on the GM's machine. */
+  lightMask?: PlayerLightMask | null;
+  lightFlash?: { x: number; y: number; until: number } | null;
   map: PlayerMap;
   grid: PlayerGrid | null;
   tokens: Record<string, PlayerToken>;
@@ -366,6 +371,13 @@ export interface PlayerScene {
   pins?: PlayerPin[];
   /** The image the GM shows players, or null; absent from an older GM. */
   handout?: PlayerHandout | null;
+}
+
+export interface PlayerLightMask {
+  width: number;
+  height: number;
+  /** Base64 PNG of safe web light glows, bounded to 512 px per side. */
+  png: string;
 }
 
 /** The image the GM shows players: its asset (null while the GM is still reading it) and its title. */
@@ -395,7 +407,7 @@ export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
-export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout'] as const;
+export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout', 'lightMask', 'lightFlash'] as const;
 export type SceneFieldKey = typeof SCENE_FIELD_KEYS[number];
 
 export interface ScenePatchBody {

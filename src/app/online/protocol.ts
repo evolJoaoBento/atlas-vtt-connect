@@ -80,6 +80,8 @@ export interface SceneStateMessage { v: 1; type: 'scene-state'; sceneId: string;
  * player that does not know it ignores it; the web page has no extension looks, and ignores the id.
  */
 export interface SceneLookMessage { v: 1; type: 'scene-look'; sceneId: string; look: string | null }
+/** Shared session toggle: any admitted participant may ask the GM to update this single table-wide value. */
+export interface DynamicLightStateMessage { v: 1; type: 'dynamic-light-state'; enabled: boolean }
 
 export type ControlMessage =
   | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
@@ -101,6 +103,9 @@ export type ControlMessage =
   | ({ v: 1; type: 'scene-camera' } & SceneCamera)
   | SceneStateMessage
   | SceneLookMessage
+  | DynamicLightStateMessage
+  | { v: 1; type: 'dynamic-light-toggle'; enabled: boolean }
+  | { v: 1; type: 'token-light-flash'; sceneId: string; tokenId: string }
   /** GM to one player: the tokens that player may move, for this session. */
   | { v: 1; type: 'turn-remove'; sceneId: string; entryId: string }
   | { v: 1; type: 'map-edit-result'; sceneId: string; accepted: boolean }
@@ -150,7 +155,7 @@ export type ControlMessage =
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'map-edit', 'turn-remove', 'turn-add', 'scene-resync', 'token-move', 'token-copy', 'token-edit', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request',
+  'map-edit', 'turn-remove', 'turn-add', 'scene-resync', 'token-move', 'token-copy', 'token-edit', 'token-light-flash', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'dynamic-light-toggle',
 ]);
 
 export type Decoded =
@@ -199,6 +204,9 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'scene-camera': (m) => isSceneCamera(m),
   'scene-state': (m) => isSceneState(m),
   'scene-look': (m) => isSceneLook(m),
+  'dynamic-light-state': (m) => typeof m.enabled === 'boolean',
+  'dynamic-light-toggle': (m) => typeof m.enabled === 'boolean',
+  'token-light-flash': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId),
   'turn-remove': (m) => isSceneId(m.sceneId) && isSceneId(m.entryId),
   'map-edit-result': (m) => isSceneId(m.sceneId) && typeof m.accepted === 'boolean',
   'map-edit': (m) => isSceneId(m.sceneId) && typeof m.key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(m.key) && isEditMatrix(m.matrix),

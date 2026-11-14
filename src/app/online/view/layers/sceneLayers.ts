@@ -11,11 +11,13 @@ import type { MiniLayer } from '../minis/miniLayer';
 import { createMapLayer } from './mapLayer';
 import { createTextsLayer } from './textsLayer';
 import { createTokensLayer } from './tokensLayer';
+import { DynamicLightLayer } from './dynamicLightLayer';
 
 /** `minis`: the 3D minis on tokens (`minis/miniLayer.ts`); without it none is drawn. */
 export function createSceneLayers(options: { minis?: MiniLayer } = {}): Record<SceneLayer, PlayerLayer> {
   return {
     map: createMapLayer(),
+    light: new DynamicLightLayer(),
     grid: createGridLayer(),
     tokens: createTokensLayer(options.minis ? { minis: options.minis } : {}),
     texts: createTextsLayer(),

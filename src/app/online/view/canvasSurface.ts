@@ -9,7 +9,7 @@ import type { ScenePoint } from '../scene/sceneTypes';
 import { MAP_ICON_BOX, mapIconPaths } from './mapIconPaths';
 import { WIDGET_ICON_PATHS, type WidgetIcon } from '../../types/widgetIcons';
 import { PIN_ICON_PATHS, type PinIconId } from './pinIcons';
-import type { ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
+import type { DynamicLightImage, ImageClip, ImageLook, LayerSurface, RasterImage, ShapeStyle, SurfaceImage, TextStyle, ViewSurface } from './ViewSurface';
 
 interface IconShape {
   path: Path2D;
@@ -549,6 +549,13 @@ class CanvasSurface implements ViewSurface {
     context.clearRect(0, 0, image.width, image.height);
     context.putImageData(pixels, 0, 0);
     this.context.drawImage(scratch, 0, 0, image.width, image.height, x, y, width, height);
+  }
+
+  dynamicLight(image: DynamicLightImage, x: number, y: number, width: number, height: number): void {
+    this.context.save();
+    this.context.globalCompositeOperation = 'screen';
+    this.context.drawImage(image.image, x, y, width, height);
+    this.context.restore();
   }
 
   pinGlyph(name: string, x: number, y: number, size: number, color: string): void {

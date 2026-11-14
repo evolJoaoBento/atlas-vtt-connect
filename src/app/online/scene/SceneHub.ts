@@ -122,6 +122,16 @@ export class SceneHub extends SlotReads implements SessionHandler {
     return this.options.assignments.scenesInUse(this.presentedTab()).length;
   }
 
+  /** Current projection slots receive the session-wide visual-light setting. */
+  lightSlots(): readonly Pick<SceneSlot, 'sceneId' | 'setDynamicLights'>[] { return [...this.slots.values()]; }
+
+  flashAt(sceneId: string, x: number, y: number): boolean {
+    const slot = [...this.slots.values()].find((scene) => scene.sceneId === sceneId && scene.state === 'live');
+    if (!slot) return false;
+    slot.flashAt(x, y);
+    return true;
+  }
+
   /** For the GM's UI: whether players can be assigned (D12), who is assigned where, and the cap (D13). */
   splitSupported(): boolean { return this.options.tabs !== null; }
   assignedTabs(): Record<string, TabKey> { return this.options.assignments.entries(); }

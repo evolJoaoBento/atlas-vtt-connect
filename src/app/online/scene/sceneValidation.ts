@@ -13,6 +13,7 @@ import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { SIDE_LIMITS } from './initiativeSides';
 import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
 import { isAssetId } from '../assets/assetIds';
+import { isLightProfile, isPlayerLightMask } from '../lighting/lightMask';
 
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => boolean;
@@ -173,7 +174,7 @@ function isPlayerGrid(value: unknown): boolean {
 }
 
 function isPlayerToken(value: unknown): boolean {
-  return isFields(value) && optional(isBoolean)(value.showHpBar)
+  return isFields(value) && optional(isLightProfile)(value.light) && optional(isBoolean)(value.showHpBar)
     && optional((text) => typeof text === 'string' && text.length <= 120)(value.statusText)
     && isCoordinate(value.x) && isCoordinate(value.y) && inRange(SCENE_RANGES.tokenSize)(value.size)
     && isNumber(value.rotation)
@@ -295,6 +296,9 @@ function isPlayerHandout(value: unknown): boolean {
   return isFields(value) && (value.asset === null || isText(value.asset, SCENE_LIMITS.idLength)) && isText(value.title, SCENE_LIMITS.pinTitle);
 }
 
+function isOptionalLightMask(value: unknown): boolean { return value === null || isPlayerLightMask(value); }
+function isOptionalLightFlash(value: unknown): boolean { return value === null || (isFields(value) && isCoordinate(value.x) && isCoordinate(value.y) && Number.isSafeInteger(value.until)); }
+
 const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   map: isPlayerMap,
   grid: nullable(isPlayerGrid),
@@ -303,6 +307,8 @@ const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   measurement: isPlayerMeasurement,
   pins: isPlayerPins,
   handout: nullable(isPlayerHandout),
+  lightMask: isOptionalLightMask,
+  lightFlash: isOptionalLightFlash,
 };
 const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
   tokens: isPlayerToken,
@@ -315,7 +321,7 @@ const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
 export function isPlayerSceneBody(value: unknown): boolean {
   return isFields(value) && isSceneId(value.sceneId)
     // An older GM sends no measurement; the mirror fills it in.
-    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins' || key === 'handout'))
+    && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins' || key === 'handout' || key === 'lightMask' || key === 'lightFlash'))
     && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText);
 }
 

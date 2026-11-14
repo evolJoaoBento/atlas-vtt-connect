@@ -45,6 +45,8 @@ export interface SlotProjection {
   shownSlot(): SlotView | null;
   /** The snapshot of the shown slot with this `sceneId`, read now; null for any other. */
   shownSnapshot(sceneId: string): SceneSnapshot | null;
+  /** A short-lived visual flare, placed from a token coordinate verified on the host. */
+  flashAt?(sceneId: string, x: number, y: number): boolean;
   /** The admitted players who have the scene `sceneId` now (P1); none for a scene no longer in use. */
   audience(sceneId: string): string[];
   /** Whether a split exists: at least one player is assigned to a tab. */

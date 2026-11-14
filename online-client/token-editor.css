@@ -6,6 +6,7 @@
 .token-editor label:has(input[type="checkbox"]) { display: flex; align-items: center; }
 .token-editor input[type="checkbox"] { width: 20px; min-height: 20px; }
 .token-editor input { width: 100%; }
+.token-editor select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: inherit; font: inherit; }
 .token-editor input[type="checkbox"] { width: 20px; }
 .token-editor__steps { display: flex; gap: 8px; }
 .token-editor__steps button { flex: 1; }

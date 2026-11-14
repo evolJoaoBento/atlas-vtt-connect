@@ -1,5 +1,6 @@
 import { isEditMatrix } from '../control/mapEdits';
 import { conditionName } from './conditionNames';
+import { lightProfileOf } from '../lighting/lightMask';
 /**
  * The only place that decides what leaves the GM's machine: the presented
  * scene as online players may see it, exactly what the local player window
@@ -375,6 +376,7 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
       ? { current: finiteOr(token.resources.hp.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(token.resources.hp.max, 0, SCENE_RANGES.resourceValue) } : null,
     ...(edits.showHpBar !== undefined ? { showHpBar: edits.showHpBar } : {}),
     ...(edits.statusText ? { statusText: edits.statusText.slice(0, 120) } : {}),
+    ...(lightProfileOf(token.light) ? { light: lightProfileOf(token.light) } : {}),
     stress: null,
     resources: character && showOf ? projectBars(character, visibleDefinitions, showOf) : [],
     ...(wheels.length > 0 ? { wheels } : {}),

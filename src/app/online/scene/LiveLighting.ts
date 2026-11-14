@@ -22,6 +22,7 @@ interface Built {
   height: number;
   shown: Uint8Array;
   raster: RasterFrame;
+  visibility: DarknessGrid;
 }
 
 /** The lighting of one presentation's view: its frame for each projection, and `onDue` when Atlas says it changed. */
@@ -49,7 +50,7 @@ export class LiveLighting {
     }
     const { tokens } = visibility;
     // Tokens never wait: they follow the window's perception at every projection; a token only sensed is not seen.
-    return { seen: (tokenId) => Object.hasOwn(tokens, tokenId) && tokens[tokenId] === 'seen', darkness: raster.darkness, shows: raster.shows };
+    return { seen: (tokenId) => Object.hasOwn(tokens, tokenId) && tokens[tokenId] === 'seen', darkness: raster.darkness, shows: raster.shows, visibility: this.built?.visibility };
   }
 
   /** Atlas's answer; an answer that cannot be had is not known, and unknown is dark (ruling L4). */
@@ -88,7 +89,8 @@ export class LiveLighting {
     const grid = darkGrid(cols, rows, cellSize, shown, map);
     if (!grid) return null;
     const raster = rasterFrame({ ...grid, map });
-    this.built = { cols, rows, cellSize, width, height, shown: shown.slice(), raster };
+    this.built = { cols, rows, cellSize, width, height, shown: shown.slice(), raster,
+      visibility: { cols: grid.cols, rows: grid.rows, cellSize, map, dark: Uint8Array.from(grid.dark, (cell) => cell === 1 ? 1 : 0) } };
     return raster;
   }
 }

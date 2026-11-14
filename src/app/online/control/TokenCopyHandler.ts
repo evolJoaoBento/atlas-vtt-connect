@@ -14,7 +14,7 @@ export type CopyableTokens = Pick<TokensApi, 'move'> & { duplicate?(viewId: stri
 
 export interface TokenCopyHandlerOptions {
   session: SceneSession & { canEditMap?(key: string): boolean };
-  projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot'>;
+  projection: Pick<SlotProjection, 'slotOf' | 'shownSnapshot' | 'flashAt'>;
   control: TokenControl;
   tokens: CopyableTokens;
   movesOnTurn?: () => boolean;

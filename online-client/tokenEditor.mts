@@ -4,7 +4,7 @@ import type { PlayerToken } from '../src/app/online/scene/sceneTypes';
 import type { TokenSheet } from '../src/app/online/tools/sheets';
 
 /** Native dialog supplies focus trapping, Escape and mobile layout without another UI dependency. */
-export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenSheet | undefined, send: (edit: TokenEdit) => boolean, parent: HTMLElement = doc.body, embedded = false): () => void {
+export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenSheet | undefined, send: (edit: TokenEdit) => boolean, parent: HTMLElement = doc.body, embedded = false, sendFlash?: () => boolean): () => void {
   token = structuredClone(token);
   if (sheet) sheet = structuredClone(sheet);
   const dialog = doc.createElement(embedded ? 'section' : 'dialog');
@@ -36,6 +36,18 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
   current.required = maximum.required = true;
   const toggle = field('Mostrar barrinha de HP', 'checkbox', '');
   toggle.checked = token.showHpBar === true;
+  const light = doc.createElement('select');
+  light.setAttribute('aria-label', 'Foco de luz');
+  for (const [value, label] of [['none', 'Sem foco de luz'], ['torch', 'Tocha (20/40 pés)'], ['light', 'Magia: Luz (20/40 pés)'], ['continual-flame', 'Magia: Chama contínua (20/40 pés)']] as const) {
+    const option = doc.createElement('option'); option.value = value; option.textContent = label; light.append(option);
+  }
+  light.value = token.light ?? 'none';
+  const lightLabel = doc.createElement('label'); lightLabel.append('Foco de luz', light); form.append(lightLabel);
+  if (embedded && sendFlash) {
+    const flash = doc.createElement('button'); flash.type = 'button'; flash.className = 'secondary'; flash.textContent = 'Clarão mágico'; flash.setAttribute('aria-label', 'Criar um clarão mágico temporário');
+    flash.addEventListener('click', () => { note.textContent = sendFlash() ? 'Clarão enviado.' : 'Não foi possível enviar o clarão.'; });
+    form.append(flash);
+  }
   const size = field('Tamanho do token', 'number', String(token.size));
   size.min = '0.75'; size.max = '5'; size.step = 'any'; size.required = true;
   const steps = (input: HTMLInputElement, name: string, step: number): void => {
@@ -82,6 +94,7 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
     const edit: TokenEdit = {};
     if (Number(current.value) !== (health?.current ?? 1) || Number(maximum.value) !== (health?.max ?? 1) || (!health && toggle.checked)) edit.hp = { current: Number(current.value), max: Number(maximum.value) };
     if (toggle.checked !== (token.showHpBar === true)) edit.showHpBar = toggle.checked;
+    if (light.value !== (token.light ?? 'none')) edit.light = light.value as NonNullable<TokenEdit['light']>;
     if (status.value.trim() !== (token.statusText ?? '')) edit.statusText = status.value.trim();
     if (Number(size.value) !== token.size) edit.size = Number(size.value);
     const chosen = conditionInputs.filter(([, input]) => input.checked).map(([id]) => id);
@@ -93,6 +106,7 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
       if (edit.hp) { health = { ...edit.hp }; if (sheet?.health) Object.assign(sheet.health, edit.hp); else token.hp = { ...edit.hp }; }
       if (edit.size !== undefined) token.size = edit.size;
       if (edit.showHpBar !== undefined) token.showHpBar = edit.showHpBar;
+      if (edit.light !== undefined) token.light = edit.light;
       if (edit.statusText !== undefined) token.statusText = edit.statusText;
       if (edit.conditions) token.conditions = edit.conditions.map((id) => (token.conditionChoices ?? token.conditions).find((item) => item.id === id) ?? { id, value: null });
       conditions.textContent = token.conditions.length ? token.conditions.map((condition) => conditionName(condition.name ?? condition.id)).join(', ') : 'Sem condições ativas';

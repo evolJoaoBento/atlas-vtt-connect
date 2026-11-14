@@ -16,6 +16,8 @@ export interface DarknessGrid {
 
 /** What a lit scene adds to the projection: which tokens players see, and the darkness over the map. */
 export interface LightingFrame {
+  /** Atlas's visibility mask in its own raster; this drives the web shadow layer without leaking wall geometry. */
+  visibility?: DarknessGrid;
   /** Whether players see the token, by the player window's own rule; a token they only sense is not seen. */
   seen(tokenId: string): boolean;
   /** The darkness players get drawn over the map (a fog lasso); never what texts and drawings are checked against. */

@@ -143,6 +143,8 @@ export class PlayerSceneMirror {
       measurement: withMeasurementDefaults(body.measurement),
       ...(body.pins ? { pins: body.pins } : {}),
       ...(body.handout !== undefined ? { handout: body.handout } : {}),
+      ...(body.lightMask !== undefined ? { lightMask: body.lightMask } : {}),
+      ...(body.lightFlash !== undefined ? { lightFlash: body.lightFlash } : {}),
       fog: keepFogIdentity(this.current?.fog, toRecord(pending.fog)), drawings: toRecord(pending.drawings),
     });
   }

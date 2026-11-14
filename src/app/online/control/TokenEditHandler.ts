@@ -4,6 +4,7 @@ import type { ControlMessage } from '../protocol';
 import { RateLimit } from '../rateLimit';
 import type { TokenCopyHandlerOptions } from './TokenCopyHandler';
 import { isTokenEdit } from './tokenEdits';
+import { isLightProfile } from '../lighting/lightMask';
 
 /** Ownership and visibility are checked against the master's current scene, never client data. */
 export class TokenEditHandler implements SessionHandler {
@@ -38,12 +39,24 @@ export class TokenEditHandler implements SessionHandler {
       if (slot?.lastSent && slot.sceneId === message.sceneId) this.options.tokens.addTurn?.(slot.tab.viewId, message.name, message.value);
       return;
     }
+    if (message.type === 'dynamic-light-toggle') return;
+    if (message.type === 'token-light-flash') {
+      if (!this.limit.allow(player.playerId, Date.now()) || !this.options.projection.flashAt) return;
+      const slot = this.options.projection.slotOf(player.playerId);
+      const snapshot = slot ? this.options.projection.shownSnapshot(slot.sceneId) : null;
+      const token = snapshot && Object.hasOwn(snapshot.objects.tokens, message.tokenId) ? snapshot.objects.tokens[message.tokenId] : null;
+      if (slot?.sceneId === message.sceneId && token && !token.isHidden && Number.isFinite(token.x) && Number.isFinite(token.y)
+        && Object.hasOwn(slot.lastSent?.tokens ?? {}, message.tokenId) && this.options.control.controls(player.playerId, message.tokenId)) {
+        this.options.projection.flashAt(slot.sceneId, token.x, token.y);
+      }
+      return;
+    }
     if (message.type !== 'token-edit' || !this.limit.allow(player.playerId, Date.now())) return;
     const { projection, control, tokens, session } = this.options;
     const slot = projection.slotOf(player.playerId);
     const snapshot = slot ? projection.shownSnapshot(slot.sceneId) : null;
     const token = snapshot && Object.hasOwn(snapshot.objects.tokens, message.tokenId) ? snapshot.objects.tokens[message.tokenId] : null;
-    if (!isTokenEdit(message.edit) || !tokens.edit || !control.controls(player.playerId, message.tokenId)
+    if (!isTokenEdit(message.edit) || (message.edit.light !== undefined && !isLightProfile(message.edit.light)) || !tokens.edit || !control.controls(player.playerId, message.tokenId)
       || !slot?.lastSent || slot.sceneId !== message.sceneId || !snapshot || !token || token.isHidden
       || !Object.hasOwn(slot.lastSent.tokens, message.tokenId)
       || !tokens.edit(slot.tab.viewId, message.tokenId, message.edit)) {

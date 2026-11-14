@@ -1,6 +1,6 @@
 import { controlWorld } from './controlFixtures';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isTokenEdit, type TokenEdit } from '../../../src/app/online/control/tokenEdits';
+import { isTokenEdit, lightEmission, type TokenEdit } from '../../../src/app/online/control/tokenEdits';
 import { TokenEditHandler } from '../../../src/app/online/control/TokenEditHandler';
 import type { TokenCopyHandlerOptions } from '../../../src/app/online/control/TokenCopyHandler';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
@@ -23,7 +23,7 @@ describe('owned token editing', () => {
     const edit = vi.fn(() => true); const send = vi.fn();
     const snapshot = { objects: { tokens: { hero: { kind: 'character', isHidden: false } } } };
     const slot = { sceneId: 'scene', tab: { viewId: 'view' }, lastSent: { sceneId: 'scene', tokens: { hero: {} } } };
-    const projection = { slotOf: () => slot, shownSnapshot: vi.fn(() => snapshot) };
+    const projection = { slotOf: () => slot, shownSnapshot: vi.fn(() => snapshot), flashAt: vi.fn(() => true) };
     const handler = new TokenEditHandler({ control, projection, session: { send }, tokens: { edit } } as unknown as TokenCopyHandlerOptions);
     const message = { v: 1, type: 'token-edit', sceneId: 'scene', tokenId: 'hero', edit: { size: 1.5 } } as ControlMessage;
     return { control, edit, send, snapshot, projection, handler, message, slot };
@@ -41,6 +41,16 @@ describe('owned token editing', () => {
       const s = setup(); change(s); s.handler.onMessage({ playerId: 'a' } as SessionPlayer, s.message);
       expect(s.edit).not.toHaveBeenCalled(); expect(s.send).toHaveBeenCalled();
     }
+  });
+  it('accepts a short-lived flash only from the owner of a visible token, using host coordinates', () => {
+    const t = setup();
+    Object.assign(t.snapshot.objects.tokens.hero, { x: 42, y: 73 });
+    const message: ControlMessage = { v: 1, type: 'token-light-flash', sceneId: 'scene', tokenId: 'hero' };
+    t.handler.onMessage({ playerId: 'a' } as SessionPlayer, message);
+    expect(t.projection.flashAt).toHaveBeenCalledWith('scene', 42, 73);
+    t.control.set('hero', 'a', false);
+    t.handler.onMessage({ playerId: 'a' } as SessionPlayer, message);
+    expect(t.projection.flashAt).toHaveBeenCalledTimes(1);
   });
   it('persists through the native store, retaining other resources and maximum overrides', () => {
     const updateToken = vi.fn();
@@ -96,6 +106,18 @@ it('validates initiative bounds and writes into the shared native tracker', () =
   api.edit?.('view', 'hero', {initiative: 12});
   expect(updateInitiativeEntry).toHaveBeenCalledWith('entry', {initiative: 12});
   expect(addToInitiative).toHaveBeenCalledOnce();
+});
+
+it('writes only the selected bounded light preset to the native token', () => {
+  expect(lightEmission('torch')).toEqual({bright:20,dim:40,intensity:1,color:'#ffcf81',animation:'torch'});
+  expect(lightEmission('none')).toBeUndefined();
+  const updateToken=vi.fn();
+  const state={mapLoaded:true,isMapLoading:false,lighting:{enabled:false},objects:{tokens:{hero:{x:1,y:1,name:'Hero'}}},updateToken};
+  const api=stockTokensApi({view:()=>({viewId:'v',atlasStore:{getState:()=>state}}) as unknown as TokenView,mapSize:()=>({width:100,height:100}),dynamicLighting:()=>false});
+  expect(api.edit?.('v','hero',{light:'continual-flame'})).toBe(true);
+  expect(updateToken).toHaveBeenCalledWith('hero',{light:{bright:20,dim:40,intensity:1,color:'#ffcf81',animation:'magic'}});
+  expect(api.edit?.('v','hero',{light:'none'})).toBe(true);
+  expect(updateToken).toHaveBeenLastCalledWith('hero',{light:undefined});
 });
 
 it('adds arbitrary named turns without a token, bounds input and opens the shared tracker', () => {

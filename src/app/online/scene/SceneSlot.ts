@@ -24,6 +24,8 @@ import type { SlotHost, SlotSource, SlotState } from './slotContracts';
 import { MapSizeWait, SnapshotCache, TickTimer } from './sceneTicks';
 import type { PlayerScene } from './sceneTypes';
 import { diceLookToSend } from './sceneValidation';
+import { renderLightMask } from '../lighting/lightMask';
+import type { PlayerLightMask } from './sceneTypes';
 
 export type { SlotHost, SlotSource, SlotState } from './slotContracts';
 
@@ -43,6 +45,9 @@ export class SceneSlot {
   board: BoardExtras | null = null;
   /** `board` as text, to tell a change. */
   private boardText = 'null';
+  private dynamicLights = true;
+  private lightMaskCache: { key: string; visibility: LightingFrame['visibility']; mask: PlayerLightMask | null } | null = null;
+  private lightFlash: { x: number; y: number; until: number } | null = null;
   /** The tab's name and map, as its tab shows them; the hub follows renames. */
   name = '';
   mapPath = '';
@@ -331,8 +336,30 @@ export class SceneSlot {
       assets: this.host.options.assets,
       ...sceneContext(snapshot, this.host.options),
     }, this.memo);
+    const lightKey = JSON.stringify([this.dynamicLights, scene.map.width, scene.map.height, scene.map.cellSize, scene.measurement.unitDistance,
+      Object.entries(scene.tokens).filter(([, token]) => token.light && token.light !== 'none').map(([id, token]) => [id, token.x, token.y, token.light])]);
+    if (this.lightMaskCache?.key !== lightKey || this.lightMaskCache.visibility !== lighting?.visibility) {
+      this.lightMaskCache = { key: lightKey, visibility: lighting?.visibility, mask: renderLightMask(scene, lighting, this.dynamicLights) };
+    }
+    if (this.lightMaskCache.mask) scene.lightMask = this.lightMaskCache.mask;
+    else if (this.lastSent && Object.hasOwn(this.lastSent, 'lightMask')) scene.lightMask = null;
+    else delete scene.lightMask;
+    if (this.dynamicLights && this.lightFlash) scene.lightFlash = this.lightFlash;
+    else delete scene.lightFlash;
     this.projectBoard(snapshot, lighting, fog.coverage, scene);
     return scene;
+  }
+
+  setDynamicLights(enabled: boolean): void {
+    if (enabled === this.dynamicLights) return;
+    this.dynamicLights = enabled;
+    this.lightMaskCache = null;
+    this.schedule();
+  }
+
+  flashAt(x: number, y: number): void {
+    this.lightFlash = { x, y, until: Date.now() + 1200 };
+    this.schedule();
   }
 
   /** Whether the last projection changed the board extras; read once. */

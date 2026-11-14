@@ -81,6 +81,14 @@ function updateTokenChoices(): void {
 const editorKey=new URLSearchParams(location.hash.slice(1)).get('edit');
 const canEditMap=editorKey!==null&&/^[A-Za-z0-9_-]{43}$/.test(editorKey);
 element('map-edit-button').hidden=!canEditMap;
+const dynamicLightButton = element<HTMLButtonElement>('dynamic-light-button');
+let dynamicLightEnabled = true;
+const renderDynamicLightButton = (): void => {
+  dynamicLightButton.setAttribute('aria-pressed', String(dynamicLightEnabled));
+  dynamicLightButton.textContent = dynamicLightEnabled ? '✦ Luz dinâmica' : '✧ Luz dinâmica';
+};
+dynamicLightButton.addEventListener('click', () => { session?.sendDynamicLightToggle(!dynamicLightEnabled); });
+renderDynamicLightButton();
 const surface = createCanvasSurface(canvas);
 /** Set once the player joins; until then a drop, a laser or a roll has nowhere to go. */
 let session: PlayerSession | null = null;
@@ -95,6 +103,7 @@ const map = surface
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
     sendCopy: (tokenId) => session?.sendTokenCopy(tokenId) ?? false,
     sendEdit: (tokenId, edit) => session?.sendTokenEdit(tokenId, edit) ?? false,
+    sendLightFlash: (tokenId) => session?.sendTokenLightFlash(tokenId) ?? false,
     sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
     sendTemplate: (change) => session?.sendTemplate(change) ?? false,
@@ -255,6 +264,7 @@ function render(state: PlayerSessionState): void {
   if (retry) retry.hidden = state.status !== 'lost' || state.reason === 'ended' || state.reason === 'replaced';
   log.event('status', { status: state.status, reason: state.reason, players: state.players.length });
   sessionState = state;
+  dynamicLightButton.hidden = state.status !== 'admitted';
   // Only an admitted player drags tokens and uses the tools: reconnecting or ended cancels a gesture.
   map?.setConnected(state.status === 'admitted');
   // The session's order of players decides whose laser has which colour.
@@ -352,6 +362,7 @@ if (!target) {
         log.event('scene state', { paused });
         map.setPaused(paused);
       },
+      onDynamicLightState: (enabled) => { dynamicLightEnabled = enabled; renderDynamicLightButton(); },
       onDiceLog: (entries, replay) => {
         log.event('dice log', { entries: entries.length, replay });
         diceLog.receive(entries, replay);

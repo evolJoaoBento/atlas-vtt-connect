@@ -38,6 +38,7 @@ import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
 import type { SheetRollExtras, SheetRollLabels } from './tools/DiceHost';
 import type { OfferedDiceRules } from './tools/toolMessages';
+import { DynamicLightHost } from './scene/DynamicLightHost';
 
 const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
@@ -221,6 +222,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
+  const dynamicLights = new DynamicLightHost({ session, projection: { slotOf: (id) => hub.slotOf(id), onSlotChange: (listener) => hub.onSlotChange(listener), lightSlots: () => hub.lightSlots() } });
   boardHub?.useTemplates(templates instanceof TemplateHost ? templates : null);
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
@@ -242,6 +244,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     stopSharing = null;
     stopErrors();
     assetServer.stop();
+    dynamicLights.stop();
     for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
     boardSender.stop();
     cameraSender.stop();
@@ -262,6 +265,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     cameraSender.start();
     boardSender.start();
     assetServer.start();
+    dynamicLights.start();
     for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
       part.start();
       parts.push(part);
