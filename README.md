@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.6.0 (the same fusion release).
+**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.7.0 (the same fusion release).
 
 Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
