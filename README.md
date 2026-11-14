@@ -2,9 +2,11 @@
 
 **Compatible with Atlas VTT 0.12.0** (TrueScale and the player window bar), and 0.11.
 
-Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
+Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/joaodlouro/atlas-vtt-connect/issues).
 
-Play [Atlas VTT](https://github.com/ByteMirror/atlas-vtt) maps online with your group. You host from Obsidian; players join from a web page or from their own Obsidian. No accounts, no server to run.
+This fork focuses on expanding browser-based co-op for [Atlas VTT](https://github.com/ByteMirror/atlas-vtt): players can do more from the web map, while the GM keeps control of the session in Obsidian. The work includes player token controls, map adjustments, status and initiative tools, and an optional relay hosted on the GM's computer.
+
+By default, players join from a web page or their own Obsidian over WebRTC; no local server process is needed. The optional local relay is for groups that need another connection route. It runs on the GM's computer and uses a temporary Cloudflare Quick Tunnel URL, so it still depends on an external tunnel service and an internet connection.
 
 ![A player joins and the GM's map opens for them](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/04-allow-player.gif)
 
@@ -176,6 +178,14 @@ Settings → Connect for Atlas VTT:
 - **Player page:** the web address in join links. Leave the default unless you host your own (see [DEVELOPING.md](DEVELOPING.md)).
 - **Keep online images on this device:** a player's Obsidian keeps map images, so the next session loads faster.
 - **Log online play events:** writes a diagnostic log to the console, for bug reports.
+
+## Optional local relay
+
+The normal WebRTC connection remains the default. In the prepared Windows vault bundle, start `RPG/Servidores/atlas-local/INICIAR SERVIDOR.cmd` before hosting a session. It runs the relay on loopback and opens a temporary public route with Cloudflare Quick Tunnel. Players still use the web join page; the relay changes how their session traffic reaches the GM.
+
+Keep the new session link private: it contains the credentials players use to join. The relay forwards session messages through the GM's computer, so treat that computer and the tunnel route as part of the trusted path; this setup is not an end-to-end encrypted relay. Stop the server with `RPG/Servidores/atlas-local/PARAR SERVIDOR.cmd` when you finish. A stopped or restarted relay needs a new online session link.
+
+The launcher is part of the prepared vault bundle, not a one-click installer in this source checkout. The relay implementation is in [`server/relay.mjs`](server/relay.mjs); development and packaging notes are in [DEVELOPING.md](DEVELOPING.md).
 
 ## What doesn't work yet
 
