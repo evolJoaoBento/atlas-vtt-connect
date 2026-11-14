@@ -26,6 +26,17 @@ export const CAMERA_INTERVAL_MS = 100;
 /** The scenes of a run are projected again at most this often. */
 export const SCENE_INTERVAL_MS = 200;
 /** How long a ready player may wait for the scene of the step shown before the run is ended for players. */
+/** The longest a level's id is taken for one (Atlas's are `level_<time>_<random>`). */
+const LEVEL_ID_LENGTH = 128;
+
+/** Whether a run's `levels` (absent is fine) names only keys the run has maps for, each with an id of a level. */
+function levelsFit(run: GmCutscene): boolean {
+  const { levels } = run;
+  if (levels === undefined) return true;
+  if (typeof levels !== 'object' || levels === null || Array.isArray(levels)) return false;
+  return Object.entries(levels).every(([key, level]) => Object.hasOwn(run.maps, key) && typeof level === 'string' && level !== '' && level.length <= LEVEL_ID_LENGTH);
+}
+
 export const STEP_WAIT_MS = 10_000;
 /** The longest they wait for it in all, from the step, even when the GM's board never gets on the step's map. */
 export const STEP_BACKSTOP_MS = 30_000;
@@ -52,6 +63,8 @@ export interface CutsceneSenderOptions {
 /** One map of the run, as last projected. */
 interface Entry {
   path: string;
+  /** The level of the map this key stands for; unset is the floor Atlas shows. */
+  level?: string;
   memo: ProjectionMemo;
   scene: PlayerScene | null;
   sceneText: string;
@@ -167,7 +180,7 @@ export class CutsceneSender implements SessionHandler {
     const given = this.options.board?.cutscene?.() ?? null;
     if (!given) return null;
     const { runId } = given.cutscene;
-    if (isBoardCutscene(given.cutscene) && Object.keys(given.maps).every(isCutsceneKeyName)) return given;
+    if (isBoardCutscene(given.cutscene) && Object.keys(given.maps).every(isCutsceneKeyName) && levelsFit(given)) return given;
     if (this.invalidRun !== runId) {
       this.invalidRun = runId;
       console.warn('[Atlas VTT Connect] Tabletop published a cutscene that is not well formed; players are not sent it.');
@@ -338,14 +351,16 @@ export class CutsceneSender implements SessionHandler {
     const keys = Object.keys(run.maps).sort((a, b) => Number(b === run.cutscene.key) - Number(a === run.cutscene.key));
     for (const key of keys) {
       const path = run.maps[key]!;
+      // A key that names a level is that floor of its map, whatever floor the GM is on.
+      const level = run.levels?.[key];
       let snapshot: SceneSnapshot | null = null;
       for (const tab of this.tabsOf(path)) {
-        snapshot = tabs.liveSnapshot(tab);
+        snapshot = tabs.liveSnapshot(tab, level);
         if (snapshot) break;
       }
       if (!snapshot) continue;
       try {
-        this.project(run, key, path, snapshot, board?.lookFor(path) ?? null);
+        this.project(run, key, path, level, snapshot, board?.lookFor(path, level) ?? null);
       } catch (error) {
         console.error('[Atlas VTT Connect] Could not project a cutscene scene:', error);
       }
@@ -354,9 +369,10 @@ export class CutsceneSender implements SessionHandler {
     }
   }
 
-  private project(run: GmCutscene, key: string, path: string, snapshot: SceneSnapshot, look: ReturnType<BoardSource['lookFor']>): void {
+  private project(run: GmCutscene, key: string, path: string, level: string | undefined, snapshot: SceneSnapshot, look: ReturnType<BoardSource['lookFor']>): void {
     const known = this.entries.get(key);
-    const memo = known && known.path === path ? known.memo : createProjectionMemo();
+    const same = known !== undefined && known.path === path && known.level === level;
+    const memo = same ? known.memo : createProjectionMemo();
     const sceneId = `cutscene:${run.cutscene.runId}:${key}`;
     const { scene, sceneText, extras, fits } = projectCutscene(
       snapshot, { ...this.options.sceneOptions, assets: this.options.assets }, look, sceneId, memo, this.options.sceneBytes ?? CUTSCENE_SCENE_BYTES,
@@ -369,8 +385,8 @@ export class CutsceneSender implements SessionHandler {
     }
     const extrasText = JSON.stringify(extras);
     let entry = known;
-    if (!entry || entry.path !== path) {
-      entry = { path, memo, scene: null, sceneText: '', extras: null, extrasText: '', parts: [], seq: 0, ids: new Set() };
+    if (!entry || !same) {
+      entry = { path, ...(level !== undefined ? { level } : {}), memo, scene: null, sceneText: '', extras: null, extrasText: '', parts: [], seq: 0, ids: new Set() };
       this.entries.set(key, entry);
     }
     if (key === run.cutscene.key) this.clearGuards();

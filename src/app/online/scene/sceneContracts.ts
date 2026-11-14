@@ -53,6 +53,8 @@ export interface AssetIds {
 export interface GmCutscene {
   cutscene: BoardCutscene;
   maps: Readonly<Record<string, string>>;
+  /** The level of its map a key stands for (Atlas levels), for the keys that name one; a key without one is the floor Atlas shows. Never sent to players. */
+  levels?: Readonly<Record<string, string>>;
 }
 
 /** What the scene handlers need of the session: register a handler, send to a player, list the players. */

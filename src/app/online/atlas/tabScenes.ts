@@ -22,8 +22,11 @@ export interface TabScenes {
    * any other's. Null while every view loads or names no tab. Atlas folds every map view into one, so there is one.
    */
   liveTab(): TabKey | null;
-  /** The snapshot of `key`'s view, only while it is loaded and names `key`'s tab; null otherwise. */
-  liveSnapshot(key: TabKey): SceneSnapshot | null;
+  /**
+   * The snapshot of `key`'s view, only while it is loaded and names `key`'s tab; null otherwise. With `level`, the
+   * scene at that floor instead of the one the view shows (stock Atlas's `views.snapshot` takes it).
+   */
+  liveSnapshot(key: TabKey, level?: string): SceneSnapshot | null;
   /**
    * Whether `key` is its view's active tab: the GM is on it, its map loaded or loading. It decides only whether a scene
    * is live or parked; what is sent of it comes from `liveSnapshot`, never from this.
@@ -149,8 +152,8 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
       return found ? { ...found } : null;
     },
     liveTab,
-    liveSnapshot: (key) => {
-      const snapshot = views.snapshot(key.viewId);
+    liveSnapshot: (key, level) => {
+      const snapshot = level === undefined ? views.snapshot(key.viewId) : (views.snapshot as (viewId: ViewId, level?: string) => SceneSnapshot | null)(key.viewId, level);
       return snapshot && liveTabIn(snapshot) === key.tabId ? snapshot : null;
     },
     isActive: (key) => watched.has(key.viewId) && activeTabOf(views, key.viewId) === key.tabId,

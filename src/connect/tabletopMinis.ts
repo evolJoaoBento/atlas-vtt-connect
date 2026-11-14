@@ -191,7 +191,7 @@ export interface TabletopBoard extends BoardSource {
 }
 
 interface TabletopBoardApi {
-  boardLook(mapPath: string): unknown;
+  boardLook(mapPath: string, level?: string | null): unknown;
   onBoardChange(listener: (mapPath: string | null) => void): () => void;
   gmCamera: { camera(mapPath: string): unknown; onChange(listener: () => void): () => void };
 }
@@ -321,10 +321,10 @@ export function tabletopBoard(app: App, notify?: PairingNotify): TabletopBoard {
   bind();
   return {
     available: () => api !== null,
-    lookFor: (mapPath) => {
+    lookFor: (mapPath, level) => {
       if (!api) return null;
       try {
-        const look = api.boardLook(mapPath) as BoardLook | null;
+        const look = (level === undefined ? api.boardLook(mapPath) : api.boardLook(mapPath, level)) as BoardLook | null;
         return look && typeof look.wallHeight === 'function' ? look : null;
       } catch (error) {
         console.warn('[Atlas VTT Connect] Could not read the Tabletop board:', error);

@@ -441,3 +441,59 @@ describe('CutsceneSender', () => {
     for (const { message } of w.sent) expect(encodeControl(message)).not.toContain('.atlasmap');
   });
 });
+
+describe('CutsceneSender: a run over the levels of one scene', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const token = (id: string) => ({ id, kind: 'character', x: 140, y: 140, imagePath: 'tokens/hero.png', name: id, resources: {} });
+  /** One tab of one map; the snapshot asked for a level holds that level's token. */
+  function levelled() {
+    let current: GmCutscene | null = null;
+    const changes = new Set<() => void>();
+    const asked: Array<[string, string | undefined]> = [];
+    const looks: Array<[string, string | undefined]> = [];
+    const tabs = {
+      tabs: () => [{ viewId: 'v1', tabId: 'a', mapPath: PATHS.k1, name: 'Crypt' }],
+      liveSnapshot: (key: { tabId: string }, level?: string): SceneSnapshot | null => {
+        asked.push([key.tabId, level]);
+        return snapshotOf({ mapPath: PATHS.k1, objects: { tokens: { [level ?? 'ground']: token(level ?? 'ground') }, texts: {}, drawings: {}, fog: {} } as unknown as SceneSnapshot['objects'] });
+      },
+      isActive: () => true,
+      watch: () => () => undefined, subscribeLive: () => () => undefined, subscribeTabs: () => () => undefined,
+    } as unknown as TabScenes;
+    const board = {
+      available: () => true, lookFor: (mapPath: string, level?: string) => { looks.push([mapPath, level]); return null; }, camera: () => null,
+      subscribe: () => () => undefined, subscribeCamera: () => () => undefined, cutscene: () => current,
+      subscribeCutscene: (listener: () => void) => { changes.add(listener); return () => { changes.delete(listener); }; }, cutsceneCamera: () => null, subscribeCutsceneCamera: () => () => undefined,
+    } as unknown as BoardSource;
+    return { w: world(null, { tabs, board }), asked, looks, publish: (next: GmCutscene | null) => { current = next; for (const listener of [...changes]) listener(); } };
+  }
+
+  it("projects each key's scene at the level the key names, and asks Tabletop's look for that level", () => {
+    const published: GmCutscene = { ...run('r1', 'k1'), maps: { k1: PATHS.k1, k2: PATHS.k1 }, levels: { k2: 'level_up' } };
+    const { w, asked, looks, publish } = levelled();
+    const anna = w.addPlayer('anna');
+    publish(published);
+    w.ready(anna);
+    const scenes = w.of('anna', 'cutscene-scene') as Array<{ key: string; scene: { tokens: Record<string, unknown> } }>;
+    expect(scenes.map((message) => [message.key, Object.keys(message.scene.tokens)])).toEqual([['k1', ['ground']], ['k2', ['level_up']]]);
+    expect(asked).toContainEqual(['a', undefined]);
+    expect(asked).toContainEqual(['a', 'level_up']);
+    expect(looks).toContainEqual([PATHS.k1, undefined]);
+    expect(looks).toContainEqual([PATHS.k1, 'level_up']);
+  });
+
+  it('does not send a run whose levels name a key it has no map for, or a level that is no id', () => {
+    for (const levels of [{ k9: 'level_up' }, { k2: '' }, { k2: 7 }, { k2: 'x'.repeat(200) }, 'junk']) {
+      const published = { ...run('r1', 'k1'), levels } as unknown as GmCutscene;
+      const { w, publish } = levelled();
+      w.addPlayer('anna');
+      publish(published);
+      expect(w.of('anna', 'cutscene')).toHaveLength(0);
+      // The same run with levels that are well formed is sent.
+      publish({ ...run('r1', 'k1'), levels: { k2: 'level_up' } });
+      expect(w.of('anna', 'cutscene')).toHaveLength(1);
+    }
+  });
+});

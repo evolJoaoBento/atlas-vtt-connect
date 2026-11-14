@@ -69,7 +69,8 @@ export interface BoardPose { eye: { x: number; y: number; z: number }; target: {
 export interface BoardSource {
   /** Whether a Tabletop that shares its board is there. */
   available(): boolean;
-  lookFor(mapPath: string): BoardLook | null;
+  /** What the GM gave the map on the board, for the floor Atlas shows; with `level`, for that floor of the scene. */
+  lookFor(mapPath: string, level?: string): BoardLook | null;
   /** The GM's 3D view of the map (its players' window, else its board); null when none shows it. */
   camera(mapPath: string): BoardPose | null;
   /** Calls `listener` when Tabletop arrives or leaves, or a map's look changes; returns the stop. */

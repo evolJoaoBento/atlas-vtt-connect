@@ -69,6 +69,23 @@ describe('stock Atlas stand-in', () => {
     expect(seen).toEqual(['maps/cave.png', 'maps/cave-gridless.webp', 'maps/upper.png', 'maps/upper-large.png']);
   });
 
+  it("reads a scene at a floor that is asked for, whatever floor the view shows (a cutscene's scene at its shot's level)", () => {
+    const { app, atlas, a, presented } = setup();
+    const extension = stockAtlasApi(app, atlas).connect(fakeConnectPlugin(app));
+    const at = (level?: string) => (extension.views.snapshot as (viewId: string, level?: string) => { background?: string | null; tabId?: string | null; objects: { tokens: Record<string, unknown> } } | null)('view-a', level);
+    a.scene.set({
+      background: 'maps/ground.png', levels: [{ id: 'ground', background: null }, { id: 'upper', background: 'maps/upper.png' }], viewedLevel: 'upper',
+      objects: { tokens: { down: { id: 'down' }, up: { id: 'up', level: 'upper' } }, texts: {}, drawings: {}, fog: {} },
+    } as never);
+    expect([at()?.background, Object.keys(at()!.objects.tokens)]).toEqual(['maps/upper.png', ['up']]);
+    expect([at('ground')?.background, Object.keys(at('ground')!.objects.tokens)]).toEqual(['maps/ground.png', ['down']]);
+    expect([at('upper')?.background, Object.keys(at('upper')!.objects.tokens)]).toEqual(['maps/upper.png', ['up']]);
+    // The presented tab is held while the GM browses another floor than players see; a floor asked for by name is not.
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    expect(at()?.tabId).toBeNull();
+    expect(at('ground')?.tabId).toBe('t1');
+  });
+
   it('lists views, reads a snapshot with its tab, and follows store changes', () => {
     const { app, atlas, a } = setup();
     const extension = stockAtlasApi(app, atlas).connect(fakeConnectPlugin(app));

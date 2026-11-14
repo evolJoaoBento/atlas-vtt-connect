@@ -208,21 +208,27 @@ function mapSize(view: StockView): { width: number; height: number } {
   return sprite && !sprite.destroyed && sprite.width > 0 && sprite.height > 0 ? { width: sprite.width, height: sprite.height } : { width: 0, height: 0 };
 }
 
-function snapshot(view: StockView, presented: StockPresentedScene | null): SceneSnapshot {
+/**
+ * The view's scene as players are sent it: the floor the view shows. With `level`, that floor of the scene instead
+ * (a cutscene's scene at the level its shot names, whatever floor the GM is on): its tab is the loaded one then, never
+ * held back for the level the GM browses. Its `mapSize` stays the shown floor's image's.
+ */
+function snapshot(view: StockView, presented: StockPresentedScene | null, level?: string): SceneSnapshot {
   const state = view.atlasStore.getState();
+  const viewed = level ?? state.viewedLevel;
   return Object.freeze({
     viewId: view.viewId,
     mapPath: state.mapPath,
     loaded: loaded(state),
-    tabId: snapshotTabId(view, presented),
+    tabId: level === undefined ? snapshotTabId(view, presented) : loadedTabId(view),
     mapSize: Object.freeze(mapSize(view)),
     // A scene of several floors is sent as the one floor shown (Atlas 0.10), never all of them.
-    background: backgroundOfLevel(state.background, state.levels, state.viewedLevel),
+    background: backgroundOfLevel(state.background, state.levels, viewed),
     // How Atlas aligned that floor's map image (the grid's stretch, or the level's own alignment): players draw it so.
-    mapAlignment: effectiveAlignment(state.grid, state.levelAlignments, shownLevel(state.levels, state.viewedLevel)),
+    mapAlignment: effectiveAlignment(state.grid, state.levelAlignments, shownLevel(state.levels, viewed)),
     grid: state.grid,
     // Atlas 0.15's rooms are walls among the others: nothing to add for them.
-    objects: objectsOnLevel(state.objects, state.levels, state.viewedLevel),
+    objects: objectsOnLevel(state.objects, state.levels, viewed),
     widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,
@@ -539,9 +545,9 @@ function viewsApi(app: App, presented: StockPresentedScene | null, disposers: Se
       const [first] = mapViews(app);
       return first ? viewInfo(first) : null;
     },
-    snapshot: (viewId: string): SceneSnapshot | null => {
+    snapshot: (viewId: string, level?: string): SceneSnapshot | null => {
       const view = trackedView(app, viewId);
-      return view ? snapshot(view, presented) : null;
+      return view ? snapshot(view, presented, level) : null;
     },
     subscribe: (viewId: string, listener: (snapshot: SceneSnapshot) => void): Disposer => {
       const view = trackedView(app, viewId);
