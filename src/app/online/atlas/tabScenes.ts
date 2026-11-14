@@ -154,8 +154,8 @@ export function createTabScenes(atlas: TabsAtlas): TabScenes {
     liveTab,
     liveSnapshot: (key, level) => {
       // Stock Atlas's snapshot takes the floor asked for; an Atlas whose own does not gives the floor it shows.
-      const read: (viewId: ViewId, level?: string) => SceneSnapshot | null = views.snapshot;
-      const snapshot = read.call(views, key.viewId, level);
+      const stock = views as unknown as { snapshot(viewId: ViewId, level?: string): SceneSnapshot | null };
+      const snapshot = level === undefined ? views.snapshot(key.viewId) : stock.snapshot(key.viewId, level);
       return snapshot && liveTabIn(snapshot) === key.tabId ? snapshot : null;
     },
     isActive: (key) => watched.has(key.viewId) && activeTabOf(views, key.viewId) === key.tabId,
