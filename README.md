@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.5.0 (the same fusion release).
+**Compatible with Atlas VTT 0.15.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.6.0 (the same fusion release).
 
 Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
@@ -109,15 +109,15 @@ Connect remembers who you gave each token to, by the player's name, and gives it
 </tr>
 <tr>
 <td><b>Measure.</b> Line, cone or circle, in the GM's units, snapping to the grid. It stays two seconds.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/23-measure.gif" alt="Measure"></td>
-<td><b>Templates.</b> Line, Circle/Sphere, Square/Cube or Cone, with its size. Tap one of yours to remove it.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/26-templates.gif" alt="Templates"></td>
+<td><b>Templates.</b> Line, Circle/Sphere, Square/Cube or Cone, with its size. Tap yours to remove it. It is kept as one of Atlas's own areas on your GM's map (shaped and snapped as Atlas does: a square from the middle of its near side, a line one square wide), so it needs the GM's Atlas to be on that map.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/26-templates.gif" alt="Templates"></td>
 </tr>
 <tr>
 <td><b>Laser.</b> Draw to point; everyone sees it, the GM too.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/24-laser.gif" alt="Laser"></td>
 <td><b>Ping.</b> Tap the map: rings show there for everyone.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/25-ping.gif" alt="Ping"></td>
 </tr>
 <tr>
-<td><b>Clear my templates</b> in the template menu removes all of yours (you can keep up to 10).<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/27-clear-my-templates.gif" alt="Clear my templates"></td>
-<td><b>GM side:</b> each player template has a <b>×</b> on your map; <b>Clear players' templates</b> (command palette) removes them all.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/28-gm-erase-template.gif" alt="GM erases templates"></td>
+<td><b>Clear my templates</b> in the template menu removes yours (you have one template at a time: placing another takes its place).<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/27-clear-my-templates.gif" alt="Clear my templates"></td>
+<td><b>GM side:</b> a player's template is an area on your Atlas map like your own (remove it there, or undo it); <b>Clear players' templates</b> (command palette) removes them all. Areas and rulers you keep in Atlas, and kept spells, show to your players too, unless you hide them.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/28-gm-erase-template.gif" alt="GM erases templates"></td>
 </tr>
 </table>
 
