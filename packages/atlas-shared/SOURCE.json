@@ -1,8 +1,12 @@
 {
   "repository": "atlas-vtt/atlas-vtt",
-  "tag": "0.15.0",
-  "commit": "1a858783e6a81acbd78145251db8448a5b3b628b",
+  "tag": "0.16.0",
+  "commit": "32cebd1adce7aa28ff3cf335a8e256b0e7da3a45",
   "files": {
+    "src/app/annotations/annotationFit.ts": "8ea3b5221956f77a60d4d5a99f795a02ba6c8f9c7474e7767198d36b6fdc8774",
+    "src/app/annotations/annotationList.ts": "b4157a569ba0d8fe4c98802bf34157be1b6628b811db76679d81d53c24d5cac7",
+    "src/app/annotations/annotationTypes.ts": "12c331b49fc802011c4f9b5ecd833a87e99bb956335caf915165c4a782355666",
+    "src/app/annotations/drawSizes.ts": "412fdc2f406daf3acec9086788c7daebc38cd32d31bc4e411cb0469e8b07d28c",
     "src/app/characters/playerTokens.ts": "1af1951ad099d7c86b19713214b89cfd5c24bb1242acaedf5ca3eab8713d0ffc",
     "src/app/gameSystems/diceRules.ts": "142ea29388b77c7c6b87d72871b5f80445da92ca14362d7089b9c426c8914aa3",
     "src/app/gameSystems/diceSets.ts": "bfa24c360007952824658a5b082632e8cc4ecd128eca934475f8564fe59df01f",
@@ -52,8 +56,9 @@
     "src/app/types/initiativeRulesTypes.ts": "275ed9af0124949e203ea7961cafeb00fe7967ab66c66d15bdd4cda215e00455",
     "src/app/types/initiativeTypes.ts": "6406ac9939375b6f381ed6bf53fb102df32a7ed0dd67083bac09f6c205e3709b",
     "src/app/types/pinIconPaths.ts": "6ebf997a7d30fbc9cd6df2aa3604425ab03abb9041b7ae13200b8d6d2274bf2c",
-    "src/app/types/pinIcons.ts": "9fc8af4df999d02103ecb29ccaaa95b63355b4d10f2811329bcd99bafb90794d",
+    "src/app/types/pinIcons.ts": "7bb3d2cc7acb3247ffdb64aa99293b24a5e4973e6485f925049cf0b5ba2fd1d0",
     "src/app/types/sceneLevelTypes.ts": "fba694d6ee48ecf0f2e39fb88c40ffcc4080a2425d604207f56da041a0f6a2d3",
+    "src/app/utils/guards.ts": "af78063eb349833a8a26a5fb34c8627342a914278089bc999d92a57b97df362a",
     "src/app/utils/hexColor.ts": "dba01c8dbf894a30193ec6e34908dfca2909e64189264e5dc40d97fdf52d5b4f"
   },
   "stubs": {
@@ -62,7 +67,7 @@
     "src/app/grid/mapStretchObjects.ts": "62ac42663bec920d5465e743d1f274b017eb8de5a6014490f50be8cd97dba0fb",
     "src/app/statblocks/model/roleTypes.ts": "ae2355672c404cc867b28f8736db2c9234455d3d14771efc35e775b93d1f4c97",
     "src/app/tools/diceFormula.ts": "f74175c6f9a0133a35443c8aaed9057484b18297b301cd826c4beeaceb905869",
-    "src/app/types.ts": "03ae07d8c74aa215c5cfbe526e9910bb333cbe787bd66d9ae0cebbd9a9a17f8b",
+    "src/app/types.ts": "4ddfe5132c97e36c538dcd7a5a0316c8624fb4be00e7b7f20f5d3506e9d55f5d",
     "src/app/types/creatureFilterTypes.ts": "839a3b59efc9027e5d6e8e54edd020727c3f40445ce266ba2224e0541d0d5339",
     "src/app/types/lightPresetTypes.ts": "98829dbea2aa32983d196a77145a96b6d6c8005a69a8bf2ec988be3c08bf49ce",
     "src/app/types/lightingTypes.ts": "329f659038133feb9910a870f885367c294a71e4aa730f5aa2f5e5ad3e92faac",

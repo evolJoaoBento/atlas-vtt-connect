@@ -178,3 +178,7 @@ export { MEASURE_EFFECTS, readMeasureEffect, type MeasureEffect } from './app/me
 export { snapAreaEnd, snapAreaOrigin, snapRulerPoint } from './app/measure/measureSnap';
 export { MAX_MEASURES, MAX_MEASURE_AUTHOR, MEASURE_SHAPES, type KeptMeasure, type Measurement, type MeasureShapeKind } from './app/measure/measureTypes';
 export { DEFAULT_AREA_CELL_RULE, DEFAULT_CONE_END, type AreaCellRule, type ConeEnd } from './app/measure/areaRules';
+
+// ── Drawings and texts (Atlas 0.16's reader): what is drawn, how, and what is kept from players ──────────────
+export { annotationList, annotationOrder, readDrawing, readText, type AnnotationRecords } from './app/annotations/annotationList';
+export type { Annotation, DrawingAnnotation, DrawDash, DrawEnds, DrawFill, DrawLayer, DrawShape, TextAnnotation, TextLook } from './app/annotations/annotationTypes';

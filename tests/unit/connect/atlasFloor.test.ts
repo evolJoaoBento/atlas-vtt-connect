@@ -36,9 +36,14 @@ describe('the Atlas version floor', () => {
     expect(pairingNotice('1.4.0', null)).toBe('Tabletop for Atlas VTT 1.4.0 and Connect for Atlas VTT unknown do not match: update both to the same release.');
   });
 
-  it('is the tag atlas-shared is copied from', () => {
+  // The shared rules may come from a newer Atlas than the floor (0.16's reader of drawings reads 0.15's records too), never an older one.
+  it('is no newer than the tag atlas-shared is copied from', () => {
     const source = JSON.parse(readFileSync(path.resolve(__dirname, '../../../packages/atlas-shared/SOURCE.json'), 'utf8')) as { tag: string };
-    expect(MIN_ATLAS_VERSION).toBe(source.tag);
+    const parts = (version: string): number[] => version.split('.').map(Number);
+    const [floor, tag] = [parts(MIN_ATLAS_VERSION), parts(source.tag)];
+    const newer = tag[0]! - floor[0]! || tag[1]! - floor[1]! || tag[2]! - floor[2]!;
+    expect(MIN_ATLAS_VERSION).toBe('0.15.0');
+    expect(newer).toBeGreaterThanOrEqual(0);
   });
 
   it('watchAtlasFloor tells of a reloaded or changed Atlas, and of nothing else', () => {

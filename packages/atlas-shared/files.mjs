@@ -1,7 +1,12 @@
 // The stock Atlas VTT files copied verbatim into packages/atlas-shared/src/app, relative to Atlas's src/app.
 // To add one: list it here, run `npm run sync:shared -- --atlas <checkout>`, and export what is needed from src/index.ts.
-export const ATLAS_TAG = '0.15.0';
+export const ATLAS_TAG = '0.16.0';
 export const FILES = [
+  // Atlas 0.16's reader of drawings and texts: what is drawn, what is hidden from players, what is passed over.
+  'annotations/annotationFit.ts',
+  'annotations/annotationList.ts',
+  'annotations/annotationTypes.ts',
+  'annotations/drawSizes.ts',
   'characters/playerTokens.ts',
   'gameSystems/diceRules.ts',
   'gameSystems/diceSets.ts',
@@ -53,6 +58,7 @@ export const FILES = [
   'types/pinIconPaths.ts',
   'types/pinIcons.ts',
   'types/sceneLevelTypes.ts',
+  'utils/guards.ts',
   'utils/hexColor.ts',
 ];
 
