@@ -236,6 +236,17 @@ describe('projectBoard', () => {
       expect(isBoardExtras(extras)).toBe(true);
     });
 
+    it("a level Atlas fitted to the scene's grid goes with its fit, and a fit that is none is refused", () => {
+      const fit = { x: 0.7, y: 0.7, offset: { x: 200, y: 100 } };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [{ ...upstairs, grid: { ...upstairs.grid, mapStretch: fit } }] }, assets);
+      expect(extras.layers![0]!.grid).toEqual({ size: 70, offsetX: 5, offsetY: 6, mapStretch: fit });
+      expect(isBoardExtras(extras)).toBe(true);
+      for (const junk of [{ x: 0, y: 1 }, { x: 1, y: 'a' }, { x: 1, y: 1, rotation: 30 }, { x: 1, y: 1, offset: { x: -5, y: 0 } }, { x: 1e6, y: 1 }]) {
+        const bad = projectBoard(state([]), 's1', all, {}, { ...look, layers: [{ ...upstairs, grid: { ...upstairs.grid, mapStretch: junk as never } }] }, assets);
+        expect(isBoardExtras(bad), JSON.stringify(junk)).toBe(false);
+      }
+    });
+
     it('a stacked scene goes with its water, as outlines', () => {
       const water = { areas: [{ polygon: [0, 0, 0, 70, 70, 70] }], motion: { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 } };
       const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [{ ...upstairs, water }] }, assets);

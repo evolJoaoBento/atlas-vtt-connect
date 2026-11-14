@@ -92,11 +92,19 @@ function isWater(value: unknown, longest: number): boolean {
     && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity));
 }
 
+/** A level's fit as Atlas keeps it: positive factors (a scale may be under one), a turn of at most five degrees, an offset of the corner never left of or above it. */
+function isFit(value: unknown): boolean {
+  if (!isFields(value) || !isNumber(value.x) || !isNumber(value.y) || !(value.x > 0 && value.x <= 40) || !(value.y > 0 && value.y <= 40)) return false;
+  if (value.rotation !== undefined && !(isNumber(value.rotation) && Math.abs(value.rotation) <= 5)) return false;
+  const { offset } = value;
+  return offset === undefined || (isFields(offset) && isNumber(offset.x) && isNumber(offset.y) && offset.x >= 0 && offset.y >= 0 && offset.x <= 1e7 && offset.y <= 1e7);
+}
+
 function isLayer(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.id) || !isNumber(value.elevation) || !isSceneId(value.image)) return false;
   const { stands, grid } = value;
   return isFields(stands) && isNumber(stands.x) && isNumber(stands.y) && isNumber(stands.turn)
-    && isFields(grid) && isNumber(grid.size) && grid.size > 0 && isNumber(grid.offsetX) && isNumber(grid.offsetY)
+    && isFields(grid) && isNumber(grid.size) && grid.size > 0 && isNumber(grid.offsetX) && isNumber(grid.offsetY) && (grid.mapStretch === undefined || isFit(grid.mapStretch))
     && isList(value.walls, BOARD_LAYER_LIMITS.walls, isWall) && isList(value.lights, BOARD_LAYER_LIMITS.lights, isLight) && isList(value.props, BOARD_LAYER_LIMITS.props, isProp)
     && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
     && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.layer));
