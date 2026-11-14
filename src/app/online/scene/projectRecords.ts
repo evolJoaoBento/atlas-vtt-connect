@@ -160,8 +160,11 @@ function textOnWire(text: TextElement, x: number, y: number): PlayerText {
   };
 }
 
+/** Atlas 0.16: a drawing or text the GM hid from players (`hidden: true`, the only value Atlas reads as hidden). Never sent. */
+const hiddenFromPlayers = (record: object): boolean => (record as { hidden?: unknown }).hidden === true;
+
 export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, visible: Shows): Record<string, PlayerText> {
-  return projectRecord(texts, (text) => projectText(text, visible));
+  return projectRecord(texts, (text) => (hiddenFromPlayers(text) ? null : projectText(text, visible)));
 }
 
 /** A drawing's shape with its points simplified; null without points. Fog is checked by the caller. */
@@ -187,6 +190,7 @@ export function projectDrawings(
 ): Record<string, PlayerDrawing> {
   // The drawing as players draw it (its simplified points, its clamped width) must be shown whole.
   return projectRecord(drawings, (stroke) => {
+    if (hiddenFromPlayers(stroke)) return null;
     const drawing = memoized(memo.drawings, stroke, projectDrawingShape);
     return drawing && visible.shows(drawingBounds(drawing)) ? drawing : null;
   });
