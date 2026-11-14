@@ -57,7 +57,14 @@ function listOf(state: Rec): KeptRecord[] {
   return kept;
 }
 
-export function stockMeasuresApi(deps: { view(viewId: string): MeasureStoreView | null }): StockMeasures {
+export function stockMeasuresApi(deps: {
+  view(viewId: string): MeasureStoreView | null;
+  /**
+   * The level of the view's map that players are shown (the presented scene's, which the GM may not be looking at):
+   * a measure kept for a player lands there. Null or undefined (no levels, nobody knows): Atlas places it as its own.
+   */
+  playersLevel?(viewId: string): string | null | undefined;
+}): StockMeasures {
   return {
     list: (viewId, mapPath) => {
       const state = heldState(deps.view(viewId), mapPath);
@@ -71,7 +78,10 @@ export function stockMeasuresApi(deps: { view(viewId: string): MeasureStoreView 
       const writes: MeasureWrites = {
         list: () => listOf(now()),
         add: (record) => {
-          const id = (now().addMeasure as (data: MeasureRecord) => unknown)(record);
+          // Atlas would keep it on the level the GM looks at, which need not be the one the players have.
+          const level = deps.playersLevel?.(viewId);
+          const placed = typeof level === 'string' && level !== '' && (record as { level?: unknown }).level === undefined ? { ...record, level } : record;
+          const id = (now().addMeasure as (data: MeasureRecord) => unknown)(placed);
           return typeof id === 'string' ? id : null;
         },
         update: (id, changes) => { (now().updateMeasure as ((id: string, changes: object) => void) | undefined)?.(id, changes); },

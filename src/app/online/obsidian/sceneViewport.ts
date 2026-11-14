@@ -19,7 +19,7 @@ export interface SceneViewport {
   setGmCamera(camera: SceneCamera | null): void;
   setControlled(tokenIds: readonly string[]): void;
   setConnected(connected: boolean): void;
-  moveRefused(tokenId: string, reason?: 'not-held'): void;
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void;
   setPaused(paused: boolean): void;
   selectTool(tool: PlayerTool): void;
   followGm(): void;

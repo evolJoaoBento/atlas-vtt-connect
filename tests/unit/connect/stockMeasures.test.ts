@@ -26,6 +26,20 @@ function fakeView(mapPath: string, over: Record<string, unknown> = {}) {
 }
 
 describe("measures on a stock Atlas's store", () => {
+  it("keeps a player's measure on the level the players are shown, not the one the GM happens to browse", () => {
+    const { view, measures } = fakeView('maps/a.atlasmap');
+    const shown: { level: string | null | undefined } = { level: 'upper' };
+    const api = stockMeasuresApi({ view: () => view, playersLevel: () => shown.level });
+    api.write('v1', 'maps/a.atlasmap', (store) => store.add({ shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }] }));
+    expect(measures.m1).toMatchObject({ level: 'upper' });
+    // A scene without levels, or a level nobody knows: Atlas places it as it places its own.
+    for (const level of [null, undefined]) {
+      shown.level = level;
+      const id = api.write('v1', 'maps/a.atlasmap', (store) => store.add({ shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }] })) as string;
+      expect('level' in measures[id]!).toBe(false);
+    }
+  });
+
   it('writes inside one history transaction, on the map the view holds', () => {
     const { view, measures, log } = fakeView('maps/a.atlasmap');
     const api = stockMeasuresApi({ view: (id) => (id === 'v1' ? view : null) });

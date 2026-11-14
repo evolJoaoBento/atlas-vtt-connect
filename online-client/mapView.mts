@@ -241,7 +241,7 @@ export class MapView {
   }
 
   /** The GM refused a move of this token. */
-  moveRefused(tokenId: string, reason?: 'not-held'): void {
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void {
     this.moves.refused(tokenId, reason);
   }
 

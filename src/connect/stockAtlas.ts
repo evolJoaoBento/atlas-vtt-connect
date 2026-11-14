@@ -882,7 +882,17 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         }),
         // Atlas 0.15's kept measures, written through its own store: where players' templates and spells are kept. The
         // extension API has no such namespace.
-        measures: stockMeasuresApi({ view: (viewId) => trackedView(app, viewId) }),
+        measures: stockMeasuresApi({
+          view: (viewId) => trackedView(app, viewId),
+          // What the players of a presented tab see is the presented scene's level, even while the GM browses another floor.
+          playersLevel: (viewId) => {
+            const view = trackedView(app, viewId);
+            if (!view) return undefined;
+            const state = view.atlasStore.getState();
+            const scene = atlasPlugin.presentedScene?.get() ?? null;
+            return shownLevel(state.levels, scene && scene.tabId === loadedTabId(view) ? scene.levelId : state.viewedLevel);
+          },
+        }),
         tokens: stockTokensApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,

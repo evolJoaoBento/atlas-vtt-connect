@@ -73,7 +73,7 @@ export interface PlayerSessionOptions {
   /** The tokens this player may move: the GM's latest `token-control` list; empty once the session is over. */
   onControl?(tokenIds: readonly string[]): void;
   /** The GM refused this player's move of the token; `reason` where the GM gave one (`not-held`: its Atlas is on another map). */
-  onMoveRefused?(tokenId: string, reason?: 'not-held'): void;
+  onMoveRefused?(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
@@ -420,8 +420,8 @@ export class PlayerSession {
         this.marks.flash(message.sceneId, message.cast);
         break;
       case 'map-refused':
-        // The GM's Atlas is on another map: said as a refused move is. The other reasons (a limit) stay silent, as they always were.
-        if (message.reason === 'not-held') this.options.onMoveRefused?.('', 'not-held');
+        // Said as a refused move is, with the reason's own words: Atlas is on another map, a limit, a full level.
+        this.options.onMoveRefused?.('', message.reason);
         break;
       case 'pin-note':
         this.options.onPinNote?.({ sceneId: message.sceneId, pinId: message.pinId, note: message.note });

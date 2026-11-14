@@ -327,7 +327,7 @@ function isMeasureExtra(value: unknown): boolean {
   return (extra.rules === undefined || isSpellRules(extra.rules)) && (extra.about === undefined || isSpellAbout(extra.about));
 }
 
-function isPlayerMeasure(value: unknown): boolean {
+export function isPlayerMeasure(value: unknown): boolean {
   if (!isFields(value) || !oneOf(PLAYER_MEASURE_SHAPES)(value.shape) || !Array.isArray(value.points)) return false;
   const most = value.shape === 'ruler' ? SCENE_LIMITS.measurePoints : 2;
   if (value.points.length < 2 || value.points.length > most || !value.points.every((point) => isPoint(point))) return false;

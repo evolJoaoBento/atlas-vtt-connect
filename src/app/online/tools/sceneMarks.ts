@@ -23,6 +23,8 @@ export class SceneMarks {
   private sceneId: string | null = null;
   private measures: Readonly<Record<string, PlayerMeasure>> | null = null;
   private kept: MapSpell[] = [];
+  /** The scene's tokens the lists were last worked out with, while a measure follows one (null while none does). */
+  private tokens: PlayerScene['tokens'] | null = null;
   /** The asks last sent, by scene: those of a scene the player is not on wait for it. */
   private readonly asked = new Map<string, readonly SpellRequest[]>();
   private readonly flashes: Array<{ cast: MapSpell; timer: number }> = [];
@@ -34,12 +36,16 @@ export class SceneMarks {
     const moved = scene?.sceneId !== this.sceneId;
     if (moved) this.dropFlashes();
     this.sceneId = scene?.sceneId ?? null;
-    if (!scene) { this.measures = null; this.kept = []; return; }
-    if (!moved && scene.measures === this.measures) return;
+    if (!scene) { this.measures = null; this.tokens = null; this.kept = []; return; }
+    // Read again when the measures changed, and, while one follows a token (an aura, a spell on its caster), when the tokens did.
+    if (!moved && scene.measures === this.measures && (this.tokens === null || scene.tokens === this.tokens)) return;
     this.measures = scene.measures;
-    this.kept = spellsOfMeasures(scene.measures);
+    this.tokens = Object.values(scene.measures).some((measure) => measure.aura) ? scene.tokens : null;
+    const tokens = scene.tokens;
+    const tokenAt = (id: string): { x: number; y: number } | null => (Object.hasOwn(tokens, id) ? { x: tokens[id]!.x, y: tokens[id]!.y } : null);
+    this.kept = spellsOfMeasures(scene.measures, { tokenAt });
     const cell = scene.grid?.size ?? scene.map.cellSize;
-    this.sink.templates(scene.sceneId, templatesOfMeasures(scene.measures, { cell, accent: MEASURE_ACCENT_COLOR }));
+    this.sink.templates(scene.sceneId, templatesOfMeasures(scene.measures, { cell, accent: MEASURE_ACCENT_COLOR, tokenAt }));
     this.tellSpells();
   }
 

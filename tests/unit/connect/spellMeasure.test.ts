@@ -83,6 +83,19 @@ describe('a spell as an Atlas measure, and back', () => {
     close(measureToSpell({ ...wall, width: 40 })!.spell.size, 40);
   });
 
+  it('a spell with no size to speak of, or numbers that are none, is still a measure of two places apart: nothing throws', () => {
+    for (const odd of [{ size: 1e-10 }, { size: 0 }, { size: Number.NaN }, { at: { x: Number.NaN, y: 0, h: 0 } }, { yaw: Number.POSITIVE_INFINITY }]) {
+      for (const shape of ['sphere', 'cube', 'cone', 'cylinder', 'wall'] as const) {
+        const spell = { shape, from: 'point' as const, at: { x: 100, y: 100, h: 0 }, ...(shape === 'wall' ? { to: { x: 100, y: 100 } } : {}), yaw: 0, pitch: 0, roll: 0, size: 70, length: 70, angle: 1, ...odd };
+        const measure = spellToMeasure(spell);
+        const [a, b] = measure.points;
+        expect(Number.isFinite(a!.x) && Number.isFinite(a!.y) && Number.isFinite(b!.x) && Number.isFinite(b!.y)).toBe(true);
+        expect(Math.hypot(b!.x - a!.x, b!.y - a!.y)).toBeGreaterThan(1e-6);
+        expect(() => measureToSpell(JSON.parse(JSON.stringify(measure)) as never)).not.toThrow();
+      }
+    }
+  });
+
   it('reads no spell from a measure that carries none, or junk', () => {
     const good = spellToMeasure(spell({}));
     const extra = good.tabletop as Record<string, unknown>;

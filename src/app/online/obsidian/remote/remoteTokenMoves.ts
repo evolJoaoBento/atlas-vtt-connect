@@ -80,7 +80,7 @@ export class RemoteTokenMoves {
   }
 
   /** The GM refused the move: the token goes back, and the notice shows for a while. */
-  refused(tokenId: string, reason?: MoveRefusedReason): void {
+  refused(tokenId: string, reason?: MoveRefusedReason | 'limit' | 'full'): void {
     this.settle(tokenId);
     // Intended (the brief): Atlas already returned the dropped token, so this ends any drag the player began since.
     this.options.cancelDrag();

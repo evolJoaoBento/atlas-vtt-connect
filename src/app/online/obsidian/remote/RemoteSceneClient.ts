@@ -167,7 +167,7 @@ export class RemoteSceneClient implements OnlineSceneSink {
     this.feedPlayer();
   }
 
-  moveRefused(tokenId: string, reason?: 'not-held'): void {
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void {
     if (!this.disposed) this.moves.refused(tokenId, reason);
   }
 

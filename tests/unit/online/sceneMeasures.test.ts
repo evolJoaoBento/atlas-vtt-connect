@@ -17,9 +17,22 @@ describe("a scene's measures as the page and the board draw them", () => {
     cast: { ...sent(spellToMeasure(spell, { owner: 'p2', color: '#3366ff', name: 'Fireball', rules: { difficult: true } })), owner: 'p2' },
   };
 
-  it('an aura is left out: it lies around its token, not where its points were last written', () => {
+  it('a measure that follows a token lies around that token, not where its points were last written; with no such token it is not drawn', () => {
     const aura: PlayerMeasure = { shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }], aura: { token: 't1', reach: 10 } };
+    const tokenAt = (id: string) => (id === 't1' ? { x: 500, y: 300 } : null);
     expect(templatesOfMeasures({ aura }, { cell: 70, accent: '#7c5cff' })).toEqual([]);
+    expect(templatesOfMeasures({ aura }, { cell: 70, accent: '#7c5cff', tokenAt })).toMatchObject([{ start: { x: 500, y: 300 }, end: { x: 570, y: 300 } }]);
+    // A spell the GM made follow its caster (Spirit Guardians) goes with the token in 3D too.
+    const guardians: PlayerMeasure = { ...sent(spellToMeasure({ ...spell, at: { x: 0, y: 0, h: 0 } })), aura: { token: 't1', reach: 10 } };
+    const [cast] = spellsOfMeasures({ guardians }, { tokenAt });
+    expect([Math.round(cast!.spell.at.x), Math.round(cast!.spell.at.y)]).toEqual([500, 300]);
+    expect(spellsOfMeasures({ guardians })).toEqual([]);
+  });
+
+  it('a spell that no longer reads as one is drawn flat, as the area its points say', () => {
+    const broken = { shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }], tabletop: { v: 1, kind: 'spell' } } as PlayerMeasure;
+    expect(spellsOfMeasures({ broken })).toEqual([]);
+    expect(templatesOfMeasures({ broken }, { cell: 70, accent: '#7c5cff' }).map((template) => template.kind)).toEqual(['area']);
   });
 
   it('every area is a flat template: its shape, its two points, its colour, its maker, a line with its width', () => {

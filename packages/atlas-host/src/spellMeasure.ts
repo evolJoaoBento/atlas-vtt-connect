@@ -178,7 +178,13 @@ function flatOf(spell: SpellLike): { shape: MeasureRecord['shape']; points: [Flo
 /** The measure a spell is kept as: its flat reading for Atlas and the 2D views, and the `tabletop` field its 3D shape is read back from. */
 export function spellToMeasure(spell: SpellLike, meta: SpellMeta = {}): MeasureRecord {
   const flat = flatOf(spell);
-  const frame = frameOf(flat.points)!;
+  let frame = frameOf(flat.points);
+  if (!frame) {
+    // A spell with no size to speak of, or numbers that are none: still two places apart, one pixel, where it is.
+    const origin = { x: Number.isFinite(spell.at.x) ? spell.at.x : 0, y: Number.isFinite(spell.at.y) ? spell.at.y : 0 };
+    flat.points = [origin, { x: origin.x + 1, y: origin.y }];
+    frame = { origin, span: 1, angle: 0 };
+  }
   const cos = Math.cos(frame.angle);
   const sin = Math.sin(frame.angle);
   const local = (point: FloorPoint): [number, number] => {

@@ -59,6 +59,8 @@ function extraFor(measure: Rec, seen: (tokenId: string) => boolean): TabletopExt
   const words = name !== undefined ? cutCastWords({ name, ...(about !== undefined ? { about: about as never } : {}) }) : {};
   return {
     ...rest,
+    // Never longer than an id the players' scene takes (a field edited by hand must not spoil the whole scene).
+    ...(rest.owner !== undefined ? { owner: rest.owner.slice(0, SCENE_LIMITS.idLength) } : {}),
     ...(isDamageType(effect) ? { effect } : {}),
     ...(caster !== undefined && seen(caster) ? { caster } : {}),
     ...(isSpellRules(rules) ? { rules: cleanRules(rules) } : {}),

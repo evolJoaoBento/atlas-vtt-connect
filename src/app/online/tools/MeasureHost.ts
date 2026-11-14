@@ -56,6 +56,9 @@ interface PendingAsk extends SpellRequest {
 /** A cast's words as they arrive: a name, and the spell's words where it has them. */
 type Words = { name: string; about?: SpellAbout } | undefined;
 
+/** The id of a spell that only went off (`flash`): never one of Atlas's measure ids. */
+const FLASH_ID = /^f\d+$/;
+
 export class MeasureHost implements SessionHandler {
   private readonly limit = new RateLimit(TEMPLATE_LIMITS.perSecond);
   private readonly spellLimit = new RateLimit(SPELL_LIMITS.perSecond);
@@ -217,6 +220,8 @@ export class MeasureHost implements SessionHandler {
       return;
     }
     const mine = (measure: KeptRecord): boolean => measureKind(measure) === 'spell' && readExtra(measure)?.owner === player.playerId;
+    // A player's board takes its own instantaneous spell off a moment after the cast: it was kept nowhere, so there is nothing to write (or to refuse).
+    if (typeof message.remove === 'string' && FLASH_ID.test(message.remove)) return;
     if (message.remove !== undefined || message.clear === true) {
       this.write(player, slot, 'spell', (store) => {
         for (const measure of store.list()) if (mine(measure) && (message.clear === true || measure.id === message.remove)) store.remove(measure.id);

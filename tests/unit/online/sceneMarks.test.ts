@@ -40,6 +40,23 @@ describe("what a player's views draw of a scene's measures", () => {
     expect([w.templates.length, w.spells.length]).toEqual([2, 2]);
   });
 
+  it('what follows a token is worked out again when the tokens move, and nothing is when no measure follows one', () => {
+    const w = world();
+    const aura: PlayerMeasure = { shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }], aura: { token: 't1', reach: 10 } };
+    const token = (x: number) => ({ t1: { ...Object.values(playerScene().tokens)[0]!, x, y: 300 } });
+    const first = playerScene({ measures: { aura }, tokens: token(500) as never });
+    w.marks.scene(first);
+    expect(w.templates.at(-1)![1]).toMatchObject([{ start: { x: 500, y: 300 } }]);
+    w.marks.scene({ ...first, tokens: token(640) as never });
+    expect(w.templates.at(-1)![1]).toMatchObject([{ start: { x: 640, y: 300 } }]);
+    // Nothing follows a token: tokens moving asks for no new list.
+    const plain = playerScene({ measures: { area }, tokens: token(640) as never });
+    w.marks.scene(plain);
+    const count = w.templates.length;
+    w.marks.scene({ ...plain, tokens: token(700) as never });
+    expect(w.templates.length).toBe(count);
+  });
+
   it("carries the GM's asks with the spells, for the scene they are for", () => {
     const w = world();
     w.marks.scene(playerScene({ measures: { kept } }));

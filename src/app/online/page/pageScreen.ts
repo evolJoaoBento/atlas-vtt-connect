@@ -24,6 +24,10 @@ export const NO_CANVAS_TEXT = "This browser can't draw the map. Try another brow
 export const STALE_PAGE_TEXT = 'This table needs the updated player page';
 /** A move refused because the GM's Atlas holds another map just now. */
 export const NOT_HELD_TEXT = "The GM's Atlas is on another map; try again in a moment.";
+/** A spell or a template refused because the player, or the scene, has as many as it may. */
+export const LIMIT_TEXT = 'No more spells or templates here: remove one first.';
+/** A spell or a template refused because the map's level holds as many areas as Atlas keeps. */
+export const FULL_TEXT = 'This map holds no more areas: ask your GM to clear some.';
 
 const DENIED_TEXT = 'The GM did not let you in.';
 const UNREACHABLE_TEXT = "Couldn't connect. Check the link, or your GM may need to add a relay server in Atlas settings.";

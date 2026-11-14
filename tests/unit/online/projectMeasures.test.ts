@@ -3,6 +3,8 @@ import { spellToMeasure, templateToMeasure, type SpellLike } from '../../../pack
 import { decodeControl } from '../../../src/app/online/protocol';
 import { MEASURE_BUDGET_BYTES, projectMeasures } from '../../../src/app/online/scene/projectMeasures';
 import { byteLength } from '../../../src/app/online/scene/sceneMessages';
+import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneLimits';
+import { isPlayerMeasure } from '../../../src/app/online/scene/sceneValidation';
 import { diffScenes, applyPatch } from '../../../src/app/online/scene/sceneDiff';
 import { playerScene } from './sceneFixtures';
 
@@ -111,5 +113,15 @@ describe('measures on the wire', () => {
       { ...measure, tabletop: { ...(extra as object), rules: { wall: 'yes' } } }, { ...measure, tabletop: { ...(extra as object), about: { text: 5 } } },
     ];
     for (const each of bad) expect(patch({ m: each }).kind, JSON.stringify(each)).toBe('invalid');
+  });
+});
+
+describe('what is sent passes the scene\'s own check', () => {
+  it("an owner longer than a player's id is cut, so one hand-edited measure cannot spoil the players' scene", () => {
+    const long = 'p'.repeat(200);
+    const kept = { ...JSON.parse(JSON.stringify(spellToMeasure({ shape: 'sphere', from: 'point', at: { x: 0, y: 0, h: 0 }, yaw: 0, pitch: 0, roll: 0, size: 70, length: 0, angle: 1 }, { owner: long }))), id: 'm1' };
+    const sent = projectMeasures({ m1: kept }, seeAll);
+    expect(sent.m1!.owner).toBe(long.slice(0, SCENE_LIMITS.idLength));
+    expect(isPlayerMeasure(sent.m1)).toBe(true);
   });
 });

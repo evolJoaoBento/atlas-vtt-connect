@@ -79,6 +79,17 @@ describe("players' spells are kept in Atlas's measures", () => {
     ]);
   });
 
+  it('an instantaneous spell taken off again by its board is no write: nothing is refused, though Atlas holds another map', () => {
+    const away = measureWorld();
+    away.hold('maps/other.atlasmap');
+    away.send(ANA, cast({ name: 'Fireball', about: instant }));
+    const flash = away.lastOf('p2', 'spell-flash')!;
+    away.tick();
+    // The player's board takes its own instantaneous spell off a moment after the cast.
+    away.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', remove: (flash.cast as { id: string }).id });
+    expect(away.sent.filter(([, m]) => m.type === 'map-refused')).toEqual([]);
+  });
+
   it("a player takes off their own spells, never another's", () => {
     const w = measureWorld();
     w.send(ANA, cast());

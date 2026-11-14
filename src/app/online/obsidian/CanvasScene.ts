@@ -317,7 +317,7 @@ export class CanvasScene implements OnlineSceneSink {
     this.showEyes();
   }
 
-  moveRefused(tokenId: string, reason?: 'not-held'): void {
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void {
     this.map?.moveRefused(tokenId, reason);
   }
 
