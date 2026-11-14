@@ -71,8 +71,12 @@ describe('token edit across real session protocol', () => {
     const edit = vi.fn((_view: string, id: string, changes: TokenEdit) => {
       const state = w.store.getState(); const token = state.objects.tokens[id];
       if (!token) return false;
-      const { hp, ...rest } = changes;
-      w.store.setState({ objects: { ...state.objects, tokens: { ...state.objects.tokens, [id]: { ...token, ...rest, ...(hp ? { resources: { ...token.resources, hp } } : {}) } } } });
+      const { hp, light, darkvision, ...rest } = changes;
+      const updated: Record<string, unknown> = { ...rest };
+      if (light !== undefined) updated.light = lightEmission(light);
+      if (darkvision !== undefined) updated.vision = { ...token.vision, enabled: true, darkvision };
+      if (hp) updated.resources = { ...token.resources, hp };
+      w.store.setState({ objects: { ...state.objects, tokens: { ...state.objects.tokens, [id]: { ...token, ...updated } as typeof token } } });
       return true;
     });
     const w: ReturnType<typeof controlWorld> = controlWorld({ edit });
@@ -118,6 +122,18 @@ it('writes only the selected bounded light preset to the native token', () => {
   expect(updateToken).toHaveBeenCalledWith('hero',{light:{bright:20,dim:40,intensity:1,color:'#ffcf81',animation:'magic'}});
   expect(api.edit?.('v','hero',{light:'none'})).toBe(true);
   expect(updateToken).toHaveBeenLastCalledWith('hero',{light:undefined});
+});
+
+it('sets D&D darkvision for the owned token while preserving its other senses', () => {
+  expect(isTokenEdit({darkvision:60})).toBe(true);
+  for (const darkvision of [-1, 45, 121, '60']) expect(isTokenEdit({darkvision})).toBe(false);
+  const updateToken=vi.fn();
+  const state={mapLoaded:true,isMapLoading:false,lighting:{enabled:false},objects:{tokens:{hero:{x:1,y:1,vision:{enabled:true,range:120,senses:[{id:'dnd5e-darkvision',range:60},{id:'custom-sense',range:10}]}}}},updateToken};
+  const api=stockTokensApi({view:()=>({viewId:'v',atlasStore:{getState:()=>state}}) as unknown as TokenView,mapSize:()=>({width:100,height:100}),dynamicLighting:()=>false});
+  expect(api.edit?.('v','hero',{darkvision:0})).toBe(true);
+  expect(updateToken).toHaveBeenCalledWith('hero',{vision:{enabled:true,range:120,senses:[{id:'custom-sense',range:10}]}});
+  expect(api.edit?.('v','hero',{darkvision:30})).toBe(true);
+  expect(updateToken).toHaveBeenLastCalledWith('hero',{vision:{enabled:true,range:120,senses:[{id:'custom-sense',range:10},{id:'dnd5e-darkvision',range:30}]}});
 });
 
 it('adds arbitrary named turns without a token, bounds input and opens the shared tracker', () => {

@@ -43,6 +43,12 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
   }
   light.value = token.light ?? 'none';
   const lightLabel = doc.createElement('label'); lightLabel.append('Foco de luz', light); form.append(lightLabel);
+  const darkvision = doc.createElement('select'); darkvision.setAttribute('aria-label', 'Visão no escuro');
+  for (const [value, label] of [[0, 'Sem visão no escuro'], [30, 'Visão no escuro: 30 pés'], [60, 'Visão no escuro: 60 pés'], [120, 'Visão no escuro: 120 pés']] as const) {
+    const option = doc.createElement('option'); option.value = String(value); option.textContent = label; darkvision.append(option);
+  }
+  darkvision.value = String(token.darkvision ?? 0);
+  const darkvisionLabel = doc.createElement('label'); darkvisionLabel.append('Visão no escuro', darkvision); form.append(darkvisionLabel);
   if (embedded && sendFlash) {
     const flash = doc.createElement('button'); flash.type = 'button'; flash.className = 'secondary'; flash.textContent = 'Clarão mágico'; flash.setAttribute('aria-label', 'Criar um clarão mágico temporário');
     flash.addEventListener('click', () => { note.textContent = sendFlash() ? 'Clarão enviado.' : 'Não foi possível enviar o clarão.'; });
@@ -95,6 +101,7 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
     if (Number(current.value) !== (health?.current ?? 1) || Number(maximum.value) !== (health?.max ?? 1) || (!health && toggle.checked)) edit.hp = { current: Number(current.value), max: Number(maximum.value) };
     if (toggle.checked !== (token.showHpBar === true)) edit.showHpBar = toggle.checked;
     if (light.value !== (token.light ?? 'none')) edit.light = light.value as NonNullable<TokenEdit['light']>;
+    if (Number(darkvision.value) !== (token.darkvision ?? 0)) edit.darkvision = Number(darkvision.value) as NonNullable<TokenEdit['darkvision']>;
     if (status.value.trim() !== (token.statusText ?? '')) edit.statusText = status.value.trim();
     if (Number(size.value) !== token.size) edit.size = Number(size.value);
     const chosen = conditionInputs.filter(([, input]) => input.checked).map(([id]) => id);
@@ -107,6 +114,7 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
       if (edit.size !== undefined) token.size = edit.size;
       if (edit.showHpBar !== undefined) token.showHpBar = edit.showHpBar;
       if (edit.light !== undefined) token.light = edit.light;
+      if (edit.darkvision !== undefined) token.darkvision = edit.darkvision;
       if (edit.statusText !== undefined) token.statusText = edit.statusText;
       if (edit.conditions) token.conditions = edit.conditions.map((id) => (token.conditionChoices ?? token.conditions).find((item) => item.id === id) ?? { id, value: null });
       conditions.textContent = token.conditions.length ? token.conditions.map((condition) => conditionName(condition.name ?? condition.id)).join(', ') : 'Sem condições ativas';

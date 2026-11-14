@@ -358,6 +358,8 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
   const definitions = context.resources ?? NO_RESOURCES;
   const showOf = character ? (context.resourceShows ?? COLLECTION_SHOWS)(id, character) : null;
   const visibleDefinitions = edits.showHpBar === undefined ? definitions : definitions.filter((definition) => definition.key !== 'hp');
+  const light = lightProfileOf(token.light);
+  const darkvision = playerDarkvision(token);
   // Sent only when there are some, so a scene without wheels is what an older GM sent.
   const wheels = character && showOf ? projectWheels(character, visibleDefinitions, showOf) : [];
   return {
@@ -376,13 +378,22 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
       ? { current: finiteOr(token.resources.hp.current, 0, SCENE_RANGES.resourceValue), max: finiteOr(token.resources.hp.max, 0, SCENE_RANGES.resourceValue) } : null,
     ...(edits.showHpBar !== undefined ? { showHpBar: edits.showHpBar } : {}),
     ...(edits.statusText ? { statusText: edits.statusText.slice(0, 120) } : {}),
-    ...(lightProfileOf(token.light) ? { light: lightProfileOf(token.light) } : {}),
+    ...(light ? { light } : {}),
+    ...(darkvision !== undefined ? { darkvision } : {}),
     stress: null,
     resources: character && showOf ? projectBars(character, visibleDefinitions, showOf) : [],
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
     ...projectMini(context.minis?.[id], context),
   };
+}
+
+function playerDarkvision(token: TokenEntity): PlayerToken['darkvision'] {
+  const vision = token.vision;
+  if (!vision) return undefined;
+  const sense = vision.senses?.find((entry) => entry.id === 'dnd5e-darkvision');
+  const range = sense ? sense.range ?? 60 : vision.senses ? 0 : vision.darkvision ?? 0;
+  return [0, 30, 60, 120].includes(range) ? range as NonNullable<PlayerToken['darkvision']> : 0;
 }
 
 /** A token's mini, for a token players are sent (a hidden or fogged one never is); the GLB goes by its fingerprint only. */

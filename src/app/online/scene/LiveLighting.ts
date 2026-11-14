@@ -50,7 +50,8 @@ export class LiveLighting {
     }
     const { tokens } = visibility;
     // Tokens never wait: they follow the window's perception at every projection; a token only sensed is not seen.
-    return { seen: (tokenId) => Object.hasOwn(tokens, tokenId) && tokens[tokenId] === 'seen', darkness: raster.darkness, shows: raster.shows, visibility: this.built?.visibility };
+    const visibilityGrid = this.built?.visibility;
+    return { seen: (tokenId) => Object.hasOwn(tokens, tokenId) && tokens[tokenId] === 'seen', darkness: raster.darkness, shows: raster.shows, ...(visibilityGrid ? { visibility: visibilityGrid } : {}) };
   }
 
   /** Atlas's answer; an answer that cannot be had is not known, and unknown is dark (ruling L4). */

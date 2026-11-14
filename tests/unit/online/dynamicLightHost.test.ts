@@ -13,7 +13,7 @@ describe('session-wide dynamic light switch', () => {
       projection: { slotOf: () => null, onSlotChange: () => () => undefined, lightSlots: () => [{ sceneId: 'scene', setDynamicLights }] },
     });
     host.start();
-    host.onMessage(players[1], { v: 1, type: 'dynamic-light-toggle', enabled: false } as ControlMessage);
+    host.onMessage(players[1]!, { v: 1, type: 'dynamic-light-toggle', enabled: false } as ControlMessage);
     expect(setDynamicLights).toHaveBeenLastCalledWith(false);
     expect(send).toHaveBeenCalledWith('a', { v: 1, type: 'dynamic-light-state', enabled: false });
     expect(send).toHaveBeenCalledWith('b', { v: 1, type: 'dynamic-light-state', enabled: false });

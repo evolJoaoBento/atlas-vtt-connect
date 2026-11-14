@@ -1,6 +1,7 @@
 /** The complete, bounded set of attributes a player may edit on an owned token. */
 export interface TokenEdit {
   light?: 'none' | 'torch' | 'light' | 'continual-flame';
+  darkvision?: 0 | 30 | 60 | 120;
   hp?: { current: number; max: number };
   showHpBar?: boolean;
   statusText?: string;
@@ -23,7 +24,7 @@ export function isTokenEdit(value: unknown): value is TokenEdit {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const edit = value as Record<string, unknown>;
   const keys = Object.keys(edit);
-  if (!keys.length || keys.some((key) => !['hp', 'showHpBar', 'statusText', 'size', 'conditions', 'initiative', 'light'].includes(key))) return false;
+  if (!keys.length || keys.some((key) => !['hp', 'showHpBar', 'statusText', 'size', 'conditions', 'initiative', 'light', 'darkvision'].includes(key))) return false;
   if (edit.hp !== undefined) {
     if (!edit.hp || typeof edit.hp !== 'object' || Array.isArray(edit.hp)) return false;
     const hp = edit.hp as Record<string, unknown>;
@@ -36,6 +37,7 @@ export function isTokenEdit(value: unknown): value is TokenEdit {
   if (edit.initiative !== undefined && (typeof edit.initiative !== 'number' || !Number.isInteger(edit.initiative) || edit.initiative < -1000 || edit.initiative > 1000)) return false;
   return (edit.showHpBar === undefined || typeof edit.showHpBar === 'boolean')
     && (edit.light === undefined || ['none', 'torch', 'light', 'continual-flame'].includes(edit.light as string))
+    && (edit.darkvision === undefined || [0, 30, 60, 120].includes(edit.darkvision as number))
     && (edit.statusText === undefined || (typeof edit.statusText === 'string' && edit.statusText.length <= 120 && [...edit.statusText].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127)))
     && (edit.size === undefined || (typeof edit.size === 'number' && Number.isFinite(edit.size) && edit.size >= 0.75 && edit.size <= 5));
 }

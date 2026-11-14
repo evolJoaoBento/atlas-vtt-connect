@@ -149,7 +149,7 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableToken
       if (!isTokenEdit(edit) || !state || !state.mapLoaded || state.isMapLoading || state.remoteView != null || state.isDragging || !state.updateToken) return false;
       const token = tokenOf(state, tokenId) as (Record<string, unknown> & { isHidden?: boolean }) | null;
       if (!token || token.isHidden) return false;
-      const { hp, initiative, light, ...changes } = edit;
+      const { hp, initiative, light, darkvision, ...changes } = edit;
       if (initiative !== undefined) {
         const entry = state.initiative?.entries.find((candidate) => candidate.tokenId === tokenId);
         if (entry) {
@@ -164,6 +164,19 @@ export function stockTokensApi(deps: StockTokensDeps): TokensApi & CopyableToken
       }
       const updates: Record<string, unknown> = { ...changes };
       if (light !== undefined) updates.light = lightEmission(light);
+      if (darkvision !== undefined) {
+        const vision: Record<string, unknown> = isObject((token as typeof token & { vision?: unknown }).vision)
+          ? { ...(token as typeof token & { vision: Record<string, unknown> }).vision }
+          : { enabled: true };
+        const senses = Array.isArray(vision.senses) ? vision.senses.filter(isObject) : null;
+        if (senses) {
+          const rest = senses.filter((sense) => sense.id !== 'dnd5e-darkvision');
+          if (darkvision > 0) rest.push({ id: 'dnd5e-darkvision', range: darkvision });
+          updates.vision = { ...vision, enabled: true, senses: rest };
+        } else {
+          updates.vision = { ...vision, enabled: darkvision > 0 || vision.enabled === true, darkvision: darkvision || undefined };
+        }
+      }
       if (hp) {
         updates.resources = { ...(isObject(token.resources) ? token.resources : {}), hp: { ...hp } };
         updates.overriddenMax = [...new Set([...(Array.isArray(token.overriddenMax) ? (token.overriddenMax as unknown[]).filter((key): key is string => typeof key === 'string') : []), 'hp'])];

@@ -157,6 +157,8 @@ export interface PlayerMini {
 export interface PlayerToken {
   /** A visual light preset chosen by this token's controller; no wall geometry is sent with it. */
   light?: 'none' | 'torch' | 'light' | 'continual-flame';
+  /** D&D 5e darkvision range in feet; 0 means none. */
+  darkvision?: 0 | 30 | 60 | 120;
   showHpBar?: boolean;
   statusText?: string;
   x: number;
