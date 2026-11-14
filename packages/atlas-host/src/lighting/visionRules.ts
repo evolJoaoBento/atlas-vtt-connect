@@ -64,6 +64,8 @@ export interface LightReach {
 }
 
 export interface SightRegion {
+  /** The token whose sight this is (Atlas's `SightRegion.tokenId`). */
+  tokenId?: string;
   sense: SenseRules;
   origin: Point;
   radius: number;

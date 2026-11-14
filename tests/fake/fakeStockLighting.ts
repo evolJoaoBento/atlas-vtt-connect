@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import fixture from './realStockLighting.json';
 import { store } from './fakeStockAtlas';
-import type { LightingView, StockLightingDeps } from '../../src/connect/stockLighting/stockLighting';
+import type { LightingView, PlayerVisibilityDeps } from '../../packages/atlas-host/src/lighting/playerVisibility';
 
 /** What was read from a real Atlas VTT 0.8.0 lit scene: its sight, ambient light, light reaches and token perception. */
 export const REAL = fixture;
@@ -71,7 +71,7 @@ export function litView(options: LitOptions = {}) {
   let flag: boolean | null = true;
   let open = true;
   const added: Array<() => void> = [];
-  const deps: StockLightingDeps = {
+  const deps: PlayerVisibilityDeps = {
     view: (viewId) => (open && viewId === 'view-a' ? (view as unknown as LightingView) : null),
     mapSize: () => map,
     dynamicLighting: () => flag,

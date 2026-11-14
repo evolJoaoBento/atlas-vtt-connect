@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerVisibility } from '@atlas-vtt/api-types';
-import { stockLightingApi } from '../../../src/connect/stockLighting/stockLighting';
+import { playerVisibilityApi } from '../../../packages/atlas-host/src/lighting/playerVisibility';
 import { FakeController, litView, REAL } from '../../fake/fakeStockLighting';
 
 type Ready = Extract<PlayerVisibility, { status: 'ready' }>;
@@ -16,7 +16,7 @@ function inside(polygon: Array<{ x: number; y: number }>, x: number, y: number):
   return in_;
 }
 
-const visibility = (lit: ReturnType<typeof litView>, options?: { maxCellsPerSide?: number }): PlayerVisibility => stockLightingApi(lit.deps).playerVisibility('view-a', options);
+const visibility = (lit: ReturnType<typeof litView>, options?: { maxCellsPerSide?: number; onlyToken?: string }): PlayerVisibility => playerVisibilityApi(lit.deps).playerVisibility('view-a', options);
 
 describe('lighting on a stock Atlas', () => {
   beforeEach(() => { vi.useFakeTimers(); });
@@ -48,6 +48,17 @@ describe('lighting on a stock Atlas', () => {
     expect(showing).toBeGreaterThan(0);
     // A scene lit by a torch and a dim ambient light is not wholly shown either.
     expect(showing).toBeLessThan(cols * rows);
+  });
+
+  it("a point of view is the raster of that token's sight alone: another token's, or none, shows no map", () => {
+    const [region] = REAL.sight.regions;
+    const whole = visibility(litView()) as Ready;
+    const own = visibility(litView(), { onlyToken: region!.tokenId }) as Ready;
+    expect(own.darkness).toEqual(whole.darkness);
+    expect(own.tokens).toEqual(whole.tokens);
+    const other = visibility(litView(), { onlyToken: 'tok_1790796966430_ww5p67blm' }) as Ready;
+    expect(other.status).toBe('ready');
+    expect(other.darkness.shown.every((cell) => cell === 0)).toBe(true);
   });
 
   it("reads Atlas 0.9.1's lighting, whose controller is the renderer's own `lighting`, as it read the experiment's", () => {
@@ -103,7 +114,7 @@ describe('lighting on a stock Atlas', () => {
     loading.scene.set({ isMapLoading: true } as never);
     expect(visibility(loading).status).toBe('pending');
     expect(visibility(litView({ map: { width: 0, height: 0 } })).status).toBe('pending');
-    expect(stockLightingApi(litView().deps).playerVisibility('unknown').status).toBe('pending');
+    expect(playerVisibilityApi(litView().deps).playerVisibility('unknown').status).toBe('pending');
   });
 
   it('is pending for anything it cannot read, never showing the map on a guess', () => {
@@ -139,7 +150,7 @@ describe('lighting on a stock Atlas', () => {
 
   it('answers a cell count within bounds, and a fresh buffer on every call', () => {
     const lit = litView();
-    const api = stockLightingApi(lit.deps);
+    const api = playerVisibilityApi(lit.deps);
     const first = api.playerVisibility('view-a') as Ready;
     const second = api.playerVisibility('view-a') as Ready;
     expect(second.darkness.shown).not.toBe(first.darkness.shown);
@@ -166,7 +177,7 @@ describe('lighting on a stock Atlas', () => {
     it('tells when the sight, the lights or the scene change, once per change', () => {
       const lit = litView();
       const heard: string[] = [];
-      stockLightingApi(lit.deps).watch('view-a', () => heard.push('changed'));
+      playerVisibilityApi(lit.deps).watch('view-a', () => heard.push('changed'));
       lit.tick(1000);
       expect(heard).toEqual([]);
       lit.controller!.parts.sight = structuredClone(REAL.sight);
@@ -186,7 +197,7 @@ describe('lighting on a stock Atlas', () => {
     it('hears the controller\'s own sight change at once, and gives the hook back when the last watch ends', () => {
       const lit = litView();
       const controller = lit.controller!;
-      const api = stockLightingApi(lit.deps);
+      const api = playerVisibilityApi(lit.deps);
       const heard: string[] = [];
       expect(Object.hasOwn(controller, 'onSightChange')).toBe(false);
       const first = api.watch('view-a', () => heard.push('one'));
@@ -206,7 +217,7 @@ describe('lighting on a stock Atlas', () => {
 
     it('follows a controller Atlas builds anew, ends with the view and with the extension, and a throwing listener harms nobody', () => {
       const lit = litView();
-      const api = stockLightingApi(lit.deps);
+      const api = playerVisibilityApi(lit.deps);
       const heard: string[] = [];
       api.watch('view-a', () => heard.push('x'));
       const next = new FakeController({ enabled: true, current: true, sight: REAL.sight, ambient: REAL.ambient, reaches: REAL.reaches });
@@ -222,7 +233,7 @@ describe('lighting on a stock Atlas', () => {
 
       const other = litView();
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      stockLightingApi(other.deps).watch('view-a', () => { throw new Error('listener'); });
+      playerVisibilityApi(other.deps).watch('view-a', () => { throw new Error('listener'); });
       other.scene.set({ isMapLoading: true } as never);
       expect(error).toHaveBeenCalled();
       error.mockRestore();
@@ -232,7 +243,7 @@ describe('lighting on a stock Atlas', () => {
     });
 
     it('does nothing for an unknown view or a listener that is not a function', () => {
-      const api = stockLightingApi(litView().deps);
+      const api = playerVisibilityApi(litView().deps);
       expect(() => api.watch('nope', () => undefined)()).not.toThrow();
       expect(() => api.watch('view-a', 'x' as never)()).not.toThrow();
       expect(vi.getTimerCount()).toBe(0);

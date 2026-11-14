@@ -11,3 +11,6 @@ export {
   atlasEffectOf, damageOfEffect, measureKind, measureToSpell, MEASURE_LIMITS, readExtra, SPELL_CHAIN, SPELL_SHAPE_NAMES, spellToMeasure, templateToMeasure,
   type MeasureRecord, type SpellLike, type SpellMeta, type SpellShape, type TabletopExtra,
 } from './spellMeasure';
+export { atlasMapSize } from './lighting/mapSize';
+export { playerVisibilityApi, type LightingScene, type LightingView, type PlayerVisibilityDeps } from './lighting/playerVisibility';
+export type { Disposer, LightingApi, Perception, PlayerVisibility, PlayerVisibilityOptions } from './lighting/types';

@@ -1,5 +1,6 @@
 /**
- * `lighting.playerVisibility` and `lighting.watch` on a stock Atlas VTT, which has no extension API.
+ * `lighting.playerVisibility` and `lighting.watch` on a stock Atlas VTT, which has no extension API. Shared by Connect
+ * (what it sends players) and Tabletop (the GM's player window of the 3D board); Tabletop copies it by `sync:connect`.
  *
  * What the GM's player window shows of a lit scene is worked out from what the view's lighting hands out
  * (`renderer.lightingFeature.controller`, private and duck-typed like everything the stand-in reads): its sight, ambient
@@ -11,7 +12,7 @@
  * answered only where Atlas itself shows the scene unlit: dynamic lighting switched off, or a scene saved unlit.
  * What is left out shows players less, never more: the footprints of tokens seen in the dark and the explored memory.
  */
-import type { Disposer, LightingApi, Perception, PlayerVisibility, PlayerVisibilityOptions } from '@atlas-vtt/api-types';
+import type { Disposer, LightingApi, Perception, PlayerVisibility, PlayerVisibilityOptions } from './types';
 import { darknessRaster, MAX_DARKNESS_CELLS_PER_SIDE, type DarknessRaster, type ExploredImage, type Lighting, type MapSize } from './darknessRaster';
 import { ExploredFollower, type ExploredDecoder } from './exploredMemory';
 import type { AmbientLight, LightReach, Point, Polygon, SenseRules, Sight, SightRegion } from './visionRules';
@@ -49,7 +50,9 @@ export interface LightingView {
   readonly renderer?: unknown;
 }
 
-export interface StockLightingDeps {
+export interface PlayerVisibilityDeps {
+  /** Who says so in the console (default `Atlas VTT Connect`). */
+  label?: string;
   /** The open map view with this id, or null. */
   view(viewId: string): LightingView | null;
   /** The loaded map's size in world pixels; 0 × 0 while none is loaded. */
@@ -204,12 +207,25 @@ class SightHooks {
   }
 }
 
-export function stockLightingApi(deps: StockLightingDeps): LightingApi {
+export function playerVisibilityApi(deps: PlayerVisibilityDeps): LightingApi {
+  const label = deps.label ?? 'Atlas VTT Connect';
   const rasters = new Map<string, Built>();
+  // One token's sight (a point of view), the same object while the view's sight is.
+  const alone = new WeakMap<Sight, Map<string, Sight>>();
+  const sightOf = (sight: Sight, token: string): Sight => {
+    const byToken = alone.get(sight) ?? new Map<string, Sight>();
+    alone.set(sight, byToken);
+    let own = byToken.get(token);
+    if (!own) {
+      own = { all: false, regions: sight.regions.filter((region) => region.tokenId === token) };
+      byToken.set(token, own);
+    }
+    return own;
+  };
   const hooks = new SightHooks();
 
-  const raster = (viewId: string, cells: number, lighting: Lighting, map: MapSize, explored: ExploredImage | null): DarknessRaster => {
-    const key = `${viewId}:${cells}`;
+  const raster = (viewId: string, cells: number, lighting: Lighting, map: MapSize, explored: ExploredImage | null, token: string): DarknessRaster => {
+    const key = `${viewId}:${cells}:${token}`;
     const inputs = [lighting.sight, lighting.ambient, lighting.reaches, map.width, map.height, explored];
     const last = rasters.get(key);
     if (last && last.inputs.length === inputs.length && last.inputs.every((input, index) => input === inputs[index])) return last.raster;
@@ -246,7 +262,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
   const pending = (view: LightingView, reason: string): PlayerVisibility => {
     if (reasons.get(view.viewId) !== reason) {
       reasons.set(view.viewId, reason);
-      console.debug(`[Atlas VTT Connect] players see nothing of a lit scene: ${reason}`);
+      console.debug(`[${label}] players see nothing of a lit scene: ${reason}`);
     }
     return PENDING;
   };
@@ -285,8 +301,10 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
       keeps: state.lighting.exploredMemory !== false, isMemory: memoryIsIn(controller),
       mask: typeof state.exploredMask === 'string' ? state.exploredMask : null, edits: isNumber(state.exploredEdits) ? state.exploredEdits : 0, mapPath: state.mapPath ?? null,
     });
-    const explored = sight.all ? null : memory;
-    const grid = raster(view.viewId, cellsPerSide(options?.maxCellsPerSide), { sight, ambient, reaches }, map, explored);
+    const only = typeof options?.onlyToken === 'string' ? options.onlyToken : null;
+    // A point of view shows what that token sees now, and none of what the party remembers.
+    const explored = sight.all || only !== null ? null : memory;
+    const grid = raster(view.viewId, cellsPerSide(options?.maxCellsPerSide), { sight: only === null ? sight : sightOf(sight, only), ambient, reaches }, map, explored, only ?? '');
     reasons.delete(view.viewId);
     // A fresh buffer on every call: the raster is kept between calls, and no caller may change it for another.
     const shown = new Uint8Array(grid.dark.length);
@@ -307,7 +325,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
         return visibility(view, options);
       } catch (error) {
         // Whatever fails while the view is read, players are shown nothing.
-        console.error('[Atlas VTT Connect] Player visibility could not be worked out:', error);
+        console.error(`[${label}] Player visibility could not be worked out:`, error);
         return PENDING;
       }
     },
@@ -332,7 +350,7 @@ export function stockLightingApi(deps: StockLightingDeps): LightingApi {
         try {
           listener();
         } catch (error) {
-          console.error('[Atlas VTT Connect] A lighting listener failed:', error);
+          console.error(`[${label}] A lighting listener failed:`, error);
         }
       };
       const hookCurrent = (): void => {

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerVisibility } from '@atlas-vtt/api-types';
-import { darknessRaster, type ExploredImage } from '../../../src/connect/stockLighting/darknessRaster';
-import { EXPLORED_SETTLE_MS, ExploredFollower, type ExploredInput } from '../../../src/connect/stockLighting/exploredMemory';
-import { stockLightingApi } from '../../../src/connect/stockLighting/stockLighting';
+import { darknessRaster, type ExploredImage } from '../../../packages/atlas-host/src/lighting/darknessRaster';
+import { EXPLORED_SETTLE_MS, ExploredFollower, type ExploredInput } from '../../../packages/atlas-host/src/lighting/exploredMemory';
+import { playerVisibilityApi } from '../../../packages/atlas-host/src/lighting/playerVisibility';
 import { litView, REAL } from '../../fake/fakeStockLighting';
 
 type Ready = Extract<PlayerVisibility, { status: 'ready' }>;
@@ -158,7 +158,7 @@ describe('explored memory on a stock Atlas', () => {
       let now = 1000;
       const memory = image(64, 61, () => true);
       const lit = litView({ explored: { mask: 'mask', memory: true }, now: () => now, decode: () => Promise.resolve(memory) });
-      const api = stockLightingApi(lit.deps);
+      const api = playerVisibilityApi(lit.deps);
       const first = api.playerVisibility('view-a') as Ready;
       expect(first.showsExplored).toBe(false);
       now += EXPLORED_SETTLE_MS + 100;
@@ -172,7 +172,7 @@ describe('explored memory on a stock Atlas', () => {
 
       // The line-of-sight fallback has no memory, and shows none.
       const fallback = litView({ explored: { mask: 'mask', memory: false }, now: () => now, decode: () => Promise.resolve(memory) });
-      const fallbackApi = stockLightingApi(fallback.deps);
+      const fallbackApi = playerVisibilityApi(fallback.deps);
       fallbackApi.playerVisibility('view-a');
       now += EXPLORED_SETTLE_MS + 100;
       await vi.advanceTimersByTimeAsync(0);
@@ -183,7 +183,7 @@ describe('explored memory on a stock Atlas', () => {
       let now = 1000;
       const memory = image(64, 61, () => true);
       const lit = litView({ explored: { mask: 'mask', memory: true }, now: () => now, decode: () => Promise.resolve(memory) });
-      const api = stockLightingApi(lit.deps);
+      const api = playerVisibilityApi(lit.deps);
       const told: string[] = [];
       api.watch('view-a', () => told.push('due'));
       api.playerVisibility('view-a');
@@ -205,7 +205,7 @@ describe('explored memory on a stock Atlas', () => {
       const decode = () => Promise.resolve(memory);
       const now = () => 1_000_000;
       for (const explored of [{ mask: 'mask', memory: true, keeps: false }, { mask: 'mask', memory: { ready: false } }, { mask: 'mask', memory: { contextLost: true } }]) {
-        const api = stockLightingApi(litView({ explored, now, decode }).deps);
+        const api = playerVisibilityApi(litView({ explored, now, decode }).deps);
         api.playerVisibility('view-a');
         expect((api.playerVisibility('view-a') as Ready).showsExplored).toBe(false);
       }

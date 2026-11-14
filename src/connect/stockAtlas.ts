@@ -6,7 +6,7 @@
  * design: it depends on private shapes of those objects, so every member is checked before use and a failed check turns
  * that capability off (`has()` is false) or makes the call fail closed, rather than throwing. What it provides:
  * `views` (with `showTab`, so `scene-tabs`), `presentation`, `rules` (the defaults), `settings`, `storage`, `lighting`
- * (`stockLighting/`, which fails closed: a lit scene whose lighting cannot be read shows players nothing), `tokens`
+ * (`packages/atlas-host/src/lighting/`, which fails closed: a lit scene whose lighting cannot be read shows players nothing), `tokens`
  * (`stockTokens/`: players' moves, stopped at walls on a lit scene), `dice` (`stockDice/`), `lasers` (`stockLasers/`)
  * and `ui` (`stockUi/`: a floating dock and panels, in place of the slots stock Atlas does not have). Not provided:
  * `scenes`, `bundles` and `collections` (sharing notes and maps, per-collection rules).
@@ -20,7 +20,7 @@ import type {
   MapRules, PresentationListener, PresentationTarget, PresentedSceneInfo, SceneSnapshot, TokenSettings, ViewCamera, ViewInfo,
 } from '@atlas-vtt/api-types';
 import { readDragDistance, resolveMeasurementSettings } from '../../packages/atlas-shared/src/index';
-import { stockLightingApi } from './stockLighting/stockLighting';
+import { atlasMapSize, playerVisibilityApi } from '../../packages/atlas-host/src/index';
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules, stockMovement } from './stockRules';
@@ -201,12 +201,7 @@ function snapshotTabId(view: StockView, presented: StockPresentedScene | null): 
 }
 
 /** The loaded background's size in world pixels; 0 × 0 while none is loaded. */
-function mapSize(view: StockView): { width: number; height: number } {
-  const rect = view.renderer?.getMapImage?.()?.worldRect ?? null;
-  if (rect && rect.width > 0 && rect.height > 0) return { width: rect.width, height: rect.height };
-  const sprite = view.renderer?.getBackgroundSprite?.() ?? null;
-  return sprite && !sprite.destroyed && sprite.width > 0 && sprite.height > 0 ? { width: sprite.width, height: sprite.height } : { width: 0, height: 0 };
-}
+const mapSize = (view: StockView): { width: number; height: number } => atlasMapSize(view);
 
 /**
  * The view's scene as players are sent it: the floor the view shows. With `level`, that floor of the scene instead
@@ -904,7 +899,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
           mapSize,
           dynamicLighting: () => dynamicLighting(service, atlasPlugin),
         }),
-        lighting: stockLightingApi({
+        lighting: playerVisibilityApi({
           view: (viewId) => trackedView(app, viewId),
           mapSize,
           dynamicLighting: () => dynamicLighting(service, atlasPlugin),
