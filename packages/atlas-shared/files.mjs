@@ -25,7 +25,10 @@ export const FILES = [
   'measure/areaRules.ts',
   'measure/dragDistance.ts',
   'measure/dragMovement.ts',
+  'measure/measureEffects.ts',
+  'measure/measureGeometry.ts',
   'measure/measureGrid.ts',
+  'measure/measureTypes.ts',
   'measure/movementRules.ts',
   'measure/reachSteps.ts',
   'measure/tokenHeight.ts',
@@ -60,6 +63,8 @@ export const STUB_TYPES = {
   // Atlas: `(object: object) => boolean`; its file's run-time closure is 31 files of map stretching.
   'grid/mapStretchObjects.ts': { MovesWithMap: '(object: any) => boolean' },
   // Atlas: one die of a roll; its file is the formula parser. The stand-in has the fields the dice files read and write.
+  // Atlas: a box on the map; its file is the lighting's polygon bounds.
+  'vision/polygonBounds.ts': { Box: "Record<'minX' | 'minY' | 'maxX' | 'maxY', number>" },
   'tools/diceFormula.ts': {
     RolledDie: "Record<'die', string> & Record<'value' | 'max', number> & Partial<Record<'negative' | 'exploded' | 'rerolled' | 'dropped' | 'advantage', true>>",
   },

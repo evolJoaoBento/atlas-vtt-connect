@@ -9,7 +9,7 @@
  * join each carry it, and a missing or different number is refused. It is the number of the Atlas fusion phase, raised
  * by each phase's first change to what the three exchange.
  */
-export const FUSION_PROTOCOL = 2;
+export const FUSION_PROTOCOL = 3;
 
 /** A sheet the AR markers are fixed on, as it lies on the table (see `tools/arTable.ts`): millimetres, x right and y down, with its heading in radians and its outline. */
 export interface ArTableGroup {

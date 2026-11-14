@@ -66,7 +66,7 @@ describe('OnlineSessionService', () => {
     const { svc, notices, network } = service();
     await svc.start();
     const link = await network.client().connect('gm-id');
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     expect(notices.map((n) => n.name)).toEqual(['Anna']);
     notices[0]!.answer(true);
     expect(notices[0]!.hidden).toBe(true);
@@ -77,7 +77,7 @@ describe('OnlineSessionService', () => {
     const { svc, notices, network } = service();
     await svc.start();
     const link = await network.client().connect('gm-id');
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Bob', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Bob', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     svc.stop();
     expect(notices[0]!.hidden).toBe(true);
     expect(onlineSessionStore.getState()).toMatchObject({ status: 'idle', players: [], joinUrl: null });
@@ -98,7 +98,7 @@ describe('OnlineSessionService', () => {
     host.fail({ code: 'network', message: 'Lost connection to the signaling server' });
     expect(onlineSessionStore.getState()).toMatchObject({ status: 'hosting', error: 'Lost connection to the signaling server' });
     const link = await network.client().connect('gm-id');
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Cy', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Cy', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     expect(onlineSessionStore.getState()).toMatchObject({ status: 'hosting', error: null });
   });
 
@@ -215,7 +215,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message.type);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!.answer(true);
     expect(received).toContain('scene-snapshot');
     svc.stop();
@@ -236,7 +236,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message.type);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!.answer(true);
     expect(received.filter((type) => type.startsWith('scene-'))).toEqual(['scene-snapshot', 'scene-camera']);
     svc.stop();
@@ -286,7 +286,7 @@ describe('OnlineSessionService', () => {
       if (decoded.message.type === 'scene-snapshot') mapAsset = decoded.message.scene.map.asset;
       if (decoded.message.type === 'scene-patch' && decoded.message.set.map) mapAsset = decoded.message.set.map.asset;
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!.answer(true);
 
     const id = fingerprintOf(map);
@@ -309,7 +309,7 @@ describe('OnlineSessionService', () => {
     });
     await svc.start();
     const link = await network.client().connect('gm-id');
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!(true);
     const events = debug.mock.calls.map((call) => call[1]);
     expect(events).toContain('players');
@@ -330,7 +330,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!.answer(true);
     const { players, tokenControl } = onlineSessionStore.getState();
     const playerId = players[0]!.playerId;
@@ -356,7 +356,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     notices[0]!.answer(true);
     expect(received.some((message) => message.type === 'token-control')).toBe(false);
     svc.stop();
@@ -390,7 +390,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     answers[0]!(true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot') as Extract<ControlMessage, { type: 'scene-snapshot' }>;
     expect(snapshot.scene.measurement).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 3, ruleDistance: 1.5, diagonalRule: 'euclidean', rangeBands: [], snapToGrid: true, coneAngle: 53.13,
@@ -421,7 +421,7 @@ describe('OnlineSessionService', () => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     answers[0]!(true);
     expect(received.filter((message) => message.type === 'dice-log')).toEqual([{ v: 1, type: 'dice-log', entries: [], replay: true }]);
     link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 }));

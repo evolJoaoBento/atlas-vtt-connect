@@ -7,3 +7,7 @@ export { pairingNotice } from './pairing';
 export { ATLAS_VIEW_TYPE, openBackgroundLeaf } from './hostLeaf';
 export { AtlasHost, HOST_LOAD_MS, HOST_MARK, type FollowResult, type HostMark, type HostState, type HostStatus, type HostStore } from './atlasHost';
 export { loadDeferredLeaves, wakeAtlasForHosting, WAKE_LOAD_MS, type HostingWakeDeps } from './wake';
+export {
+  atlasEffectOf, damageOfEffect, measureKind, measureToSpell, MEASURE_LIMITS, readExtra, SPELL_CHAIN, SPELL_SHAPE_NAMES, spellToMeasure, templateToMeasure,
+  type MeasureRecord, type SpellLike, type SpellMeta, type SpellShape, type TabletopExtra,
+} from './spellMeasure';

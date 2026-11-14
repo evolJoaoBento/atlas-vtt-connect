@@ -37,7 +37,7 @@ function fakeTabletop(overrides: Record<string, unknown> = {}) {
   return {
     api: {
       version: 1,
-      fusion: 2,
+      fusion: 3,
       placementsFor: () => ({}),
       onChange: () => () => undefined,
       boardLook: (mapPath: string) => (mapPath === 'm.atlasmap' ? LOOK : { ...LOOK, fogHeight: 3 }),
@@ -68,13 +68,13 @@ describe('tabletopBoard', () => {
   });
 
   it('pairs only with a Tabletop of the same fusion step, and says once when it is not', () => {
-    expect(FUSION_PROTOCOL).toBe(2);
+    expect(FUSION_PROTOCOL).toBe(3);
     const notices: string[] = [];
     const paired = fakeApp();
     paired.plugins['atlas-vtt-tabletop'] = { api: fakeTabletop().api };
     expect(tabletopBoard(paired.app, (message) => notices.push(message)).available()).toBe(true);
     expect(notices).toEqual([]);
-    for (const fusion of [undefined, 1]) {
+    for (const fusion of [undefined, 1, 2]) {
       const { app, plugins } = fakeApp();
       plugins['atlas-vtt-tabletop'] = { api: fakeTabletop({ fusion }).api };
       const heard: string[] = [];

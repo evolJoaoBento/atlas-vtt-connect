@@ -19,7 +19,7 @@ function gm() {
       const decoded = channel === 'control' ? decodeControl(data) : null;
       if (decoded?.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name, playerKey, client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name, playerKey, client: { kind: 'web', version: '1' } }));
     return { link, received };
   };
   return { session, requests, players: () => players, join };

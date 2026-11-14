@@ -195,7 +195,7 @@ async function rawPlayer(h: Harness, playerKey: string): Promise<{ link: PeerLin
     const decoded = decodeControl(data);
     if (decoded.kind === 'message') received.push(decoded.message);
   });
-  link.send('control', encodeControl({ v: 1, type: 'join', fusion: 2, name: 'Raw', playerKey, client: { kind: 'web', version: '1' } }));
+  link.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name: 'Raw', playerKey, client: { kind: 'web', version: '1' } }));
   h.gm.allow(h.requests.at(-1)!.playerId);
   return { link, received, sizes };
 }
