@@ -17,6 +17,11 @@ describe("a scene's measures as the page and the board draw them", () => {
     cast: { ...sent(spellToMeasure(spell, { owner: 'p2', color: '#3366ff', name: 'Fireball', rules: { difficult: true } })), owner: 'p2' },
   };
 
+  it('an aura is left out: it lies around its token, not where its points were last written', () => {
+    const aura: PlayerMeasure = { shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }], aura: { token: 't1', reach: 10 } };
+    expect(templatesOfMeasures({ aura }, { cell: 70, accent: '#7c5cff' })).toEqual([]);
+  });
+
   it('every area is a flat template: its shape, its two points, its colour, its maker, a line with its width', () => {
     const templates = templatesOfMeasures(measures, { cell: 70, accent: '#7c5cff' });
     expect(templates.map((template) => [template.id, template.shape, template.kind, template.owner, template.color])).toEqual([
