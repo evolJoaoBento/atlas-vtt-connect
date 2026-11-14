@@ -21,7 +21,7 @@ describe("players' spells are kept in Atlas's measures", () => {
     expect(readExtra(kept)).toMatchObject({ kind: 'spell', owner: 'p1', name: 'Web', rules: { difficult: true } });
     expect(measureToSpell(kept)!.spell).toMatchObject({ shape: 'sphere', from: 'point', size: 140 });
     // No list goes out: players get the measure in the scene.
-    expect(w.sent.filter(([, m]) => m.type === 'map-spells' || m.type === 'map-templates')).toEqual([]);
+    expect(w.sent.map(([, m]) => m.type as string).filter((type) => type === 'map-spells' || type === 'map-templates')).toEqual([]);
     expect(Object.keys(w.host).sort()).not.toContain('spellsByScene');
   });
 

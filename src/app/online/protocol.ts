@@ -15,7 +15,7 @@ import { isPingPoint } from './tools/pings';
 import { isArPose, type ArPose } from './tools/arViews';
 import { isArTable, type ArSurvey } from './tools/arTable';
 import { isPinNote, type PinNote } from './tools/pinNotes';
-import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
+import { isTemplateDraft, isTemplateId, type TemplateShape } from './tools/templates';
 import { isAskRulesList, isCastName, isSpellAbout, isMapSpells, isSpell, isSpellId, isSpellRequests, isSpellRules, isSpellWordsList, type AskRules, type SpellRules, type MapSpell, type Spell, type SpellRequest, type SpellWords, type SpellAbout } from './tools/spells';
 import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
@@ -130,13 +130,15 @@ export type ControlMessage =
   | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
   /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
   | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string }
-  /** Player to GM: add a lasting template on the scene they have, remove one of their own, or clear all of theirs (`tools/templates.ts`). */
+  /**
+   * Player to GM: place a template on the scene they have (it takes the place of their last), remove their own, or
+   * clear theirs (`tools/templates.ts`). A request: the GM keeps it in Atlas's measures, and it comes back in the scene.
+   */
   | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
-  /** GM to players: every template on the scene, whenever they change. */
-  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] }
   /**
    * Player to GM: cast a spell through a token's eyes on the scene they have (for the GM's ask `request`), take one of
-   * theirs off, clear theirs, or turn down an ask (`decline`) (`tools/spells.ts`).
+   * theirs off, clear theirs, or turn down an ask (`decline`) (`tools/spells.ts`). A request: a kept spell is written
+   * to Atlas's measures and comes back in the scene; an instantaneous one comes back as `spell-flash`.
    */
   | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; request?: string; remove?: string; clear?: true; decline?: string; rules?: SpellRules; name?: string; about?: SpellAbout }
   /** GM to the players of a token: the spells the GM asks of the tokens they control on the scene (`MeasureHost.requestSpell`). */
@@ -147,8 +149,6 @@ export type ControlMessage =
   | { v: 1; type: 'map-refused'; what: 'template' | 'spell'; reason: MeasureRefusal }
   /** Player to GM, on admission and when they pick another: their own colour (`tools/playerColors.ts`), one of the laser swatches. */
   | { v: 1; type: 'player-color'; color: string }
-  /** GM to players: every spell on the scene, whenever they change. */
-  | { v: 1; type: 'map-spells'; sceneId: string; spells: MapSpell[]; asks?: SpellRequest[]; askWords?: SpellWords[]; askRules?: AskRules[] }
   /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
@@ -254,13 +254,11 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   'map-template': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1
     && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
     && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
-  'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
   'map-spell': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear, m.decline].filter((part) => part !== undefined).length === 1
     && (m.add === undefined || isSpell(m.add)) && (m.remove === undefined || isSpellId(m.remove)) && (m.clear === undefined || m.clear === true)
     && (m.request === undefined || (m.add !== undefined && isSpellId(m.request))) && (m.decline === undefined || isSpellId(m.decline))
     && (m.rules === undefined || (m.add !== undefined && isSpellRules(m.rules)))
     && (m.name === undefined || (m.add !== undefined && isCastName(m.name))) && (m.about === undefined || (m.add !== undefined && isSpellAbout(m.about))),
-  'map-spells': (m) => isSceneId(m.sceneId) && isMapSpells(m.spells) && (m.asks === undefined || isSpellRequests(m.asks)) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
   'spell-asks': (m) => isSceneId(m.sceneId) && isSpellRequests(m.asks) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
   'spell-flash': (m) => isSceneId(m.sceneId) && isMapSpells([m.cast]),
   'map-refused': (m) => (m.what === 'template' || m.what === 'spell') && (MEASURE_REFUSALS as readonly unknown[]).includes(m.reason),

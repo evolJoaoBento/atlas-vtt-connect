@@ -23,6 +23,7 @@ import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 import { FUSION_PROTOCOL } from './scene/boardTypes';
+import { SceneMarks } from './tools/sceneMarks';
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -85,9 +86,15 @@ export interface PlayerSessionOptions {
   onSheets?(entries: readonly TokenSheet[]): void;
   /** Someone else's ping, for the scene `sceneId`. */
   onPing?(ping: PlayerPing): void;
-  /** Every lasting template on the scene `sceneId`, whenever they change. */
+  /**
+   * The scene's measures flat on the map (Atlas's kept measures: areas, rulers, templates, spells), whenever they
+   * change: worked out from the scene (`SceneMarks`), never sent as a list.
+   */
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
-  /** Every spell on the scene `sceneId`, whenever they change, and the spells the GM asks of the player's tokens there. */
+  /**
+   * The scene's spells (those kept in its measures, and an instantaneous one while it goes off), whenever they change,
+   * and the spells the GM asks of the player's tokens there.
+   */
   onSpells?(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[]): void;
   /** The player's own colour, sent on each admission (null: the one their place gives). */
   color?(): string | null;
@@ -141,11 +148,16 @@ export class PlayerSession {
   private readonly cutsceneExtras = new CutsceneExtrasInbox();
 
   private readonly inbox: PlayerSceneInbox;
+  /** What the views draw of the scene's measures, worked out from each scene as it arrives. */
+  private readonly marks = new SceneMarks({
+    templates: (sceneId, templates) => this.options.onTemplates?.(sceneId, templates),
+    spells: (sceneId, spells, asks) => this.options.onSpells?.(sceneId, spells, asks),
+  });
 
   constructor(private readonly options: PlayerSessionOptions) {
     this.inbox = new PlayerSceneInbox({
       sendResync: (seq) => this.link?.send('control', encodeControl({ v: 1, type: 'scene-resync', seq })),
-      onScene: (scene) => this.options.onScene?.(scene),
+      onScene: (scene) => { this.options.onScene?.(scene); this.marks.scene(scene); },
       onCamera: (camera) => this.options.onCamera?.(camera),
       onPaused: (paused) => this.options.onSceneState?.(paused),
       onDiceLook: (look) => this.options.onDiceLook?.(look),
@@ -287,6 +299,7 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.marks.dispose();
     this.endCutscene();
     this.leaveAssets();
     this.link?.send('control', encodeControl({ v: 1, type: 'bye', reason: 'left' }));
@@ -400,11 +413,15 @@ export class PlayerSession {
       case 'token-sheets':
         this.options.onSheets?.(message.entries);
         break;
-      case 'map-spells':
-        this.options.onSpells?.(message.sceneId, message.spells, joinAsks(message.asks ?? [], message.askWords, message.askRules));
+      case 'spell-asks':
+        this.marks.asks(message.sceneId, joinAsks(message.asks, message.askWords, message.askRules));
         break;
-      case 'map-templates':
-        this.options.onTemplates?.(message.sceneId, message.templates);
+      case 'spell-flash':
+        this.marks.flash(message.sceneId, message.cast);
+        break;
+      case 'map-refused':
+        // The GM's Atlas is on another map: said as a refused move is. The other reasons (a limit) stay silent, as they always were.
+        if (message.reason === 'not-held') this.options.onMoveRefused?.('', 'not-held');
         break;
       case 'pin-note':
         this.options.onPinNote?.({ sceneId: message.sceneId, pinId: message.pinId, note: message.note });
@@ -519,6 +536,7 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.marks.dispose();
     this.endCutscene();
     this.leaveAssets();
     this.setControlled([]);

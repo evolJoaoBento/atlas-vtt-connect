@@ -29,6 +29,7 @@
     "src/app/measure/measureEffects.ts": "68b6fe2e7242a3be7cf32f0e36a147269a35ec436c1e09b0de6353974d476136",
     "src/app/measure/measureGeometry.ts": "67ef220f3c923feaf726bba2d3303ee404e9ba09acca4fa340888752cc0583c1",
     "src/app/measure/measureGrid.ts": "2e19c3f9e580096285068a6e0e6eadeb19e818f28d568fe96d5d8a1b766c0e5b",
+    "src/app/measure/measureSnap.ts": "94b6842b9f863842ca7da47efc5df76d637f6ac8210408341f9bc4b2da6110bc",
     "src/app/measure/measureTypes.ts": "c2a3a9ed0e61189afd9678f8c834905582d4fe9485fc3f68b7e0d933ad25bcc2",
     "src/app/measure/movementRules.ts": "73cf4d937a9fed117b7fc4b4297832136e65ae39bebe31fc7143a462ad528fe5",
     "src/app/measure/reachSteps.ts": "ac10bf2b079b5f8a45fdb3cea21c747f3fad1d5651d3f27ed81465e47d63aca5",

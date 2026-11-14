@@ -1,11 +1,10 @@
 /**
  * Draws other people's lasers over a map view: a transparent canvas laid over the view's canvas that does not take
  * the pointer, redrawn each frame while a laser shows. Stock Atlas has no remote lasers to ask for, and nothing it
- * draws is reachable, so this is drawn here in screen space from the view's own camera (`viewport.toScreen`).
+ * draws is reachable, so this is drawn here in screen space from the view's own camera (`viewport.toScreen`). Players'
+ * templates are no part of it: they are Atlas's kept measures, which Atlas draws itself.
  */
 import { PingModel, ringRadius, type PingRing } from '../../app/online/tools/pings';
-import { setIcon } from 'obsidian';
-import { templateHandleAt, templateOutline, type MapTemplate } from '../../app/online/tools/templates';
 import { LaserModel, type ShownLaser } from './laserModel';
 import type { RemoteLaser } from '@atlas-vtt/api-types';
 
@@ -26,13 +25,6 @@ const HEAD = 7;
 export class LaserOverlay {
   private readonly model = new LaserModel();
   private readonly pings = new PingModel();
-  private templates: readonly MapTemplate[] = [];
-  private coneAngle = Math.PI / 2;
-  /** Takes a template off its scene: the GM's erase button on each one. */
-  private erase: ((id: string) => void) | null = null;
-  /** The erase buttons over the map, one per template, by its id. */
-  private handles: HTMLElement | null = null;
-  private readonly handleButtons = new Map<string, HTMLButtonElement>();
   private element: HTMLCanvasElement | null = null;
   private frame: number | null = null;
   private window: Window | null = null;
@@ -52,15 +44,6 @@ export class LaserOverlay {
     this.schedule();
   }
 
-  /** The players' lasting templates to draw, kept on screen as the camera moves; none stops drawing them. */
-  setTemplates(templates: readonly MapTemplate[], coneAngleDegrees: number, erase?: (id: string) => void): void {
-    if (this.disposed) return;
-    this.templates = templates;
-    this.erase = erase ?? null;
-    this.coneAngle = (Number.isFinite(coneAngleDegrees) && coneAngleDegrees > 0 ? coneAngleDegrees : 90) * Math.PI / 180;
-    this.schedule();
-  }
-
   /** Shows a ping at a world point. */
   ping(point: { x: number; y: number }, color: string): void {
     if (this.disposed) return;
@@ -74,9 +57,6 @@ export class LaserOverlay {
     this.frame = null;
     this.element?.remove();
     this.element = null;
-    this.handles?.remove();
-    this.handles = null;
-    this.handleButtons.clear();
     this.model.clear();
     this.pings.clear();
   }
@@ -90,8 +70,7 @@ export class LaserOverlay {
     this.frame = win.requestAnimationFrame(() => {
       this.frame = null;
       this.draw();
-      // Templates stay: drawn every frame while there are any, so they follow the camera.
-      if ((this.model.active || this.pings.active || this.templates.length > 0) && !this.disposed) this.schedule();
+      if ((this.model.active || this.pings.active) && !this.disposed) this.schedule();
     });
   }
 
@@ -104,9 +83,8 @@ export class LaserOverlay {
     const rect = canvas.getBoundingClientRect();
     const shown = this.model.frame(this.now());
     const rings = this.pings.frame(this.now());
-    if ((shown.length === 0 && rings.length === 0 && this.templates.length === 0) || rect.width === 0 || rect.height === 0) {
+    if ((shown.length === 0 && rings.length === 0) || rect.width === 0 || rect.height === 0) {
       this.element?.setCssProps({ display: 'none' });
-      this.placeHandles(canvas, rect);
       return;
     }
     const element = this.ensure(canvas);
@@ -124,97 +102,8 @@ export class LaserOverlay {
     if (!context) return;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     context.clearRect(0, 0, rect.width, rect.height);
-    for (const template of this.templates) this.drawTemplate(context, template);
     for (const laser of shown) this.drawLaser(context, laser);
     for (const ring of rings) this.drawRing(context, ring);
-    this.placeHandles(canvas, rect);
-  }
-
-  /**
-   * An erase button on every template, at its far edge, kept there as the camera moves. Only the buttons take the
-   * pointer: the map under the rest of the layer stays the GM's.
-   */
-  private placeHandles(canvas: HTMLCanvasElement, rect: DOMRect): void {
-    const templates = this.erase && rect.width > 0 && rect.height > 0 ? this.templates : [];
-    if (templates.length === 0) {
-      this.handles?.setCssProps({ display: 'none' });
-      return;
-    }
-    let layer = this.handles;
-    if (!layer?.isConnected) {
-      layer = createDiv({ cls: 'atlas-connect-template-handles' });
-      // Over the overlay, still below Atlas's own panels, which come later in the view.
-      (this.element?.isConnected ? this.element : canvas).after(layer);
-      this.handles = layer;
-      this.handleButtons.clear();
-    }
-    const besideCanvas = layer.parentElement === canvas.parentElement;
-    layer.setCssProps({
-      display: 'block', position: besideCanvas ? 'absolute' : 'fixed',
-      left: `${besideCanvas ? canvas.offsetLeft : rect.left}px`, top: `${besideCanvas ? canvas.offsetTop : rect.top}px`,
-      width: `${rect.width}px`, height: `${rect.height}px`,
-    });
-    const shownIds = new Set<string>();
-    for (const template of templates) {
-      const at = templateHandleAt(template);
-      const place = this.target.toScreen(at.x, at.y);
-      if (!place) continue;
-      shownIds.add(template.id);
-      let button = this.handleButtons.get(template.id);
-      if (!button) {
-        button = layer.createEl('button', { cls: 'atlas-connect-template-erase', attr: { type: 'button', 'aria-label': 'Erase template' } });
-        setIcon(button, 'x');
-        const id = template.id;
-        button.addEventListener('pointerdown', (event) => event.stopPropagation());
-        button.addEventListener('click', (event) => {
-          event.stopPropagation();
-          this.erase?.(id);
-        });
-        this.handleButtons.set(template.id, button);
-      }
-      button.setCssProps({ left: `${place.x}px`, top: `${place.y}px`, '--template-color': template.color });
-    }
-    for (const [id, button] of this.handleButtons) {
-      if (shownIds.has(id)) continue;
-      button.remove();
-      this.handleButtons.delete(id);
-    }
-  }
-
-  /** A template as players draw it: its area filled faintly in its owner's colour, outlined. */
-  private drawTemplate(context: CanvasRenderingContext2D, template: MapTemplate): void {
-    const outline = templateOutline(template, this.coneAngle);
-    const start = this.target.toScreen(template.start.x, template.start.y);
-    const end = this.target.toScreen(template.end.x, template.end.y);
-    if (!start || !end) return;
-    context.strokeStyle = template.color;
-    context.fillStyle = template.color;
-    context.lineWidth = 2;
-    context.beginPath();
-    if (template.shape === 'circle') {
-      context.arc(start.x, start.y, Math.hypot(end.x - start.x, end.y - start.y), 0, Math.PI * 2);
-    } else if (outline) {
-      outline.forEach((point, index) => {
-        const place = this.target.toScreen(point.x, point.y);
-        if (!place) return;
-        if (index === 0) context.moveTo(place.x, place.y);
-        else context.lineTo(place.x, place.y);
-      });
-      context.closePath();
-    } else {
-      context.lineWidth = 6;
-      context.globalAlpha = 0.5;
-      context.moveTo(start.x, start.y);
-      context.lineTo(end.x, end.y);
-      context.stroke();
-      context.globalAlpha = 1;
-      return;
-    }
-    context.globalAlpha = 0.18;
-    context.fill();
-    context.globalAlpha = 0.8;
-    context.stroke();
-    context.globalAlpha = 1;
   }
 
   private drawRing(context: CanvasRenderingContext2D, ring: PingRing): void {
@@ -236,7 +125,7 @@ export class LaserOverlay {
     if (this.element?.isConnected) return this.element;
     const element = createEl('canvas', { cls: 'atlas-connect-lasers', attr: { 'aria-hidden': 'true' } });
     // Right after the map's canvas: above the map, below Atlas's own panels and menus, which come later in the view.
-    // Lasting templates stay on screen, so they must never cover a panel. Without a parent, over the page.
+    // Without a parent, over the page.
     if (canvas.parentElement) canvas.after(element);
     else canvas.ownerDocument.body.appendChild(element);
     this.element = element;

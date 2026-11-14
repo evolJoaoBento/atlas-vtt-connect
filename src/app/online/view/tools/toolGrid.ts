@@ -13,7 +13,8 @@
 // The grid's shape as the page's drawing code (the older Atlas bundle) types it; the rules below are Atlas 0.15's own.
 import type { GridGeometry } from '@atlas-vtt/shared/grid';
 import {
-  cellCentreAt, dragMove, formatDistance, pathLengthInCells, readDragDistance, showsDragDistance, snapTokenCenter, type GridGeometry as AtlasGeometry,
+  cellCentreAt, dragMove, formatDistance, pathLengthInCells, readDragDistance, showsDragDistance, snapAreaEnd, snapAreaOrigin, snapTokenCenter,
+  type GridGeometry as AtlasGeometry,
 } from '../../../../../packages/atlas-shared/src/index';
 import { snapGridOf } from '../../scene/snapGrid';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
@@ -24,6 +25,10 @@ export interface ToolGrid {
   snap(point: ScenePoint): ScenePoint;
   /** Where a square template's corner lands: the nearest corner of a square grid's cells while snapping is on. */
   snapCorner(point: ScenePoint): ScenePoint;
+  /** Where a template starts, as Atlas snaps an area's origin: a cell's centre, corner or edge middle (a hex's centre or corner). */
+  snapAreaOrigin(point: ScenePoint): ScenePoint;
+  /** Where a template started at `origin` ends, as Atlas snaps an area's end. */
+  snapAreaEnd(origin: ScenePoint, point: ScenePoint): ScenePoint;
   /** Where a drag ruler point of a token of `tokenSize` lands: the GM's snap-to-grid decides, as for a dropped token, even if the grid is hidden. */
   snapDrag(point: ScenePoint, tokenSize: number): ScenePoint;
   /** The distance along `points`, e.g. "30ft" or a range band's name. */
@@ -53,6 +58,8 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
       const corner = (value: number, offset: number): number => offset + Math.round((value - offset) / geometry.size) * geometry.size;
       return { x: corner(point.x, geometry.offsetX ?? 0), y: corner(point.y, geometry.offsetY ?? 0) };
     },
+    snapAreaOrigin: (point) => snapAreaOrigin(scene.measurement.snapToGrid && (grid || snapGrid) ? geometry as AtlasGeometry : null, point) as ScenePoint,
+    snapAreaEnd: (origin, point) => snapAreaEnd(scene.measurement.snapToGrid && (grid || snapGrid) ? geometry as AtlasGeometry : null, origin, point) as ScenePoint,
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => centreOf(snapGrid, cell))
       : { x: point.x, y: point.y }),

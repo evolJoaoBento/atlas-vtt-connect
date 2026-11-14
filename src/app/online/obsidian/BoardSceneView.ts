@@ -170,7 +170,8 @@ export class BoardSceneView implements SceneViewport {
     this.options.onToolsChange();
   }
   setPlayers(order: readonly string[], self: string | null): void { this.board.setPlayers(order, self); }
-  receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.board.receiveTemplates(sceneId, templates); }
+  // A kept spell's flat mark is left out: the board draws its 3D shape (`receiveSpells`).
+  receiveTemplates(sceneId: string, templates: readonly MapTemplate[]): void { this.board.receiveTemplates(sceneId, templates.filter((template) => template.kind !== 'spell')); }
   /** The scene's spells (a Tabletop without spells draws none). */
   receiveSpells(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[] = []): void { this.board.receiveSpells?.(sceneId, spells, asks); }
   receivePing(ping: PlayerPing): void { this.board.receivePing(ping); }

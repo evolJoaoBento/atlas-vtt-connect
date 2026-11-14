@@ -28,6 +28,7 @@ export const FILES = [
   'measure/measureEffects.ts',
   'measure/measureGeometry.ts',
   'measure/measureGrid.ts',
+  'measure/measureSnap.ts',
   'measure/measureTypes.ts',
   'measure/movementRules.ts',
   'measure/reachSteps.ts',

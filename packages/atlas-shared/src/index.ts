@@ -175,5 +175,6 @@ export * as pinIcons from './app/types/pinIcons';
 // ── Measures: areas as Atlas shapes them, and their looks ────────────────────
 export { shapedArea, circleCorners, type AreaShapeRules, type MeasureArea, type ShapedArea } from './app/measure/measureGeometry';
 export { MEASURE_EFFECTS, readMeasureEffect, type MeasureEffect } from './app/measure/measureEffects';
+export { snapAreaEnd, snapAreaOrigin, snapRulerPoint } from './app/measure/measureSnap';
 export { MAX_MEASURES, MAX_MEASURE_AUTHOR, MEASURE_SHAPES, type KeptMeasure, type Measurement, type MeasureShapeKind } from './app/measure/measureTypes';
 export { DEFAULT_AREA_CELL_RULE, DEFAULT_CONE_END, type AreaCellRule, type ConeEnd } from './app/measure/areaRules';

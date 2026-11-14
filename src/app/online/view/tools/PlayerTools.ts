@@ -286,7 +286,7 @@ export class PlayerTools implements TokenGrab {
     } else if (this.current === 'measure') {
       this.measure.begin(this.options.toWorld(point), grid);
     } else if (this.current === 'template') {
-      const at = this.templateSnap(this.options.toWorld(point), grid);
+      const at = grid.snapAreaOrigin(this.options.toWorld(point));
       this.draft = { start: at, end: at };
     } else if (this.current === 'ping') {
       // One tap, one ping: shown here at once, and sent to everyone else.
@@ -311,7 +311,7 @@ export class PlayerTools implements TokenGrab {
     } else if (this.pressed === 'measure') {
       this.measure.move(this.options.toWorld(point), grid);
     } else if (this.pressed === 'template') {
-      if (this.draft) this.draft = { start: this.draft.start, end: this.templateSnap(this.options.toWorld(point), grid) };
+      if (this.draft) this.draft = { start: this.draft.start, end: grid.snapAreaEnd(this.draft.start, this.options.toWorld(point)) };
     } else if (this.pressed === 'ping') {
       return;
     } else {
@@ -352,7 +352,8 @@ export class PlayerTools implements TokenGrab {
       }),
       pings: this.pings.frame(this.options.now()),
       templates: (this.draft && this.pressed === 'template'
-        ? [...this.templates, { id: 'draft', owner: this.self ?? SELF, shape: this.templateShapeChoice, start: this.draft.start, end: this.draft.end, color: this.selfColor() }]
+        // Drawn as the measure it becomes: a line one cell wide, a square from the middle of its near side.
+        ? [...this.templates, { id: 'draft', owner: this.self ?? SELF, shape: this.templateShapeChoice, start: this.draft.start, end: this.draft.end, color: this.selfColor(), ...(this.templateShapeChoice === 'line' ? { width: this.grid?.geometry.size ?? 70 } : {}) }]
         : this.templates).map((template) => this.withSize(template)),
       coneOpening: this.grid?.coneOpening ?? Math.PI / 2,
     };
@@ -382,11 +383,6 @@ export class PlayerTools implements TokenGrab {
     return (tokens && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.speed : undefined) ?? null;
   }
 
-  /** A template's points land as a measurement's do; a square's on the corners of the grid's cells. */
-  private templateSnap(point: ScenePoint, grid: ToolGrid): ScenePoint {
-    return this.templateShapeChoice === 'square' ? grid.snapCorner(point) : grid.snap(point);
-  }
-
   /** A template with its size: a line's or cone's length, a circle's radius, a square's side. */
   private withSize(template: MapTemplate): ShownTemplate {
     return this.grid ? { ...template, label: this.grid.label(templateSpan(template)) } : template;
@@ -409,7 +405,7 @@ export class PlayerTools implements TokenGrab {
     }
     const opening = this.grid?.coneOpening ?? Math.PI / 2;
     const mine = [...this.templates].reverse()
-      .find((template) => template.owner === this.self && templateContains(template, pointer, opening, TEMPLATE_REACH / zoom));
+      .find((template) => template.owner === this.self && template.kind !== 'spell' && template.kind !== 'area' && templateContains(template, pointer, opening, TEMPLATE_REACH / zoom));
     if (mine) this.options.sendTemplate?.({ remove: mine.id });
   }
 
