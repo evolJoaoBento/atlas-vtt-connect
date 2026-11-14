@@ -236,9 +236,16 @@ export interface PlayerDrawing {
   order: number;
   points: ScenePoint[];
   color: string;
+  /** 0 (Atlas 0.16): a fill without a line. */
   width: number;
   opacity: number;
   icon: string | null;
+  /** Atlas 0.16: a closed drawing's inside, in its colour (soft: a quarter of it); absent for none. */
+  fill?: 'solid' | 'soft';
+  /** Atlas 0.16: rings cut out of the fill. */
+  holes?: ScenePoint[][];
+  /** Atlas 0.16: a stamp's turn, degrees clockwise on screen. */
+  rotation?: number;
 }
 
 export const PLAYER_WIDGET_TYPES = ['counter', 'clock', 'timer'] as const;

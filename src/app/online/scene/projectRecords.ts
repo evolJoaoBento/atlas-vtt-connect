@@ -172,14 +172,25 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
   const points = wirePoints(stroke.points);
   if (points.length === 0) return null;
   const type = oneOf(PLAYER_DRAWING_TYPES, stroke.type, 'pen');
+  // Atlas 0.16: a closed drawing (it ends where it began) may be filled, with holes; its line may be none (width 0).
+  const record = stroke as DrawingStroke & { fill?: unknown; holes?: unknown; rotation?: unknown };
+  const [first] = points;
+  const last = points[points.length - 1];
+  const closed = type !== 'icon' && points.length >= 4 && first !== undefined && last !== undefined && first.x === last.x && first.y === last.y;
+  const fill = closed && (record.fill === 'solid' || record.fill === 'soft') ? record.fill : undefined;
+  const holes = fill && Array.isArray(record.holes) ? record.holes.slice(0, SCENE_LIMITS.holes).map((ring) => wirePoints(Array.isArray(ring) ? ring : [])).filter((ring) => ring.length >= 3) : [];
+  const rotation = type === 'icon' ? finiteOr(record.rotation, 0) : 0;
   return {
     type,
     order: finiteOr(stroke.timestamp, 0),
     points,
     color: textOr(stroke.color, '#000000'),
-    width: positiveOr(stroke.width, 1, SCENE_RANGES.stroke),
+    width: fill && stroke.width === 0 ? 0 : positiveOr(stroke.width, 1, SCENE_RANGES.stroke),
     opacity: unitOr(stroke.opacity, 1),
     icon: type === 'icon' ? textOrNull(stroke.icon) : null,
+    ...(fill ? { fill } : {}),
+    ...(holes.length > 0 ? { holes } : {}),
+    ...(rotation !== 0 ? { rotation: ((rotation % 360) + 360) % 360 } : {}),
   };
 }
 

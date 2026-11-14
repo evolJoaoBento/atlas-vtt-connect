@@ -225,7 +225,11 @@ function isPlayerText(value: unknown): boolean {
 
 function isPlayerDrawing(value: unknown): boolean {
   return isFields(value) && oneOf(PLAYER_DRAWING_TYPES)(value.type) && isNumber(value.order) && isPoints(value.points, 1)
-    && isString(value.color) && isStroke(value.width) && isOpacity(value.opacity) && nullable(isString)(value.icon);
+    && isString(value.color) && isStroke(value.width) && isOpacity(value.opacity) && nullable(isString)(value.icon)
+    // Atlas 0.16's looks: all optional, so a scene of an older Connect is well formed.
+    && (value.fill === undefined || value.fill === 'solid' || value.fill === 'soft')
+    && (value.holes === undefined || (Array.isArray(value.holes) && value.holes.length <= SCENE_LIMITS.holes && value.holes.every((ring) => isPoints(ring, 3))))
+    && (value.rotation === undefined || isNumber(value.rotation));
 }
 
 function isPlayerWidget(value: unknown): boolean {

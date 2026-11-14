@@ -23,6 +23,8 @@ export const SCENE_LIMITS = {
   textLength: 10_000,
   /** Keeps one fog operation well under a fog part's budget. */
   points: 5_000,
+  /** Rings cut out of one drawing's fill (Atlas 0.16). */
+  holes: 64,
   records: 10_000,
   conditions: 64,
   /** Longest condition name players get. */
