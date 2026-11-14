@@ -42,6 +42,14 @@ describe("players' spells are kept in Atlas's measures", () => {
     expect(w.flashes).toEqual([[MAP, flash.cast]]);
   });
 
+  it('an instantaneous spell that summons is kept: its going is what offers to take its summons off', () => {
+    const w = measureWorld();
+    w.send(ANA, cast({ name: 'Find Familiar', about: instant, rules: { summon: { name: 'Owl', count: 1 } } }));
+    expect(w.list()).toHaveLength(1);
+    expect(readExtra(record(w.list()[0]))).toMatchObject({ kind: 'spell', rules: { summon: { name: 'Owl', count: 1 } } });
+    expect(w.lastOf('p2', 'spell-flash')).toBeUndefined();
+  });
+
   it("holds a player to ten kept spells and a scene to forty; an answer to the GM's ask is held by the scene only", () => {
     const w = measureWorld();
     for (let i = 0; i < MEASURE_LIMITS.perPlayer + 1; i++) { w.tick(); w.send(ANA, cast()); }

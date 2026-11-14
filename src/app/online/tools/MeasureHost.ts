@@ -236,7 +236,8 @@ export class MeasureHost implements SessionHandler {
       this.asking?.notify?.(`${player.name} cast ${what}.`);
       this.broadcastAsks(slot.sceneId);
     };
-    if (isInstantaneous(words?.about)) {
+    // A summoning spell is kept though instantaneous (Find Familiar): its going is what offers to take its summons off.
+    if (isInstantaneous(words?.about) && !rules?.summon) {
       this.flash(slot.sceneId, { id: `f${this.nextFlash++}`, owner: player.playerId, color, spell, ...(rules ? { rules: cleanRules(rules) } : {}), ...cutCastWords(words) }, true);
       done();
       return;
