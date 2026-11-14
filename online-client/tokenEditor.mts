@@ -14,6 +14,19 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
   const title = doc.createElement('h2');
   title.textContent = sheet?.name ?? token.name ?? 'Personagem';
   form.append(title);
+  const light = doc.createElement('select');
+  light.setAttribute('aria-label', 'Foco de luz');
+  for (const [value, label] of [['none', 'Sem foco de luz'], ['torch', 'Tocha (20/40 pés)'], ['light', 'Magia: Luz (20/40 pés)'], ['continual-flame', 'Magia: Chama contínua (20/40 pés)']] as const) {
+    const option = doc.createElement('option'); option.value = value; option.textContent = label; light.append(option);
+  }
+  light.value = token.light ?? 'none';
+  const lightLabel = doc.createElement('label'); lightLabel.append('Foco de luz', light); form.append(lightLabel);
+  const darkvision = doc.createElement('select'); darkvision.setAttribute('aria-label', 'Visão no escuro');
+  for (const [value, label] of [[0, 'Sem visão no escuro'], [30, 'Visão no escuro: 30 pés'], [60, 'Visão no escuro: 60 pés'], [120, 'Visão no escuro: 120 pés']] as const) {
+    const option = doc.createElement('option'); option.value = String(value); option.textContent = label; darkvision.append(option);
+  }
+  darkvision.value = String(token.darkvision ?? 0);
+  const darkvisionLabel = doc.createElement('label'); darkvisionLabel.append('Visão no escuro', darkvision); form.append(darkvisionLabel);
   const field = (label: string, type: string, value: string): HTMLInputElement => {
     const row = doc.createElement('label');
     row.textContent = label;
@@ -36,19 +49,6 @@ export function openTokenEditor(doc: Document, token: PlayerToken, sheet: TokenS
   current.required = maximum.required = true;
   const toggle = field('Mostrar barrinha de HP', 'checkbox', '');
   toggle.checked = token.showHpBar === true;
-  const light = doc.createElement('select');
-  light.setAttribute('aria-label', 'Foco de luz');
-  for (const [value, label] of [['none', 'Sem foco de luz'], ['torch', 'Tocha (20/40 pés)'], ['light', 'Magia: Luz (20/40 pés)'], ['continual-flame', 'Magia: Chama contínua (20/40 pés)']] as const) {
-    const option = doc.createElement('option'); option.value = value; option.textContent = label; light.append(option);
-  }
-  light.value = token.light ?? 'none';
-  const lightLabel = doc.createElement('label'); lightLabel.append('Foco de luz', light); form.append(lightLabel);
-  const darkvision = doc.createElement('select'); darkvision.setAttribute('aria-label', 'Visão no escuro');
-  for (const [value, label] of [[0, 'Sem visão no escuro'], [30, 'Visão no escuro: 30 pés'], [60, 'Visão no escuro: 60 pés'], [120, 'Visão no escuro: 120 pés']] as const) {
-    const option = doc.createElement('option'); option.value = String(value); option.textContent = label; darkvision.append(option);
-  }
-  darkvision.value = String(token.darkvision ?? 0);
-  const darkvisionLabel = doc.createElement('label'); darkvisionLabel.append('Visão no escuro', darkvision); form.append(darkvisionLabel);
   if (embedded && sendFlash) {
     const flash = doc.createElement('button'); flash.type = 'button'; flash.className = 'secondary'; flash.textContent = 'Clarão mágico'; flash.setAttribute('aria-label', 'Criar um clarão mágico temporário');
     flash.addEventListener('click', () => { note.textContent = sendFlash() ? 'Clarão enviado.' : 'Não foi possível enviar o clarão.'; });

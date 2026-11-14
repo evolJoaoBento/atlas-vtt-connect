@@ -8,7 +8,7 @@
 import type { Disposer, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { TabKey } from '../split/tabKey';
 import { SightWait } from './goLive';
-import type { LightingFrame } from './lightingFrame';
+import { OPEN_FRAME, type LightingFrame } from './lightingFrame';
 import { projectForPlayers, visibleShows } from './projectForPlayers';
 import { projectBoard } from './projectBoard';
 import type { BoardExtras } from './boardTypes';
@@ -117,8 +117,9 @@ export class SceneSlot {
     if (this.state !== 'parked' || !this.kept || !this.lastSent) return;
     const { snapshot, frame } = this.kept;
     // A coverage of its own, dropped once sent: a parked slot holds none.
-    const fog = new FogCoverageCache().get(snapshot.objects.fog, this.memo, frame?.darkness, snapshot.mapSize);
-    this.send({ snapshot, lighting: frame, fog });
+    const lighting = this.dynamicLights ? frame : OPEN_FRAME;
+    const fog = new FogCoverageCache().get(snapshot.objects.fog, this.memo, lighting.darkness, snapshot.mapSize);
+    this.send({ snapshot, lighting, fog });
   }
 
   /**
@@ -305,7 +306,7 @@ export class SceneSlot {
   private prepare(): Prepared | null {
     const snapshot = this.source.snapshot();
     if (!snapshot || !this.fogCache) return null;
-    const lighting = this.lighting?.frame(snapshot) ?? null;
+    const lighting = this.dynamicLights ? this.lighting?.frame(snapshot) ?? null : OPEN_FRAME;
     return { snapshot, lighting, fog: this.fogCache.get(snapshot.objects.fog, this.memo, lighting?.darkness, snapshot.mapSize) };
   }
 
@@ -354,7 +355,8 @@ export class SceneSlot {
     if (enabled === this.dynamicLights) return;
     this.dynamicLights = enabled;
     this.lightMaskCache = null;
-    this.schedule();
+    if (this.state === 'parked') this.rulesChanged();
+    else this.schedule();
   }
 
   flashAt(x: number, y: number): void {

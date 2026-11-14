@@ -11,6 +11,21 @@ const click = (label: string): void => document.querySelector<HTMLButtonElement>
 const save = (): void => { document.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true })); };
 
 describe('token editor', () => {
+  it('shows light and darkvision controls at the top of the player token panel and sends changes', () => {
+    const send = vi.fn(() => true);
+    const panel = document.createElement('section'); document.body.append(panel);
+    openTokenEditor(document, token, undefined, send, panel, true);
+    const form = panel.querySelector('form')!;
+    expect(form.querySelector('label')?.textContent).toContain('Foco de luz');
+    expect(form.querySelectorAll('label')[1]?.textContent).toContain('Visão no escuro');
+    const light = form.querySelector<HTMLSelectElement>('select[aria-label="Foco de luz"]')!;
+    light.value = 'torch'; light.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(send).toHaveBeenLastCalledWith({ light: 'torch' });
+    const darkvision = form.querySelector<HTMLSelectElement>('select[aria-label="Visão no escuro"]')!;
+    darkvision.value = '60'; darkvision.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(send).toHaveBeenLastCalledWith({ darkvision: 60 });
+  });
+
   it('reads private owner HP, changes HP, size and status, and sends only edited attributes', () => {
     const send = vi.fn(() => true);
     openTokenEditor(document, token, { tokenId: 'hero', name: 'Hero', resources: [], sheet: null, health: { current: 5, max: 10 } }, send);

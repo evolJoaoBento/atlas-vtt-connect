@@ -85,7 +85,8 @@ const dynamicLightButton = element<HTMLButtonElement>('dynamic-light-button');
 let dynamicLightEnabled = true;
 const renderDynamicLightButton = (): void => {
   dynamicLightButton.setAttribute('aria-pressed', String(dynamicLightEnabled));
-  dynamicLightButton.textContent = dynamicLightEnabled ? '✦ Luz dinâmica' : '✧ Luz dinâmica';
+  dynamicLightButton.textContent = dynamicLightEnabled ? '✦ Luz e sombras: ligadas' : '✧ Luz e sombras: desligadas';
+  dynamicLightButton.setAttribute('aria-label', `Luz e sombras dinâmicas ${dynamicLightEnabled ? 'ligadas' : 'desligadas'}; alternar`);
 };
 dynamicLightButton.addEventListener('click', () => { session?.sendDynamicLightToggle(!dynamicLightEnabled); });
 renderDynamicLightButton();
@@ -264,7 +265,7 @@ function render(state: PlayerSessionState): void {
   if (retry) retry.hidden = state.status !== 'lost' || state.reason === 'ended' || state.reason === 'replaced';
   log.event('status', { status: state.status, reason: state.reason, players: state.players.length });
   sessionState = state;
-  dynamicLightButton.hidden = state.status !== 'admitted';
+  dynamicLightButton.disabled = state.status !== 'admitted';
   // Only an admitted player drags tokens and uses the tools: reconnecting or ended cancels a gesture.
   map?.setConnected(state.status === 'admitted');
   // The session's order of players decides whose laser has which colour.

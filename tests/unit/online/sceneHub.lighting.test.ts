@@ -29,7 +29,38 @@ function lastSnapshot(messages: readonly ControlMessage[]): { tokens: Record<str
   return snapshot?.type === 'scene-snapshot' ? snapshot.scene : null;
 }
 
+function finalFog(messages: readonly ControlMessage[]): Record<string, unknown> {
+  const fog: Record<string, unknown> = {};
+  for (const message of messages) {
+    if (message.type === 'scene-clear') for (const id of Object.keys(fog)) delete fog[id];
+    if (message.type === 'scene-fog') Object.assign(fog, message.records);
+    if (message.type === 'scene-patch') {
+      for (const id of message.remove.fog ?? []) delete fog[id];
+      Object.assign(fog, message.upsert.fog ?? {});
+    }
+  }
+  return fog;
+}
+
 describe('SceneHub going live on a lit scene (P8)', () => {
+  it('the global web switch removes and restores dynamic darkness for everyone', async () => {
+    const w = await splitWorld({ lighting: true });
+    w.atlas.views.setSnapshot(VIEW, tabScene('a', { ambushguard: character('ambushguard', 600) }, true));
+    w.atlas.lighting.setVisibility(VIEW, ready({ [TOKEN.a]: 'seen', ambushguard: 'seen' }, (x) => x < MAP.width / 2, MAP));
+    await w.present('a');
+    const anna = await w.join('anna');
+    expect(finalFog(anna.received)).toHaveProperty(DARKNESS_FOG_ID);
+
+    const slot = w.hub.lightSlots()[0]!;
+    slot.setDynamicLights(false);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(finalFog(anna.received)).not.toHaveProperty(DARKNESS_FOG_ID);
+
+    slot.setDynamicLights(true);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(finalFog(anna.received)).toHaveProperty(DARKNESS_FOG_ID);
+  });
+
   it('going live on a lit scene keeps the parked projection until sight is ready, then patches', async () => {
     const { w, anna, from } = await backOnAmbush();
     // The tab loaded and sight is pending: nothing new is sent, no darkness flash.
