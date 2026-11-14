@@ -8,8 +8,8 @@ import { isPhysicalRoll } from '../../../src/app/online/tools/toolMessages';
 describe('online protocol', () => {
   it('round-trips every message type', () => {
     const messages: ControlMessage[] = [
-      { v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
-      { v: 1, type: 'join', fusion: 3, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
+      { v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
+      { v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
       { v: 1, type: 'token-move-refused', tokenId: 'hero' },
       { v: 1, type: 'token-move-refused', tokenId: 'hero', reason: 'not-held' },
       { v: 1, type: 'admitted', playerId: 'p1', session: { title: 'Vault' } },
@@ -42,7 +42,7 @@ describe('online protocol', () => {
     expect(decodeControl('not json').kind).toBe('invalid');
     expect(decodeControl(42).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'denied', reason: 'bored' })).kind).toBe('invalid');
-    expect(decodeControl(JSON.stringify({ v: 1, type: 'join', fusion: 3, name: 'A', playerKey: 7, client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
+    expect(decodeControl(JSON.stringify({ v: 1, type: 'join', fusion: 4, name: 'A', playerKey: 7, client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'join', fusion: '1', name: 'A', playerKey: 'k', client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'token-move-refused', tokenId: 'hero', reason: 'because' })).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'presence', players: [{ playerId: 'p', name: 'A' }] })).kind).toBe('invalid');

@@ -5,7 +5,7 @@ import { decodeControl, encodeControl, type ControlMessage } from '../../../src/
 import type { PeerLink } from '../../../src/app/online/transport/types';
 
 const join = (name: string, playerKey: string): string =>
-  encodeControl({ v: 1, type: 'join', fusion: 3, name, playerKey, client: { kind: 'web', version: '0.5.0' } });
+  encodeControl({ v: 1, type: 'join', fusion: 4, name, playerKey, client: { kind: 'web', version: '0.5.0' } });
 
 /** A connected player end that records what the GM sent it. */
 async function player(network: MemoryNetwork): Promise<{ link: PeerLink; received: ControlMessage[]; closed: () => boolean }> {
@@ -168,7 +168,7 @@ describe('GmSession', () => {
   it('refuses a page or player of another fusion step, or of none, as out of date; the same step waits for the GM', async () => {
     const { network, requests } = setup();
     const join = (fusion?: number): string => encodeControl({ v: 1, type: 'join', ...(fusion === undefined ? {} : { fusion }), name: `P${fusion ?? 'none'}`, playerKey: `k${fusion ?? 'none'}`, client: { kind: 'web', version: '1' } });
-    for (const fusion of [undefined, 1, 2]) {
+    for (const fusion of [undefined, 1, 2, 3]) {
       const stale = await player(network);
       stale.link.send('control', join(fusion));
       expect(stale.received).toEqual([{ v: 1, type: 'denied', reason: 'version' }]);
@@ -176,9 +176,9 @@ describe('GmSession', () => {
     }
     expect(requests).toEqual([]);
     const current = await player(network);
-    current.link.send('control', join(3));
+    current.link.send('control', join(4));
     expect(current.received).toEqual([]);
-    expect(requests.map((request) => request.name)).toEqual(['P3']);
+    expect(requests.map((request) => request.name)).toEqual(['P4']);
   });
 
   it('logs a rejected message once per connection, without its contents, and not ignored types', async () => {

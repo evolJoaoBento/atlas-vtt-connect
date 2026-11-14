@@ -9,7 +9,7 @@
  * join each carry it, and a missing or different number is refused. It is the number of the Atlas fusion phase, raised
  * by each phase's first change to what the three exchange.
  */
-export const FUSION_PROTOCOL = 3;
+export const FUSION_PROTOCOL = 4;
 
 /** A sheet the AR markers are fixed on, as it lies on the table (see `tools/arTable.ts`): millimetres, x right and y down, with its heading in radians and its outline. */
 export interface ArTableGroup {
@@ -130,12 +130,21 @@ export interface BoardLayerRecord {
   water?: BoardWater;
 }
 
+/** One patch of water: its outline and what stands dry inside it, each ring a flat list of x, y in the scene's world. */
+export interface BoardWaterArea {
+  polygon: number[];
+  holes?: number[][];
+}
+
 /**
- * Painted water as Tabletop keeps it: the mask's size in texels, its run lengths (base64 varints) and how it moves.
- * Under the fog it still shows only as the board draws it there (black): the mask is the GM's whole drawing.
+ * A scene's water for Tabletop's board: the outlines of Atlas's liquids as Tabletop reads them (`areas`), and how the
+ * water moves. `mask` is the water a map still keeps from before it was Atlas's (Tabletop's old brush mask: its size
+ * in texels and its run lengths, base64 varints), sent until that map's water is moved. At least one of the two.
+ * Under the fog it still shows only as the board draws it there (black): it is the GM's whole drawing.
  */
 export interface BoardWater {
-  mask: { width: number; height: number; data: string };
+  areas?: BoardWaterArea[];
+  mask?: { width: number; height: number; data: string };
   motion?: { kind: string; amount: number; direction: number; tint: string; clarity: number } | null;
 }
 
@@ -176,8 +185,11 @@ export interface BoardCamera {
 /** The most the layers of one scene may carry: each layer's records, and all the layers together as JSON (a layer that would pass it is left out). */
 export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights: 60, props: 100, bytes: 110 * 1024 });
 
-/** The longest painted water mask sent (its base64 text): the scene's own, and a layer's (which counts towards the layers' bytes). */
-export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048 });
+/**
+ * The most water sent, as text (an old mask's base64, the outlines' JSON, each within it): the scene's own, and a
+ * layer's (which counts towards the layers' bytes). An outline has at most Atlas's corners, an area its holes, a scene its areas.
+ */
+export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048, corners: 2048, holes: 256, areas: 256 });
 
 export const BOARD_PART_LIMITS = Object.freeze({ walls: 1500, lights: 1000, props: 1000, materials: 200, maps: 8, parts: 64, text: 200 });
 

@@ -100,13 +100,48 @@ function copyTable(table: ArTable): ArTable {
   return { squareMm: table.squareMm, groups: table.groups.map(({ group, x, y, heading, w, h }) => ({ group, x, y, heading, w, h })) };
 }
 
-/** Painted water as the wire carries it; none when there is none, or when its mask is longer than `longest`. */
-function waterOf(water: BoardWater | undefined, longest: number): BoardWater | null {
-  if (!water?.mask || typeof water.mask.data !== 'string' || water.mask.data.length > longest) return null;
-  const { width, height, data } = water.mask;
+/** A ring of an outline as the wire carries it (to the hundredth); null for what is no ring Atlas would keep. */
+function waterRing(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length < 6 || value.length % 2 !== 0 || value.length > BOARD_WATER_LIMITS.corners * 2) return null;
+  const ring: number[] = [];
+  for (const n of value) {
+    if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) >= 1e7) return null;
+    ring.push(Math.round(n * 100) / 100);
+  }
+  return ring;
+}
+
+/** An old water mask as the wire carries it; null when it is broken or longer than `longest`. */
+function waterMask(mask: BoardWater['mask'], longest: number): NonNullable<BoardWater['mask']> | null {
+  if (!mask || typeof mask.data !== 'string' || mask.data.length > longest) return null;
+  const { width, height, data } = mask;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0 || width > BOARD_WATER_LIMITS.side || height > BOARD_WATER_LIMITS.side) return null;
+  return { width, height, data };
+}
+
+/**
+ * Water as the wire carries it: its outlines (those that are rings, in order, while they fit in `longest` as text) and
+ * the old mask of a map not moved yet; none when neither is left.
+ */
+function waterOf(water: BoardWater | undefined, longest: number): BoardWater | null {
+  if (!water) return null;
+  const areas: NonNullable<BoardWater['areas']> = [];
+  let length = 2;
+  for (const area of Array.isArray(water.areas) ? water.areas : []) {
+    if (areas.length >= BOARD_WATER_LIMITS.areas) break;
+    const polygon = typeof area === 'object' && area !== null ? waterRing(area.polygon) : null;
+    if (!polygon) continue;
+    const holes = (Array.isArray(area.holes) ? area.holes : []).map(waterRing).filter((ring): ring is number[] => ring !== null).slice(0, BOARD_WATER_LIMITS.holes);
+    const kept = { polygon, ...(holes.length > 0 ? { holes } : {}) };
+    const size = JSON.stringify(kept).length + 1;
+    if (length + size > longest) continue;
+    length += size;
+    areas.push(kept);
+  }
+  const mask = waterMask(water.mask, longest);
+  if (areas.length === 0 && !mask) return null;
   const motion = water.motion;
-  return { mask: { width, height, data }, ...(motion ? { motion: { kind: motion.kind, amount: motion.amount, direction: motion.direction, tint: motion.tint, clarity: motion.clarity } } : {}) };
+  return { ...(areas.length > 0 ? { areas } : {}), ...(mask ? { mask } : {}), ...(motion ? { motion: { kind: motion.kind, amount: motion.amount, direction: motion.direction, tint: motion.tint, clarity: motion.clarity } } : {}) };
 }
 
 function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 'idFor'>, material: (id: string | null) => string | null): BoardLayerRecord | null {

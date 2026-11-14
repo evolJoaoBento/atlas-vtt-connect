@@ -62,12 +62,31 @@ function isMaterial(value: unknown): boolean {
   return maps.length <= BOARD_PART_LIMITS.maps && maps.every(([role, id]) => isSceneId(role) && isSceneId(id)) && (value.tuning === undefined || isTuning(value.tuning));
 }
 
-/** Painted water: a mask no larger than the board draws, its text within the limit, and a motion of plain values. */
+/** A ring of water's outline: a flat list of x, y, at least three places and no more than Atlas keeps. */
+const isWaterRing = (value: unknown): boolean => Array.isArray(value) && value.length >= 6 && value.length % 2 === 0 && value.length <= BOARD_WATER_LIMITS.corners * 2
+  && value.every((n) => isNumber(n) && Math.abs(n) < 1e7);
+
+/**
+ * Water: outlines within the limits, or an old mask no larger than the board draws with its text within the limit (at
+ * least one of the two, all of it within `longest` as text), and a motion of plain values.
+ */
 function isWater(value: unknown, longest: number): boolean {
-  if (!isFields(value) || !isFields(value.mask)) return false;
-  const { width, height, data } = value.mask;
-  const side = (n: unknown): boolean => Number.isSafeInteger(n) && (n as number) > 0 && (n as number) <= BOARD_WATER_LIMITS.side;
-  if (!side(width) || !side(height) || typeof data !== 'string' || data.length > longest || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return false;
+  if (!isFields(value)) return false;
+  const { areas, mask } = value;
+  if (areas === undefined && mask === undefined) return false;
+  if (areas !== undefined) {
+    if (!Array.isArray(areas) || areas.length === 0 || areas.length > BOARD_WATER_LIMITS.areas || JSON.stringify(areas).length > longest) return false;
+    for (const area of areas) {
+      if (!isFields(area) || !isWaterRing(area.polygon)) return false;
+      if (area.holes !== undefined && (!Array.isArray(area.holes) || area.holes.length === 0 || area.holes.length > BOARD_WATER_LIMITS.holes || !area.holes.every(isWaterRing))) return false;
+    }
+  }
+  if (mask !== undefined) {
+    if (!isFields(mask)) return false;
+    const { width, height, data } = mask;
+    const side = (n: unknown): boolean => Number.isSafeInteger(n) && (n as number) > 0 && (n as number) <= BOARD_WATER_LIMITS.side;
+    if (!side(width) || !side(height) || typeof data !== 'string' || data.length > longest || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return false;
+  }
   const motion = value.motion;
   return motion === undefined || motion === null || (isFields(motion) && typeof motion.kind === 'string' && motion.kind.length <= 20
     && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity));

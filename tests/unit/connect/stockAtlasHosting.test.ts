@@ -44,7 +44,7 @@ function stockHosting(files: Record<string, string> = {}) {
       const decoded = channel === 'control' && typeof data === 'string' ? decodeControl(data) : null;
       if (decoded?.kind === 'message') received.push(decoded.message);
     });
-    client.send('control', encodeControl({ v: 1, type: 'join', fusion: 3, name, playerKey: `key-${name}`, client: { kind: 'web', version: '1' } }));
+    client.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name, playerKey: `key-${name}`, client: { kind: 'web', version: '1' } }));
     requests.at(-1)?.(true);
     return received;
   };

@@ -3,6 +3,7 @@ import type { WorldBounds } from '../../../src/app/online/scene/FogCoverage';
 import { projectBoard } from '../../../src/app/online/scene/projectBoard';
 import type { BoardLook } from '../../../src/app/online/scene/sceneContracts';
 import { isBoardExtras } from '../../../src/app/online/scene/boardValidation';
+import { BOARD_WATER_LIMITS } from '../../../src/app/online/scene/boardTypes';
 
 /** Everything left of x = 500 is shown; the rest is under fog (or dark). */
 const leftHalf = { shows: (bounds: WorldBounds) => bounds.x + bounds.width <= 500 };
@@ -154,6 +155,31 @@ describe('projectBoard', () => {
     expect(projectBoard(state([]), 's1', null, {}, { ...look, layerLook: 'hidden' as 'faded' }, assets)).not.toHaveProperty('layerLook');
   });
 
+  it("the scene's water goes as outlines (Atlas's liquids, as Tabletop reads them) with its motion; what is no outline, or too much of it, does not", () => {
+    const motion = { kind: 'flow', amount: 0.5, direction: 45, tint: '#2a6f8a', clarity: 0.7 };
+    const areas = [{ polygon: [0, 0, 0, 70, 70, 70], holes: [[10, 30, 10, 40, 20, 40]] }, { polygon: [100, 0, 100, 10, 110, 10] }];
+    const sent = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, { ...look, water: { areas, motion } }, assets);
+    expect(sent.water).toEqual({ areas, motion });
+    expect(isBoardExtras(sent)).toBe(true);
+    // Rings that are none are left out, with their area when it is the outline; numbers that are none never go.
+    const odd = projectBoard(state([]), 's1', leftHalf, {}, { ...look, water: { areas: [{ polygon: [0, 0, 1, 1] }, { polygon: [0, 0, 0, 70, 70, Number.NaN] }, { polygon: [0, 0, 0, 70, 70, 70], holes: [[1, 2, 3], 'x'] }] as never, motion } }, assets);
+    expect(odd.water).toEqual({ areas: [{ polygon: [0, 0, 0, 70, 70, 70] }], motion });
+    // More outline than a scene's water may send (as text, like its old mask): the areas that still fit go, in order.
+    const small = Array.from({ length: 600 }, (_, k) => k);
+    const wide = Array.from({ length: 4096 }, (_, k) => 100000.25 + k);
+    expect(JSON.stringify(wide).length * 2).toBeGreaterThan(BOARD_WATER_LIMITS.scene);
+    const many = projectBoard(state([]), 's1', leftHalf, {}, { ...look, water: { areas: [{ polygon: small }, { polygon: wide }, { polygon: wide }, { polygon: [5, 5, 5, 9, 9, 9] }], motion } }, assets);
+    expect(many.water!.areas!.map((area) => area.polygon.length)).toEqual([600, 4096, 6]);
+    // A ring of more corners than Atlas keeps is no ring.
+    expect(projectBoard(state([]), 's1', leftHalf, {}, { ...look, water: { areas: [{ polygon: [...wide, 1, 2] }], motion } }, assets).water).toBeUndefined();
+    // With no outline left and no mask there is no water.
+    expect(projectBoard(state([]), 's1', leftHalf, {}, { ...look, water: { areas: [], motion } }, assets).water).toBeUndefined();
+    expect(isBoardExtras({ ...sent, water: { areas: [{ polygon: [0, 0, 1] }] } })).toBe(false);
+    expect(isBoardExtras({ ...sent, water: { areas: [{ polygon: [0, 0, 0, 70, 70, '70'] }] } })).toBe(false);
+    expect(isBoardExtras({ ...sent, water: { areas: [{ polygon: [0, 0, 0, 70, 70, 70], holes: [[1, 1]] }] } })).toBe(false);
+    expect(isBoardExtras({ ...sent, water: { motion } })).toBe(false);
+  });
+
   it('the painted water of the scene goes with its motion; water too long to send, or a broken mask, does not', () => {
     const water = { mask: { width: 40, height: 30, data: 'AQID' }, motion: { kind: 'flow', amount: 0.5, direction: 45, tint: '#2a6f8a', clarity: 0.7 } };
     const sent = projectBoard(state([wall('w1', 'solid', 0)]), 's1', leftHalf, {}, { ...look, water }, assets);
@@ -207,6 +233,13 @@ describe('projectBoard', () => {
       expect(layer.props).toEqual([{ id: 'p', asset: 'id:minis/barrel.glb', x: 1, y: 2, scale: 1, turn: 0 }]);
       expect(layer.lights[0]).toMatchObject({ id: 'l', color: '#ffaa00', animation: 'torch' });
       expect(extras.materials.map((entry) => entry.id)).toContain('id:mat/brick/c.jpg');
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it('a stacked scene goes with its water, as outlines', () => {
+      const water = { areas: [{ polygon: [0, 0, 0, 70, 70, 70] }], motion: { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 } };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [{ ...upstairs, water }] }, assets);
+      expect(extras.layers![0]!.water).toEqual(water);
       expect(isBoardExtras(extras)).toBe(true);
     });
 
