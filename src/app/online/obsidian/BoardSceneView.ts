@@ -18,7 +18,7 @@ import type { ArTable } from '../tools/arTable';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
-import type { TokenSheet } from '../tools/sheets';
+import type { TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { MapTemplate, TemplateShape } from '../tools/templates';
 import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';

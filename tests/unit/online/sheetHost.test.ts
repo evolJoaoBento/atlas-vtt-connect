@@ -3,7 +3,7 @@ import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSe
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { SheetHost } from '../../../src/app/online/tools/SheetHost';
-import type { SheetCard } from '../../../src/app/online/tools/sheetCards';
+import type { SheetCard } from '../../../packages/atlas-host/src/sheets/sheetCards';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };

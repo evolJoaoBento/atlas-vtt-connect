@@ -10,7 +10,7 @@ import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { ArPose } from '../tools/arViews';
-import type { SheetRollRef } from '../tools/sheets';
+import type { SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { OfferedDiceRules, PhysicalRoll, PlayerLaser } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';

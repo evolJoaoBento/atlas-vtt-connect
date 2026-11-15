@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SheetView } from '../../../online-client/sheetView.mts';
-import { buildSheet, type TokenSheet } from '../../../src/app/online/tools/sheets';
+import { buildSheet, type TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 
 let last: SheetView | null = null;
 

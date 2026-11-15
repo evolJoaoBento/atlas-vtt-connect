@@ -10,7 +10,7 @@ import { SheetHost } from '../tools/SheetHost';
 import { PingRelay } from '../tools/PingRelay';
 import { MeasureHost } from '../tools/MeasureHost';
 import type { StockMeasures } from '../../../connect/stockMeasures';
-import type { SheetCard } from '../tools/sheetCards';
+import type { SheetCard } from '../../../../packages/atlas-host/src/sheets/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
 export function tokenControlPart(tokens: TokensApi, movesOnTurn?: () => boolean): NonNullable<OptionalParts['tokenControl']> {

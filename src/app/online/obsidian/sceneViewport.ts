@@ -7,7 +7,7 @@ import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
 import type { PlayerPing } from '../tools/pings';
-import type { TokenSheet } from '../tools/sheets';
+import type { TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { MapTemplate, TemplateShape } from '../tools/templates';
 import type { PlayerLaser } from '../tools/toolMessages';
 import type { MeasureChoice } from '../view/tools/MeasureTool';

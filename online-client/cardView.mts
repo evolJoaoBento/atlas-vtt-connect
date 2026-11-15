@@ -3,7 +3,7 @@
  * Atlas's card of a token's stat block on the player's side (`sheetCards.ts`): its markup kept to what a card is made
  * of, drawn in a shadow root so its styles and the page's never meet. Shared with the Obsidian scene tab.
  */
-import { CARD_ATTRIBUTES, CARD_DROPPED, CARD_ELEMENTS, IMAGE_DATA_URL, safeCss, type CardRoll, type SheetCard } from '../src/app/online/tools/sheetCards';
+import { CARD_ATTRIBUTES, CARD_DROPPED, CARD_ELEMENTS, IMAGE_DATA_URL, safeCss, type CardRoll, type SheetCard } from '../packages/atlas-host/src/sheets/sheetCards';
 
 /** `html` as a fragment of `doc` holding only what a card may hold. */
 export function sanitizeCardHtml(html: string, doc: Document): DocumentFragment {

@@ -8,7 +8,7 @@
 import {
   addDieLabel, CLEAR_LABEL, DiceTray, EMPTY_TRAY_TEXT, MODIFIER_LABEL, removeDieLabel, ROLL_LABEL, SIDE_LABEL, SIDE_NAMES,
 } from '../src/app/online/page/diceTray';
-import type { AdvantageSide } from '../src/app/online/tools/sheets';
+import type { AdvantageSide } from '../packages/atlas-host/src/sheets/sheets';
 import { DIE_ART } from '../src/app/online/page/dieArt';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import { MAX_MODIFIER, TRAY_DICE, type TrayDie } from '@atlas-vtt/shared/rules';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSheet, isSheetRollRef, isTokenSheets, sheetRollFormula, sheetRollLabel, textParts, toRollFormula } from '../../../src/app/online/tools/sheets';
+import { buildSheet, isSheetRollRef, isTokenSheets, sheetRollFormula, sheetRollLabel, textParts, toRollFormula } from '../../../packages/atlas-host/src/sheets/sheets';
 
 const GOBLIN = {
   name: 'Goblin', path: 'Bestiary/Goblin.md', image: 'secret/goblin.png', size: 'Small', type: 'humanoid', subtype: 'goblinoid', alignment: 'neutral evil',

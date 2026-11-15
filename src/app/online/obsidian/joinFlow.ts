@@ -4,7 +4,7 @@
  */
 import type { MapSpell, SpellRequest } from '../tools/spells';
 import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
-import type { TokenSheet } from '../tools/sheets';
+import type { TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { MapTemplate } from '../tools/templates';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { JoinTarget } from '../joinLink';

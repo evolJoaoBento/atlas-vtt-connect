@@ -10,7 +10,7 @@ import {
 } from './scene/sceneValidation';
 import type { BoardCamera, BoardCutscene, BoardExtras } from './scene/boardTypes';
 import { isBoardCamera, isBoardCutscene, isBoardExtras, isBoardPart, isCutsceneKeyName, isCutsceneRunId, isCutscenePose } from './scene/boardValidation';
-import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from './tools/sheets';
+import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import { isPingPoint } from './tools/pings';
 import { isArPose, type ArPose } from './tools/arViews';
 import { isArTable, type ArSurvey } from './tools/arTable';
@@ -124,7 +124,7 @@ export type ControlMessage =
    * milliseconds from each to the one before it in the stroke, so receivers can play the motion back smoothly.
    */
   | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string; size?: number }
-  /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
+  /** GM to one player: the tokens they control, with exact numbers and stat block (`atlas-host/src/sheets/sheets.ts`); never to anyone else. */
   | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
   /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
   | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }

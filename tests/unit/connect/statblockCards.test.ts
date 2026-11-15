@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { cardKey, cardKeyParts, scopeSelector, StatblockCards } from '../../../src/connect/statblockCards';
-import type { SheetCard } from '../../../src/app/online/tools/sheetCards';
+import type { SheetCard } from '../../../packages/atlas-host/src/sheets/sheetCards';
 
 const card = (name: string): SheetCard => ({ html: name, css: '', variables: {}, rolls: [] });
 

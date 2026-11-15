@@ -7,7 +7,7 @@ import { SCENE_RANGES } from '../scene/sceneLimits';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { isSceneId } from '../scene/sceneValidation';
 import { dieTagOf } from './diceTags';
-import { isSheetRollRef, type SheetRollRef } from './sheets';
+import { isSheetRollRef, type SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 
 export const DICE_LIMITS = {
   /** Dice in one player roll. */

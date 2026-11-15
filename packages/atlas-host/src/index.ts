@@ -1,6 +1,7 @@
 /**
  * Obsidian-side code shared by Connect and Tabletop: the Atlas version floor, the pairing notice, the one Atlas host
- * that follows a board, and the wake of Atlas's deferred tab. Tabletop holds a copy made by its `npm run sync:connect`.
+ * that follows a board, the wake of Atlas's deferred tab, the players' visibility, and the one sheet model with the
+ * reader of a token's linked stat block. Tabletop holds a copy made by its `npm run sync:connect`.
  */
 export { atlasFloor, compareVersions, floorNotice, FLOOR_POLL_MS, MIN_ATLAS_VERSION, watchAtlasFloor, type AtlasFloor } from './atlasFloor';
 export { pairingNotice } from './pairing';
@@ -14,3 +15,17 @@ export {
 export { atlasMapSize } from './lighting/mapSize';
 export { playerVisibilityApi, type LightingScene, type LightingView, type PlayerVisibilityDeps } from './lighting/playerVisibility';
 export type { Disposer, LightingApi, Perception, PlayerVisibility, PlayerVisibilityOptions } from './lighting/types';
+// The one sheet model (pure: a page imports `./sheets/sheets` and `./sheets/sheetCards` by path) and its reader.
+export {
+  ABILITY_NAMES, ADVANTAGE_SIDES, advantageSide, buildSheet, isSheetRollRef, isTokenSheets, mayHaveAdvantage, modifierOf, rollableName, sheetColor,
+  sheetRollFormula, sheetRollLabel, SHEET_LIMITS, signed, text as sheetText, textParts, toRollFormula,
+  type AdvantageSide, type PlayerSheet, type SheetBonus, type SheetItem, type SheetLine, type SheetResource, type SheetRollRef, type SheetSection,
+  type TextPart, type TokenSheet,
+} from './sheets/sheets';
+export { CARD_LIMITS, cardRollFormula, isSheetCard, safeCss, type CardRoll, type SheetCard } from './sheets/sheetCards';
+export {
+  buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, isTemplatedStatblock, templateHidesFields, templateId, type TemplatedStatblock,
+} from './sheets/templateSheets';
+export {
+  linkedCreatures, notePath, TemplateFiles, TEMPLATE_EXTENSION, type LinkedCreatureOptions, type LinkedCreatures, type StatblockLink,
+} from './sheets/linkedCreature';

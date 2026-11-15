@@ -6,6 +6,9 @@
  * capped, never a path, an image or a field this file does not name. A roll is asked for by where it is on the sheet
  * (`SheetRollRef`), never by a formula: the GM builds the sheet again from its own stat block and rolls what it finds
  * there (`sheetRollFormula`), so a player can roll only what their sheet offers.
+ *
+ * The one sheet model of Connect and Tabletop (`packages/atlas-host`; Tabletop's board draws its stat sheet drawer
+ * from it); pure, so the join page bundles it too.
  */
 
 import { CARD_LIMITS, isSheetCard, type SheetCard } from './sheetCards';
@@ -95,6 +98,17 @@ export interface TokenSheet {
 export const ADVANTAGE_SIDES = ['advantage', 'disadvantage'] as const;
 export type AdvantageSide = typeof ADVANTAGE_SIDES[number];
 
+/** The side Shift (advantage) and Alt (disadvantage) ask for; both at once cancel. */
+export function advantageSide(shift: boolean, alt: boolean): AdvantageSide | null {
+  if (shift === alt) return null;
+  return shift ? 'advantage' : 'disadvantage';
+}
+
+/** Whether advantage can change a roll: a bare bonus (added to the default roll) or a roll with a d20. */
+export function mayHaveAdvantage(formula: string): boolean {
+  return /^[+-]\d+$/.test(formula) || /(^|[^\d])\d*d20(?!\d)/i.test(formula);
+}
+
 /**
  * Where on a sheet a roll is: an ability check, a save, a skill, or the n-th roll in a trait's or action's text, whose
  * `text` is what the player clicked (the GM rolls only when its own copy has that text there), and the side it is
@@ -127,7 +141,7 @@ export function text(value: unknown, max: number): string | null {
 
 export const modifierOf = (score: number): number => Math.floor((score - 10) / 2);
 
-const signed = (value: number): string => (value >= 0 ? `+${value}` : String(value));
+export const signed = (value: number): string => (value >= 0 ? `+${value}` : String(value));
 
 /** A save or skill list as Fantasy Statblocks keeps it: `[{ dexterity: 5 }]`, `[{ name, desc }]` or `{ perception: 4 }`. */
 function bonuses(value: unknown): SheetBonus[] {
@@ -211,13 +225,19 @@ export function buildSheet(creature: unknown, fallbackName: string | null = null
   const sections: SheetSection[] = [];
   for (const [key, title] of SECTIONS) {
     const found = items(creature[key]);
+    // Fantasy Statblocks keeps the intro to these lists in its own field; in a full list it takes the last item's place.
+    const intro = text(creature[key.replace(/_actions$/, '_description')], SHEET_LIMITS.desc);
+    if (intro && found.length > 0) {
+      found.unshift({ name: title, desc: intro });
+      found.length = Math.min(found.length, SHEET_LIMITS.items);
+    }
     if (found.length > 0) sections.push({ title, items: found });
     if (sections.length >= SHEET_LIMITS.sections) break;
   }
   return {
     name,
     subtitle,
-    ac: text(creature.ac, SHEET_LIMITS.short),
+    ac: text([text(creature.ac, SHEET_LIMITS.short), creature.ac_class ? `(${text(creature.ac_class, SHEET_LIMITS.short) ?? ''})` : null].filter(Boolean).join(' '), SHEET_LIMITS.short),
     hp,
     speed: text(creature.speed, SHEET_LIMITS.short),
     stats,

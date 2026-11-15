@@ -11,7 +11,7 @@ import { CutsceneExtrasInbox, mergeBoardExtras } from './scene/cutsceneExtrasInb
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
-import type { AdvantageSide, SheetRollRef, TokenSheet } from './tools/sheets';
+import type { AdvantageSide, SheetRollRef, TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';

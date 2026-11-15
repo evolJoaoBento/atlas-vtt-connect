@@ -1,5 +1,5 @@
 /**
- * A note's stat block as Atlas draws it, for a player (`tools/sheetCards.ts`): Atlas's own `atlas-statblock` card,
+ * A note's stat block as Atlas draws it, for a player (`atlas-host/src/sheets/sheetCards.ts`): Atlas's own `atlas-statblock` card,
  * rendered off screen in the GM's window, then taken as markup with every rule of the window's style sheets that
  * styles it, the variables those read, its images shrunk and embedded, and its dice links numbered.
  *
@@ -7,7 +7,7 @@
  * text sheet. Cards are drawn one at a time and kept until their note, a template or the bestiary changes.
  */
 import { Component, MarkdownRenderer, type App } from 'obsidian';
-import { CARD_LIMITS, type CardRoll, type SheetCard } from '../app/online/tools/sheetCards';
+import { CARD_LIMITS, type CardRoll, type SheetCard } from '../../packages/atlas-host/src/sheets/sheetCards';
 
 /** About the width of a player's drawer, so Atlas picks the columns the player will see. */
 const CARD_WIDTH = 330;

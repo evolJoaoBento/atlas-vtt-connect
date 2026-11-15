@@ -1,6 +1,6 @@
 /**
  * Sends each admitted player the sheets of the tokens they control (`token-sheets`): the exact numbers of every
- * resource the token has and its linked stat block, as `tools/sheets.ts` whitelists it. Only to that player, only for
+ * resource the token has and its linked stat block, as `atlas-host/src/sheets/sheets.ts` whitelists it. Only to that player, only for
  * tokens they control that their own scene shows them, and never part of a scene's projection. Sent on admission,
  * when their assignments change, when they move to another scene, and after each projection of their scene when
  * something on their sheets changed (a hit lowers HP). A scene whose snapshot is not at hand (parked, loading) keeps
@@ -19,10 +19,10 @@ import type { SceneSession } from '../scene/sceneContracts';
 import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
-import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type SheetRollRef, type TokenSheet } from './sheets';
+import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type SheetRollRef, type TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { SheetRollExtras } from './DiceHost';
-import { buildPlayerSheet } from './templateSheets';
-import { cardRollFormula, type SheetCard } from './sheetCards';
+import { buildPlayerSheet } from '../../../../packages/atlas-host/src/sheets/templateSheets';
+import { cardRollFormula, type SheetCard } from '../../../../packages/atlas-host/src/sheets/sheetCards';
 
 /** A sheets message stays under this, well inside a control message, with room for the envelope. */
 const SHEETS_BUDGET_BYTES = Math.floor(MAX_CONTROL_MESSAGE_BYTES * 0.75);

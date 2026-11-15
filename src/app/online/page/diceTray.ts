@@ -9,7 +9,7 @@ import {
 } from '@atlas-vtt/shared/rules';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { traySelection } from '../obsidian/onlineDice';
-import type { AdvantageSide } from '../tools/sheets';
+import type { AdvantageSide } from '../../../../packages/atlas-host/src/sheets/sheets';
 import { DICE_LIMITS } from '../tools/toolMessages';
 
 /** Atlas's tray copy. */

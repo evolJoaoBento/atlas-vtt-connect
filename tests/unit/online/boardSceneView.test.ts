@@ -6,7 +6,7 @@ import { OnlineJoinService, type OnlineSceneSink } from '../../../src/app/online
 import { ONLINE_SCENE_VIEW_TYPE } from '../../../src/app/online/obsidian/onlineSceneTab';
 import type { PlayerBoardFactory, PlayerBoardHandle, PlayerBoardHost, PlayerDiceRequest } from '../../../src/app/online/obsidian/playerBoardContract';
 import { sheetThrow } from '../../../src/app/online/obsidian/onlineDice';
-import type { TokenSheet } from '../../../src/app/online/tools/sheets';
+import type { TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 import { memorySettings } from '../connect/memorySettings';

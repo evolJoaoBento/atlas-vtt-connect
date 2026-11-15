@@ -33,7 +33,7 @@ import { NoteView, type NoteViewOptions } from './noteView.mts';
 import type { PinNoteAnswer } from '../src/app/online/tools/pinNotes';
 import { InitiativeView } from './initiativeView.mts';
 import { StatblockPreviewView } from './statblockPreviewView.mts';
-import type { TokenSheet } from '../src/app/online/tools/sheets';
+import type { TokenSheet } from '../packages/atlas-host/src/sheets/sheets';
 import { conditionRows, tokenAt } from '../src/app/online/view/tokenHover';
 import type { TokenOverlay } from '../src/app/online/view/layers/layerTypes';
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';

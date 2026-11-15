@@ -7,7 +7,7 @@
  */
 import { swatchLaserColor } from '../tools/laserColors';
 import type { SpellChange } from '../tools/spells';
-import type { AdvantageSide, SheetRollRef } from '../tools/sheets';
+import type { AdvantageSide, SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { PhysicalRoll } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 import { Notice, type App } from 'obsidian';

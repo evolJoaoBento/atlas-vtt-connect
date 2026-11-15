@@ -8,7 +8,7 @@
 import { setIcon } from 'obsidian';
 import type { MapSpell, SpellChange, SpellRequest } from '../tools/spells';
 import { SheetView } from '../../../../online-client/sheetView.mts';
-import type { AdvantageSide, SheetRollRef, TokenSheet } from '../tools/sheets';
+import type { AdvantageSide, SheetRollRef, TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { PinNoteAnswer } from '../tools/pinNotes';

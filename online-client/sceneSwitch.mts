@@ -19,7 +19,7 @@ import type { SceneCamera } from '../src/app/online/scene/sceneCamera';
 import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
 import type { PinNoteAnswer } from '../src/app/online/tools/pinNotes';
 import type { PlayerPing } from '../src/app/online/tools/pings';
-import type { TokenSheet } from '../src/app/online/tools/sheets';
+import type { TokenSheet } from '../packages/atlas-host/src/sheets/sheets';
 import type { MapTemplate, TemplateShape } from '../src/app/online/tools/templates';
 import type { PlayerLaser } from '../src/app/online/tools/toolMessages';
 import type { ArPose } from '../src/app/online/tools/arViews';

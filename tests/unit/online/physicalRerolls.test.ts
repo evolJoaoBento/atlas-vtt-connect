@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { sheetThrow } from '../../../src/app/online/obsidian/onlineDice';
 import { meetsReroll, readThrownTerms } from '../../../src/app/online/tools/diceRerolls';
 import { critOf, physicalRollResult, rerollExpectation, totalOf } from '../../../src/app/online/tools/physicalRolls';
-import { sheetRollFormula, type SheetRollRef, type TokenSheet } from '../../../src/app/online/tools/sheets';
+import { sheetRollFormula, type SheetRollRef, type TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import { diceLogEntry, isPhysicalRoll, type OfferedDiceRules, type PhysicalDie, type PhysicalRoll } from '../../../src/app/online/tools/toolMessages';
 
 // ---- Atlas's own functions, transcribed from its 0.10.2 build ----

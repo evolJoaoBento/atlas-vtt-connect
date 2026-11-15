@@ -2,7 +2,7 @@
 import type { MapSpell, SpellRequest } from '../tools/spells';
 import type { BoardCamera, BoardCutscene, BoardExtras, CutsceneCamera } from '../scene/boardTypes';
 import type { PinNoteAnswer } from '../tools/pinNotes';
-import type { TokenSheet } from '../tools/sheets';
+import type { TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { PlayerPing } from '../tools/pings';
 import type { MapTemplate } from '../tools/templates';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';

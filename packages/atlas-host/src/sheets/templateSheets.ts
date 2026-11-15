@@ -424,10 +424,20 @@ export function buildUntemplatedSheet(record: Rec, fallbackName: string | null =
   return { name, subtitle: null, ac: null, hp: null, speed: null, stats: null, saves: [], skills: [], lines: [], sections: out.finish() };
 }
 
-/** A player's sheet of whatever a token links: a template's stat block, or Fantasy Statblocks' creature (5e keys). */
-export function buildPlayerSheet(statblock: unknown, fallbackName: string | null = null): PlayerSheet | null {
+/** The 5e built-ins: read by `buildSheet`, whose ability row, saves and skills roll. */
+const FIVE_E_PREFIX = `${BUILT_IN_PREFIX}5e-`;
+
+/**
+ * A player's sheet of whatever a token links: a template's stat block, or Fantasy Statblocks' creature (5e keys).
+ * `builtIns` gives a built-in template by its id where the caller holds Atlas's own (Tabletop's port of them); a
+ * built-in it cannot give, and every 5e one, reads as a 5e stat block.
+ */
+export function buildPlayerSheet(statblock: unknown, fallbackName: string | null = null, builtIns?: (id: string) => unknown): PlayerSheet | null {
   if (!isTemplatedStatblock(statblock)) return buildSheet(statblock, fallbackName);
-  if (statblock.atlasTemplate.startsWith(BUILT_IN_PREFIX)) return buildSheet(statblock.fields, fallbackName);
+  if (statblock.atlasTemplate.startsWith(BUILT_IN_PREFIX)) {
+    const builtIn = statblock.atlasTemplate.startsWith(FIVE_E_PREFIX) ? null : builtIns?.(statblock.atlasTemplate);
+    return (builtIn ? buildTemplateSheet(builtIn, statblock.fields, fallbackName) : null) ?? buildSheet(statblock.fields, fallbackName);
+  }
   // A template not read (yet): the name alone, never every field of a note whose template hides some.
   if (statblock.template === undefined) return buildUntemplatedSheet({ name: statblock.fields.name }, fallbackName);
   return statblock.template

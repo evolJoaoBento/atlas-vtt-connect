@@ -6,7 +6,7 @@
  * disadvantage, both at once cancel, and a right-click offers the three. Its button shows only while the player has
  * sheets. Text only, never markup: everything comes from the GM. Shared with the Obsidian scene tab.
  */
-import { ABILITY_NAMES, modifierOf, rollableName, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../src/app/online/tools/sheets';
+import { ABILITY_NAMES, modifierOf, rollableName, textParts, type AdvantageSide, type PlayerSheet, type SheetRollRef, type TokenSheet } from '../packages/atlas-host/src/sheets/sheets';
 import { toolIconUrl, type ToolIconName } from '../src/app/online/page/toolIcons';
 import { iconElement } from './icons.mts';
 import { renderCard } from './cardView.mts';

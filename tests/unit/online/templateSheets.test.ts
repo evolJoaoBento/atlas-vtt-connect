@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isTokenSheets, rollableName, sheetRollFormula, textParts, type SheetItem } from '../../../src/app/online/tools/sheets';
-import { buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, templateHidesFields, templateId } from '../../../src/app/online/tools/templateSheets';
+import { isTokenSheets, rollableName, sheetRollFormula, textParts, type SheetItem } from '../../../packages/atlas-host/src/sheets/sheets';
+import { buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, templateHidesFields, templateId } from '../../../packages/atlas-host/src/sheets/templateSheets';
 
 /** A Daggerheart-like adversary template a GM made in Atlas (issue #9), its labels renamed into Portuguese. */
 const ADVERSARY = {

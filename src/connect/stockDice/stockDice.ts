@@ -18,7 +18,7 @@
 import type { DiceApi, DicePublishOptions, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
 import { SHEET_AWARE_DICE, type PlayerRollRequest } from '../../app/online/tools/DiceHost';
 import { dieTagOf } from '../../app/online/tools/diceTags';
-import { ADVANTAGE_SIDES, type AdvantageSide } from '../../app/online/tools/sheets';
+import { ADVANTAGE_SIDES, type AdvantageSide } from '../../../packages/atlas-host/src/sheets/sheets';
 
 /** Most dice a roll may list, as the API's `publish` holds it to. */
 const MAX_DICE = 1000;

@@ -19,7 +19,7 @@ import { admitted } from '../scene/slotAudience';
 import type { SlotProjection } from '../scene/slotViews';
 import { cleanSceneLabel, DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry, type OfferedDiceRules, type PhysicalRoll } from './toolMessages';
 import { physicalRollResult, rerollExpectation, type RerollExpectation } from './physicalRolls';
-import type { AdvantageSide, SheetRollRef } from './sheets';
+import type { AdvantageSide, SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 
 /** What a roll from a player's sheet adds: the ability Atlas's toast names it after, and the side it is rolled with. */
 export interface SheetRollExtras {

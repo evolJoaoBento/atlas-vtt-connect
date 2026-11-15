@@ -7,9 +7,9 @@
  */
 import { isDieType, parseFormula, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
 import { entryRolls, rollerLabel } from '../page/diceLogModel';
-import { cardRollFormula } from '../tools/sheetCards';
+import { cardRollFormula } from '../../../../packages/atlas-host/src/sheets/sheetCards';
 import { readThrownTerms } from '../tools/diceRerolls';
-import { sheetRollFormula, sheetRollLabel, type SheetRollRef, type TokenSheet } from '../tools/sheets';
+import { sheetRollFormula, sheetRollLabel, type SheetRollRef, type TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import { DICE_LIMITS, PHYSICAL_MODIFIER, type DiceLogEntry, type OfferedDiceRules } from '../tools/toolMessages';
 import type { PlayerDiceRequest } from './playerBoardContract';
 
