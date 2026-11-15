@@ -151,7 +151,9 @@ export * as diceRules from './app/gameSystems/diceRules';
 // ── Dice: critical results and exploding faces ───────────────────────────────
 export { defaultDiceOf, getDiceCrit, type DiceCrit } from './app/tools/diceCrit';
 export { explodingFaces, MAX_EXPLOSIONS } from './app/tools/diceExplosion';
-export { rollingRules } from './app/gameSystems/diceSets';
+export { DICE_SET_COLOURS, isDieColour, rollingRules } from './app/gameSystems/diceSets';
+// The dice look (Atlas's global `diceColour` / `diceFont`, read with `getDiceLook`): its values and how they are checked.
+export { DEFAULT_DICE_LOOK, isDiceColour, isDiceFont, parseHex, readableInk, type DiceColour, type DiceFont, type DiceLook } from './app/dice3d/diceLook';
 export type { RollingDice } from './app/types/diceSetTypes';
 export type * from './app/types/initiativeRulesTypes';
 export type * from './app/types/initiativeTypes';

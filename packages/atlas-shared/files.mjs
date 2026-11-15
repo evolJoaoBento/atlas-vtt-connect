@@ -10,6 +10,7 @@ export const FILES = [
   'characters/playerTokens.ts',
   'gameSystems/diceRules.ts',
   'gameSystems/diceSets.ts',
+  'dice3d/diceLook.ts',
   'gameSystems/initiativeSideRules.ts',
   'grid/cellNumbering.ts',
   'grid/gridDistance.ts',
