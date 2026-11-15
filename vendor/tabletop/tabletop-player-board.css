@@ -2311,3 +2311,9 @@ body.atlas-tabletop-player-window .view-header {
  * so a 0.13 Atlas (which wrapped them in its overlay scroll) still scrolls them.
  */
 .atlas-vtt-plugin .atlas-command-palette-options { flex: 1; min-height: 0; overflow-y: auto; }
+
+/*
+ * Atlas 0.15's floating UI joins Atlas's host under <body>; with no Atlas host the copied panels make Tabletop's own
+ * (src/atlasPort/shims/portalHost.ts). Atlas's rule for its host while it holds a dialog, restated for that one.
+ */
+.atlas-tabletop-portal-host.atlas-portal-host--dialog .tooltip-content { display: none; }
