@@ -15,7 +15,7 @@ const run: BoardCutscene = {
 const extras = (walls: number): BoardExtras => ({
   sceneId: 's1',
   walls: Array.from({ length: walls }, (_, i) => ({ id: `w${i}`, type: 'solid' as const, p1: { x: i, y: 0 }, p2: { x: i + 1, y: 0 }, height: null, material: null })),
-  lights: [], props: [], materials: [], ambient: null, fogHeight: null, wallThickness: null,
+  lights: [], props: [], materials: [], fogHeight: null, wallThickness: null,
   lighting: { enabled: false, ambient: 1, ambientColor: null },
 });
 

@@ -22,7 +22,7 @@ import type { OfferedDiceRules } from '../../../src/app/online/tools/toolMessage
 
 const LOOK: BoardLook = {
   wallHeight: () => null, wallMaterial: () => null, doorProp: () => null, lightHeight: () => null,
-  fogHeight: 1, wallThickness: null, ambient: null, props: [], materials: [],
+  fogHeight: 1, wallThickness: null, props: [], materials: [],
 };
 
 function fakeBoard(available = true) {
@@ -223,7 +223,7 @@ const ID = { glb1: 'A'.repeat(43), glb2: 'B'.repeat(43), tex1: 'C'.repeat(43), t
 describe('board assets', () => {
   it('a board\'s files are its materials\' maps, door props and props, each once', () => {
     const ids = boardAssetIds({
-      sceneId: 's', lights: [], ambient: null, fogHeight: null, wallThickness: null, lighting: { enabled: false, ambient: 1, ambientColor: null },
+      sceneId: 's', lights: [], fogHeight: null, wallThickness: null, lighting: { enabled: false, ambient: 1, ambientColor: null },
       walls: [{ id: 'd', type: 'door', p1: { x: 0, y: 0 }, p2: { x: 1, y: 0 }, height: null, material: 'm1', door: { open: false, swing: 'left', prop: ID.glb1 } }],
       props: [{ id: 'p', asset: ID.glb2, x: 0, y: 0, scale: 1, turn: 0 }, { id: 'q', asset: ID.glb1, x: 0, y: 0, scale: 1, turn: 0 }],
       materials: [{ id: 'm1', scale: 1, maps: { color: ID.tex1, normal: ID.tex2 } }],

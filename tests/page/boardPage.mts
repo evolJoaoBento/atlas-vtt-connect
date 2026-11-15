@@ -71,7 +71,7 @@ const extras = {
     { id: 'w2', type: 'solid', p1: { x: 840, y: 280 }, p2: { x: 840, y: 700 }, height: null, material: null },
   ],
   lights: [], props: [], materials: [],
-  ambient: 0.8, fogHeight: 1, wallThickness: 0.12,
+  fogHeight: 1, wallThickness: 0.12,
   // Water across the middle of the map, and a floor stacked above with water of its own.
   water: { mask: waterRows(60, 80), motion },
   // The GM draws the floors above faded.

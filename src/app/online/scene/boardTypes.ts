@@ -155,10 +155,7 @@ export interface BoardExtras {
   lights: BoardLightRecord[];
   props: BoardPropRecord[];
   materials: BoardMaterialRecord[];
-  /** The GM's ambient light on the board, or null for the scene's own. */
-  ambient: number | null;
-  /** The colour the GM tinted the board's daylight, '#rrggbb'; absent or null for none. */
-  tint?: string | null;
+  /** Atlas's scene lighting (`state.lighting`), the one light level a 3D board is lit by. */
   lighting: BoardLighting;
   fogHeight: number | null;
   /** How thick walls stand, as a share of a grid square; null is the board's default. */

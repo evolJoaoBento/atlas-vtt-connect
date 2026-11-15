@@ -11,7 +11,6 @@ const extras = (overrides: Partial<BoardExtras> = {}): BoardExtras => ({
   lights: [{ id: 'l1', x: 35, y: 35, height: 1.5, color: '#ffaa00', bright: 20, dim: 40, intensity: 1, animation: 'torch', angle: null, rotation: 0, darkness: false, activeBelowAmbient: null }],
   props: [{ id: 'p1', asset: 'a'.repeat(64), x: 10, y: 10, scale: 1, turn: 0 }],
   materials: [{ id: 'stone', scale: 1, maps: { color: 'b'.repeat(64) } }],
-  ambient: null,
   lighting: { enabled: true, ambient: 0.2, ambientColor: null },
   fogHeight: 2,
   wallThickness: null,

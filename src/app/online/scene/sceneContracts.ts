@@ -109,9 +109,6 @@ export interface BoardLook {
   lightHeight(id: string): number | null;
   readonly fogHeight: number | null;
   readonly wallThickness: number | null;
-  readonly ambient: number | null;
-  /** The colour the GM tinted the board's daylight; absent from an older Tabletop. */
-  readonly tint?: string | null;
   /** The scenes stacked with the map; absent from an older Tabletop, or when the GM does not share them. */
   readonly layers?: ReadonlyArray<BoardLayerLook>;
   /** The map's painted water and its motion; absent for none, or from an older Tabletop. */

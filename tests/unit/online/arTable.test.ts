@@ -132,7 +132,7 @@ describe('a survey', () => {
 
 describe('the placed table in the board extras', () => {
   const extras: BoardExtras = {
-    sceneId: 's1', walls: [], lights: [], props: [], materials: [], ambient: null,
+    sceneId: 's1', walls: [], lights: [], props: [], materials: [],
     lighting: { enabled: false, ambient: 0.1, ambientColor: null }, fogHeight: null, wallThickness: null, arTable: TABLE,
   };
 

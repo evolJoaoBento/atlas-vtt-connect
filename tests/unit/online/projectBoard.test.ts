@@ -17,7 +17,6 @@ const look: BoardLook = {
   lightHeight: (id) => (id === 'l1' ? 1.5 : null),
   fogHeight: 2,
   wallThickness: 0.3,
-  ambient: 0.4,
   props: [{ id: 'p1', path: 'minis/barrel.glb', x: 100, y: 100, scale: 1, turn: 90 }, { id: 'p2', path: 'minis/crate.glb', x: 900, y: 100, scale: 1, turn: 0 }],
   materials: [{ id: 'mat/brick', scale: 2, maps: { color: 'mat/brick/c.jpg' } }, { id: 'mat/wood', scale: 1, maps: { color: 'mat/wood/c.jpg' } }],
 };
@@ -35,7 +34,10 @@ describe('projectBoard', () => {
   it('a wall whose middle is under fog is not sent; one in view is, with its look', () => {
     const extras = projectBoard(state([wall('w1', 'solid', 0), wall('w2', 'solid', 600)]), 's1', leftHalf, {}, look, assets);
     expect(extras.walls).toEqual([{ id: 'w1', type: 'solid', p1: { x: 0, y: 0 }, p2: { x: 70, y: 0 }, height: 3, material: 'id:mat/brick/c.jpg' }]);
-    expect(extras).toMatchObject({ sceneId: 's1', ambient: 0.4, fogHeight: 2, wallThickness: 0.3, lighting: { enabled: true, ambient: 0.2, ambientColor: '#223344' } });
+    // Atlas's scene lighting is the board's one light level: the GM's own ambient and tint went with fusion 4E.
+    expect(extras).not.toHaveProperty('ambient');
+    expect(extras).not.toHaveProperty('tint');
+    expect(extras).toMatchObject({ sceneId: 's1', fogHeight: 2, wallThickness: 0.3, lighting: { enabled: true, ambient: 0.2, ambientColor: '#223344' } });
   });
 
   it('a door under fog is not sent with its prop, and the same door in view is (Atlas 0.7.0: door icons under fog are hidden)', () => {
@@ -110,14 +112,7 @@ describe('projectBoard', () => {
     expect(projectBoard(state([wall('d1', 'door', 0, { closed: true })]), 's1', all, {}, look, assets).walls[0]!.door).not.toHaveProperty('hinge');
   });
 
-  it('the daylight tint goes when the GM set one; extras with or without it, and a turned door, are valid; a bad colour is not', () => {
-    expect(projectBoard(state([]), 's1', all, {}, { ...look, tint: '#ffcc88' }, assets).tint).toBe('#ffcc88');
-    expect(projectBoard(state([]), 's1', all, {}, { ...look, tint: null }, assets)).not.toHaveProperty('tint');
-    expect(projectBoard(state([]), 's1', all, {}, look, assets)).not.toHaveProperty('tint');
-    const extras = projectBoard(state([]), 's1', all, {}, { ...look, tint: '#ffcc88' }, assets);
-    expect(isBoardExtras(extras)).toBe(true);
-    expect(isBoardExtras({ ...extras, tint: 'red' })).toBe(false);
-    expect(isBoardExtras({ ...extras, tint: null })).toBe(true);
+  it('a turned door is valid, a door whose hinge is no side is not', () => {
     const door = projectBoard(state([wall('d1', 'door', 0, { closed: true })]), 's1', all, {}, look, assets);
     expect(isBoardExtras({ ...door, walls: [{ ...door.walls[0], door: { ...door.walls[0]!.door, hinge: false } }] })).toBe(false);
   });
@@ -203,7 +198,7 @@ describe('projectBoard', () => {
   it('without the GM\'s look the walls come plain, and a file not hashed yet is left out until it is', () => {
     const plain = projectBoard(state([wall('w1', 'solid', 0)]), 's1', all, {}, null, assets);
     expect(plain.walls[0]).toMatchObject({ height: null, material: null });
-    expect([plain.props, plain.materials, plain.ambient, plain.fogHeight]).toEqual([[], [], null, null]);
+    expect([plain.props, plain.materials, plain.fogHeight]).toEqual([[], [], null]);
     const unhashed = projectBoard(state([wall('w1', 'solid', 0)]), 's1', all, {}, look, { idFor: () => null });
     expect(unhashed.props).toEqual([]);
     expect(unhashed.materials).toEqual([]);

@@ -116,7 +116,7 @@ export function isBoardExtras(value: unknown): value is BoardExtras {
   const lighting = value.lighting;
   return isList(value.walls, BOARD_PART_LIMITS.walls, isWall) && isList(value.lights, BOARD_PART_LIMITS.lights, isLight)
     && isList(value.props, BOARD_PART_LIMITS.props, isProp) && isList(value.materials, BOARD_PART_LIMITS.materials, isMaterial)
-    && isNullable(isNumber)(value.ambient) && (value.tint === undefined || value.tint === null || (typeof value.tint === 'string' && /^#[0-9a-f]{6}$/i.test(value.tint))) && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
+    && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
     && (value.layers === undefined || isList(value.layers, BOARD_LAYER_LIMITS.layers, isLayer))
     && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.scene))
     && (value.layerLook === undefined || value.layerLook === 'solid' || value.layerLook === 'faded' || value.layerLook === 'transparent')

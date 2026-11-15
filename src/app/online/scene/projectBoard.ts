@@ -34,8 +34,6 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     lights: [],
     props: [],
     materials: [],
-    ambient: look?.ambient ?? null,
-    ...(look?.tint ? { tint: look.tint } : {}),
     lighting: { enabled: lighting.enabled === true, ambient: Math.min(1, Math.max(0, num(lighting.ambient, 0.1))), ambientColor: str(lighting.ambientColor) },
     fogHeight: look?.fogHeight ?? null,
     wallThickness: look?.wallThickness ?? null,

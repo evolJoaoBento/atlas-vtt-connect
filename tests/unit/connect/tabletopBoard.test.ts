@@ -27,7 +27,7 @@ function fakeApp() {
 
 const LOOK = {
   wallHeight: () => 2, wallMaterial: () => null, doorProp: () => null, lightHeight: () => null,
-  fogHeight: 1, wallThickness: 0.12, ambient: null, props: [], materials: [],
+  fogHeight: 1, wallThickness: 0.12, props: [], materials: [],
 };
 
 function fakeTabletop(overrides: Record<string, unknown> = {}) {
