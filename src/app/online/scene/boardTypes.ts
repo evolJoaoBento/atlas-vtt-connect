@@ -210,7 +210,8 @@ export interface BoardCutsceneShot {
 export interface BoardCutscene {
   runId: string;
   mode: 'prepared' | 'live';
-  look: { bars: number | null; fadeMs: number };
+  /** `transition`: the GM's default, how a shot skipped to (the GM's timeline, Previous) is reached; absent from an older Tabletop (a cut). */
+  look: { bars: number | null; fadeMs: number; transition?: 'fade' | 'cut' | 'move' };
   shots: BoardCutsceneShot[];
   step: { shot: number; seq: number };
   key: string;

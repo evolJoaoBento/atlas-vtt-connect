@@ -160,6 +160,7 @@ export function isBoardCutscene(value: unknown): value is BoardCutscene {
   const { look, step, shots } = value;
   if (!isFields(look) || !isNumber(look.fadeMs) || look.fadeMs < CUTSCENE_LIMITS.fadeMs[0] || look.fadeMs > CUTSCENE_LIMITS.fadeMs[1]) return false;
   if (look.bars !== null && !(isNumber(look.bars) && CUTSCENE_LIMITS.bars.includes(look.bars))) return false;
+  if (look.transition !== undefined && look.transition !== 'fade' && look.transition !== 'cut' && look.transition !== 'move') return false;
   if (!isFields(step) || !Number.isSafeInteger(step.seq) || (step.seq as number) < 1 || !Number.isSafeInteger(step.shot)) return false;
   if (!Array.isArray(shots) || shots.length > CUTSCENE_LIMITS.shots || !shots.every(isShot)) return false;
   if (value.mode === 'live') return shots.length === 0 && step.shot === 0;

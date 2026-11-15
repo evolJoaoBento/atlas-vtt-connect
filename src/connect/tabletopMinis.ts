@@ -237,7 +237,7 @@ function cleanCutscene(raw: unknown): GmCutscene | null {
   return {
     cutscene: {
       runId, mode, key,
-      look: { bars: look.bars, fadeMs: look.fadeMs },
+      look: { bars: look.bars, fadeMs: look.fadeMs, ...(look.transition ? { transition: look.transition } : {}) },
       shots: shots.map((shot) => ({
         key: shot.key, eye: { x: shot.eye.x, y: shot.eye.y, z: shot.eye.z }, target: { x: shot.target.x, y: shot.target.y, z: shot.target.z },
         at: shot.at, keyframe: shot.keyframe, transition: shot.transition,

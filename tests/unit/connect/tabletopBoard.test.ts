@@ -198,6 +198,17 @@ describe('tabletopBoard', () => {
       expect(JSON.stringify(read?.cutscene)).not.toContain('atlasmap');
     });
 
+    it("carries the run's default transition (how a skipped-to shot is reached), and refuses one that is no transition", () => {
+      const run = goodRun();
+      const w = withCutscene({ ...run, cutscene: { ...run.cutscene, look: { bars: 2.39, fadeMs: 600, transition: 'move' } } });
+      expect(w.board.cutscene?.()?.cutscene.look).toEqual({ bars: 2.39, fadeMs: 600, transition: 'move' });
+      w.set({ ...run, cutscene: { ...run.cutscene, look: { bars: 2.39, fadeMs: 600, transition: 'spin' } } });
+      expect(w.board.cutscene?.()).toBeNull();
+      // From an older Tabletop: no transition, read as none.
+      w.set(run);
+      expect(w.board.cutscene?.()?.cutscene.look).toEqual({ bars: 2.39, fadeMs: 600 });
+    });
+
     it('reads a malformed run as none: 201 shots, a bad key, a bad map key, a camera at 1e8', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const run = goodRun();
