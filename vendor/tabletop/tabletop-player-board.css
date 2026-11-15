@@ -349,6 +349,8 @@
 
 /* While a cutscene is made the bars cover the toolbar: it is taken away, not left clickable under them. */
 .tabletop-authoring .atlas-tabletop-toolbar-row { visibility: hidden; }
+/* Cinematic mode: the toolbar stays above the bars and the fade (the cinema layer is 200). */
+.tabletop-cinematic-mode .atlas-tabletop-toolbar-row { z-index: 205; }
 
 .atlas-tabletop-toolbar,
 .atlas-tabletop-palette {
@@ -2173,17 +2175,24 @@ body.atlas-tabletop-player-window .view-header {
 .tabletop-gallery__empty { color: var(--text-muted); padding: 6px 2px; }
 .tabletop-gallery__row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* One line: the name (double-click renames it), how many shots, and the icon buttons, which never wrap. */
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 2px 8px;
   align-items: center;
   padding: 6px;
   border-radius: var(--radius-m, 8px);
   background: var(--background-secondary);
 }
-.tabletop-gallery__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold, 600); }
+.tabletop-gallery__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-semibold, 600); cursor: text; user-select: none; }
+.tabletop-gallery__count { white-space: nowrap; }
 .tabletop-gallery__count { color: var(--text-muted); font-size: var(--font-ui-smaller, 12px); }
 .tabletop-gallery__row--empty .tabletop-gallery__count { color: var(--text-error); }
-.tabletop-gallery__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tabletop-gallery__actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; }
+.tabletop-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0 !important; flex: none; }
+.tabletop-icon-button.mod-cta { color: var(--text-on-accent); background: var(--interactive-accent); }
+.tabletop-icon-button.mod-cta:hover:not(:disabled) { background: var(--interactive-accent-hover); }
+.tabletop-icon-button.is-active { color: var(--text-accent); }
+.tabletop-icon-button svg { width: 16px; height: 16px; }
 .tabletop-gallery__actions button,
 .tabletop-gallery__head button,
 .tabletop-timeline__head button,
@@ -2214,7 +2223,35 @@ body.atlas-tabletop-player-window .view-header {
 .tabletop-timeline__title { font-weight: var(--font-semibold, 600); }
 .tabletop-timeline__hint { flex: 1; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabletop-timeline__scroll { overflow-x: auto; overflow-y: hidden; border-top: 1px solid var(--background-modifier-border); cursor: copy; }
-.tabletop-timeline__track { position: relative; height: 72px; min-width: 100%; }
+.tabletop-timeline__track { position: relative; height: 124px; min-width: 100%; }
+/* What each shot sees, under its marker. */
+.tabletop-timeline__thumb {
+  position: absolute;
+  top: 60px;
+  width: 96px;
+  margin-left: -48px;
+  border-radius: var(--radius-s, 4px);
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--background-secondary);
+  cursor: pointer;
+  z-index: 1;
+}
+.tabletop-timeline__thumb:hover { z-index: 3; border-color: var(--interactive-accent); }
+.tabletop-timeline__thumb img { display: block; width: 100%; height: auto; pointer-events: none; }
+.tabletop-timeline__thumb--none { height: 54px; display: flex; align-items: center; justify-content: center; padding: 2px 4px; font-size: var(--font-ui-smaller, 12px); color: var(--text-muted); text-align: center; overflow: hidden; }
+.tabletop-timeline__thumb.is-current { z-index: 2; border-color: var(--interactive-accent); }
+.tabletop-timeline__shot.is-current { box-shadow: 0 0 0 3px var(--background-primary), 0 0 0 5px var(--interactive-accent); }
+/* A run's strip: shots are clicked to cut to them; nothing is added. */
+.tabletop-timeline--run .tabletop-timeline__scroll { cursor: default; }
+.tabletop-timeline--run .tabletop-timeline__shot { cursor: pointer; }
+.tabletop-run.tabletop-run--with-timeline,
+.tabletop-preview.tabletop-preview--with-timeline { bottom: 260px; }
+.tabletop-timeline--previewing .tabletop-timeline__scroll { cursor: default; }
+.tabletop-timeline--previewing .tabletop-timeline__shot { cursor: pointer; }
+.tabletop-timeline--previewing .tabletop-timeline__preview,
+.tabletop-timeline--previewing .tabletop-timeline__done { display: none; }
+.tabletop-gallery__actions .tabletop-icon-button.is-disabled { opacity: 0.45; cursor: not-allowed; }
 .tabletop-timeline__tick {
   position: absolute;
   top: 0;
