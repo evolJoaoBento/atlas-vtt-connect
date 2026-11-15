@@ -14,9 +14,9 @@ import { hostPlugin } from './hostingFixtures';
 import { memorySettings } from './memorySettings';
 
 /** Connect hosting through the stand-in for a stock Atlas: no extension API anywhere, only what stock Atlas leaves reachable. */
-function stockHosting() {
+function stockHosting(files: Record<string, string> = {}) {
   const stock = setupStockAtlas();
-  const vault = createInMemoryApp({ files: {} }).app;
+  const vault = createInMemoryApp({ files }).app;
   const vaultEvents = fakeEvents();
   const cacheEvents = fakeEvents();
   Object.assign(stock.app, {
@@ -25,13 +25,13 @@ function stockHosting() {
   });
   const connect = hostPlugin(stock.app);
   const network = new MemoryNetwork();
-  const memoryHost = network.host('gm-id');
   const requests: Array<(allow: boolean) => void> = [];
   const link = new AtlasLink(connect.plugin, (extension, api) => startConnect(connect.plugin, extension, api, {
     settings: memorySettings(),
     lifetime: sharingLifetime(connect.plugin),
     hosting: {
-      createHost: async () => memoryHost,
+      // A fresh host for each session, as a stop and a new start make.
+      createHost: async () => network.host('gm-id'),
       table: async () => null,
       showRequest: (_player, answer) => { requests.push(answer); return { hide: () => {} }; },
     },
@@ -44,11 +44,11 @@ function stockHosting() {
       const decoded = channel === 'control' && typeof data === 'string' ? decodeControl(data) : null;
       if (decoded?.kind === 'message') received.push(decoded.message);
     });
-    client.send('control', encodeControl({ v: 1, type: 'join', name, playerKey: `key-${name}`, client: { kind: 'web', version: '1' } }));
+    client.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name, playerKey: `key-${name}`, client: { kind: 'web', version: '1' } }));
     requests.at(-1)?.(true);
     return received;
   };
-  return { ...stock, connect, link, join };
+  return { ...stock, connect, link, join, vault };
 }
 
 describe('hosting on a stock Atlas through the stand-in', () => {
@@ -71,6 +71,126 @@ describe('hosting on a stock Atlas through the stand-in', () => {
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
   });
 
+  it('sends a scene presented before the session to a player who joins after it starts, and after a stop and a new start', async () => {
+    const { connect, join, a, presented } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    for (const name of ['Ana', 'Bea']) {
+      expect(connect.run('start-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      const received = await join(name);
+      await vi.advanceTimersByTimeAsync(80);
+      const snapshot = received.find((message) => message.type === 'scene-snapshot');
+      expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
+      expect(connect.run('stop-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    }
+  });
+
+  it('sends a scene presented while the GM was on another tab once the GM goes back to it, without presenting again', async () => {
+    const { connect, join, a, presented } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    a.tabMeta.set({ activeTabId: 't2' });
+    a.scene.set({ mapPath: 'maps/two.atlasmap' } as never);
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(0);
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(80);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(false);
+    a.tabMeta.set({ activeTabId: 't1' });
+    a.scene.set({ mapPath: 'maps/one.atlasmap' } as never);
+    await vi.advanceTimersByTimeAsync(80);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(true);
+  });
+
+  it("remembers Controlled by while Atlas's tab is deferred (the GM on Tabletop's board), from the presented map's file, and gives it back next session", async () => {
+    const map = 'atlas-vtt/collections/Default/scenes/inn.atlasmap';
+    const file = JSON.stringify({ state: { mapPath: map, objects: { tokens: { tok_orc: { x: 1, y: 1, imagePath: 'art/orc.webp', kind: 'character' } } } }, version: 4 });
+    const { connect, join, presented, leaves, vault } = stockHosting({ [map]: file });
+    // After a restart Atlas's leaf is deferred: its view has no stores until it is shown.
+    leaves[0] = { view: {} as never };
+    presented.set({ tabId: 't1', filePath: map });
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    const memory = async (): Promise<unknown> => {
+      const path = [...(await vault.vault.adapter.list('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect').catch(() => ({ files: [] as string[] }))).files].find((entry) => entry.endsWith('player-characters.json'));
+      return path ? (JSON.parse(await vault.vault.adapter.read(path)) as { links: unknown }).links : null;
+    };
+    for (const round of [1, 2]) {
+      expect(connect.run('start-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+      await join('Ana');
+      await vi.advanceTimersByTimeAsync(80);
+      const { tokenControl, players } = onlineSessionStore.getState();
+      const ana = players.find((player) => player.name === 'Ana')!;
+      if (round === 1) {
+        // Ticked from Tabletop's token menu: straight into the session's token control.
+        tokenControl!.set('tok_orc', ana.playerId, true);
+        await vi.advanceTimersByTimeAsync(80);
+        expect(await memory()).toEqual({ [`token:${map}#tok_orc`]: 'Ana' });
+      } else {
+        expect(tokenControl!.controls(ana.playerId, 'tok_orc')).toBe(true);
+      }
+      expect(connect.run('stop-online-session')).toBe(true);
+      await vi.advanceTimersByTimeAsync(0);
+    }
+  });
+
+  it("loads Atlas's deferred tab when hosting starts (the GM only on Tabletop's board), so joiners get the presented scene", async () => {
+    const { connect, join, a, presented, leaves } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    presented.set({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    // After a restart: Atlas's leaf is deferred, its view a placeholder until loaded.
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: vi.fn(async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); }),
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    expect(connect.run('start-online-session')).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(deferred.loadIfDeferred).toHaveBeenCalledTimes(1);
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(2_500);
+    const snapshot = received.find((message) => message.type === 'scene-snapshot');
+    expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toEqual(['a']);
+  });
+
+  it("never switches Atlas's tab on its own: a presented scene whose tab is not the loaded one is left for the GM's board to bring up", async () => {
+    const { connect, a, presented, leaves } = stockHosting();
+    presented.set({ tabId: 't2', filePath: 'maps/two.atlasmap' });
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); },
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(a.view.switchToTab).not.toHaveBeenCalled();
+    expect(a.tabMeta.getState().activeTabId).toBe('t1');
+    expect(presented.get()).toEqual({ tabId: 't2', filePath: 'maps/two.atlasmap' });
+  });
+
+  it('presents the woken tab when nothing was presented before', async () => {
+    const { connect, join, a, presented, leaves } = stockHosting();
+    a.scene.set({ objects: { tokens: { a: { id: 'a', kind: 'token', x: 70, y: 70, imagePath: 'art/a.png' } }, texts: {}, drawings: {}, fog: {} } } as never);
+    const deferred = {
+      view: {} as never, isDeferred: true,
+      loadIfDeferred: async () => { Object.assign(deferred, { view: a.view, isDeferred: false }); },
+    };
+    leaves[0] = deferred as never;
+    await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
+    connect.run('start-online-session');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(presented.get()).toEqual({ tabId: 't1', filePath: 'maps/one.atlasmap' });
+    const received = await join('Ana');
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(received.some((message) => message.type === 'scene-snapshot')).toBe(true);
+  });
+
   it('shows players nothing of a scene saved lit whose lighting Atlas does not give (fails closed)', async () => {
     const { connect, join, a, presented } = stockHosting();
     await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
@@ -89,13 +209,15 @@ describe('hosting on a stock Atlas through the stand-in', () => {
   });
 
   /** A lit scene as a stock Atlas 0.8.0 lights it (real sight, light and perception), with `perception` deciding which tokens the players' frame shows. */
-  async function litHosting(perception: Record<string, string>) {
+  async function litHosting(perception: Record<string, string>, atlas091 = false) {
     const hosting = stockHosting();
     const { connect, join, a, presented, atlas } = hosting;
-    (atlas.settingsService as unknown as { isExperimentalOn: (id: string) => boolean }).isExperimentalOn = (id) => id === 'dynamicLighting';
+    // Atlas 0.9.1 has no lighting experiment: asked about it, it says off whatever the scene. Before, it was switched on.
+    (atlas.settingsService as unknown as { isExperimentalOn: (id: string) => boolean }).isExperimentalOn = (id) => !atlas091 && id === 'dynamicLighting';
+    if (atlas091) Object.assign(atlas, { manifest: { version: '0.15.0' } });
     const controller = new FakeController({ enabled: true, current: true, sight: structuredClone(REAL.sight), ambient: structuredClone(REAL.ambient), reaches: structuredClone(REAL.reaches) });
     Object.assign(a.view.renderer, {
-      lightingFeature: { controller },
+      ...(atlas091 ? { lighting: controller } : { lightingFeature: { controller } }),
       getTokenRenderer: () => ({ playerFramePerception: () => (id: string) => perception[id] }),
     });
     await vi.advanceTimersByTimeAsync(STOCK_GRACE_MS);
@@ -111,6 +233,14 @@ describe('hosting on a stock Atlas through the stand-in', () => {
   it("sends the tokens the players' frame shows of a lit scene, and the darkness Atlas's lighting gives", async () => {
     const ids = Object.keys(realScene.objects.tokens);
     const { received } = await litHosting({ [ids[0]!]: 'seen', [ids[1]!]: 'unseen' });
+    const snapshot = received.find((message) => message.type === 'scene-snapshot');
+    expect(snapshot).toBeDefined();
+    expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toHaveLength(1);
+  });
+
+  it("on an Atlas whose lighting is standard (0.9.1 and later: no experiment) still sends only the tokens the players' frame shows of a lit scene", async () => {
+    const ids = Object.keys(realScene.objects.tokens);
+    const { received } = await litHosting({ [ids[0]!]: 'seen', [ids[1]!]: 'unseen' }, true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot');
     expect(snapshot).toBeDefined();
     expect(snapshot?.type === 'scene-snapshot' && Object.keys(snapshot.scene.tokens)).toHaveLength(1);

@@ -1,11 +1,15 @@
 /**
- * Atlas 0.8's player characters and Connect's online players, on a stock Atlas.
+ * Connect's "Controlled by", remembered across sessions, on a stock Atlas.
  *
- * Atlas marks a library token as a player character (`TokenAsset.playerCharacter`); the tokens placed from it on any scene
- * are that character. Connect's "Controlled by" gives a placed token to an online player for the running session only (the
- * session's `TokenControl`), so every scene and every session would need the same assignments made again. This remembers
- * which player a character was given to, by the player's name, and gives each placed token of that character to them again
- * whenever they are at the table and have it in front of them. Taking a character from a player takes the memory with it.
+ * Connect's "Controlled by" gives a placed token to an online player for the running session only (the session's
+ * `TokenControl`), so every session would need the same assignments made again. This remembers which player each token was
+ * given to, by the player's name, and gives it to them again whenever they are at the table and its scene is one the GM
+ * works on: in Atlas's view, presented, or on Tabletop's board (read from the map's file while Atlas's view is not loaded).
+ * Taking a token from a player takes the memory with it.
+ *
+ * Atlas 0.8 marks a library token as a player character (`TokenAsset.playerCharacter`); the tokens placed from it on any
+ * scene are that character, so a character is remembered by its library token and given back on every scene. Any other
+ * token is remembered as itself: its map and its id (`tokenKey`).
  *
  * It never gives a token to anyone who was not asked for by name: no player at the table of that name, or two of them, and
  * nothing is assigned.
@@ -44,8 +48,18 @@ export function playerCharacterTokens(tokens: Readonly<Record<string, PlacedToke
   return found;
 }
 
-/** Who each player character was given to: the library token's id, then the player's name. */
+/**
+ * Who each token was given to, by the player's name: a player character under its library token's id, any other token under
+ * `tokenKey` of its map and id.
+ */
 export type Remembered = Readonly<Record<string, string>>;
+
+const TOKEN_KEY = 'token:';
+
+/** Where a token that is no player character is remembered: its map's path and its id. */
+export function tokenKey(mapPath: string, tokenId: string): string {
+  return `${TOKEN_KEY}${mapPath}#${tokenId}`;
+}
 
 export interface PartyPlayer {
   playerId: string;
@@ -59,18 +73,30 @@ export interface PartyControl {
   onChange(listener: () => void): Disposer;
 }
 
+/** The scene the GM works on, as far as telling its tokens goes. */
+export interface PartyScene {
+  /** Its map's path; null while it is not known (then only player characters are kept). */
+  mapPath: string | null;
+  tokens: Readonly<Record<string, PlacedToken | undefined>>;
+  /**
+   * Whether `tokens` are the scene's every token now (a loaded Atlas map view), so a remembered token missing from them
+   * was deleted. False for the map's saved file, read while Atlas's view is not loaded (the GM on Tabletop's board).
+   */
+  live: boolean;
+}
+
 export interface PartyLinksDeps {
   /** The session: who is at the table, and who controls which token (null while none is hosted). */
   session: {
     state(): { players: readonly PartyPlayer[]; tokenControl: PartyControl | null };
     subscribe(listener: () => void): Disposer;
   };
-  /** The tokens of the scene the GM is on, or null while there is none. */
-  tokens(): Readonly<Record<string, PlacedToken | undefined>> | null;
+  /** The scenes the GM works on (the one in Atlas's view, the presented one, those on Tabletop's boards), one per map. */
+  scenes(): readonly PartyScene[];
   /** Calls `listener` when the scene or its tokens may have changed. */
   watchScene(listener: () => void): Disposer;
-  /** Atlas's library tokens. */
-  library(): Promise<readonly LibraryToken[]>;
+  /** Atlas's library tokens; null while they cannot be read (no Atlas map view loaded), so the last read stands. */
+  library(): Promise<readonly LibraryToken[] | null>;
   memory: { load(): Promise<Remembered>; save(remembered: Remembered): Promise<void> };
 }
 
@@ -83,10 +109,12 @@ export class PartyLinks {
   private library: readonly LibraryToken[] | null = null;
   private libraryAt = -Infinity;
   private reading = false;
+  /** A refresh asked for while the library was read: run once it is. */
+  private again = false;
   private queued = false;
   private control: PartyControl | null = null;
   private stopControl: Disposer | null = null;
-  /** Who controlled each player character's token at the last look: a player who still has no token they had was taken it from. */
+  /** Who controlled each token at the last look: a player who still has no token they had was taken it from. */
   private readonly lastControllers = new Map<string, ReadonlySet<string>>();
   private readonly stops: Disposer[] = [];
   private stopped = false;
@@ -128,29 +156,57 @@ export class PartyLinks {
   }
 
   private async refresh(): Promise<void> {
-    if (this.stopped || !this.loaded || this.reading) return;
-    const { players, tokenControl } = this.deps.session.state();
+    if (this.stopped || !this.loaded) return;
+    if (this.reading) {
+      // A change while the library is read (the GM ticking Controlled by) is looked at once it is, never dropped.
+      this.again = true;
+      return;
+    }
+    const { tokenControl } = this.deps.session.state();
     this.follow(tokenControl);
-    const tokens = this.deps.tokens();
-    if (!tokenControl || !tokens || Object.keys(tokens).length === 0) {
+    const scenes = this.deps.scenes().filter((scene) => Object.keys(scene.tokens).length > 0);
+    if (!tokenControl || scenes.length === 0) {
       this.lastControllers.clear();
       return;
     }
-    if (this.library === null || this.now() - this.libraryAt > LIBRARY_MS) {
+    if (this.libraryAt === -Infinity || this.now() - this.libraryAt > LIBRARY_MS) {
       this.reading = true;
       try {
-        this.library = await this.deps.library();
-        this.libraryAt = this.now();
+        // Not readable now (no Atlas view): the last library read stands, or none is known.
+        this.library = (await this.deps.library()) ?? this.library;
       } catch {
-        // Atlas's library cannot be read: no token is known as a player character.
-        this.library = [];
-        this.libraryAt = this.now();
+        // Atlas's library cannot be read: the last read stands.
       } finally {
+        this.libraryAt = this.library === null ? -Infinity : this.now();
         this.reading = false;
       }
       if (this.stopped) return;
+      if (this.again) {
+        this.again = false;
+        this.refreshSoon();
+        return;
+      }
     }
-    this.look(players, tokenControl, this.deps.tokens() ?? tokens, this.library);
+    const now = this.deps.session.state();
+    if (now.tokenControl !== tokenControl) {
+      this.refreshSoon();
+      return;
+    }
+    this.look(now.players, tokenControl, this.deps.scenes(), this.library);
+  }
+
+  /**
+   * The placed tokens that are player characters, by token id, with the library token each is. Without a library read
+   * yet, a token placed from a library token remembered as a character is one: only characters are remembered so.
+   */
+  private characters(tokens: PartyScene['tokens'], library: readonly LibraryToken[] | null): Map<string, string> {
+    if (library !== null) return playerCharacterTokens(tokens, library);
+    const found = new Map<string, string>();
+    for (const [tokenId, token] of Object.entries(tokens)) {
+      const assetId = token?.assetId;
+      if (assetId !== undefined && !assetId.startsWith(TOKEN_KEY) && assetId in this.remembered) found.set(tokenId, assetId);
+    }
+    return found;
   }
 
   /** Follows whoever controls what, so an assignment by the GM is learned and one taken back is forgotten. */
@@ -162,30 +218,55 @@ export class PartyLinks {
     this.lastControllers.clear();
   }
 
-  private look(players: readonly PartyPlayer[], control: PartyControl, tokens: Readonly<Record<string, PlacedToken | undefined>>, library: readonly LibraryToken[]): void {
-    const admitted = players.filter((player) => player.status === 'admitted');
-    const characters = playerCharacterTokens(tokens, library);
+  private look(players: readonly PartyPlayer[], control: PartyControl, scenes: readonly PartyScene[], library: readonly LibraryToken[] | null): void {
     const now = new Map<string, ReadonlySet<string>>();
     let changed = false;
-    for (const [tokenId, assetId] of characters) {
-      const controllers = admitted.filter((player) => control.controls(player.playerId, tokenId));
-      if (controllers.length === 1) {
-        // Given to one player: that is who this character is.
-        const name = controllers[0]!.name;
-        if (this.remembered[assetId] !== name) {
-          this.remembered[assetId] = name;
+    for (const scene of scenes) changed = this.lookAt(players, control, scene, library, now) || changed;
+    this.lastControllers.clear();
+    for (const [tokenId, ids] of now) this.lastControllers.set(tokenId, ids);
+    if (changed) void this.deps.memory.save({ ...this.remembered }).catch(() => undefined);
+  }
+
+  /** One scene: learns, forgets and gives back its tokens, noting who controls each in `now`; true when memory changed. */
+  private lookAt(players: readonly PartyPlayer[], control: PartyControl, scene: PartyScene, library: readonly LibraryToken[] | null, now: Map<string, ReadonlySet<string>>): boolean {
+    const admitted = players.filter((player) => player.status === 'admitted');
+    const { tokens, mapPath } = scene;
+    const characters = this.characters(tokens, library);
+    let changed = false;
+    // Only every token of the scene now tells a deleted one: a saved file misses tokens placed since.
+    if (mapPath !== null && scene.live) {
+      // A token of this map that is remembered but no longer on it was deleted: its memory goes with it.
+      const prefix = tokenKey(mapPath, '');
+      for (const key of Object.keys(this.remembered)) {
+        if (key.startsWith(prefix) && !(key.slice(prefix.length) in tokens)) {
+          delete this.remembered[key];
           changed = true;
         }
-      } else if (controllers.length === 0 && assetId in this.remembered) {
+      }
+    }
+    for (const tokenId of Object.keys(tokens)) {
+      if (!tokens[tokenId]) continue;
+      // A player character is remembered by its library token, any other token as itself.
+      const key = characters.get(tokenId) ?? (mapPath === null ? null : tokenKey(mapPath, tokenId));
+      if (key === null) continue;
+      const controllers = admitted.filter((player) => control.controls(player.playerId, tokenId));
+      if (controllers.length === 1) {
+        // Given to one player: that is whose it is.
+        const name = controllers[0]!.name;
+        if (this.remembered[key] !== name) {
+          this.remembered[key] = name;
+          changed = true;
+        }
+      } else if (controllers.length === 0 && key in this.remembered) {
         // A player who had it, still at the table, no longer does: it was taken from them. One who left has not lost it.
         const prior = this.lastControllers.get(tokenId) ?? new Set<string>();
         if ([...prior].some((playerId) => admitted.some((player) => player.playerId === playerId))) {
-          delete this.remembered[assetId];
+          delete this.remembered[key];
           changed = true;
         }
       }
       if (controllers.length === 0) {
-        const name = this.remembered[assetId];
+        const name = this.remembered[key];
         const owners = name === undefined ? [] : admitted.filter((player) => player.name === name);
         // Asked for by name, and exactly one player at the table has it.
         if (owners.length === 1) {
@@ -194,11 +275,9 @@ export class PartyLinks {
           continue;
         }
       }
-      now.set(tokenId, new Set(controllers.map((player) => player.playerId)));
+      if (controllers.length > 0) now.set(tokenId, new Set(controllers.map((player) => player.playerId)));
     }
-    this.lastControllers.clear();
-    for (const [tokenId, ids] of now) this.lastControllers.set(tokenId, ids);
-    if (changed) void this.deps.memory.save({ ...this.remembered }).catch(() => undefined);
+    return changed;
   }
 }
 
@@ -211,7 +290,7 @@ export function fileMemory(file: () => Promise<string>, adapter: { exists(path: 
       const parsed: unknown = JSON.parse(await adapter.read(path));
       const links = typeof parsed === 'object' && parsed !== null ? (parsed as { links?: unknown }).links : null;
       if (typeof links !== 'object' || links === null) return {};
-      // Only what is a name against a library token's id: anything else in the file is not a link.
+      // Only what is a name against a library token's id or a token's key: anything else in the file is not a link.
       return Object.fromEntries(Object.entries(links).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''));
     },
     save: async (remembered) => {

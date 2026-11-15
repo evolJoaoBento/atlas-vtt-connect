@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayerSessionState } from '../../../src/app/online/PlayerSession';
-import { pageScreen } from '../../../src/app/online/page/pageScreen';
+import { NOT_HELD_TEXT, pageScreen } from '../../../src/app/online/page/pageScreen';
 
 const state = (overrides: Partial<PlayerSessionState>): PlayerSessionState => ({
   status: 'connecting', playerId: null, title: null, players: [], reason: null, ...overrides,
@@ -19,13 +19,21 @@ describe('join page screens', () => {
       .toEqual({ kind: 'message', text: 'Connected to Vault. Waiting for the GM to show a scene.' });
     expect(pageScreen(state({ status: 'denied', reason: 'kicked' }), true)).toEqual({ kind: 'message', text: 'The GM removed you from the session.' });
     expect(pageScreen(state({ status: 'lost', reason: 'ended' }), true)).toEqual({ kind: 'message', text: 'The session ended.' });
+    expect(pageScreen(state({ status: 'denied', reason: 'version' }), true)).toEqual({ kind: 'message', text: 'This table needs the updated player page' });
+    expect(NOT_HELD_TEXT).toBe("The GM's Atlas is on another map; try again in a moment.");
     expect(pageScreen(state({ status: 'lost', reason: 'something-new' }), false)).toEqual({ kind: 'message', text: UNREACHABLE });
     expect(pageScreen(state({ status: 'lost', reason: 'constructor' }), false)).toEqual({ kind: 'message', text: UNREACHABLE });
   });
 
   it('shows the table with a scene, also while reconnecting', () => {
     expect(pageScreen(state({ status: 'admitted', title: 'Vault' }), true)).toEqual({ kind: 'table', title: 'Vault', connection: 'Connected' });
-    expect(pageScreen(state({ status: 'connecting', title: 'Vault' }), true)).toEqual({ kind: 'table', title: 'Vault', connection: 'Reconnecting…' });
+    expect(pageScreen(state({ status: 'connecting', title: 'Vault' }), true)).toEqual({ kind: 'table', title: 'Vault', connection: 'Reconnecting…', reconnect: true });
     expect(pageScreen(state({ status: 'admitted' }), true)).toMatchObject({ kind: 'table', title: 'the table' });
+  });
+
+  it('offers to join again once the connection is lost for good, not when refused', () => {
+    expect(pageScreen(state({ status: 'lost', reason: 'connection-lost' }), true)).toEqual({ kind: 'message', text: 'Lost the connection to your GM.', rejoin: true });
+    expect(pageScreen(state({ status: 'lost', reason: 'unreachable' }), false)).not.toHaveProperty('rejoin');
+    expect(pageScreen(state({ status: 'denied', reason: 'kicked' }), false)).not.toHaveProperty('rejoin');
   });
 });

@@ -81,6 +81,27 @@ $connect-mark-size: 8px;
   }
 }
 
+/* The join link as a QR code: dark on white whatever the theme, as a scanner needs. */
+.atlas-connect-panel__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+
+  svg {
+    width: min(100%, 240px);
+    height: auto;
+    border-radius: 6px;
+  }
+
+  figcaption {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    text-align: center;
+  }
+}
+
 .atlas-connect-panel__players {
   display: flex;
   flex-direction: column;

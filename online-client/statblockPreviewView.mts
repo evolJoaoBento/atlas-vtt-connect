@@ -5,7 +5,7 @@
  * it eases in as Atlas's preview does and never takes input, so its rolls show as text. Placed in the window's
  * coordinates (`position: fixed`). Text only, never markup: everything comes from the GM. Shared with the Obsidian tab.
  */
-import type { TokenSheet } from '../src/app/online/tools/sheets';
+import type { TokenSheet } from '../packages/atlas-host/src/sheets/sheets';
 import { sheetContent } from './sheetView.mts';
 
 /** Atlas's distance from the pointer, and the margin kept inside the window. */

@@ -83,6 +83,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
       this.options.resourceVisibility?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
       // A mini was placed on a token, changed or taken off: every scene in use shows it.
       this.options.minis?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
+      // Tabletop came or went, or the GM changed a map's look on the 3D board: every scene in use makes its board again.
+      this.options.board?.subscribe(() => this.rulesChanged()) ?? (() => undefined),
       // A collection's dice look (or the default's) changed: every scene in use reads its own again.
       this.options.diceLook?.watch(() => { for (const slot of this.slots.values()) slot.readLook(); }) ?? (() => undefined),
       assignments.onChange(() => { this.update(); this.changes.emit({ kind: 'assignments' }); }),
@@ -123,6 +125,8 @@ export class SceneHub extends SlotReads implements SessionHandler {
   /** For the GM's UI: whether players can be assigned (D12), who is assigned where, and the cap (D13). */
   splitSupported(): boolean { return this.options.tabs !== null; }
   assignedTabs(): Record<string, TabKey> { return this.options.assignments.entries(); }
+  /** The presented tab, or null. */
+  presented(): TabKey | null { return this.presentedTab(); }
   wouldExceedCap(playerId: string, tab: TabKey): boolean { return this.options.assignments.wouldExceedCap(playerId, tab, this.presentedTab()); }
   /** The session's players changed: a kicked player's assignment goes (spec 4); only a drop changes anything (I1). */
   playersChanged(players: readonly SessionPlayer[]): void { this.options.assignments.retainPlayers(new Set(players.map((player) => player.playerId))); }

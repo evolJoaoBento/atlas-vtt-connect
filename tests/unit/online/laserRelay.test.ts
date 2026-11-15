@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encodeControl } from '../../../src/app/online/protocol';
+import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
 import type { PlayerLaser } from '../../../src/app/online/tools/toolMessages';
 import { LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
 import { toolsWorld } from './toolsFixtures';
@@ -23,6 +23,18 @@ describe.each(HUB_PATHS)('LaserRelay, $atlas', ({ tabs }) => {
     expect(heard).toEqual([{ from: a.playerId, sceneId: w.sceneId(), points: [{ x: 10, y: 20 }], lifted: false, color: LASER_COLOR_SWATCHES[1].value }]);
     expect(w.lasersOf(a)).toEqual([]);
     expect(w.shown()).toEqual([{ from: a.playerId, color: LASER_COLOR_SWATCHES[1].value, points: [{ x: 10, y: 20 }], lifted: false }]);
+    w.finish();
+  });
+
+  it("relays a player's laser size (Atlas's 8 to 100) to the other players; a size out of range is not a laser at all", async () => {
+    const w = toolsWorld();
+    w.present();
+    const heard: PlayerLaser[] = [];
+    const a = await w.join('A');
+    await w.join('B', { onLaser: (laser) => heard.push(laser) });
+    expect(a.session.sendLaser([{ x: 10, y: 20 }], false, undefined, undefined, 40)).toBe(true);
+    expect(heard.at(-1)).toMatchObject({ from: a.playerId, points: [{ x: 10, y: 20 }], size: 40 });
+    expect(decodeControl(JSON.stringify({ v: 1, type: 'laser', sceneId: 's', points: [{ x: 1, y: 1 }], lifted: false, size: 500 })).kind).toBe('invalid');
     w.finish();
   });
 

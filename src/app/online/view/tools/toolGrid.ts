@@ -5,11 +5,17 @@
  * drop puts a token of its size (`snapTokenCenter`: where cells meet for Large and Gargantuan), also on a
  * hidden grid, while the GM's snap-to-grid is on; on a map without a grid it does not snap. Without a
  * grid, distances count squares of the map's cell size. Distances are labelled with the GM's measurement
- * settings, as Atlas's ruler labels them, and cones open by the GM's cone angle. Shared with the web page.
+ * settings, as Atlas's ruler labels them, and cones open by the GM's cone angle. A dragged token's ruler reads as
+ * Atlas 0.15's does (`dragMove`): against the token's speed, in the colour of the movement step the move lies in, where
+ * the collection names steps and the token has a speed; it shows only when the GM's drag-distance choice says so.
+ * Shared with the web page.
  */
-import { cellCenterAt, type GridGeometry } from '@atlas-vtt/shared/grid';
-import { snapTokenCenter } from '@atlas-vtt/shared/grid';
-import { dragRulerLabel } from '@atlas-vtt/shared/draw';
+// The grid's shape as the page's drawing code (the older Atlas bundle) types it; the rules below are Atlas 0.15's own.
+import type { GridGeometry } from '@atlas-vtt/shared/grid';
+import {
+  cellCentreAt, dragMove, formatDistance, pathLengthInCells, readDragDistance, showsDragDistance, snapAreaEnd, snapAreaOrigin, snapTokenCenter,
+  type GridGeometry as AtlasGeometry,
+} from '../../../../../packages/atlas-shared/src/index';
 import { snapGridOf } from '../../scene/snapGrid';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 
@@ -19,13 +25,25 @@ export interface ToolGrid {
   snap(point: ScenePoint): ScenePoint;
   /** Where a square template's corner lands: the nearest corner of a square grid's cells while snapping is on. */
   snapCorner(point: ScenePoint): ScenePoint;
+  /** Where a template starts, as Atlas snaps an area's origin: a cell's centre, corner or edge middle (a hex's centre or corner). */
+  snapAreaOrigin(point: ScenePoint): ScenePoint;
+  /** Where a template started at `origin` ends, as Atlas snaps an area's end. */
+  snapAreaEnd(origin: ScenePoint, point: ScenePoint): ScenePoint;
   /** Where a drag ruler point of a token of `tokenSize` lands: the GM's snap-to-grid decides, as for a dropped token, even if the grid is hidden. */
   snapDrag(point: ScenePoint, tokenSize: number): ScenePoint;
   /** The distance along `points`, e.g. "30ft" or a range band's name. */
   label(points: readonly ScenePoint[]): string;
+  /**
+   * How a dragged token's ruler along `points` reads: against `speed` (game units; null without one) in its step's colour
+   * (`#rrggbb`, or `beyond` past the last step), else the plain distance. Null where the GM's choice shows no drag distance.
+   */
+  dragLook(points: readonly ScenePoint[], speed: number | null): { label: string; color?: string } | null;
   /** A cone's full opening in radians: the GM's measure tool's, so the game system's. */
   coneOpening: number;
 }
+
+/** The centre of the cell a point lies in, by Atlas (whose own point type is not carried by the shared package). */
+const centreOf = (grid: GridGeometry, point: ScenePoint): ScenePoint => cellCentreAt(grid as AtlasGeometry, point) as ScenePoint;
 
 export function toolGridOf(scene: PlayerScene): ToolGrid {
   const grid = scene.grid;
@@ -34,16 +52,29 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     ?? (grid ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY } : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 });
   return {
     geometry,
-    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
+    snap: (point) => (scene.measurement.snapToGrid && (grid || snapGrid) ? centreOf(geometry, point) : { x: point.x, y: point.y }),
     snapCorner: (point) => {
       if (!scene.measurement.snapToGrid || !(grid || snapGrid) || geometry.type !== 'square' || !(geometry.size > 0)) return { x: point.x, y: point.y };
       const corner = (value: number, offset: number): number => offset + Math.round((value - offset) / geometry.size) * geometry.size;
       return { x: corner(point.x, geometry.offsetX ?? 0), y: corner(point.y, geometry.offsetY ?? 0) };
     },
+    snapAreaOrigin: (point) => snapAreaOrigin(scene.measurement.snapToGrid && (grid || snapGrid) ? geometry as AtlasGeometry : null, point) as ScenePoint,
+    snapAreaEnd: (origin, point) => snapAreaEnd(scene.measurement.snapToGrid && (grid || snapGrid) ? geometry as AtlasGeometry : null, origin, point) as ScenePoint,
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
-      ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
+      ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => centreOf(snapGrid, cell))
       : { x: point.x, y: point.y }),
-    label: (points) => dragRulerLabel(geometry, points, scene.measurement),
+    // Atlas 0.15's own distance and label: the diagonal rule (Manhattan too) and the unit's name as the GM typed it.
+    label: (points) => formatDistance(pathLengthInCells(geometry as AtlasGeometry, points, scene.measurement.diagonalRule), scene.measurement),
+    dragLook: (points, speed) => {
+      const { measurement } = scene;
+      if (!showsDragDistance(readDragDistance(measurement.dragDistance), scene.initiative?.active === true)) return null;
+      const cells = pathLengthInCells(geometry as AtlasGeometry, points, measurement.diagonalRule);
+      // What the token moved earlier in the turn is not tracked here: each drag counts from where it starts.
+      const move = measurement.movement
+        ? dragMove({ cells, earlier: 0, speed, rules: measurement.movement, settings: measurement })
+        : null;
+      return move ? { label: move.label, color: move.color } : { label: formatDistance(cells, measurement) };
+    },
     coneOpening: (scene.measurement.coneAngle * Math.PI) / 180,
   };
 }

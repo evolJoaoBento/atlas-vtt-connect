@@ -5,7 +5,7 @@
  */
 import type { DiceRollResult, ViewId } from '@atlas-vtt/api-types';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { diceHostPart, laserRelayPart } from '../../../src/app/online/atlas/toolParts';
+import { diceHostPart, laserRelayPart, offeredRulesOf } from '../../../src/app/online/atlas/toolParts';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import type { HostedContext } from '../../../src/app/online/hostedSession';
 import { controlWorld, type ControlPlayer } from './controlFixtures';
@@ -16,7 +16,7 @@ export const MIDDLE_ROLL = (): number => 0.5;
 type Laser = Extract<ControlMessage, { type: 'laser' }>;
 type DiceLog = Extract<ControlMessage, { type: 'dice-log' }>;
 
-export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
+export function toolsWorld(options: { rules?: Partial<PlayerViewRules>; gmRollsShared?: () => boolean } = {}) {
   const world = controlWorld({ scene: { rules: { showTokenNameplates: true, ...options.rules } } });
   const scene = world.scene!;
   const { atlas, extension } = scene.presented;
@@ -25,7 +25,7 @@ export function toolsWorld(options: { rules?: Partial<PlayerViewRules> } = {}) {
   const logged: DiceRollResult[] = [];
   extension.dice.onRolled((result) => logged.push(result));
   const context: HostedContext = { session: world.gm, presented: scene.presented, projection: scene.broadcaster };
-  const dice = diceHostPart(extension.dice)(context);
+  const dice = diceHostPart(extension.dice, offeredRulesOf(extension), options.gmRollsShared)(context);
   const lasers = laserRelayPart(extension.lasers, extension.settings)(context);
   dice.start();
   lasers.start();

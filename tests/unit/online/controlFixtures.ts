@@ -72,10 +72,12 @@ export interface ControlPlayer {
   /** A `token-move` on the player's current link, for the scene players have unless `sceneId` is given. */
   move(tokenId: string, x: number, y: number, sceneId?: string): void;
   refusals(): string[];
+  /** The reason of each refusal, in order: undefined where the GM gave none. */
+  refusalReasons(): Array<string | undefined>;
   controlLists(): string[][];
 }
 
-export function controlWorld(options: { scene?: ControlScene } = {}) {
+export function controlWorld(options: { scene?: ControlScene; movesOnTurn?: () => boolean; cutscene?: { running(): boolean } } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let host: TokenControlHost | null = null;
@@ -87,7 +89,7 @@ export function controlWorld(options: { scene?: ControlScene } = {}) {
   gm.start();
   const scene = presentedScene(gm, options.scene ?? {});
   const { tokens } = scene.presented.extension;
-  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens });
+  const controlHost = new TokenControlHost({ session: gm, projection: scene.broadcaster, tokens, ...(options.movesOnTurn ? { movesOnTurn: options.movesOnTurn } : {}), ...(options.cutscene ? { cutscene: options.cutscene } : {}) });
   host = controlHost;
   controlHost.start();
   const players: ControlPlayer[] = [];
@@ -120,6 +122,7 @@ export function controlWorld(options: { scene?: ControlScene } = {}) {
         link?.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId, x, y }));
       },
       refusals: () => received.flatMap((message) => (message.type === 'token-move-refused' ? [message.tokenId] : [])),
+      refusalReasons: () => received.flatMap((message) => (message.type === 'token-move-refused' ? [message.reason] : [])),
       controlLists: () => received.flatMap((message) => (message.type === 'token-control' ? [message.tokenIds] : [])),
     };
     players.push(player);

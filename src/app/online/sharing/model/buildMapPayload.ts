@@ -179,7 +179,7 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     const note = path ? context.noteItem(path) : null;
     if (note) setOwn(tokenNotes, id, note);
   }
-  return { format: MAP_PAYLOAD_FORMAT, mode: 'player-safe', name, scene, pins, tokenNotes, notes: [...context.linked], images: sceneAssetIds(scene) };
+  return { format: MAP_PAYLOAD_FORMAT, mode: 'player-safe', name, scene, pins, tokenNotes, notes: [...context.linked], images: sceneAssetIds(scene, { video: false }) };
 }
 
 /** Keys that hold vault paths (`notePath`, `imagePath`, `notePaths`, an audio's `path`, the `background`), and everything nested under them. A new `*Path` field is covered by its name. */

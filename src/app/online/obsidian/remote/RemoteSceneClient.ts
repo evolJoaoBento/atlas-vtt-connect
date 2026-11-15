@@ -167,8 +167,8 @@ export class RemoteSceneClient implements OnlineSceneSink {
     this.feedPlayer();
   }
 
-  moveRefused(tokenId: string): void {
-    if (!this.disposed) this.moves.refused(tokenId);
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void {
+    if (!this.disposed) this.moves.refused(tokenId, reason);
   }
 
   /** The scene is paused (the GM is on another scene) or live again: the status bar says so while paused. */

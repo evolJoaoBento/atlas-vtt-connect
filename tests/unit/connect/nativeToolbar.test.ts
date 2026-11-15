@@ -463,4 +463,25 @@ describe('Connect in Atlas\'s own toolbar', () => {
     expect(vi.getTimerCount()).toBe(0);
     expect(t.native.handles('v1')).toBe(false);
   });
+
+  it('on a Tabletop board: the same buttons in its toolbar, acting for the Atlas view holding the map, panels opening there', () => {
+    const t = setup();
+    // The 3D board's root, with a toolbar laid out as Atlas's (Tabletop draws the same slot).
+    const boardRoot = document.createElement('div');
+    boardRoot.innerHTML = '<div class="atlas-vtt-toolbar atlas-main-toolbar"><div class="atlas-toolbar-end"></div></div>';
+    document.body.appendChild(boardRoot);
+    t.views.set('tabletop:1', { viewId: 'tabletop:1', contextViewId: 'v1', doc: document, root: boardRoot, selectedTokens: () => [], tabs: () => t.view.tabs() });
+    const clicked: string[] = [];
+    const log: string[] = [];
+    const panel = t.ui.addPanel({ id: 'online', title: 'Online session', mount: (container, ctx) => { log.push(`mount:${ctx.viewId}`); container.textContent = 'hello'; return () => undefined; } });
+    t.ui.addToolbarItem({ id: 'online', icon: 'network', label: 'Online session', onClick: (ctx) => { clicked.push(ctx.viewId); panel.open(ctx.viewId); } });
+    t.native.sync();
+    const boardButton = boardRoot.querySelector<HTMLButtonElement>('.atlas-connect-group button[aria-label="Online session"]');
+    expect(boardButton).not.toBeNull();
+    boardButton!.click();
+    expect(clicked).toEqual(['v1']);
+    expect(log).toEqual(['mount:v1']);
+    expect(boardRoot.querySelector('.atlas-connect-tray')?.textContent).toContain('hello');
+    expect(t.root.querySelector('.atlas-connect-tray')).toBeNull();
+  });
 });

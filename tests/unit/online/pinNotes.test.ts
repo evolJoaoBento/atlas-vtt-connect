@@ -88,8 +88,10 @@ describe("the GM's notes for players who open a pin", () => {
     w.tick(1000);
     expect(await w.open('pin-0', 's2')).toBeNull();
     w.tick(1000);
+    // Atlas 0.11: the readable switch wins over `gmOnly` (the dungeon generator's room pins), so such a pin is still offered.
     w.pins.a = { notePath: 'Cellar.md', readable: true, gmOnly: true };
-    expect(await w.open('pin-0')).toBeNull();
+    expect(await w.open('pin-0')).not.toBeNull();
+    w.read.mockClear();
     w.tick(1000);
     w.pins.a = { notePath: 'Cellar.md' };
     expect(await w.open('pin-0')).toBeNull();

@@ -5,7 +5,8 @@ import type { OnlineSessionService } from './OnlineSessionService';
 import { tabBadge } from './gm-ui/tabBadge';
 import { EVERYONE_BACK_COMMAND } from './split/splitCopy';
 import { canBringEveryoneBack } from './splitStore';
-import { CLEAR_TEMPLATES_LABEL, ONLINE_SESSION_LABEL, SHOW_HANDOUT_LABEL, START_SESSION_LABEL, STOP_HANDOUT_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
+import type { Curtain } from './atlas/curtain';
+import { CLEAR_TEMPLATES_LABEL, CURTAIN_DOWN_LABEL, ONLINE_SESSION_LABEL, SHOW_HANDOUT_LABEL, START_SESSION_LABEL, STOP_HANDOUT_LABEL, STOP_SESSION_LABEL } from './ui/onlineCopy';
 import { HandoutModal } from './ui/handoutModal';
 import { handouts } from './handouts';
 import { openOnlineSession, type PanelOpener } from './ui/openOnlineSession';
@@ -19,6 +20,8 @@ export interface RegisterOnlineOptions {
   splitParty?: boolean;
   /** Atlas's UI slots, when it has them: "Online session…" then opens the panel in a map view. */
   gmUi?: PanelOpener;
+  /** The curtain: a command lowers or lifts Connect's own, which blacks out every player's scene. */
+  curtain?: Curtain;
 }
 
 function statusText(state: OnlineSessionState): string {
@@ -86,6 +89,20 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, op
       checkCallback: (checking) => {
         if (!canBringEveryoneBack(options.presentation)) return false;
         if (!checking) service.everyoneBack();
+        return true;
+      },
+    });
+  }
+
+  const { curtain } = options;
+  if (curtain) {
+    commands.push('toggle-curtain');
+    plugin.addCommand({
+      id: 'toggle-curtain',
+      name: CURTAIN_DOWN_LABEL,
+      checkCallback: (checking) => {
+        if (onlineSessionStore.getState().status !== 'hosting') return false;
+        if (!checking) curtain.setOwn(!curtain.ownDown);
         return true;
       },
     });

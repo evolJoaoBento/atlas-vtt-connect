@@ -25,8 +25,8 @@ function stillOffered(pins: unknown, notePath: string): boolean {
   if (typeof pins !== 'object' || pins === null) return false;
   return Object.values(pins as Record<string, unknown>).some((value) => {
     if (typeof value !== 'object' || value === null) return false;
-    const pin = value as { notePath?: unknown; readable?: unknown; gmOnly?: unknown };
-    return pin.notePath === notePath && pin.readable === true && pin.gmOnly !== true;
+    const pin = value as { notePath?: unknown; readable?: unknown };
+    return pin.notePath === notePath && pin.readable === true;
   });
 }
 

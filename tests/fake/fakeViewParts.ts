@@ -66,6 +66,8 @@ export function sliceOf(scene: Scene, tabId: string | null): readonly unknown[] 
     tabId, scene.mapPath, scene.loaded, scene.background, scene.grid, scene.objects.tokens, scene.objects.texts,
     scene.objects.drawings, scene.objects.fog, scene.widgets.settings, scene.widgets.values, scene.initiative,
     scene.initiativeTrackerOpen, scene.lighting,
+    // As the stock stand-in: walls and lights change what players on Tabletop's 3D board see.
+    (scene.objects as { walls?: unknown }).walls, (scene.objects as { lights?: unknown }).lights,
   ];
 }
 

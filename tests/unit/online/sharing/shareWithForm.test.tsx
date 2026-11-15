@@ -1,7 +1,8 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ShareWithForm, type ShareRow } from '../../../../src/app/online/sharing/ui/ShareWithForm';
+import { pickOption } from '../../pickOption';
 
 const rows: ShareRow[] = [{ key: 'k/ana', name: 'Ana', known: true }, { key: 'k/ben', name: 'Ben', known: true }, { key: 'name:Zed', name: 'Zed', known: false }];
 
@@ -12,7 +13,7 @@ describe('Share with form', () => {
     render(<ShareWithForm rows={rows} initial={{ everyone: false, people: ['k/ana', 'name:Zed'], except: [] }} map={null}
       preview={preview} warnings={['Not in your people list: Zed.']} onSave={save} onCancel={() => {}} />);
     expect(screen.getByText('Not in your people list: Zed.')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Preview as'), { target: { value: 'k/ben' } });
+    act(() => { pickOption(screen.getByLabelText('Preview as'), 'Ben'); });
     expect(await screen.findByText('text for k/ben')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Everyone in my sessions'));
     fireEvent.click(screen.getByLabelText('Except Ben'));

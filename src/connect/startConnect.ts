@@ -1,3 +1,4 @@
+import { Curtain } from '../app/online/atlas/curtain';
 import { obsidianStatblocks } from './statblockSource';
 import type { Plugin } from 'obsidian';
 import type { AtlasApi, AtlasExtension, Disposer } from '@atlas-vtt/api-types';
@@ -17,7 +18,8 @@ import { connectStorage } from './connectStorage';
 import type { MigrationSettings } from './migrateFromFork';
 import { migrationGate, startMigration, type MigrationStart } from './startMigration';
 import { startJoining, type JoinSettings } from './startJoining';
-import { tabletopMinis } from './tabletopMinis';
+import { tabletopBoard, tabletopMinis } from './tabletopMinis';
+import { resourceVisibilityForMap } from '../app/online/gm-ui/resourceVisibilitySection';
 
 export interface ConnectOptions {
   /** Connect's own settings (`ConnectSettingsStore`). */
@@ -61,10 +63,27 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
   void resourceVisibility?.load();
   // The Tabletop extension's 3D minis, when it is installed: players see them on the tokens they are sent.
   const minis = tabletopMinis(plugin.app);
+  // And its 3D board, for players who show it.
+  const board = tabletopBoard(plugin.app);
+  // Players see black while the curtain is down: Atlas 0.12's own (its player window bar) or Connect's command.
+  const curtain = new Curtain(plugin.app);
+  const asAtlas = sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) });
   const deps: Deps = {
-    ...sessionDeps(atlas, { dice: need(api, atlas, 'dice'), lasers: need(api, atlas, 'lasers'), lighting: need(api, atlas, 'lighting'), tokens: need(api, atlas, 'tokens'), sceneTabs: api.has('scene-tabs'), statblocks: obsidianStatblocks(plugin.app) }),
-    people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, ...options.hosting,
+    ...asAtlas,
+    playerViewSettings: {
+      getLocalPlayerViewSettings: () => ({ ...asAtlas.playerViewSettings.getLocalPlayerViewSettings(), curtain: curtain.down() }),
+      onChange: (listener) => {
+        const stops = [asAtlas.playerViewSettings.onChange(listener), curtain.subscribe(listener)];
+        return () => { for (const stop of stops) stop(); };
+      },
+    },
+    people, isJoined: () => isInSession(joinedSessionStore.getState()), ...(resourceVisibility ? { resourceVisibility } : {}), minis, board, attachBoard: (session) => board.attachSession(session), ...options.hosting,
   };
+  // "Players see" on Tabletop's board: the Edit Token section's choices, read in the GM's view holding the map.
+  const shownResources = deps.resources;
+  if (resourceVisibility && shownResources) {
+    deps.resourceShows = (mapPath, tokenId) => resourceVisibilityForMap({ views: atlas.views, store: resourceVisibility, resources: shownResources }, mapPath, tokenId);
+  }
   const service = new OnlineSessionService(plugin.app, options.settings, deps);
   // Atlas's UI slots (toolbar, palette, menus, panel) when this Atlas has them; the commands and the modal run a session either way.
   const ui = need(api, atlas, 'ui');
@@ -73,13 +92,15 @@ async function startHosting(plugin: Plugin, api: AtlasApi, atlas: AtlasExtension
     presented: deps.presented, joinSession: () => openJoinSessionModal(plugin.app),
     ...(resourceVisibility && resources ? { resourceVisibility: { store: resourceVisibility, resources } } : {}),
   }) : undefined;
-  const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), ...(gmUi ? { gmUi } : {}) });
+  const stopOnline = registerOnline(plugin, service, { presentation: atlas.presentation, splitParty: api.has('scene-tabs'), curtain, ...(gmUi ? { gmUi } : {}) });
   return {
     service,
     stop: () => {
       gmUi?.();
       stopOnline();
+      curtain.dispose();
       minis.dispose();
+      board.dispose();
     },
   };
 }

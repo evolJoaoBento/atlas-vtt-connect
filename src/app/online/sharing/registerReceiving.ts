@@ -1,4 +1,5 @@
 /** Receiving: the Shared with me command and buttons, push prompts, and pulled files that follow renames. */
+import { openPulledNote } from './receive/openPulled';
 import { Notice, type App } from 'obsidian';
 import type { ScenesApi } from '@atlas-vtt/api-types';
 import { chooseAction, confirmAction, type ChoiceDialogOptions } from '../../ui/confirmDialog';
@@ -141,7 +142,11 @@ export function registerReceiving(plugin: SharingScope, services: ReceivingServi
   setSharedOpener(open);
   plugin.register(() => setSharedOpener(null));
   // A push shows a prompt; only Pull writes anything.
-  const prompts = pushPromptListener({ show: showPushPrompt, service: sharedWithMe, notify: (text) => new Notice(text) });
+  const prompts = pushPromptListener({
+    show: showPushPrompt, service: sharedWithMe, notify: (text) => new Notice(text),
+    // A note the receiver allowed in opens, as a pull from Shared with me does.
+    open: (path) => { void openPulledNote(plugin.app, path); },
+  });
   plugin.register(shareSessionStore.subscribe(prompts));
   plugin.register(() => prompts.dispose());
   // Pulled files follow renames; a deleted one leaves its record without a path, so no later file is taken for it.

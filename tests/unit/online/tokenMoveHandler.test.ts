@@ -36,6 +36,31 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it('refuses a move while a cutscene runs, and accepts it again after the end', async () => {
+    let running = true;
+    const w = controlWorld({ cutscene: { running: () => running } });
+    const a = await withHero(w);
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
+    expect(w.undoSteps()).toBe(0);
+    running = false;
+    await vi.advanceTimersByTimeAsync(1100);
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 315, y: 175 });
+    w.finish();
+  });
+
+  it('gives no reason for a refusal that is not about the map Atlas holds', async () => {
+    const w = controlWorld();
+    const a = await withHero(w);
+    a.move('ally', 300, 150);
+    expect(a.refusals()).toEqual(['ally']);
+    expect(a.refusalReasons()).toEqual([undefined]);
+    w.finish();
+  });
+
   it('refuses a move of a token the player does not control', async () => {
     const w = controlWorld();
     const a = await withHero(w);
@@ -101,6 +126,8 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     expect(w.broadcaster.currentProjection()?.sceneId).toBe(sceneId);
     a.move('hero', 300, 150, sceneId);
     expect(a.refusals()).toEqual(['hero']);
+    // The GM's Atlas holds another map: the player is told so, and may try again.
+    expect(a.refusalReasons()).toEqual(['not-held']);
     expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
     expect(w.undoSteps()).toBe(0);
     w.finish();
@@ -112,6 +139,7 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
     w.store.setState({ isMapLoading: true });
     a.move('hero', 300, 150);
     expect(a.refusals()).toEqual(['hero']);
+    expect(a.refusalReasons()).toEqual(['not-held']);
     w.finish();
   });
 
@@ -247,11 +275,83 @@ describe.each(HUB_PATHS)('token moves on the GM side, $atlas', ({ tabs }) => {
       const decoded = decodeControl(data);
       if (decoded.kind === 'message') received.push(decoded.message);
     });
-    link.send('control', encodeControl({ v: 1, type: 'join', name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Eve', playerKey: 'eve', client: { kind: 'web', version: '1' } }));
     const sceneId = w.broadcaster.currentProjection()!.sceneId;
     link.send('control', encodeControl({ v: 1, type: 'token-move', sceneId, tokenId: 'hero', x: 300, y: 150 }));
     expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
     expect(received.filter((message) => message.type === 'token-move-refused')).toEqual([]);
     w.finish();
+  });
+});
+
+describe.each(HUB_PATHS)('players move only on their turn, $atlas', ({ tabs }) => {
+  onHubPath(tabs);
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  const entry = (tokenId: string, order: number, isActive: boolean) => ({
+    id: `e-${tokenId}`, tokenId, name: tokenId, initiative: 20 - order, initiativeModifier: 0, hp: { current: 5, max: 5 },
+    imagePath: '', isActive, isDefeated: false, isNPC: false, order,
+  });
+  /** A fight between the hero and the ally, shown to players; both tokens belong to the player. */
+  async function fight(movesOnTurn: () => boolean) {
+    const w = controlWorld({ movesOnTurn });
+    w.present();
+    const a = await w.join('A');
+    w.control.set('hero', a.playerId, true);
+    w.control.set('ally', a.playerId, true);
+    const start = (active: string | null): void => w.store.setState((state) => ({
+      initiativeTrackerOpen: true,
+      initiative: { ...state.initiative, isActive: active !== null, round: 1, entries: [entry('ally', 0, active === 'ally'), entry('hero', 1, active === 'hero')] },
+    }));
+    return { w, a, start };
+  }
+
+  it('holds a token that is in the fight and has not the turn, and lets the token whose turn it is move', async () => {
+    let on = true;
+    const { w, a, start } = await fight(() => on);
+    start('ally');
+    await w.tick();
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
+    a.move('ally', 400, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('ally')).not.toMatchObject({ x: 280, y: 140 });
+    // The turn passes: the hero may move now, the ally may not.
+    start('hero');
+    await w.tick();
+    a.move('hero', 300, 150);
+    expect(a.refusals()).toEqual(['hero']);
+    expect(w.token('hero')).toMatchObject({ x: 315, y: 175 });
+    a.move('ally', 500, 150);
+    expect(a.refusals()).toEqual(['hero', 'ally']);
+    // Switched off, nothing is held, as the setting is read at each move.
+    on = false;
+    a.move('ally', 500, 150);
+    expect(a.refusals()).toEqual(['hero', 'ally']);
+    w.finish();
+  });
+
+  it('holds nothing without the setting, with no fight running, or with the tracker closed', async () => {
+    const off = await fight(() => false);
+    off.start('ally');
+    await off.w.tick();
+    off.a.move('hero', 300, 150);
+    expect(off.a.refusals()).toEqual([]);
+    off.w.finish();
+    const idle = await fight(() => true);
+    idle.start(null);
+    await idle.w.tick();
+    idle.a.move('hero', 300, 150);
+    expect(idle.a.refusals()).toEqual([]);
+    idle.w.finish();
+    const closed = await fight(() => true);
+    closed.start('ally');
+    closed.w.store.setState({ initiativeTrackerOpen: false });
+    await closed.w.tick();
+    closed.a.move('hero', 300, 150);
+    expect(closed.a.refusals()).toEqual([]);
+    closed.w.finish();
   });
 });

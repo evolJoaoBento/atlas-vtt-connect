@@ -1,3 +1,4 @@
+import { pickPlayerViewRules, samePlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { describe, expect, it } from 'vitest';
 import type { Character, FogOperation, GridState, ResourceDefinition, SceneSnapshot, Token } from '@atlas-vtt/api-types';
 import { decodeControl, encodeControl } from '../../../src/app/online/protocol';
@@ -7,6 +8,7 @@ import { SCENE_RANGES } from '../../../src/app/online/scene/sceneLimits';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import { notePathOf, type ProjectionContext } from '../../../src/app/online/scene/projectForPlayers';
 import { coverageOfFog, createDefaultInitiativeState, fakeAssetIds, projectForPlayers, snapshotOf } from './sceneFixtures';
+import { mapMatrix } from '../../../src/app/online/scene/mapPlacement';
 
 const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
 const ALL_OFF: PlayerViewRules = { showGrid: false, showTokenNameplates: false, showWidgets: false, showInitiative: false };
@@ -268,6 +270,14 @@ describe('projectForPlayers', () => {
     });
   });
 
+  it('sends the Manhattan rule and the name of a custom unit, the scene\'s own name first', () => {
+    const collectionGrid = { unitType: 'custom' as const, unitName: ' mi ', unitDistance: 1, measurementMode: 'metric' as const, diagonalRule: 'manhattan' } as never;
+    expect(projectForPlayers(gmState(), context({ collectionGrid })).measurement).toMatchObject({ diagonalRule: 'manhattan', unitName: 'mi', unitType: 'custom' });
+    const grid = { ...gmState().grid!, unitNameOverride: 'ly' };
+    expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement.unitName).toBe('ly');
+    expect(projectForPlayers(gmState(), context()).measurement).not.toHaveProperty('unitName');
+  });
+
   it("sends a scene's own distance per cell, keeping the collection's as the rules square", () => {
     const collectionGrid = { unitType: 'feet' as const, unitDistance: 5, measurementMode: 'metric' as const };
     const grid = { ...gmState().grid!, unitDistanceOverride: 10 };
@@ -347,6 +357,7 @@ describe('projectForPlayers fix round 1', () => {
       a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md#The Cellar', readable: true, label: '1', icon: 'number' },
       b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Secrets/Guard.md' },
       c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gm.md', readable: true, gmOnly: true },
+      g: { id: 'g', kind: 'pin', x: 180, y: 100, notePath: 'Room.md#Room 1', gmOnly: true },
       d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'scenes/Cave.atlasmap', readable: true },
       e: { id: 'e', kind: 'pin', x: 700, y: 700, notePath: 'Fogged.md', readable: true },
       f: { id: 'f', kind: 'pin', x: 300, y: 100, notePath: 'Dock.md', readable: true, icon: 'coins' },
@@ -354,13 +365,28 @@ describe('projectForPlayers fix round 1', () => {
     const scene = projectForPlayers(withTokens({}, { pins } as never), context({ coverage: fogOver(600, 600, 300, 200) }));
     expect(scene.pins).toEqual([
       { id: 'pin-0', x: 100, y: 100, label: '1', title: 'The Cellar', icon: 'number' },
+      // Atlas 0.11: the pin menu's readable switch wins over `gmOnly`, the mark the dungeon generator gives its room pins.
+      { id: 'pin-1', x: 140, y: 100, label: null, title: 'Gm', icon: expect.any(String) },
       // A legacy Lucide icon reads as Atlas's pin icon for it.
-      { id: 'pin-1', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
+      { id: 'pin-2', x: 300, y: 100, label: null, title: 'Dock', icon: 'treasure' },
     ]);
     expect(JSON.stringify(scene.pins)).not.toContain('Secrets');
     // The note each sent pin links stays on the GM's side, for a player who opens it (`NoteHost`).
-    expect(scene.pins?.map((pin) => notePathOf(pin))).toEqual(['Secrets/Tavern.md#The Cellar', 'Dock.md']);
+    expect(scene.pins?.map((pin) => notePathOf(pin))).toEqual(['Secrets/Tavern.md#The Cellar', 'Gm.md', 'Dock.md']);
     expect(notePathOf({ id: 'pin-0', x: 100, y: 100, label: null, title: 'The Cellar' })).toBeNull();
+  });
+
+  it('sends a pin by the name the GM gave it, and that name under it where the GM shows it (Atlas 0.14)', () => {
+    const pins = {
+      a: { id: 'a', kind: 'pin', x: 100, y: 100, notePath: 'Secrets/Tavern.md', readable: true, name: '  The Rusty Mug  ' },
+      b: { id: 'b', kind: 'pin', x: 120, y: 100, notePath: 'Dock.md#North pier', readable: true, showName: true },
+      c: { id: 'c', kind: 'pin', x: 140, y: 100, notePath: 'Gate.md', readable: true, name: 'Gate', showName: true },
+      d: { id: 'd', kind: 'pin', x: 160, y: 100, notePath: 'Well.md', readable: true, name: '   ', showName: true },
+    };
+    const scene = projectForPlayers(withTokens({}, { pins } as never), context());
+    expect(scene.pins?.map((pin) => [pin.title, pin.name])).toEqual([['The Rusty Mug', undefined], ['North pier', 'North pier'], ['Gate', 'Gate'], ['Well', 'Well']]);
+    expect(isPlayerSceneBody({ ...scene, pins: [{ ...scene.pins![0]!, name: 'x'.repeat(61) }] })).toBe(false);
+    expect(isPlayerSceneBody(scene)).toBe(true);
   });
 
   it('sends no conditions for plain tokens', () => {
@@ -379,5 +405,134 @@ describe('projectForPlayers fix round 1', () => {
     const state = { ...withTokens({ a: hero({ id: 'a', x: 200, y: 200 }), b: hero({ id: 'b', x: 800, y: 200 }) }), initiative, initiativeTrackerOpen: true };
     const scene = projectForPlayers(state, context({ coverage: fogOver(0, 0, 500, 500) }));
     expect(scene.initiative?.entries.map((entry) => entry.tokenId)).toEqual(['b']);
+  });
+});
+
+describe("the map as Atlas aligned it (Atlas 0.7.1 and 0.10)", () => {
+  const world = { width: 3100, height: 2100 };
+  const aligned = { x: 1, y: 1, rotation: 3 } as const;
+
+  it('sends the place of a map Atlas turned or shifted, and nothing for one that fills its world rect', () => {
+    const turned = projectForPlayers(withTokens({}), context({ mapSize: world, mapAlignment: aligned }));
+    expect(turned.map.matrix).toEqual(mapMatrix(aligned, world));
+    expect(turned.map.matrix).toHaveLength(6);
+    expect(isPlayerSceneBody(turned)).toBe(true);
+    for (const alignment of [undefined, null, { x: 1.2, y: 1.1 }]) {
+      const plain = projectForPlayers(withTokens({}), context({ mapSize: world, ...(alignment !== undefined ? { mapAlignment: alignment } : {}) }));
+      expect(plain.map).not.toHaveProperty('matrix');
+    }
+    // No map image, nothing to place.
+    expect(projectForPlayers({ ...withTokens({}), background: null }, context({ mapSize: world, mapAlignment: aligned })).map).not.toHaveProperty('matrix');
+  });
+
+  it("keeps the world rect as it is: tokens, fog and grid stay in Atlas's world", () => {
+    const withMatrix = projectForPlayers(withTokens({ hero: hero() }), context({ mapSize: world, mapAlignment: aligned }));
+    const without = projectForPlayers(withTokens({ hero: hero() }), context({ mapSize: world }));
+    expect({ ...withMatrix.map, matrix: undefined }).toEqual({ ...without.map, matrix: undefined });
+    expect(withMatrix.tokens).toEqual(without.tokens);
+  });
+
+  it('is read by a page that does not know it, and one that does refuses a matrix a drawing could not stand', () => {
+    const scene = projectForPlayers(withTokens({}), context({ mapSize: world, mapAlignment: aligned }));
+    // An older page: the same scene without the field is still a scene.
+    const { matrix: _matrix, ...bare } = scene.map;
+    expect(isPlayerSceneBody({ ...scene, map: bare })).toBe(true);
+    const body = (matrix: unknown): unknown => ({ ...scene, map: { ...scene.map, matrix } });
+    expect(isPlayerSceneBody(body([1, 0, 0, 1, 0, 0]))).toBe(true);
+    for (const bad of [[1, 0, 0, 1, 0], [1, 0, 0, 1, 0, 0, 0], [1, 0, 0, 1, 0, Number.NaN], [1, 0, 0, 1, 0, '5'], [1, 0, 0, 1, 0, 9e9], 'matrix', {}]) {
+      expect(isPlayerSceneBody(body(bad))).toBe(false);
+    }
+  });
+});
+
+describe('the curtain (Atlas 0.12 "Hide the map", or Connect\'s own)', () => {
+  const curtained = (): ReturnType<typeof projectForPlayers> => projectForPlayers(
+    { ...withTokens({ hero: hero() }), background: 'maps/secret.png' } as SceneSnapshot,
+    context({ rules: { ...ALL_ON, curtain: true }, handout: { path: 'handouts/note.png', title: 'Note' } }),
+  );
+
+  it('sends players no map image, grid, tokens, initiative, widgets or handout', () => {
+    const scene = curtained();
+    expect(scene.map.asset).toBeNull();
+    expect(scene.grid).toBeNull();
+    expect(scene.tokens).toEqual({});
+    expect(scene.initiative).toBeNull();
+    expect(scene.widgets).toEqual([]);
+    expect(scene.handout).toBeNull();
+  });
+
+  it('covers the whole map in the dark, so a page that draws what it is given shows black', () => {
+    const scene = curtained();
+    expect(Object.keys(scene.fog).length).toBeGreaterThan(0);
+  });
+
+  it('leaves a scene without the curtain as it was', () => {
+    const scene = projectForPlayers(withTokens({ hero: hero() }), context());
+    expect(Object.keys(scene.tokens)).toEqual(['hero']);
+    expect(scene.grid).not.toBeNull();
+  });
+});
+
+describe('the player view rules with a curtain', () => {
+  it('keep it only where it is down, and tell a lowered curtain from none', () => {
+    expect(pickPlayerViewRules({ ...ALL_ON, curtain: true }).curtain).toBe(true);
+    expect(pickPlayerViewRules({ ...ALL_ON, curtain: false })).not.toHaveProperty('curtain');
+    expect(samePlayerViewRules(pickPlayerViewRules({ ...ALL_ON, curtain: true }), pickPlayerViewRules(ALL_ON))).toBe(false);
+    expect(samePlayerViewRules(pickPlayerViewRules(ALL_ON), pickPlayerViewRules({ ...ALL_ON, curtain: false }))).toBe(true);
+  });
+});
+
+describe('token height and speed, and the movement rules (Atlas 0.15)', () => {
+  const steps = [{ name: 'Move', multiple: 1, color: '#22c55e' }, { name: 'Dash', multiple: 2, color: '#eab308' }];
+  const movement = (speedOf: (token: unknown) => number | null = () => 30, ruleSteps: typeof steps = steps) => ({ rules: { steps: ruleSteps, countPerTurn: true, speed: 30 }, speedOf });
+  const party = (overrides: Partial<Character> = {}): Character => hero({ vision: { enabled: true }, ...overrides } as Partial<Character>);
+
+  it("sends every token's height, and a speed only for a token on the players' side, where the rules name steps", () => {
+    const tokens = { hero: party({ elevation: 10 } as Partial<Character>), goblin: hero({ id: 'goblin', x: 300, elevation: -5 } as Partial<Character>) };
+    const scene = projectForPlayers(withTokens(tokens), context({ movement: movement() }));
+    expect(scene.tokens.hero).toMatchObject({ elevation: 10, speed: 30 });
+    expect(scene.tokens.goblin?.elevation).toBe(-5);
+    expect(scene.tokens.goblin).not.toHaveProperty('speed');
+    expect(scene.measurement.movement).toEqual({ steps, countPerTurn: true });
+  });
+
+  it("sends the speed of a player character Atlas knows as one, whatever it holds itself (no side, no vision)", () => {
+    const pc = hero({ id: 'pc' });
+    const known = { ...movement(), isPlayers: (token: unknown) => (token as { id?: string }).id === 'pc' };
+    expect(projectForPlayers(withTokens({ pc }), context({ movement: known })).tokens.pc?.speed).toBe(30);
+    expect(projectForPlayers(withTokens({ pc }), context({ movement: movement() })).tokens.pc).not.toHaveProperty('speed');
+  });
+
+  it('sends no height that is none, and no speed that is none', () => {
+    for (const elevation of ['x', Number.NaN, 0]) {
+      const scene = projectForPlayers(withTokens({ hero: party({ elevation } as Partial<Character>) }), context({ movement: movement() }));
+      expect(scene.tokens.hero, String(elevation)).not.toHaveProperty('elevation');
+    }
+    for (const speed of [-5, 0, Number.NaN, null]) {
+      const scene = projectForPlayers(withTokens({ hero: party() }), context({ movement: movement(() => speed) }));
+      expect(scene.tokens.hero, String(speed)).not.toHaveProperty('speed');
+    }
+  });
+
+  it('sends no steps and no speed where the rules name no step', () => {
+    const scene = projectForPlayers(withTokens({ hero: party() }), context({ movement: movement(() => 30, []) }));
+    expect(scene.measurement).not.toHaveProperty('movement');
+    expect(scene.tokens.hero).not.toHaveProperty('speed');
+    expect(projectForPlayers(withTokens({ hero: party() }), context()).measurement).not.toHaveProperty('movement');
+  });
+
+  it("carries the GM's choice of when a drag shows its distance, settled by whether a fight runs", () => {
+    // 'Only in a fight' is the GM's to decide (Atlas asks whether a fight runs): players may be sent no initiative list.
+    const inFight = (isActive: boolean) => ({ ...gmState(), initiative: { ...createDefaultInitiativeState(), isActive } }) as SceneSnapshot;
+    const calm = projectForPlayers(inFight(false), context({ rules: { ...ALL_ON, dragDistance: 'combat' } }));
+    expect(calm.measurement.dragDistance).toBe('never');
+    const fighting = projectForPlayers(inFight(true), context({ rules: { ...ALL_OFF, dragDistance: 'combat' } }));
+    expect(fighting.initiative).toBeNull();
+    expect(fighting.measurement).not.toHaveProperty('dragDistance');
+    expect(projectForPlayers(inFight(true), context({ rules: { ...ALL_ON, dragDistance: 'never' } })).measurement.dragDistance).toBe('never');
+    expect(projectForPlayers(withTokens({}), context()).measurement).not.toHaveProperty('dragDistance');
+    expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'never' }).dragDistance).toBe('never');
+    expect(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'sometimes' as never })).not.toHaveProperty('dragDistance');
+    expect(samePlayerViewRules(pickPlayerViewRules({ ...ALL_ON, dragDistance: 'never' }), pickPlayerViewRules(ALL_ON))).toBe(false);
   });
 });

@@ -5,11 +5,17 @@
  * patch can never reach an object's prototype.
  */
 import {
-  PLAYER_DIAGONAL_RULES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
-  PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
+  PLAYER_DIAGONAL_RULES, PLAYER_DRAG_DISTANCES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
+  PLAYER_MEASUREMENT_MODES, PLAYER_MEASURE_EFFECTS, PLAYER_MEASURE_SHAPES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
+import { MAX_UNIT_NAME } from '../../../../packages/atlas-shared/src/index';
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
+import { SIDE_LIMITS } from './initiativeSides';
+import { LIQUID_KINDS, LIQUID_LIMITS } from './projectLiquids';
+import { isAssetId } from '../assets/assetIds';
+import { readExtra } from '../../../../packages/atlas-host/src/spellMeasure';
+import { isSpellAbout, isSpellRules } from '../tools/spells';
 
 type Fields = Record<string, unknown>;
 type Check = (value: unknown) => boolean;
@@ -133,9 +139,32 @@ function isCondition(value: unknown): boolean {
     && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(value.icon);
 }
 
+/** Six finite numbers, the map's matrix (`mapPlacement.ts`): nothing a drawing could not stand. */
+function isMapMatrix(value: unknown): boolean {
+  return Array.isArray(value) && value.length === 6 && value.every(inRange(SCENE_RANGES.mapMatrix));
+}
+
+/** An outline of 3 to `LIQUID_LIMITS.points` points. */
+const isRing = (value: unknown): boolean => Array.isArray(value) && value.length >= 3 && value.length <= LIQUID_LIMITS.points && value.every((point) => isPoint(point));
+
+function isLiquid(value: unknown): boolean {
+  if (!isFields(value) || !(LIQUID_KINDS as readonly unknown[]).includes(value.liquid) || !isRing(value.polygon)) return false;
+  const { holes, colors } = value;
+  return (holes === undefined || (Array.isArray(holes) && holes.length <= LIQUID_LIMITS.holes && holes.every((hole) => isRing(hole))))
+    && isFields(colors) && ['surface', 'deep', 'glint'].every((key) => typeof colors[key] === 'string' && HEX_COLOR.test(colors[key]));
+}
+
+/** At most `LIQUID_LIMITS.liquids`, and `LIQUID_LIMITS.totalPoints` points in all. */
+function isLiquids(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > LIQUID_LIMITS.liquids || !value.every((liquid) => isLiquid(liquid))) return false;
+  const points = (value as Array<{ polygon: unknown[]; holes?: unknown[][] }>).reduce((sum, liquid) => sum + liquid.polygon.length + (liquid.holes ?? []).reduce((inner, hole) => inner + hole.length, 0), 0);
+  return points <= LIQUID_LIMITS.totalPoints;
+}
+
 function isPlayerMap(value: unknown): boolean {
   return isFields(value) && nullable(isString)(value.asset) && inRange(SCENE_RANGES.mapSize)(value.width)
-    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize);
+    && inRange(SCENE_RANGES.mapSize)(value.height) && inRange(SCENE_RANGES.cellSize)(value.cellSize) && optional(isMapMatrix)(value.matrix)
+    && optional(isLiquids)(value.liquids) && optional(isAssetId)(value.video);
 }
 
 function isPlayerGrid(value: unknown): boolean {
@@ -155,7 +184,18 @@ function isPlayerToken(value: unknown): boolean {
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
     && optional(isResources)(value.resources) && optional(isWheels)(value.wheels) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side)
     && optional((n: unknown) => Number.isInteger(n) && inRange(SCENE_RANGES.instance)(n))(value.instance)
-    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale) && optional(isPlayerMini)(value.mini);
+    && optional(inRange(SCENE_RANGES.ringScale))(value.ringScale) && optional(isPlayerMini)(value.mini)
+    && optional(inRange(SCENE_RANGES.elevation))(value.elevation) && optional(isSpeed)(value.speed);
+}
+
+/** A speed or a step's multiple: above 0, within its range. */
+const isSpeed = (value: unknown): boolean => inRange(SCENE_RANGES.speed)(value) && value > 0;
+const isStepMultiple = (value: unknown): boolean => inRange(SCENE_RANGES.stepMultiple)(value) && value > 0;
+
+function isPlayerMovement(value: unknown): boolean {
+  return isFields(value) && isBoolean(value.countPerTurn) && Array.isArray(value.steps) && value.steps.length <= SCENE_LIMITS.movementSteps
+    && value.steps.every((step) => isFields(step) && isText(step.name, SCENE_LIMITS.stepName) && step.name !== ''
+      && isStepMultiple(step.multiple) && typeof step.color === 'string' && HEX_COLOR.test(step.color));
 }
 
 function isPlayerMini(value: unknown): boolean {
@@ -185,7 +225,13 @@ function isPlayerText(value: unknown): boolean {
 
 function isPlayerDrawing(value: unknown): boolean {
   return isFields(value) && oneOf(PLAYER_DRAWING_TYPES)(value.type) && isNumber(value.order) && isPoints(value.points, 1)
-    && isString(value.color) && isStroke(value.width) && isOpacity(value.opacity) && nullable(isString)(value.icon);
+    && isString(value.color) && isStroke(value.width) && isOpacity(value.opacity) && nullable(isString)(value.icon)
+    // Atlas 0.16's looks: all optional, so a scene of an older Connect is well formed.
+    && (value.fill === undefined || value.fill === 'solid' || value.fill === 'soft')
+    && (value.holes === undefined || (Array.isArray(value.holes) && value.holes.length <= SCENE_LIMITS.holes && value.holes.every((ring) => isPoints(ring, 3))))
+    && (value.rotation === undefined || isNumber(value.rotation))
+    && (value.layer === undefined || value.layer === 'map')
+    && (value.stack === undefined || isNumber(value.stack));
 }
 
 function isPlayerWidget(value: unknown): boolean {
@@ -199,7 +245,17 @@ function isPlayerWidgets(value: unknown): boolean {
 function isInitiativeEntry(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && isText(value.tokenId, SCENE_LIMITS.idLength)
     && isNumber(value.initiative) && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp)
-    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut);
+    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut)
+    && optional((flag) => flag === true)(value.delayed) && optional((flag) => flag === true)(value.awaiting)
+    && optional((id) => isText(id, SIDE_LIMITS.idLength) && id !== '')(value.sideId);
+}
+function isSideRow(value: unknown): boolean {
+  return isFields(value) && isText(value.id, SIDE_LIMITS.idLength) && value.id !== '' && isText(value.name, SIDE_LIMITS.nameLength) && value.name !== ''
+    && optional(isNumber)(value.roll) && optional((flag) => flag === true)(value.turn);
+}
+function isSideList(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SIDE_LIMITS.sides && value.every((row) => isSideRow(row))
+    && new Set(value.map((row: { id: string }) => row.id)).size === value.length;
 }
 function isPlayerSides(value: unknown): boolean {
   return isFields(value) && oneOf(PLAYER_SIDES)(value.first) && optional(oneOf(PLAYER_SIDES))(value.active);
@@ -207,7 +263,7 @@ function isPlayerSides(value: unknown): boolean {
 function isPlayerInitiative(value: unknown): boolean {
   return isFields(value) && isNumber(value.round) && isBoolean(value.active) && Array.isArray(value.entries)
     && value.entries.length <= SCENE_LIMITS.initiativeEntries && value.entries.every((entry) => isInitiativeEntry(entry))
-    && optional(isPlayerSides)(value.sides);
+    && optional(isPlayerSides)(value.sides) && optional(isSideList)(value.sideList) && (value.sideList === undefined || value.sides !== undefined);
 }
 
 function isRecordOf(value: unknown, check: Check): boolean {
@@ -237,19 +293,24 @@ function isPlayerMeasurement(value: unknown): boolean {
     && Array.isArray(value.rangeBands) && value.rangeBands.length <= SCENE_LIMITS.rangeBands
     && value.rangeBands.every((band) => isRangeBand(band))
     // An older GM sends no snap flag and no cone angle; the mirror fills them in.
+    // A unit's name is absent, or as long as Atlas lets the GM type one.
+    && (!Object.hasOwn(value, 'unitName') || (typeof value.unitName === 'string' && value.unitName.length >= 1 && value.unitName.length <= MAX_UNIT_NAME))
     && (!Object.hasOwn(value, 'snapToGrid') || isBoolean(value.snapToGrid))
     && (!Object.hasOwn(value, 'coneAngle') || isConeAngle(value.coneAngle))
     // A GM before extension API 1.14.0 sends no rules square; the mirror fills in the distance per cell.
     && (!Object.hasOwn(value, 'ruleDistance') || inRange(SCENE_RANGES.unitDistance)(value.ruleDistance))
     // An older GM sends no snap grid; the players then snap to the grid they see.
-    && optional(nullable(isSnapGrid))(value.snapGrid);
+    && optional(nullable(isSnapGrid))(value.snapGrid)
+    // Atlas 0.15: the movement steps and when a drag shows its distance, both absent from an older GM.
+    && optional(isPlayerMovement)(value.movement) && optional(oneOf(PLAYER_DRAG_DISTANCES))(value.dragDistance);
 }
 
 function isPlayerPins(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.pins && value.every((pin) => isFields(pin)
     && isText(pin.id, SCENE_LIMITS.idLength) && isCoordinate(pin.x) && isCoordinate(pin.y)
     && (pin.label === null || isText(pin.label, SCENE_LIMITS.pinLabel)) && (pin.title === null || isText(pin.title, SCENE_LIMITS.pinTitle))
-    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(pin.icon));
+    && optional((icon: unknown) => isText(icon, SCENE_LIMITS.idLength))(pin.icon)
+    && optional((name: unknown) => isText(name, SCENE_LIMITS.pinName) && name !== '')(pin.name));
 }
 
 function isPlayerHandout(value: unknown): boolean {
@@ -265,7 +326,29 @@ const FIELD_CHECKS: Record<SceneFieldKey, Check> = {
   pins: isPlayerPins,
   handout: nullable(isPlayerHandout),
 };
+/** A measure's `tabletop` field: one `readExtra` reads, of a bounded size, its rules and words well formed. */
+function isMeasureExtra(value: unknown): boolean {
+  const extra = readExtra({ tabletop: value });
+  if (!extra || JSON.stringify(value).length > SCENE_LIMITS.measureExtraBytes) return false;
+  return (extra.rules === undefined || isSpellRules(extra.rules)) && (extra.about === undefined || isSpellAbout(extra.about));
+}
+
+export function isPlayerMeasure(value: unknown): boolean {
+  if (!isFields(value) || !oneOf(PLAYER_MEASURE_SHAPES)(value.shape) || !Array.isArray(value.points)) return false;
+  const most = value.shape === 'ruler' ? SCENE_LIMITS.measurePoints : 2;
+  if (value.points.length < 2 || value.points.length > most || !value.points.every((point) => isPoint(point))) return false;
+  const above = (range: readonly [number, number]) => (n: unknown): boolean => inRange(range)(n) && n > 0;
+  return optional(above(SCENE_RANGES.lineWidth))(value.width)
+    && optional((color: unknown) => typeof color === 'string' && HEX_COLOR.test(color))(value.color)
+    && optional((walls: unknown) => walls === false)(value.walls)
+    && optional(oneOf(PLAYER_MEASURE_EFFECTS))(value.effect)
+    && optional((owner: unknown) => isText(owner, SCENE_LIMITS.idLength) && owner !== '')(value.owner)
+    && optional((aura: unknown) => isFields(aura) && isSceneId(aura.token) && above(SCENE_RANGES.auraReach)(aura.reach))(value.aura)
+    && optional(isMeasureExtra)(value.tabletop);
+}
+
 const RECORD_CHECKS: Record<SceneRecordKey, Check> = {
+  measures: isPlayerMeasure,
   tokens: isPlayerToken,
   fog: isPlayerFogOp,
   texts: isPlayerText,
@@ -277,7 +360,9 @@ export function isPlayerSceneBody(value: unknown): boolean {
   return isFields(value) && isSceneId(value.sceneId)
     // An older GM sends no measurement; the mirror fills it in.
     && SCENE_FIELD_KEYS.every((key) => (Object.hasOwn(value, key) ? FIELD_CHECKS[key](value[key]) : key === 'measurement' || key === 'pins' || key === 'handout'))
-    && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText);
+    && isRecordOf(value.tokens, isPlayerToken) && isRecordOf(value.texts, isPlayerText)
+    // Absent from a body made before measures were sent: the mirror then has none.
+    && optional((measures: unknown) => isRecordOf(measures, isPlayerMeasure))(value.measures);
 }
 
 export function isFogRecords(value: unknown): boolean {

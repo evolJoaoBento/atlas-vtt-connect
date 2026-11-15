@@ -1,23 +1,30 @@
 {
   "name": "atlas-vtt-connect",
-  "version": "0.5.0",
+  "version": "0.15.0",
   "private": true,
   "description": "Online play and sharing for Atlas VTT: host a session, the web join page, the player tab, and note and map sharing.",
   "main": "dist/main.js",
   "license": "AGPL-3.0-only",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "vite build",
     "build:page": "vite build -c vite.page.config.mts",
     "test": "vitest",
     "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json && eslint -c eslint.tests.config.mjs --max-warnings 0 tests scripts",
     "check:vendor": "node scripts/check-vendor.mjs",
+    "check:shared": "node scripts/check-shared.mjs",
     "sync:atlas": "node scripts/sync-atlas.mjs",
+    "sync:shared": "node scripts/sync-atlas-shared.mjs",
     "inventory": "node scripts/test-inventory.mjs"
   },
   "dependencies": {
+    "clipper2-ts": "2.0.1-18",
+    "js-aruco2": "2.0.0",
     "lucide-react": "^0.503.0",
     "peerjs": "^1.5.5",
+    "qrcode-generator": "2.0.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "three": "^0.185.1",

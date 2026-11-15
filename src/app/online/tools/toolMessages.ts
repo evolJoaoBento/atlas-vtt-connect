@@ -7,6 +7,7 @@ import { SCENE_RANGES } from '../scene/sceneLimits';
 import type { ScenePoint } from '../scene/sceneTypes';
 import { isSceneId } from '../scene/sceneValidation';
 import { dieTagOf } from './diceTags';
+import { isSheetRollRef, type SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 
 export const DICE_LIMITS = {
   /** Dice in one player roll. */
@@ -42,6 +43,11 @@ export interface LoggedDie {
   colorName?: string;
   /** Counted for nothing: a die advantage or a keep mark dropped (Atlas 0.8's `RolledDie.dropped`); an older page ignores it. */
   dropped?: true;
+  /** Counted for nothing: rolled again (Atlas 0.8's rerolls), the die that replaced it follows; an older page ignores it. */
+  rerolled?: true;
+  /** Counted as a success or a failure, where the roll counts them (`6d10>=8`); an older page ignores them. */
+  success?: true;
+  failure?: true;
 }
 
 /** One roll in the shared dice log. */
@@ -86,6 +92,8 @@ export interface PlayerLaser {
   dt?: number[];
   /** The laser's colour, `#rrggbb`: the sender's pick, or the one the GM gave it. */
   color?: string;
+  /** The laser's size as the sender picked it (Atlas's 8 to 100); without it, Atlas's default. */
+  size?: number;
 }
 
 type Fields = Record<string, unknown>;
@@ -122,14 +130,87 @@ export function playerRollFormula(dice: DiceSelection, modifier: number): string
   return parseFormula(formula).ok ? formula : null;
 }
 
+/** The sides of each die a player may throw physically; a d100 reads as one combined value, 1 to 100 (00 and 0 make 100). */
+const PHYSICAL_SIDES: Readonly<Record<string, number>> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
+
+/** One die of a roll the player threw on Tabletop's board, as Atlas's `RolledDie` without `max`. */
+export interface PhysicalDie {
+  die: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
+  /** 1 up to the die's sides; never 0. */
+  value: number;
+  exploded?: true;
+  negative?: true;
+  dropped?: true;
+  /** Thrown again under a reroll rule and counted for nothing; the die that replaced it follows. Never also `dropped`. An older GM or page ignores it. */
+  rerolled?: true;
+  color?: string;
+  colorName?: string;
+}
+
+/** A finished physical throw, as the player sends it (`dice-result`) and Tabletop's board hands it over. */
+export interface PhysicalRoll {
+  rolls: PhysicalDie[];
+  modifier: number;
+  label?: string;
+  sheet?: { tokenId: string; roll: SheetRollRef };
+}
+
+/** How a collection rolls dice, as the GM offers it with `board-offer` (Atlas's `DiceRules`). */
+export interface OfferedDiceRules {
+  defaultRoll: string;
+  crit: 'natural' | 'roll-under' | 'doubles' | 'high-total' | 'none';
+  explode?: { dice: 'default' | 'all'; repeats: boolean; highFaces: number; lowFaces: number };
+}
+
+/** A physical roll's modifier lies within ±999. */
+export const PHYSICAL_MODIFIER = 999;
+const PHYSICAL_LABEL = 120;
+const CRIT_RULES: readonly unknown[] = ['natural', 'roll-under', 'doubles', 'high-total', 'none'];
+
+function isPhysicalDie(value: unknown): value is PhysicalDie {
+  if (!isFields(value) || typeof value.die !== 'string' || !Object.hasOwn(PHYSICAL_SIDES, value.die)) return false;
+  return Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= (PHYSICAL_SIDES[value.die] ?? 0)
+    && isFlag(value.exploded) && isFlag(value.negative) && isFlag(value.dropped) && isFlag(value.rerolled)
+    // A die is set aside by advantage or thrown away by a reroll rule, never both.
+    && !(value.rerolled === true && value.dropped === true)
+    && (value.color === undefined || isLaserColor(value.color))
+    && (value.colorName === undefined || isText(value.colorName, 0, DICE_LIMITS.nameLength));
+}
+
+/** 1 to 20 dice, each read (1 up to its sides), a modifier within ±999, a label of at most 120 characters, and a sheet roll if any. */
+export function isPhysicalRoll(value: unknown): value is PhysicalRoll {
+  return isFields(value) && Array.isArray(value.rolls) && value.rolls.length >= 1 && value.rolls.length <= DICE_LIMITS.dicePerRoll
+    && value.rolls.every((die) => isPhysicalDie(die))
+    && Number.isSafeInteger(value.modifier) && Math.abs(value.modifier as number) <= PHYSICAL_MODIFIER
+    && (value.label === undefined || isText(value.label, 0, PHYSICAL_LABEL))
+    && (value.sheet === undefined || (isFields(value.sheet) && isSceneId(value.sheet.tokenId) && isSheetRollRef(value.sheet.roll)));
+}
+
+const isWhole = (value: unknown, max: number): boolean => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= max;
+
+export function isOfferedDiceRules(value: unknown): value is OfferedDiceRules {
+  if (!isFields(value) || !isText(value.defaultRoll, 1, 32) || !CRIT_RULES.includes(value.crit)) return false;
+  const rule = value.explode;
+  if (rule === undefined) return true;
+  return isFields(rule) && (rule.dice === 'default' || rule.dice === 'all') && typeof rule.repeats === 'boolean'
+    && isWhole(rule.highFaces, 100) && isWhole(rule.lowFaces, 100);
+}
+
 /** Absent, or exactly `true`. */
 const isFlag = (value: unknown): boolean => value === undefined || value === true;
 
 function isLoggedDie(value: unknown): value is LoggedDie {
   if (!isFields(value) || typeof value.die !== 'string') return false;
-  const sides = DIE.exec(value.die)?.[1];
-  return sides !== undefined && Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= Number(sides)
-    && isFlag(value.negative) && isFlag(value.exploded) && isFlag(value.dropped);
+  const number = value.value;
+  // A Fate die (Atlas 0.8's dF) reads -1, 0 or 1; any other die from 1 up to its sides.
+  const read = value.die === 'dF'
+    ? number === -1 || number === 0 || number === 1
+    : (() => {
+      const sides = DIE.exec(value.die)?.[1];
+      return sides !== undefined && Number.isSafeInteger(number) && (number as number) >= 1 && (number as number) <= Number(sides);
+    })();
+  return read && isFlag(value.negative) && isFlag(value.exploded) && isFlag(value.dropped)
+    && isFlag(value.rerolled) && isFlag(value.success) && isFlag(value.failure);
 }
 
 export function isDiceLogEntry(value: unknown): value is DiceLogEntry {
@@ -178,8 +259,13 @@ export function isLaserColor(value: unknown): value is string {
 export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry | null {
   const all = result.rolls.map((rolled): LoggedDie => {
     const { die, value, negative, exploded } = rolled;
-    const dropped = (rolled as { dropped?: unknown }).dropped === true;
-    return { die, value, ...(negative && { negative }), ...(exploded && { exploded }), ...(dropped && { dropped: true as const }), ...dieTagOf(rolled) };
+    const flags = rolled as { dropped?: unknown; rerolled?: unknown; success?: unknown; failure?: unknown };
+    return {
+      die, value, ...(negative && { negative }), ...(exploded && { exploded }),
+      ...(flags.dropped === true && { dropped: true as const }), ...(flags.rerolled === true && { rerolled: true as const }),
+      ...(flags.success === true && { success: true as const }), ...(flags.failure === true && { failure: true as const }),
+      ...dieTagOf(rolled),
+    };
   });
   const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
   // A roll made elsewhere (physical dice) may come with dice its own list leaves out already.

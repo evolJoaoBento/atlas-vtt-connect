@@ -11,7 +11,8 @@ import type { AssetFile } from '../scene/sceneContracts';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { SlotProjection } from '../scene/slotViews';
 import type { ChannelPort } from '../transport/types';
-import { ASSET_LIMITS, sceneAssetIds } from './assetIds';
+import { ASSET_LIMITS, boardAssetIds, sceneAssetIds } from './assetIds';
+import type { BoardExtras } from '../scene/boardTypes';
 import { decodeAsset, encodeAsset, encodeChunk, IMAGE_HANDLE_MAX } from './assetProtocol';
 import { SharedReads } from './SharedReads';
 
@@ -24,6 +25,8 @@ export interface AssetServerOptions {
   projection: Pick<SlotProjection, 'slotOf' | 'onSlotChange'>;
   /** Verified file reads (the registry): null when a file cannot be served. */
   files: { read(id: string): Promise<AssetFile | null> };
+  /** The files of a running cutscene's scenes a ready player may fetch, until the run ends; without it none. */
+  cutscene?: { assetsFor(playerId: string): ReadonlySet<string>; onAssetsChange(listener: () => void): () => void };
 }
 
 interface Transfer {
@@ -51,7 +54,7 @@ export class AssetServer implements SessionHandler {
   private readonly reads: SharedReads;
   private readonly stops: Array<() => void> = [];
   /** The images of each projection a slot sent, worked out once per projection. */
-  private readonly idsOf = new WeakMap<PlayerScene, ReadonlySet<string>>();
+  private readonly idsOf = new WeakMap<PlayerScene, { board: BoardExtras | null; ids: ReadonlySet<string> }>();
 
   constructor(private readonly options: AssetServerOptions) {
     this.reads = new SharedReads((id) => options.files.read(id));
@@ -60,18 +63,30 @@ export class AssetServer implements SessionHandler {
   start(): void {
     const { session, projection } = this.options;
     this.stops.push(session.use(this), projection.onSlotChange(() => this.scenesChanged()));
+    if (this.options.cutscene) this.stops.push(this.options.cutscene.onAssetsChange(() => this.scenesChanged()));
   }
 
-  /** The images `playerId` may fetch: those of what their scene last sent them; none without a scene. */
+  /**
+   * The images `playerId` may fetch: those of what their scene last sent them, and the files of its board on
+   * Tabletop's 3D board (made by the same rules of what players see); none without a scene.
+   */
   allowedFor(playerId: string): ReadonlySet<string> {
-    const scene = this.sceneOf(playerId);
+    const own = this.ownAllowedFor(playerId);
+    const cutscene = this.options.cutscene?.assetsFor(playerId);
+    return cutscene && cutscene.size > 0 ? new Set([...own, ...cutscene]) : own;
+  }
+
+  private ownAllowedFor(playerId: string): ReadonlySet<string> {
+    const slot = this.options.projection.slotOf(playerId);
+    const scene = slot?.lastSent ?? null;
     if (!scene) return new Set();
-    let ids = this.idsOf.get(scene);
-    if (!ids) {
-      ids = new Set(sceneAssetIds(scene));
-      this.idsOf.set(scene, ids);
+    const board = slot?.board ?? null;
+    let known = this.idsOf.get(scene);
+    if (!known || known.board !== board) {
+      known = { board, ids: new Set([...sceneAssetIds(scene), ...boardAssetIds(board)]) };
+      this.idsOf.set(scene, known);
     }
-    return ids;
+    return known.ids;
   }
 
   stop(): void {

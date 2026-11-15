@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Defence in depth (GitHub Pages sets no headers). connect-src stays broad: the join link names the signalling server, which may be a plain http/ws one on a LAN. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https: wss: http: ws: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https: wss: http: ws: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Atlas VTT · Join</title>
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -23,6 +23,7 @@
         <div id="loader" class="loader" hidden aria-hidden="true"></div>
         <p id="status" role="status"></p>
       </div>
+      <button id="rejoin-button" class="rejoin-button" type="button" hidden>Reconnect</button>
     </main>
     <footer class="links">
       Atlas VTT online play · <a href="https://github.com/evolJoaoBento/atlas-vtt-connect" target="_blank" rel="noopener">Source code (AGPL-3.0)</a>
@@ -31,9 +32,13 @@
   </div>
   <section id="table" class="table" hidden aria-label="Scene">
     <canvas id="map" role="img" aria-label="Map"></canvas>
+    <!-- Augmented reality: the phone's back camera, under the board. -->
+    <video id="ar-video" class="ar-video" playsinline muted autoplay hidden></video>
+    <div id="board-3d" class="board-3d atlas-tabletop-atlas" hidden></div>
     <header class="top-bar">
       <div class="top-pill top-info">
         <span id="connection" class="connection" role="status"></span>
+        <button id="reconnect-button" class="reconnect-button" type="button" hidden>Reconnect</button>
         <span id="session-name" class="session-name"></span>
         <div id="image-progress" class="image-progress" hidden>
           <progress id="image-progress-bar" aria-label="Loading images"></progress>
@@ -47,9 +52,22 @@
         <button id="menu-button" class="icon-button" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu">☰</button>
       </div>
     </header>
+    <!-- A cutscene: the black the 2D map fades into, the curtain of a browser that cannot draw it, and Back to AR for room AR. -->
+    <div id="cutscene-overlay" class="cutscene-overlay" hidden></div>
+    <div id="cutscene-curtain" class="cutscene-curtain" role="status" hidden></div>
+    <button id="back-to-ar" class="back-to-ar" type="button" hidden>Back to AR</button>
     <div id="view-buttons" class="view-buttons" hidden>
       <button id="follow-gm" type="button">Follow GM</button>
       <button id="fit-map" class="secondary" type="button">Fit map</button>
+    </div>
+    <!-- The 3D board's own buttons, at the end of the toolbar: 2D/3D, seeing through one of your tokens' eyes, and AR
+         (its settings in its menu while it is on). -->
+    <div id="board-buttons" class="board-buttons">
+      <button id="dimension-button" class="tool-button" type="button" hidden></button>
+      <button id="eye-button" class="tool-button" type="button" aria-haspopup="menu" aria-pressed="false" hidden></button>
+      <div id="eye-menu" class="eye-menu toolbar-menu" role="menu" aria-label="See through" hidden></div>
+      <button id="ar-button" class="tool-button" type="button" aria-haspopup="menu" aria-pressed="false" hidden></button>
+      <div id="ar-panel" class="ar-panel toolbar-menu" role="menu" aria-label="AR settings" hidden></div>
     </div>
     <!-- What shows at the top of the map, one under another so none covers another: a refused move, a roll, your own throw. -->
     <div class="top-stack">

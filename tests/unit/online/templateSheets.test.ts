@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isTokenSheets, sheetRollFormula } from '../../../src/app/online/tools/sheets';
-import { buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, templateId } from '../../../src/app/online/tools/templateSheets';
+import { isTokenSheets, rollableName, sheetRollFormula, textParts, type SheetItem } from '../../../packages/atlas-host/src/sheets/sheets';
+import { buildPlayerSheet, buildTemplateSheet, buildUntemplatedSheet, templateHidesFields, templateId } from '../../../packages/atlas-host/src/sheets/templateSheets';
 
 /** A Daggerheart-like adversary template a GM made in Atlas (issue #9), its labels renamed into Portuguese. */
 const ADVERSARY = {
@@ -130,5 +130,89 @@ describe("a player's sheet of a templated stat block", () => {
     expect(templateId(ADVERSARY)).toBe('adversario-k3j9x2');
     expect(templateId({ ...ADVERSARY, format: 'other' })).toBeNull();
     expect(templateId({ ...ADVERSARY, layout: null })).toBeNull();
+  });
+});
+
+describe("a template's players settings (Atlas 0.9's `players`)", () => {
+  const items = (template: unknown, note: Record<string, unknown> = NOTE): string => JSON.stringify(buildTemplateSheet(template, note));
+
+  it('never sends a field the template hides from players, nor a block that shows one', () => {
+    const json = items({ ...ADVERSARY, players: { atk: 'hidden', damage: 'hidden', major: 'hidden', experience: 'hidden', features: 'hidden', pv: 'hidden', patamar: 'hidden' } });
+    // A Stat whose dice are hidden is hidden whole; a Metric keeps its numbers players may see.
+    for (const secret of ['ATK', 'Claws', '1d6+2', 'Major', 'Ambush', 'teste', 'Features', 'PV', 'Patamar']) expect(json).not.toContain(secret);
+    expect(json).toContain('Severe 15');
+    expect(json).toContain('Difficulty');
+  });
+
+  it('reads a setting kept under a key the field had before, and one it does not know as hidden', () => {
+    const fields = ADVERSARY.fields.map((field) => (field.key === 'motives_tactics' ? { ...field, formerKeys: ['motives'] } : field));
+    expect(items({ ...ADVERSARY, fields, players: { motives: 'hidden' } })).not.toContain('Motives');
+    expect(items({ ...ADVERSARY, players: { difficulty: 'gm-only' } })).not.toContain('Difficulty');
+    expect(items({ ...ADVERSARY, players: { difficulty: 'read', atk: 'edit' } })).toContain('Difficulty');
+  });
+
+  it('always shows the name, and works a condition out on the hidden field as the GM does', () => {
+    const sheet = buildTemplateSheet({ ...ADVERSARY, players: { name: 'hidden', difficulty: 'hidden' } }, { ...NOTE, difficulty: 100 })!;
+    expect(sheet.name).toBe('Modelo NPC');
+    // `secret` shows where the difficulty is above 99: the condition reads the value, players never get it.
+    expect(JSON.stringify(sheet)).toContain('GM only: a spy');
+    expect(JSON.stringify(sheet)).not.toContain('100');
+  });
+
+  it('leaves out the hit dice beside the hit points where the template hides them', () => {
+    const note = { ...NOTE, hit_dice: '3d8' };
+    expect(items(ADVERSARY, note)).toContain('3d8');
+    expect(items({ ...ADVERSARY, players: { hit_dice: 'hidden' } }, note)).not.toContain('3d8');
+  });
+
+  it("shows nothing of a block kind it does not know, such as Atlas 0.9's counters, without failing", () => {
+    const blocks = [{ id: 'k1', type: 'counters', fields: ['major', 'severe'], look: 'pips' }, { id: 'k2', type: 'stat', field: 'difficulty', look: 'run-in' }];
+    const sheet = buildTemplateSheet({ ...ADVERSARY, header: { hidden: ['hp', 'description', 'level'] }, layout: { maxColumns: 1, blocks } }, NOTE)!;
+    expect(sheet.sections).toEqual([{ title: '', items: [{ name: 'Difficulty', desc: '12' }] }]);
+  });
+
+  it("says whether a template hides any field from players, which keeps Atlas's own card from them", () => {
+    expect(templateHidesFields(ADVERSARY)).toBe(false);
+    expect(templateHidesFields({ ...ADVERSARY, players: { atk: 'read', features: 'edit' } })).toBe(false);
+    expect(templateHidesFields({ ...ADVERSARY, players: { atk: 'hidden' } })).toBe(true);
+    expect(templateHidesFields({ ...ADVERSARY, players: { atk: 'gm-only' } })).toBe(true);
+    expect(templateHidesFields(null)).toBe(false);
+  });
+
+  it("keeps a block's rollable setting, so a plain number rolls for a player as it does in Atlas", () => {
+    const blocks = [
+      { id: 'r1', type: 'stat', field: 'difficulty', look: 'run-in', rollable: true },
+      { id: 'r2', type: 'metric', heading: 'Thresholds', fields: ['major', 'severe'], rollable: true },
+      { id: 'r3', type: 'stat', field: 'atk', look: 'run-in' },
+    ];
+    const sheet = buildTemplateSheet({ ...ADVERSARY, header: { hidden: ['hp', 'description', 'level'] }, layout: { maxColumns: 1, blocks } }, NOTE)!;
+    const [difficulty, thresholds, plain] = sheet.sections[0]!.items as [SheetItem, SheetItem, SheetItem];
+    expect(difficulty).toMatchObject({ name: 'Difficulty', rollable: true });
+    expect(thresholds).toMatchObject({ rollable: true });
+    expect(plain.rollable).toBeUndefined();
+    expect(isTokenSheets([{ tokenId: 't', name: 'x', resources: [], sheet }])).toBe(true);
+    expect(sheetRollFormula(sheet, { kind: 'text', section: 0, item: 0, index: 0, text: difficulty.desc })).toBe(`+${difficulty.desc}`);
+    // A block without the setting rolls nothing from a bare number.
+    expect(sheetRollFormula(sheet, { kind: 'text', section: 0, item: 2, index: 0, text: plain.desc })).toBeNull();
+  });
+
+  it("rolls a rollable item's plain numbers as Atlas does, and leaves text with dice of its own alone", () => {
+    const rolls = (desc: string, rollable = true): Array<[string, string]> => textParts(desc, rollable).flatMap((part) => ('roll' in part ? [[part.text, part.formula] as [string, string]] : []));
+    expect(rolls('14')).toEqual([['14', '+14']]);
+    expect(rolls('-2')).toEqual([['-2', '-2']]);
+    expect(rolls('−2')).toEqual([['−2', '-2']]);
+    expect(rolls('0')).toEqual([['0', '+0']]);
+    expect(rolls('Major 7 | Severe 14')).toEqual([['7', '+7'], ['14', '+14']]);
+    expect(rolls('45 (7d10 + 7)')).toEqual([['7d10 + 7', '7d10+7']]);
+    expect(rolls('1.5')).toEqual([]);
+    expect(rolls('14', false)).toEqual([]);
+  });
+
+  it('names a rolled number by the label before it, as Atlas names a rolled cell', () => {
+    const item: SheetItem = { name: 'Thresholds', desc: 'Major 7 | Severe 14', rollable: true };
+    expect(rollableName(item, 0)).toBe('Major');
+    expect(rollableName(item, 1)).toBe('Severe');
+    expect(rollableName({ name: 'Difficulty', desc: '12', rollable: true }, 0)).toBe('Difficulty');
+    expect(rollableName({ name: 'Attack', desc: 'Claws: +5' }, 0)).toBe('Attack');
   });
 });

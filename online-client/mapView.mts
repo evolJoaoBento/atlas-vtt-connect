@@ -33,7 +33,7 @@ import { NoteView, type NoteViewOptions } from './noteView.mts';
 import type { PinNoteAnswer } from '../src/app/online/tools/pinNotes';
 import { InitiativeView } from './initiativeView.mts';
 import { StatblockPreviewView } from './statblockPreviewView.mts';
-import type { TokenSheet } from '../src/app/online/tools/sheets';
+import type { TokenSheet } from '../packages/atlas-host/src/sheets/sheets';
 import { conditionRows, tokenAt } from '../src/app/online/view/tokenHover';
 import type { TokenOverlay } from '../src/app/online/view/layers/layerTypes';
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingCenterRadius } from '@atlas-vtt/shared/draw';
@@ -52,6 +52,7 @@ export interface ToolState {
   /** Whether this player has a template on the scene. */
   ownTemplates: boolean;
   laserColor: string;
+  laserSize: number;
 }
 
 export interface MapViewOptions {
@@ -68,7 +69,7 @@ export interface MapViewOptions {
   /** Sends one drop of a controlled token; false when it could not be sent. */
   sendMove(tokenId: string, x: number, y: number): boolean;
   /** Sends new points of the player's laser; false when they could not be sent. */
-  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string): boolean;
+  sendLaser(points: ScenePoint[], lifted: boolean, dt: number[], color?: string, size?: number): boolean;
   /** Sends a ping at a world point; false when it could not go. */
   sendPing?(x: number, y: number): boolean;
   /** Asks the GM to add or remove a template; false when it could not go. */
@@ -77,6 +78,9 @@ export interface MapViewOptions {
   laserColor?: string | null;
   /** The player picked a laser colour: remember it. */
   onLaserColor?(color: string): void;
+  /** The laser size remembered from an earlier visit, and remembering a new one. */
+  laserSize?: number | null;
+  onLaserSize?(size: number): void;
   /** Shows "Move not allowed." after a refused move. */
   notice: HTMLElement;
   /** The tool or measure shape changed, also by Escape: the toolbar follows. */
@@ -136,7 +140,7 @@ export class MapView {
   /** Where the last press began, so a click that dragged (a pan) does not select. */
   private pressedAt: { x: number; y: number } | null = null;
   /** What the toolbar was last told. */
-  private shownTool: ToolState = { tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '' };
+  private shownTool: ToolState = { tool: 'move', shape: 'line', templateShape: 'circle', ownTemplates: false, laserColor: '', laserSize: 16 };
   private readonly listeners = new AbortController();
   private resizeObserver: ResizeObserver | null = null;
   private watchedRatio: number | null = null;
@@ -172,10 +176,11 @@ export class MapView {
       toWorld: (point) => this.camera.toWorld(point),
       zoom: () => this.camera.current().zoom,
       now: options.now ?? ((): number => performance.now()),
-      sendLaser: (points, lifted, dt, color) => options.sendLaser(points, lifted, dt, color),
+      sendLaser: (points, lifted, dt, color, size) => options.sendLaser(points, lifted, dt, color, size),
       sendPing: (x, y) => options.sendPing?.(x, y) ?? false,
       sendTemplate: (change) => options.sendTemplate?.(change) ?? false,
       laserColor: options.laserColor ?? null,
+      laserSize: options.laserSize ?? null,
       onChange: () => this.toolsChanged(),
     });
     this.input = new ViewInput(this.camera, this.tools);
@@ -184,7 +189,7 @@ export class MapView {
     this.note = options.note && options.requestNote
       ? new NoteView({ ...options.note, ...(options.active ? { active: options.active } : {}), ...(options.doc ? { doc: options.doc } : {}) })
       : null;
-    this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images }) : null;
+    this.initiative = options.initiative ? new InitiativeView({ panel: options.initiative, images: options.images, onFind: (tokenId) => this.findToken(tokenId) }) : null;
     this.preview = options.statblockPreview ? new StatblockPreviewView(options.statblockPreview) : null;
     options.canvas.dataset.tool = this.shownTool.tool;
     this.bind();
@@ -236,8 +241,8 @@ export class MapView {
   }
 
   /** The GM refused a move of this token. */
-  moveRefused(tokenId: string): void {
-    this.moves.refused(tokenId);
+  moveRefused(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void {
+    this.moves.refused(tokenId, reason);
   }
 
   /** The scene is paused (the GM is on another scene) or live again: the move notice shows the paused banner while paused. */
@@ -251,6 +256,12 @@ export class MapView {
   }
 
   /** The camera follows the GM's again (the Follow GM button). */
+  /** Brings a token into view: the camera glides to it. Nothing for a token players do not see. */
+  private findToken(tokenId: string): void {
+    const token = this.scene !== null && Object.hasOwn(this.scene.tokens, tokenId) ? this.scene.tokens[tokenId] : undefined;
+    if (token) this.camera.lookAt({ x: token.x, y: token.y });
+  }
+
   followGm(): void {
     this.camera.followGm();
   }
@@ -278,10 +289,15 @@ export class MapView {
     if (this.tools.selectLaserColor(color)) this.options.onLaserColor?.(this.tools.laserColor);
   }
 
+  selectLaserSize(size: number): void {
+    this.tools.selectLaserSize(size);
+    this.options.onLaserSize?.(this.tools.laserSize);
+  }
+
   toolState(): ToolState {
     return {
       tool: this.tools.tool, shape: this.tools.shape, templateShape: this.tools.templateShape,
-      ownTemplates: this.tools.hasOwnTemplates(), laserColor: this.tools.laserColor,
+      ownTemplates: this.tools.hasOwnTemplates(), laserColor: this.tools.laserColor, laserSize: this.tools.laserSize,
     };
   }
 
@@ -477,7 +493,7 @@ export class MapView {
     const state = this.toolState();
     const shown = this.shownTool;
     if (state.tool === shown.tool && state.shape === shown.shape && state.templateShape === shown.templateShape
-      && state.ownTemplates === shown.ownTemplates && state.laserColor === shown.laserColor) return;
+      && state.ownTemplates === shown.ownTemplates && state.laserColor === shown.laserColor && state.laserSize === shown.laserSize) return;
     this.shownTool = state;
     const { tool } = state;
     this.options.canvas.dataset.tool = tool;

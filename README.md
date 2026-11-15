@@ -1,15 +1,21 @@
-# Atlas VTT Extension - Connect
+# Connect for Atlas VTT
+
+**Compatible with Atlas VTT 0.15.0 and 0.16.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.9.0 (the same fusion release).
+
+**Atlas VTT 0.16's drawings and texts:** a drawing or text you hide from your players in Atlas is never sent to them (the scene, a cutscene, a split party, a shared map). Filled shapes (solid or soft, with their holes), lines of no width and stamps by any pin symbol, turned, reach players as Atlas draws them; dashed lines, arrowheads and a text's outline look not yet.
+
+Connect for Atlas VTT is a community extension. It is not made, endorsed or supported by Atlas VTT or Atlas Online. Support: [issues](https://github.com/evolJoaoBento/atlas-vtt-connect/issues).
 
 Play [Atlas VTT](https://github.com/ByteMirror/atlas-vtt) maps online with your group. You host from Obsidian; players join from a web page or from their own Obsidian. No accounts, no server to run.
 
 ![A player joins and the GM's map opens for them](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/04-allow-player.gif)
 
-Connect is an independent plugin, not made by or affiliated with the Atlas VTT author. It changes nothing in Atlas.
+It changes nothing in Atlas, and it is not Atlas Online: players connect through the servers listed under [Servers and privacy](#servers-and-privacy).
 
 ## Install
 
 1. Obsidian 1.8.7 or newer, on desktop.
-2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Atlas VTT Extension - Connect**.
+2. Settings → Community plugins → Browse: install and enable **Atlas VTT**, then **Connect for Atlas VTT**.
 
 **Updating to 0.5.0:** the GM and every player in Obsidian should update together (Settings → Community plugins → Check for updates). The web join page updates by itself. Players on an older version still get a text sheet, without Atlas's card.
 
@@ -48,6 +54,10 @@ Players see the scene you present, as Atlas's own player window shows it: hidden
 ![Hide a token](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/09-hide-token.gif)
 
 **Dynamic lighting:** with Atlas's dynamic lighting experiment on, players see only what their tokens see, plus the places they explored.
+
+**Token height and movement (Atlas 0.15):** players see each token's height, and on Tabletop's board it stands that high. Where your collection has movement steps, a player dragging one of the party's tokens reads the move against its speed, "20 / 30ft", in the colour of the step it lies in, as your Atlas reads it (its own speed, its statblock's or the collection's). Other tokens' speeds are never sent. The drag shows its distance only when your Atlas setting says so (always, only in a fight, never). What a token already moved this turn is not added yet.
+
+**Tabletop's 3D board:** with the [Tabletop for Atlas](https://github.com/evolJoaoBento/atlas-vtt-tabletop) plugin, players in Obsidian can see the scene on its 3D board: walls, doors (hung as you turned them with Rotate 180° or Mirror), lights, props, your daylight tint, and the other scenes stacked with it (Tabletop's elevation layers: each floor with its walls, doors, lights and props, at its height and place). Players never get what is on a stacked scene (tokens, pins, notes, fog), and a stacked scene is not hidden by its own fog; **Show layers to Connect players** in Tabletop's settings turns it off. Both plugins should be updated together.
 
 ### Health bars, per token
 
@@ -88,7 +98,9 @@ Right-click a token → **Controlled by** → tick the player. They can drag it 
 
 Players see the stat block of every token they control, with exact numbers, and roll from it; the roll is made by your Atlas and logged under their name. Mind that this includes a monster you hand to a player. In Obsidian they see Atlas's own card for the token, in their own theme; stat blocks made with Atlas templates show their template's fields, without the hidden ones.
 
-**Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect remembers that player by name and gives them that character on every scene and in later sessions.
+Connect remembers who you gave each token to, by the player's name, and gives it back when they rejoin, in this session or a later one (only while exactly one player of that name is at the table). Untick them to make it forget.
+
+**Player characters:** mark a token as a player character in Atlas, then give it with **Controlled by**. Connect gives that player the character on every scene, wherever it is placed.
 
 ## At the table (players)
 
@@ -99,15 +111,15 @@ Players see the stat block of every token they control, with exact numbers, and 
 </tr>
 <tr>
 <td><b>Measure.</b> Line, cone or circle, in the GM's units, snapping to the grid. It stays two seconds.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/23-measure.gif" alt="Measure"></td>
-<td><b>Templates.</b> Line, Circle/Sphere, Square/Cube or Cone, with its size. Tap one of yours to remove it.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/26-templates.gif" alt="Templates"></td>
+<td><b>Templates.</b> Line, Circle/Sphere, Square/Cube or Cone, with its size. Tap yours to remove it. It is kept as one of Atlas's own areas on your GM's map (shaped and snapped as Atlas does: a square from the middle of its near side, a line one square wide), so it needs the GM's Atlas to be on that map.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/26-templates.gif" alt="Templates"></td>
 </tr>
 <tr>
 <td><b>Laser.</b> Draw to point; everyone sees it, the GM too.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/24-laser.gif" alt="Laser"></td>
 <td><b>Ping.</b> Tap the map: rings show there for everyone.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/25-ping.gif" alt="Ping"></td>
 </tr>
 <tr>
-<td><b>Clear my templates</b> in the template menu removes all of yours (you can keep up to 10).<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/27-clear-my-templates.gif" alt="Clear my templates"></td>
-<td><b>GM side:</b> each player template has a <b>×</b> on your map; <b>Clear players' templates</b> (command palette) removes them all.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/28-gm-erase-template.gif" alt="GM erases templates"></td>
+<td><b>Clear my templates</b> in the template menu removes yours (you have one template at a time: placing another takes its place).<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/27-clear-my-templates.gif" alt="Clear my templates"></td>
+<td><b>GM side:</b> a player's template is an area on your Atlas map like your own (remove it there, or undo it); <b>Clear players' templates</b> (command palette) removes them all. Areas and rulers you keep in Atlas, and kept spells, show to your players too, unless you hide them.<br><img src="https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/28-gm-erase-template.gif" alt="GM erases templates"></td>
 </tr>
 </table>
 
@@ -130,6 +142,10 @@ Connect follows Obsidian's light or dark theme:
 
 ## More for the GM
 
+### Hide the map
+
+While you host, run **Hide the map from players** to black out every player's screen (it toggles: run it again to show the map). Players get no map, tokens, fog, initiative or images while it is down, and the data is not sent at all. With Atlas 0.12 or later, Atlas's own **Hide the map** in the player window bar does the same for your online players too.
+
 ### Show an image
 
 Run **Show image to players…** and pick an image. Players can zoom, pan, close and reopen it; **Stop showing image to players** takes it away.
@@ -150,7 +166,7 @@ During a session, right-click a note → **Send to…** and pick anyone who play
 
 ## Settings
 
-Settings → Atlas VTT Extension - Connect:
+Settings → Connect for Atlas VTT:
 
 - **Signaling server / My own server:** how players find your session. The default works.
 - **Relay (TURN) servers:** add one if players can't connect from strict networks (some offices, schools, mobile data).
@@ -167,9 +183,9 @@ On Atlas from Community plugins, Connect reads what Atlas leaves reachable, so a
 - Templates show their size to players only; the GM sees them without the label.
 - **Sharing maps** and per-collection rules need an Atlas build with the extension API, which no released Atlas has yet. Notes are shared on any Atlas (Send to…, Share with…, Shared with me…).
 
-## Privacy
+## Servers and privacy
 
-Connect talks to:
+Connect uses these servers:
 
 - PeerJS cloud signalling (`0.peerjs.com`) to connect players, unless you set your own server;
 - the STUN server `stun.l.google.com:19302`, to find a direct route;

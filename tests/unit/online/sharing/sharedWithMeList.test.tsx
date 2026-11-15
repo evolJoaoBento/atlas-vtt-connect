@@ -20,7 +20,7 @@ describe('Shared with me list push requests', () => {
     const props = renderList(async () => ({ kind: 'created', path: 'Shared/Ana/Cave.md' }));
     expect(screen.getByText('Ana is sending you a note: Cave')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
-    await waitFor(() => expect(props.onPulled).toHaveBeenCalledWith('Shared/Ana/Cave.md'));
+    await waitFor(() => expect(props.onPulled).toHaveBeenCalledWith('Shared/Ana/Cave.md', 'note'));
     expect(props.dismissPush).toHaveBeenCalledWith(PUSH);
   });
 

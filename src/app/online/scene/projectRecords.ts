@@ -13,7 +13,7 @@ import {
 import { SCENE_LIMITS, SCENE_RANGES } from './sceneLimits';
 import { isSceneId } from './sceneValidation';
 import { finitePoints, wirePoints } from './simplifyPoints';
-import type { InstanceNumbers } from './instanceNumbers';
+import { annotationOrder } from '../../../../packages/atlas-shared/src/index';
 
 /**
  * Projections by GM record. Immer keeps unchanged records, so their projections
@@ -22,8 +22,6 @@ import type { InstanceNumbers } from './instanceNumbers';
 export interface ProjectionMemo {
   fog: WeakMap<FogOperation, PlayerFogOp | null>;
   drawings: WeakMap<DrawingStroke, PlayerDrawing | null>;
-  /** The look-alikes' numbers as the last projection gave them, and the map they belong to: a token keeps its number. */
-  instances?: { map: string | null; numbers: InstanceNumbers };
 }
 
 export function createProjectionMemo(): ProjectionMemo {
@@ -163,8 +161,11 @@ function textOnWire(text: TextElement, x: number, y: number): PlayerText {
   };
 }
 
+/** Atlas 0.16: a drawing or text the GM hid from players (`hidden: true`, the only value Atlas reads as hidden). Never sent. */
+const hiddenFromPlayers = (record: object): boolean => (record as { hidden?: unknown }).hidden === true;
+
 export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, visible: Shows): Record<string, PlayerText> {
-  return projectRecord(texts, (text) => projectText(text, visible));
+  return projectRecord(texts, (text) => (hiddenFromPlayers(text) ? null : projectText(text, visible)));
 }
 
 /** A drawing's shape with its points simplified; null without points. Fog is checked by the caller. */
@@ -172,14 +173,26 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
   const points = wirePoints(stroke.points);
   if (points.length === 0) return null;
   const type = oneOf(PLAYER_DRAWING_TYPES, stroke.type, 'pen');
+  // Atlas 0.16: a closed drawing (it ends where it began) may be filled, with holes; its line may be none (width 0).
+  const record = stroke as DrawingStroke & { fill?: unknown; holes?: unknown; rotation?: unknown };
+  const [first] = points;
+  const last = points[points.length - 1];
+  const closed = type !== 'icon' && points.length >= 4 && first !== undefined && last !== undefined && first.x === last.x && first.y === last.y;
+  const fill = closed && (record.fill === 'solid' || record.fill === 'soft') ? record.fill : undefined;
+  const holes = fill && Array.isArray(record.holes) ? record.holes.slice(0, SCENE_LIMITS.holes).map((ring) => wirePoints(Array.isArray(ring) ? ring : [])).filter((ring) => ring.length >= 3) : [];
+  const rotation = type === 'icon' ? finiteOr(record.rotation, 0) : 0;
   return {
     type,
     order: finiteOr(stroke.timestamp, 0),
     points,
     color: textOr(stroke.color, '#000000'),
-    width: positiveOr(stroke.width, 1, SCENE_RANGES.stroke),
+    width: fill && stroke.width === 0 ? 0 : positiveOr(stroke.width, 1, SCENE_RANGES.stroke),
     opacity: unitOr(stroke.opacity, 1),
     icon: type === 'icon' ? textOrNull(stroke.icon) : null,
+    ...(fill ? { fill } : {}),
+    ...(holes.length > 0 ? { holes } : {}),
+    ...(rotation !== 0 ? { rotation: ((rotation % 360) + 360) % 360 } : {}),
+    ...((stroke as { layer?: unknown }).layer === 'map' ? { layer: 'map' as const } : {}),
   };
 }
 
@@ -188,9 +201,17 @@ export function projectDrawings(
   visible: Shows,
   memo: ProjectionMemo,
 ): Record<string, PlayerDrawing> {
-  // The drawing as players draw it (its simplified points, its clamped width) must be shown whole.
+  // The drawing as players draw it (its simplified points, its clamped width) must be shown whole; a fill is sent while
+  // any part of it is shown (leaving it out would show what it covers).
   return projectRecord(drawings, (stroke) => {
+    if (hiddenFromPlayers(stroke)) return null;
     const drawing = memoized(memo.drawings, stroke, projectDrawingShape);
-    return drawing && visible.shows(drawingBounds(drawing)) ? drawing : null;
+    if (!drawing) return null;
+    const bounds = drawingBounds(drawing);
+    const shown = drawing.fill ? (visible.showsSome ?? visible.shows)(bounds) : visible.shows(bounds);
+    if (!shown) return null;
+    // Atlas 0.16 stacks drawings by `order` first (0 for one made before there was one), then by the time drawn.
+    const stack = annotationOrder(stroke);
+    return stack !== 0 ? { ...drawing, stack } : drawing;
   });
 }

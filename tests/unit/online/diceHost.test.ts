@@ -35,6 +35,32 @@ describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
     w.finish();
   });
 
+  it("keeps the GM's own rolls private unless the GM shares them, as Atlas's \"Show my rolls to players\" does (Atlas 0.7)", async () => {
+    let shared = false;
+    const w = toolsWorld({ gmRollsShared: () => shared });
+    w.present();
+    const a = await w.join('A');
+    const b = await w.join('B');
+    const live = (player: typeof a) => w.logs(player).filter((log) => !log.replay).flatMap((log) => log.entries.map((entry) => entry.formula));
+    // A secret roll of the GM reaches nobody, and is not in the replay of a player who comes later.
+    w.publish(rollFormula('d20'));
+    expect(live(a)).toEqual([]);
+    const late = await w.join('C');
+    expect(w.logs(late)[0]).toMatchObject({ replay: true, entries: [] });
+    // A player's roll is the table's whatever the GM shares: everyone hears it, the roller included.
+    expect(a.session.sendDiceRoll({ d6: 2 }, 1)).toBe(true);
+    expect(live(a)).toEqual(['2d6+1']);
+    expect(live(b)).toEqual(['2d6+1']);
+    // Shared, the GM's rolls go out; the setting is read at each roll, so turning it off hides the next ones again.
+    shared = true;
+    w.publish(rollFormula('d8'));
+    expect(live(b)).toEqual(['2d6+1', 'd8']);
+    shared = false;
+    w.publish(rollFormula('d10'));
+    expect(live(b)).toEqual(['2d6+1', 'd8']);
+    w.finish();
+  });
+
   it("rolls a player's roll with Atlas's dice code, named after them", async () => {
     const w = toolsWorld();
     w.present();
@@ -68,6 +94,19 @@ describe.each(HUB_PATHS)('DiceHost, $atlas', ({ tabs }) => {
     w.publish(rollFormula('d20'));
     expect(w.logs(a).slice(-3).map((log) => log.entries[0]?.name)).toEqual(['GM', 'Hero', 'GM']);
     expect(JSON.stringify(a.received)).not.toContain('Orc');
+    w.finish();
+  });
+
+  it("keeps an unseen token's roll to its ability and result, as Atlas does: no name, no picture (Atlas 0.7.0)", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    const source = { type: 'statblock', tokenId: 'orc', tokenName: 'Orc', abilityName: 'Axe', tokenImagePath: 'atlas-vtt/assets/secret-orc.png' };
+    w.publish({ ...rollFormula('d20'), source } as never);
+    const sent = JSON.stringify(a.received);
+    for (const leaked of ['Orc', 'secret-orc', 'tokenImagePath', 'tokenName']) expect(sent).not.toContain(leaked);
+    // Atlas's own player window (`PlayerDiceToasts`) keeps the ability of a roll for a hidden token, and so does the log.
+    expect(w.logs(a).at(-1)?.entries[0]).toMatchObject({ name: 'GM', ability: 'Axe' });
     w.finish();
   });
 
@@ -296,5 +335,29 @@ describe('a roll from a player sheet', () => {
     expect(foldedRequest({ formula: '1d6+2', rolledBy: 'Ana', advantage: 'advantage' })).toEqual({ formula: '1d6+2', rolledBy: 'Ana' });
     expect(foldedRequest({ formula: 'd20', mapPath: 'm' })).toEqual({ formula: 'd20', mapPath: 'm' });
     expect(foldedRequest({ formula: '+1', rolledBy: 'A'.repeat(30), abilityName: 'Long ability name' }).rolledBy).toHaveLength(40);
+  });
+});
+
+describe('whether the GM shares their rolls (Atlas `showDiceRolls`)', () => {
+  const settings = (view: unknown) => ({ get: () => view }) as never;
+
+  it('reads the player view rule, and takes a missing one to mean shared, as rolls went before Atlas had it', async () => {
+    const { gmRollsShared } = await import('../../../src/app/online/atlas/toolParts');
+    expect(gmRollsShared(settings({ showDiceRolls: true }))).toBe(true);
+    expect(gmRollsShared(settings({ showDiceRolls: false }))).toBe(false);
+    expect(gmRollsShared(settings({ showGrid: true }))).toBe(true);
+    expect(gmRollsShared({ get: () => { throw new Error('gone'); } } as never)).toBe(true);
+  });
+});
+
+describe('whether players move only on their turn (Atlas initiativeMovesOnTurn)', () => {
+  const settings = (view: unknown) => ({ get: () => view }) as never;
+
+  it('reads the player view rule, and takes a missing one to mean no hold, as moves went before Atlas had it', async () => {
+    const { movesOnTurn } = await import('../../../src/app/online/atlas/toolParts');
+    expect(movesOnTurn(settings({ movesOnTurn: true }))).toBe(true);
+    expect(movesOnTurn(settings({ movesOnTurn: false }))).toBe(false);
+    expect(movesOnTurn(settings({ showGrid: true }))).toBe(false);
+    expect(movesOnTurn({ get: () => { throw new Error('gone'); } } as never)).toBe(false);
   });
 });

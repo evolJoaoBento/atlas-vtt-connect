@@ -24,6 +24,19 @@ describe('map layer', () => {
     expect(surface.calls).toEqual([{ op: 'image', image: art.image, x: 0, y: 0, width: 1000, height: 800, clip: null }]);
   });
 
+  it('draws a map Atlas aligned turned or shifted by its matrix, and still a placeholder before it has loaded', () => {
+    const surface = new RecordingSurface();
+    const layer = createMapLayer();
+    const matrix = [1, 0.05, -0.05, 1, 12, 8] as const;
+    const aligned = playerScene({ map: { asset: 'map-asset', width: 1000, height: 800, cellSize: 70, matrix } });
+    layer.draw(surface, frame(aligned));
+    expect(surface.calls).toEqual([{ op: 'rect', x: 0, y: 0, width: 1000, height: 800, style: { fill: MAP_PLACEHOLDER } }]);
+    surface.clear();
+    const art = decodedImage(500, 400);
+    layer.draw(surface, frame(aligned, { images: (id) => (id === 'map-asset' ? art : null) }));
+    expect(surface.calls).toEqual([{ op: 'imageMatrix', image: art.image, matrix: [...matrix] }]);
+  });
+
   it('draws nothing off screen or without a map size', () => {
     const surface = new RecordingSurface();
     const layer = createMapLayer();

@@ -16,7 +16,7 @@ import { imagesCopied, indexedDbImageCaches, markImagesCopied, migrateDeviceKeys
 import type { KeyValueStore } from '../app/online/sharing/identity/deviceKeys';
 
 export const RETRY_COMMAND = { id: 'bring-over-preview-data', name: "Bring over the online preview's data again" } as const;
-const FAILED = "Atlas VTT Connect couldn't bring over the preview's online play data, so hosting and sharing are off for now.";
+const FAILED = "Connect for Atlas VTT couldn't bring over the preview's online play data, so hosting and sharing are off for now.";
 const AGAIN = `To try again, run "${RETRY_COMMAND.name}" or restart Obsidian.`;
 
 export interface MigrationStart {

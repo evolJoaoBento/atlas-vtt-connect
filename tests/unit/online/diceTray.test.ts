@@ -36,3 +36,36 @@ describe("the join page dice tray (Atlas's tray rules)", () => {
     expect(tray.isEmpty()).toBe(true);
   });
 });
+
+describe('the side of a tray roll (advantage or disadvantage)', () => {
+  it('applies to one d20 alone, and is the roll that carries it', () => {
+    const tray = new DiceTray();
+    expect(tray.canChooseSide()).toBe(false);
+    tray.add(20);
+    expect(tray.canChooseSide()).toBe(true);
+    tray.chooseSide('disadvantage');
+    expect(tray.side).toBe('disadvantage');
+    tray.step(2);
+    expect(tray.roll()).toEqual({ dice: { d20: 1 }, modifier: 2, advantage: 'disadvantage' });
+    tray.chooseSide(null);
+    expect(tray.roll()).toEqual({ dice: { d20: 1 }, modifier: 2 });
+  });
+
+  it('is dropped while the tray holds anything else, and comes back with the lone d20, until it is cleared', () => {
+    const tray = new DiceTray();
+    tray.add(20);
+    tray.chooseSide('advantage');
+    tray.add(6);
+    expect(tray.side).toBeNull();
+    expect(tray.roll()).toEqual({ dice: { d20: 1, d6: 1 }, modifier: 0 });
+    tray.remove(6);
+    expect(tray.side).toBe('advantage');
+    tray.clear();
+    tray.add(20);
+    expect(tray.side).toBeNull();
+    tray.add(20);
+    tray.chooseSide('advantage');
+    expect(tray.canChooseSide()).toBe(false);
+    expect(tray.roll()?.advantage).toBeUndefined();
+  });
+});

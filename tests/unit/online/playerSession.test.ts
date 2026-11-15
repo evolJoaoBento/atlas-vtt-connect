@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
-import { PlayerSession, RECONNECT_GIVE_UP_MS, type PlayerSessionState } from '../../../src/app/online/PlayerSession';
+import { PlayerSession, RECONNECT_GIVE_UP_MS, type PlayerSessionOptions, type PlayerSessionState } from '../../../src/app/online/PlayerSession';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
 import { MemoryNetwork } from '../../fake/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../src/app/online/transport/types';
@@ -60,6 +60,24 @@ describe('PlayerSession', () => {
     expect(requests).toHaveLength(1);
   });
 
+  it('reconnect() drops the link in use and joins again at once, as the same player', async () => {
+    const { gm, requests, player } = setup();
+    expect(player.reconnect()).toBe(false);
+    player.start();
+    await flush();
+    expect(player.reconnect()).toBe(false);
+    gm.allow(requests[0]!.playerId);
+    const before = player.state.playerId;
+    expect(player.reconnect()).toBe(true);
+    expect(player.state.status).toBe('connecting');
+    await flush();
+    expect(player.state.status).toBe('admitted');
+    expect(player.state.playerId).toBe(before);
+    expect(requests).toHaveLength(1);
+    player.stop();
+    expect(player.reconnect()).toBe(false);
+  });
+
   it('stops when the GM ends the session', async () => {
     const { gm, requests, player } = setup();
     player.start();
@@ -114,7 +132,7 @@ describe('PlayerSession', () => {
       drop(): void { this.closeCb?.(); }
     }
 
-    function fake() {
+    function fake(extra: Partial<PlayerSessionOptions> = {}) {
       const links: FakeLink[] = [];
       const state = { calls: 0, fail: false };
       const transport: ClientTransport = {
@@ -128,7 +146,7 @@ describe('PlayerSession', () => {
       };
       const changes: PlayerSessionState[] = [];
       const player = new PlayerSession({
-        hostId: 'gm', name: 'A', playerKey: 'k', clientVersion: '1', transport, onChange: (s) => changes.push({ ...s }),
+        hostId: 'gm', name: 'A', playerKey: 'k', clientVersion: '1', transport, onChange: (s) => changes.push({ ...s }), ...extra,
       });
       const admit = (link: FakeLink): void => link.receive({ v: 1, type: 'admitted', playerId: 'p1', session: { title: 'T' } });
       return { links, state, player, changes, admit };
@@ -191,6 +209,25 @@ describe('PlayerSession', () => {
       await flush();
       links[0]!.receive({ v: 1, type: 'ping', t: 42 });
       expect(links[0]!.sent.at(-1)).toEqual({ v: 1, type: 'pong', t: 42 });
+    });
+
+    it('sends thrown dice only while the GM offers to take them, and hands on the offered rules', async () => {
+      const offers: unknown[] = [];
+      const { links, player, admit } = fake({ onBoardOffer: (...args) => { offers.push(args); } });
+      player.start();
+      await flush();
+      admit(links[0]!);
+      const thrown = { rolls: [{ die: 'd20' as const, value: 7 }], modifier: 2, sheet: { tokenId: 't1', roll: { kind: 'check' as const, index: 1 } } };
+      links[0]!.receive({ v: 1, type: 'board-offer', available: true });
+      expect(player.sendDiceResult(thrown)).toBe(false);
+      const rules = { defaultRoll: '1d20', crit: 'natural' as const };
+      links[0]!.receive({ v: 1, type: 'board-offer', available: true, diceResults: true, diceRules: rules });
+      expect(player.sendDiceResult(thrown)).toBe(true);
+      expect(links[0]!.sent.at(-1)).toEqual({ v: 1, type: 'dice-result', ...thrown });
+      expect(offers).toEqual([[true, undefined], [true, { rules }]]);
+      // A new admission (a reconnect, a GM hosting anew) takes none until the GM offers again.
+      admit(links[0]!);
+      expect(player.sendDiceResult(thrown)).toBe(false);
     });
 
     it('start() twice connects once', async () => {

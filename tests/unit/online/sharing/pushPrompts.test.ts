@@ -12,6 +12,7 @@ function setup() {
     show: vi.fn((_push, _name, answer) => { answers.push(answer); return { hide }; }),
     service: () => ({ pullPushed }),
     notify: vi.fn(),
+    open: vi.fn(),
   };
   shareSessionStore.setState({ people: [{ personId: 'ana', name: 'Ana' }], pushes: [] });
   const stop = shareSessionStore.subscribe(pushPromptListener(deps));
@@ -32,11 +33,12 @@ describe('push prompts', () => {
   });
 
   it('Not now dismisses the push and writes nothing: nothing is pulled', () => {
-    const { answers, pullPushed, stop } = setup();
+    const { deps, answers, pullPushed, stop } = setup();
     addPush(PUSH);
     answers[0]!(false);
     expect(shareSessionStore.getState().pushes).toEqual([]);
     expect(pullPushed).not.toHaveBeenCalled();
+    expect(deps.open).not.toHaveBeenCalled();
     stop();
   });
 
@@ -47,6 +49,19 @@ describe('push prompts', () => {
     expect(shareSessionStore.getState().pushes).toEqual([]);
     expect(pullPushed).toHaveBeenCalledWith(PUSH);
     await vi.waitFor(() => expect(deps.notify).toHaveBeenCalledWith('Pulled into Shared/Ana/Cave.md'));
+    // The note let in opens, once.
+    expect(deps.open).toHaveBeenCalledTimes(1);
+    expect(deps.open).toHaveBeenCalledWith('Shared/Ana/Cave.md');
+    stop();
+  });
+
+  it('a map let in is not opened as a note', async () => {
+    const { deps, answers, pullPushed, stop } = setup();
+    pullPushed.mockResolvedValueOnce({ kind: 'created', path: 'Shared/Ana/Inn.md' });
+    addPush({ ...PUSH, kind: 'map' });
+    answers[0]!(true);
+    await vi.waitFor(() => expect(deps.notify).toHaveBeenCalledWith('Pulled into Shared/Ana/Inn.md'));
+    expect(deps.open).not.toHaveBeenCalled();
     stop();
   });
 

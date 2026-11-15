@@ -24,7 +24,9 @@ function withoutBarNumbers<T>(value: T): T {
       }
     }
     if (typeof node !== 'object' || node === null) return node;
-    const entries = Object.entries(node).filter(([key]) => !(inResources && (key === 'current' || key === 'max' || key === 'fixed')));
+    // The recording predates measures too: a scene without any carries an empty record now.
+    const noMeasures = (key: string, inner: unknown): boolean => key === 'measures' && typeof inner === 'object' && inner !== null && Object.keys(inner).length === 0;
+    const entries = Object.entries(node).filter(([key, inner]) => !(inResources && (key === 'current' || key === 'max' || key === 'fixed')) && !noMeasures(key, inner));
     return Object.fromEntries(entries.map(([key, inner]) => [key, strip(inner, key === 'resources')]));
   };
   return strip(value, false) as T;
@@ -195,7 +197,7 @@ async function rawPlayer(h: Harness, playerKey: string): Promise<{ link: PeerLin
     const decoded = decodeControl(data);
     if (decoded.kind === 'message') received.push(decoded.message);
   });
-  link.send('control', encodeControl({ v: 1, type: 'join', name: 'Raw', playerKey, client: { kind: 'web', version: '1' } }));
+  link.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Raw', playerKey, client: { kind: 'web', version: '1' } }));
   h.gm.allow(h.requests.at(-1)!.playerId);
   return { link, received, sizes };
 }

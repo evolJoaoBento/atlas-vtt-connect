@@ -1,0 +1,228 @@
+/**
+ * What a player with the Tabletop extension gets besides the scene, to draw it on Tabletop's 3D board: the walls,
+ * doors, lights and props players may see, the materials and heights the GM gave them, and the GM's 3D camera.
+ * Sent only to players who asked (`board-request`). Shared with the web player page, so this file imports nothing.
+ * Heights are in grid squares, as Tabletop keeps them; null is the board's default (the fog's height).
+ */
+/**
+ * The fusion step both plugins and the player page are builds of: Tabletop's API, Connect's board session and a player's
+ * join each carry it, and a missing or different number is refused. It is the number of the Atlas fusion phase, raised
+ * by each phase's first change to what the three exchange.
+ */
+export const FUSION_PROTOCOL = 4;
+
+/** A sheet the AR markers are fixed on, as it lies on the table (see `tools/arTable.ts`): millimetres, x right and y down, with its heading in radians and its outline. */
+export interface ArTableGroup {
+  group: string;
+  x: number;
+  y: number;
+  heading: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The table as the GM placed it, for the phones: the groups in the map's frame (millimetres from the map's top left,
+ * x right and y down as the map reads), and how long a square of the map is on the table.
+ */
+export interface ArTable {
+  squareMm: number;
+  groups: ArTableGroup[];
+}
+
+export interface BoardPoint { x: number; y: number }
+/** A point of the board's world. */
+export interface BoardPoint3 { x: number; y: number; z: number }
+/** The camera of a live cutscene: where the GM's eye is and what it looks at. */
+export interface CutsceneCamera { eye: BoardPoint3; target: BoardPoint3 }
+
+export interface BoardDoor {
+  open: boolean;
+  swing: 'left' | 'right';
+  /** The asset id of the GLB standing in the doorway, or null for Tabletop's own leaf. */
+  prop: string | null;
+  chainId?: string;
+  /** The door was turned by the GM: its hinge is at the segment's second end, and/or it opens to the other side of the wall. Absent as Atlas draws it. */
+  hinge?: true;
+  side?: true;
+}
+
+export interface BoardWallRecord {
+  id: string;
+  /** A closed secret door is sent as `solid`, with no `door`. */
+  type: 'solid' | 'door';
+  p1: BoardPoint;
+  p2: BoardPoint;
+  height: number | null;
+  /** A material of `BoardExtras.materials`, or null for the plain wall. */
+  material: string | null;
+  door?: BoardDoor;
+  /** Atlas's one-way side, a wall that stops only sight (a curtain), only light (glass) or only tokens (a window), and a limited one. */
+  direction?: 'left' | 'right';
+  blocks?: 'sight' | 'light' | 'movement';
+  limited?: boolean;
+  /** A window's opening on Tabletop's board (grid squares from the floor), where the GM set it. */
+  window?: { bottom: number; top: number };
+  /** The wall's own width (thickness) on Tabletop's board, in grid squares, where the GM set one. */
+  width?: number;
+}
+
+export interface BoardLightRecord {
+  id: string;
+  x: number;
+  y: number;
+  height: number | null;
+  color: string;
+  bright: number;
+  dim: number;
+  intensity: number;
+  animation: string | null;
+  angle: number | null;
+  rotation: number;
+  /** A light that darkens, and the ambient level below which it shines (Atlas's `activeBelowAmbient`). */
+  darkness: boolean;
+  activeBelowAmbient: number | null;
+}
+
+/** How strongly a material shows its texture on Tabletop's board (the GM's sliders); players' boards draw it the same way. */
+export interface BoardMaterialTuning {
+  relief: number;
+  occlusion: number;
+  shine: number;
+  depth: number;
+  displace: number;
+  outward: number;
+}
+
+export interface BoardMaterialRecord {
+  id: string;
+  scale: number;
+  /** Texture role (`color`, `normal`, `roughness`…) to asset id. */
+  maps: Record<string, string>;
+  /** Absent when the material is as made. */
+  tuning?: BoardMaterialTuning;
+}
+
+/** `solid`: tokens set on it stand on its top. `lift`: how high it stands, in grid squares. */
+export interface BoardPropRecord { id: string; asset: string; x: number; y: number; scale: number; turn: number; solid?: true; lift?: number }
+
+export interface BoardLighting { enabled: boolean; ambient: number; ambientColor: string | null }
+
+/**
+ * A scene stacked with the one shown (an elevation layer): its floor and the walls, doors, lights and props standing in it,
+ * at its height and place. Never what is on it (tokens, pins, notes, fog). Materials are those of `BoardExtras.materials`.
+ */
+export interface BoardLayerRecord {
+  id: string;
+  /** Grid squares above the shown scene (negative: below it). */
+  elevation: number;
+  /** Where it stands on the plane beyond its height, seen from the shown scene: a shift in map pixels after a turn in degrees. */
+  stands: { x: number; y: number; turn: number };
+  /** The asset id of its floor image. */
+  image: string;
+  /** Where its grid lies; `mapStretch`: how Atlas fitted the level's image to the scene's grid (its stretch's factors times its scale, a turn of a few degrees, an offset), absent for an image that fills the scene's frame. */
+  grid: { size: number; offsetX: number; offsetY: number; mapStretch?: { x: number; y: number; rotation?: number; offset?: { x: number; y: number } } };
+  walls: BoardWallRecord[];
+  lights: BoardLightRecord[];
+  props: BoardPropRecord[];
+  fogHeight: number | null;
+  wallThickness: number | null;
+  /** The layer's painted water; absent for none. */
+  water?: BoardWater;
+}
+
+/** One patch of water: its outline and what stands dry inside it, each ring a flat list of x, y in the scene's world. */
+export interface BoardWaterArea {
+  polygon: number[];
+  holes?: number[][];
+}
+
+/**
+ * A scene's water for Tabletop's board: the outlines of Atlas's liquids as Tabletop reads them (`areas`), and how the
+ * water moves. `mask` is the water a map still keeps from before it was Atlas's (Tabletop's old brush mask: its size
+ * in texels and its run lengths, base64 varints), sent until that map's water is moved. At least one of the two.
+ * Under the fog it still shows only as the board draws it there (black): it is the GM's whole drawing.
+ */
+export interface BoardWater {
+  areas?: BoardWaterArea[];
+  mask?: { width: number; height: number; data: string };
+  motion?: { kind: string; amount: number; direction: number; tint: string; clarity: number } | null;
+}
+
+export interface BoardExtras {
+  sceneId: string;
+  walls: BoardWallRecord[];
+  lights: BoardLightRecord[];
+  props: BoardPropRecord[];
+  materials: BoardMaterialRecord[];
+  /** Atlas's scene lighting (`state.lighting`), the one light level a 3D board is lit by. */
+  lighting: BoardLighting;
+  fogHeight: number | null;
+  /** How thick walls stand, as a share of a grid square; null is the board's default. */
+  wallThickness: number | null;
+  /** The scenes stacked with this one, lowest first; absent when it stands alone. Sent with the first part only. */
+  layers?: BoardLayerRecord[];
+  /** The water painted on the scene; absent for none. Sent with the first part only. */
+  water?: BoardWater;
+  /** How the GM draws the scenes stacked above (Tabletop's Upper layers), so players see them the same; absent from an older Tabletop. */
+  layerLook?: 'solid' | 'faded' | 'transparent';
+  /** Where the marker sheets lie on the players' table, as the GM placed them on this map; absent for none. Sent with the first part only. */
+  arTable?: ArTable;
+}
+
+export interface BoardCamera {
+  sceneId: string;
+  eye: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+}
+
+/**
+ * The most of each kind one `board-extras` part carries, so a part stays well under the control message size; the
+ * GM splits larger scenes into parts (materials ride on the first).
+ */
+/** The most the layers of one scene may carry: each layer's records, and all the layers together as JSON (a layer that would pass it is left out). */
+export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights: 60, props: 100, bytes: 110 * 1024 });
+
+/**
+ * The most water sent, as text (an old mask's base64, the outlines' JSON, each within it): the scene's own, and a
+ * layer's (which counts towards the layers' bytes). An outline has at most Atlas's corners, an area its holes, a scene its areas.
+ */
+export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048, corners: 2048, holes: 256, areas: 256 });
+
+export const BOARD_PART_LIMITS = Object.freeze({ walls: 1500, lights: 1000, props: 1000, materials: 200, maps: 8, parts: 64, text: 200 });
+
+/** One shot of a running cutscene, as a player's board plays it (a copy of Tabletop's `BoardCutsceneShot`; `key` names its map for this run only). */
+export interface BoardCutsceneShot {
+  key: string;
+  eye: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  /** Milliseconds from the start of the run. */
+  at: number;
+  keyframe: boolean;
+  transition: 'fade' | 'cut' | 'move';
+}
+
+/**
+ * A cutscene running for players (a copy of Tabletop's `BoardCutscene`); `null` is sent when it ends. A map keeps its
+ * `key` for the whole run: a live run back on a map names it by its old key, the player drops the scenes of keys a
+ * publication no longer names, and `CutsceneSender` sends the map again, as it is now.
+ */
+export interface BoardCutscene {
+  runId: string;
+  mode: 'prepared' | 'live';
+  look: { bars: number | null; fadeMs: number };
+  shots: BoardCutsceneShot[];
+  step: { shot: number; seq: number };
+  key: string;
+}
+
+/** The limits both sides check (Tabletop's `readBoardCutscene` and `isBoardCutscene`). */
+export const CUTSCENE_LIMITS = Object.freeze({
+  shots: 200,
+  runId: /^[A-Za-z0-9_-]{1,64}$/,
+  key: /^k[0-9]{1,4}$/,
+  at: 3_600_000,
+  coordinate: 1e7,
+  fadeMs: [100, 3000] as readonly [number, number],
+  bars: [1.85, 2, 2.39] as readonly number[],
+});

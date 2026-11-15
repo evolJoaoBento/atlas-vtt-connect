@@ -16,6 +16,8 @@ export const WAYPOINT_HOLD_MS = 500;
 export interface RulerOverlay {
   points: ScenePoint[];
   label: string;
+  /** The movement step's colour (`#rrggbb`, or `beyond` past the last step); absent: the accent. */
+  color?: string;
 }
 
 export class DragRulerTool {
@@ -25,14 +27,17 @@ export class DragRulerTool {
   /** Where the finger came to rest; moving past the tap slop from it starts a new hold. */
   private still: ScreenPoint | null = null;
   private holdTimer: number | null = null;
+  /** The dragged token's speed in game units; null without one. */
+  private speed: number | null = null;
 
   /** `onChange`: a hold added a waypoint, so the ruler must be drawn again. */
   constructor(private readonly onChange: () => void) {}
 
-  /** `tokenSize`: the dragged token's, so the ruler ends where the GM's drop puts it. */
-  begin(origin: ScenePoint, grid: ToolGrid, kind: PointerKind, tokenSize: number): void {
+  /** `tokenSize`: the dragged token's, so the ruler ends where the GM's drop puts it; `speed`: its speed, which the ruler reads the move against. */
+  begin(origin: ScenePoint, grid: ToolGrid, kind: PointerKind, tokenSize: number, speed: number | null = null): void {
     this.end();
     this.grid = grid;
+    this.speed = speed;
     this.path = new DragRulerPath((point) => grid.snapDrag(point, tokenSize));
     this.path.begin(origin);
     this.touch = kind === 'touch';
@@ -69,7 +74,9 @@ export class DragRulerTool {
 
   overlay(): RulerOverlay | null {
     const points = this.path?.points();
-    return points && this.grid ? { points, label: this.grid.label(points) } : null;
+    const look = points && this.grid ? this.grid.dragLook(points, this.speed) : null;
+    if (!points || !look) return null;
+    return { points, label: look.label, ...(look.color !== undefined ? { color: look.color } : {}) };
   }
 
   private cancelHold(): void {

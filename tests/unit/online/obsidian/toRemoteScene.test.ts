@@ -126,7 +126,7 @@ describe('toRemoteScene', () => {
       mode: 'abstract', unitType: 'custom', unitDistance: 1, ruleDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
     });
     expect(input(scene).grid).toMatchObject({ snapToGrid: false, measurementType: 'abstract' });
-    expect(input(scene).grid).not.toHaveProperty('unitType');
+    expect(input(scene).grid).toMatchObject({ unitType: 'custom' });
   });
 
   it("gives the remote view a scene's own distance per cell and the collection's rules square", () => {

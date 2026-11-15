@@ -23,6 +23,8 @@ export const SCENE_LIMITS = {
   textLength: 10_000,
   /** Keeps one fog operation well under a fog part's budget. */
   points: 5_000,
+  /** Rings cut out of one drawing's fill (Atlas 0.16). */
+  holes: 64,
   records: 10_000,
   conditions: 64,
   /** Longest condition name players get. */
@@ -31,11 +33,21 @@ export const SCENE_LIMITS = {
   pins: 200,
   pinLabel: 8,
   pinTitle: 120,
+  /** Atlas 0.14's pin name (`MAX_PIN_NAME`). */
+  pinName: 60,
   /** A token has this many resource sockets; the window draws the first two. */
   resources: 6,
   widgets: 64,
   initiativeEntries: 200,
   rangeBands: 32,
+  /** Atlas's `MAX_MEASURES` (per level) and `MAX_RULER_POINTS`. */
+  measures: 256,
+  measurePoints: 64,
+  /** The most a measure's `tabletop` field may take, as JSON. */
+  measureExtraBytes: 8 * 1024,
+  /** Atlas 0.15's `MAX_MOVEMENT_STEPS` and `MAX_STEP_NAME`. */
+  movementSteps: 4,
+  stepName: 24,
 } as const;
 
 type Range = readonly [min: number, max: number];
@@ -45,6 +57,8 @@ export const SCENE_RANGES = {
   gridSize: [1, 10_000],
   cellSize: [1, 10_000],
   mapSize: [0, 200_000],
+  /** A number of a map's matrix: its scale and turn terms are a map's size at most, its offsets that and more. */
+  mapMatrix: [-1_000_000, 1_000_000],
   coordinate: [-10_000_000, 10_000_000],
   stroke: [0, 10_000],
   fontSize: [1, 1_000],
@@ -66,4 +80,14 @@ export const SCENE_RANGES = {
   miniScale: [0.2, 4],
   /** A mini's turn on its token, in degrees. */
   miniTurn: [0, 360],
+  /** A line measure's width, map pixels, above 0. */
+  lineWidth: [0, 100_000],
+  /** How far an aura reaches, game units, above 0 (Atlas's `MAX_AURA`). */
+  auraReach: [0, 100_000],
+  /** A token's height in game units (Atlas 0.15's `MAX_TOKEN_HEIGHT` either way). */
+  elevation: [-100_000, 100_000],
+  /** A token's speed in game units, above 0 (Atlas 0.15's `MAX_MOVEMENT_SPEED`). */
+  speed: [0, 100_000],
+  /** A movement step's multiple of the speed, above 0 (Atlas 0.15's `MAX_STEP_MULTIPLE`). */
+  stepMultiple: [0, 100],
 } as const satisfies Record<string, Range>;

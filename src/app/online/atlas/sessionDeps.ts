@@ -4,11 +4,16 @@ import type { Deps } from '../OnlineSessionService';
 import { liveLighting } from '../scene/sceneLighting';
 import type { DiceLookSource } from '../scene/sceneSources';
 import { presentedSource } from './presentedSource';
+import type { StockMeasures } from '../../../connect/stockMeasures';
+import type { ProjectedMovement } from '../scene/projectForPlayers';
 import { handouts } from '../handouts';
 import { createTabScenes } from './tabScenes';
-import { diceHostPart, laserRelayPart, pingRelayPart, sheetHostPart, templateHostPart, tokenControlPart, type StatblockSource } from './toolParts';
+import { diceHostPart, gmRollsShared, laserRelayPart, movesOnTurn, offeredRulesOf, pingRelayPart, sheetHostPart, measureHostPart, tokenControlPart, type StatblockSource } from './toolParts';
 
 type SessionAtlas = Pick<AtlasExtension, 'presentation' | 'views' | 'rules' | 'settings' | 'on'>;
+
+/** What a stock Atlas 0.15's rules add (`stockAtlas.ts`): each map's movement. The extension API's types know none. */
+type MovementRulesApi = { movementFor?: (mapPath: string | null) => ProjectedMovement | null };
 
 /** The namespaces an older Atlas lacks: null where its capability is missing. */
 export interface OptionalNamespaces {
@@ -23,7 +28,7 @@ export interface OptionalNamespaces {
 }
 
 export type AtlasSessionDeps = Pick<Deps,
-  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'templates' | 'handout'
+  'presented' | 'views' | 'diceLook' | 'collectionGrid' | 'coneAngle' | 'movement' | 'resources' | 'conditions' | 'initiativeRules' | 'watchResources' | 'playerViewSettings' | 'dice' | 'diceRules' | 'laser' | 'lighting' | 'tokenControl' | 'sheets' | 'pings' | 'templates' | 'handout'
   | 'tabScenes'
 >;
 
@@ -59,11 +64,14 @@ export function diceLookSource(atlas: Pick<AtlasExtension, 'rules' | 'on'>, dice
  */
 export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, tokens, sceneTabs, statblocks }: OptionalNamespaces): AtlasSessionDeps {
   const diceLooks = diceLookSource(atlas, dice);
+  const diceRules = offeredRulesOf(atlas);
+  const movementFor = (atlas.rules as MovementRulesApi).movementFor;
   return {
     presented: presentedSource(atlas),
     views: atlas.views,
     collectionGrid: (p) => atlas.rules.forMap(p).gridDefaults,
     coneAngle: (p) => atlas.rules.forMap(p).measurement.coneAngle,
+    ...(typeof movementFor === 'function' ? { movement: (p: string | null) => movementFor.call(atlas.rules, p) } : {}),
     resources: (p) => atlas.rules.forMap(p).resources,
     conditions: (p) => atlas.rules.forMap(p).conditions,
     initiativeRules: (p) => atlas.rules.forMap(p).initiative,
@@ -73,12 +81,14 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
       onChange: (cb) => atlas.on('settings-changed', (key) => { if (key === 'playerView') cb(); }),
     },
     ...(diceLooks ? { diceLook: diceLooks } : {}),
-    ...(tokens ? { tokenControl: tokenControlPart(tokens) } : {}),
+    ...(tokens ? { tokenControl: tokenControlPart(tokens, () => movesOnTurn(atlas.settings)) } : {}),
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
-    ...(dice ? { dice: diceHostPart(dice) } : {}),
+    // Players' physical rolls are judged by the rules the board offer tells them.
+    ...(dice ? { dice: diceHostPart(dice, diceRules, () => gmRollsShared(atlas.settings)), diceRules } : {}),
     ...(lasers ? { laser: laserRelayPart(lasers, atlas.settings) } : {}),
     pings: pingRelayPart(lasers),
-    templates: templateHostPart(lasers, (mapPath) => atlas.rules.forMap(mapPath).measurement.coneAngle),
+    // Atlas's kept measures hold players' templates and spells: a stock Atlas 0.15 offers its store (`stockAtlas.ts`).
+    templates: measureHostPart((atlas as { measures?: StockMeasures }).measures ?? null),
     handout: handouts,
     ...(lighting ? { lighting: liveLighting(lighting) } : {}),
     // One per hosted session, disposed with it.

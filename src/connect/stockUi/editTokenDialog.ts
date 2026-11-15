@@ -8,6 +8,7 @@
  * reads it), saved; Escape, Cancel, the close button or a click beside it did not.
  */
 import type { EditTokenSectionSpec } from '../../app/online/gm-ui/editTokenSection';
+import { inPageSelect } from '../../app/ui/primitives/inPageSelect';
 
 const MODAL = '.atlas-edit-token-modal';
 /** How long after a right press the dialog is waited for: the GM reads the menu first. */
@@ -32,16 +33,9 @@ function sectionElement(spec: EditTokenSectionSpec, values: Map<string, string>)
     table.appendChild(make('span', 'atlas-edit-token__label atlas-connect-edit-table__label', row.label));
     for (const choice of row.choices) {
       values.set(choice.id, choice.value);
-      const select = make('select', 'dropdown atlas-connect-edit-table__choice');
-      select.setAttribute('aria-label', choice.label);
-      for (const option of choice.options) {
-        const element = make('option', '', option.label);
-        element.value = option.value;
-        select.appendChild(element);
-      }
-      select.value = choice.value;
-      select.addEventListener('change', () => values.set(choice.id, select.value));
-      table.appendChild(select);
+      // Drawn in the page, not a native select, so its list shows in screen recordings; it stays inside the dialog.
+      const select = inPageSelect(table, { options: choice.options, value: choice.value, ariaLabel: choice.label, className: 'atlas-connect-edit-table__choice' }, (value) => values.set(choice.id, value));
+      select.el.classList.add('atlas-connect-edit-table__cell');
     }
   }
   section.appendChild(table);

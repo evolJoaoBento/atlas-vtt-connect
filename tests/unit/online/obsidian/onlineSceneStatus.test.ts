@@ -21,7 +21,7 @@ describe('onlineSceneStatus', () => {
     expect(onlineSceneStatus(state('lost', 'connection-lost'), true)).toMatchObject({ message: 'Lost the connection to your GM.', reconnect: true });
     expect(onlineSceneStatus(state('lost', 'unreachable'), false)).toMatchObject({ reconnect: true });
     expect(onlineSceneStatus(state('denied', 'kicked'), true)).toMatchObject({ message: 'The GM removed you from the session.', reconnect: false });
-    expect(onlineSceneStatus(state('denied', 'version'), true).message).toBe("This page is out of date for your GM's Atlas. Ask them for a new link.");
+    expect(onlineSceneStatus(state('denied', 'version'), true).message).toBe('This table needs the updated player page');
     expect(onlineSceneStatus(state('lost', 'replaced'), true).message).toBe('You joined from another tab.');
   });
 });

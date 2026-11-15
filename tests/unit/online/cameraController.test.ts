@@ -87,6 +87,37 @@ describe('CameraController', () => {
     expect([controller.current().centerX, controller.current().centerY]).toEqual([1000, 0]);
   });
 
+  it('glides to a world point on look-at, keeping the zoom, and breaks away from the GM', () => {
+    const { controller, advance } = setup();
+    controller.setScreen(SCREEN);
+    controller.setScene(playerScene());
+    controller.setGmCamera(gm());
+    advance(CAMERA_SETTLE_MS);
+    const before = controller.current();
+    controller.lookAt({ x: 700, y: 120 });
+    expect(controller.isFollowing()).toBe(false);
+    expect(controller.isMoving()).toBe(true);
+    advance(CAMERA_SETTLE_MS);
+    const after = controller.current();
+    expect([after.centerX, after.centerY]).toEqual([700, 120]);
+    expect(after.zoom).toBe(before.zoom);
+    // Follow GM brings the view back.
+    controller.followGm();
+    advance(CAMERA_SETTLE_MS);
+    expect(controller.isFollowing()).toBe(true);
+  });
+
+  it('keeps a look-at point on the map, as a pan does', () => {
+    const { controller, advance } = setup();
+    controller.setScreen(SCREEN);
+    controller.setScene(playerScene());
+    controller.lookAt({ x: 90_000, y: -90_000 });
+    advance(CAMERA_SETTLE_MS);
+    const camera = controller.current();
+    expect(camera.centerX).toBeLessThanOrEqual(1000);
+    expect(camera.centerY).toBeGreaterThanOrEqual(0);
+  });
+
   it('breaks away on a pan or zoom, and follows again on Follow GM', () => {
     const { controller, advance, changes } = setup();
     controller.setScreen(PHONE);

@@ -26,6 +26,11 @@ export interface DockTab {
 /** A map view as the dock reads it. */
 export interface DockView {
   viewId: string;
+  /**
+   * The Atlas view what is done here acts on, when it is not this one: a Tabletop 3D board's toolbar carries Connect's
+   * buttons for the Atlas view that holds its map.
+   */
+  contextViewId?: string;
   /** The document of the window the view is in. */
   doc: Document;
   /** The view's root element, where Atlas's own toolbar is; null when it has none to read. */
@@ -242,7 +247,7 @@ export class FloatingDock implements PanelHost {
     const grip = make('div', 'atlas-connect-dock__grip');
     const gripIcon = make('span', 'atlas-connect-dock__icon');
     this.env.setIcon(gripIcon, 'grip-vertical');
-    grip.append(gripIcon, make('span', 'atlas-connect-dock__title', 'Atlas VTT Connect'));
+    grip.append(gripIcon, make('span', 'atlas-connect-dock__title', 'Connect for Atlas VTT'));
     const collapse = make('button', 'atlas-connect-dock__collapse');
     collapse.setAttribute('aria-label', 'Collapse or expand the Connect panel');
     this.env.setIcon(collapse, 'chevrons-up-down');

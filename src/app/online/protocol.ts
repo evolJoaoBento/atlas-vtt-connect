@@ -4,15 +4,20 @@
  */
 import type { SceneCamera } from './scene/sceneCamera';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
-import type { PlayerDrawing, PlayerFogOp, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
+import type { PlayerDrawing, PlayerFogOp, PlayerScene, PlayerSceneBody, ScenePatchBody, ScenePoint } from './scene/sceneTypes';
 import {
   isDrawingRecords, isFogRecords, isLastSeq, isPlayerSceneBody, isSceneCamera, isSceneCount, isSceneId, isSceneLook, isScenePatchBody, isSceneSeq, isSceneState,
 } from './scene/sceneValidation';
-import { isSheetRollRef, isTokenSheets, type SheetRollRef, type TokenSheet } from './tools/sheets';
+import type { BoardCamera, BoardCutscene, BoardExtras } from './scene/boardTypes';
+import { isBoardCamera, isBoardCutscene, isBoardExtras, isBoardPart, isCutsceneKeyName, isCutsceneRunId, isCutscenePose } from './scene/boardValidation';
+import { ADVANTAGE_SIDES, isSheetRollRef, isTokenSheets, type AdvantageSide, type SheetRollRef, type TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import { isPingPoint } from './tools/pings';
+import { isArPose, type ArPose } from './tools/arViews';
+import { isArTable, type ArSurvey } from './tools/arTable';
 import { isPinNote, type PinNote } from './tools/pinNotes';
-import { isMapTemplates, isTemplateDraft, isTemplateId, type MapTemplate, type TemplateShape } from './tools/templates';
-import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, type DiceLogEntry } from './tools/toolMessages';
+import { isTemplateDraft, isTemplateId, type TemplateShape } from './tools/templates';
+import { isAskRulesList, isCastName, isSpellAbout, isMapSpells, isSpell, isSpellId, isSpellRequests, isSpellRules, isSpellWordsList, type AskRules, type SpellRules, type MapSpell, type Spell, type SpellRequest, type SpellWords, type SpellAbout } from './tools/spells';
+import { cleanLoggedEntries, isDiceLogEntries, isDiceModifier, isDiceSelection, isLaserColor, isLaserPoints, isLaserTimes, isOfferedDiceRules, isPhysicalRoll, type DiceLogEntry, type OfferedDiceRules, type PhysicalDie } from './tools/toolMessages';
 export const PROTOCOL_VERSION = 1;
 export const MAX_CONTROL_MESSAGE_BYTES = 256 * 1024;
 export const MAX_PLAYER_NAME_LENGTH = 40;
@@ -76,8 +81,12 @@ export interface SceneStateMessage { v: 1; type: 'scene-state'; sceneId: string;
  */
 export interface SceneLookMessage { v: 1; type: 'scene-look'; sceneId: string; look: string | null }
 
+/** Why a move was refused, where the GM says: the map the player is on is not the one the GM's Atlas holds. */
+export type MoveRefusedReason = 'not-held';
+
 export type ControlMessage =
-  | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
+  /** `fusion`: the fusion step the page or player is a build of (`FUSION_PROTOCOL`); the GM refuses one that is missing or not its own. */
+  | { v: 1; type: 'join'; fusion?: number; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
   | { v: 1; type: 'admitted'; playerId: string; session: { title: string }; table?: TableProof }
   | { v: 1; type: 'denied'; reason: DenyReason }
   | { v: 1; type: 'presence'; players: PresencePlayer[] }
@@ -101,9 +110,12 @@ export type ControlMessage =
   /** Player to GM, once per drop: where the player let go of one of their tokens, in world units. */
   | { v: 1; type: 'token-move'; sceneId: string; tokenId: string; x: number; y: number }
   /** GM to the player who sent the move: it failed a check, so the token stays where the scene has it. */
-  | { v: 1; type: 'token-move-refused'; tokenId: string }
-  /** Player to GM: a roll from the dice tray, rolled on the GM's side. */
-  | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number }
+  /** `reason`: given only where the player can do something about it: `not-held`, the GM's Atlas is on another map just now. */
+  | { v: 1; type: 'token-move-refused'; tokenId: string; reason?: MoveRefusedReason }
+  /** Player to GM: a roll from the dice tray, rolled on the GM's side; with `advantage`, on the side the player chose (a lone d20). */
+  | { v: 1; type: 'dice-roll'; dice: DiceSelection; modifier: number; advantage?: AdvantageSide }
+  /** Player to GM: dice thrown on Tabletop's board, every die as it landed; sent only when the GM offered `diceResults`. */
+  | { v: 1; type: 'dice-result'; rolls: PhysicalDie[]; modifier: number; label?: string; sheet?: { tokenId: string; roll: SheetRollRef } }
   /** GM to players: dice log entries, newest first; `replay` replaces a player's log (sent on every admission). */
   | { v: 1; type: 'dice-log'; entries: DiceLogEntry[]; replay: boolean }
   /**
@@ -111,25 +123,71 @@ export type ControlMessage =
    * it with `from`, the sender's session id (`gm` for the GM's own). `dt` times the points: the
    * milliseconds from each to the one before it in the stroke, so receivers can play the motion back smoothly.
    */
-  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string }
-  /** GM to one player: the tokens they control, with exact numbers and stat block (`tools/sheets.ts`); never to anyone else. */
+  | { v: 1; type: 'laser'; sceneId: string; points: ScenePoint[]; lifted: boolean; dt?: number[]; color?: string; from?: string; size?: number }
+  /** GM to one player: the tokens they control, with exact numbers and stat block (`atlas-host/src/sheets/sheets.ts`); never to anyone else. */
   | { v: 1; type: 'token-sheets'; entries: TokenSheet[] }
   /** Player to GM: a roll from their own sheet, by where it is on it; the GM finds the formula on its own copy. */
   | { v: 1; type: 'sheet-roll'; tokenId: string; roll: SheetRollRef }
   /** A ping at a world point of `sceneId`. Players send it without `from`; the GM relays it with `from` and the colour. */
   | { v: 1; type: 'map-ping'; sceneId: string; x: number; y: number; from?: string; color?: string }
-  /** Player to GM: add a lasting template on the scene they have, remove one of their own, or clear all of theirs (`tools/templates.ts`). */
+  /**
+   * Player to GM: place a template on the scene they have (it takes the place of their last), remove their own, or
+   * clear theirs (`tools/templates.ts`). A request: the GM keeps it in Atlas's measures, and it comes back in the scene.
+   */
   | { v: 1; type: 'map-template'; sceneId: string; add?: { shape: TemplateShape; start: ScenePoint; end: ScenePoint }; remove?: string; clear?: true }
-  /** GM to players: every template on the scene, whenever they change. */
-  | { v: 1; type: 'map-templates'; sceneId: string; templates: MapTemplate[] }
+  /**
+   * Player to GM: cast a spell through a token's eyes on the scene they have (for the GM's ask `request`), take one of
+   * theirs off, clear theirs, or turn down an ask (`decline`) (`tools/spells.ts`). A request: a kept spell is written
+   * to Atlas's measures and comes back in the scene; an instantaneous one comes back as `spell-flash`.
+   */
+  | { v: 1; type: 'map-spell'; sceneId: string; add?: Spell; request?: string; remove?: string; clear?: true; decline?: string; rules?: SpellRules; name?: string; about?: SpellAbout }
+  /** GM to the players of a token: the spells the GM asks of the tokens they control on the scene (`MeasureHost.requestSpell`). */
+  | { v: 1; type: 'spell-asks'; sceneId: string; asks: SpellRequest[]; askWords?: SpellWords[]; askRules?: AskRules[] }
+  /** GM to a scene's players: an instantaneous spell, cast now and kept nowhere. */
+  | { v: 1; type: 'spell-flash'; sceneId: string; cast: MapSpell }
+  /** GM to a player: their template or spell was not kept, and why. */
+  | { v: 1; type: 'map-refused'; what: 'template' | 'spell'; reason: MeasureRefusal }
+  /** Player to GM, on admission and when they pick another: their own colour (`tools/playerColors.ts`), one of the laser swatches. */
+  | { v: 1; type: 'player-color'; color: string }
   /** Player to GM: open the note of a readable pin of the scene they have, by the pin's alias. */
   | { v: 1; type: 'note-request'; sceneId: string; pinId: string }
   /** GM to the player who asked: the pin's note (`tools/pinNotes.ts`), or null when it cannot be read or is no longer theirs to read. */
-  | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null };
+  | { v: 1; type: 'pin-note'; sceneId: string; pinId: string; note: PinNote | null }
+  /** GM to a player, on admission and when it changes: whether the GM can send the scene for Tabletop's 3D board; `diceResults` when it also takes `dice-result`, with the rules of that player's map. */
+  | { v: 1; type: 'board-offer'; available: boolean; diceResults?: true; diceRules?: OfferedDiceRules }
+  /** Player to GM: start (or stop) sending this player the board extras of its scene; only a player showing 3D asks. */
+  | { v: 1; type: 'board-request'; on: boolean }
+  /** GM to a player who asked: one part of its scene's board extras (`parts` of one `seq` make the whole), or none. */
+  | { v: 1; type: 'board-extras'; seq: number; part: number; parts: number; extras: BoardExtras | null }
+  /** GM to a player who asked: the GM's 3D view of its scene, for the "GM view" button; null when there is none. */
+  | { v: 1; type: 'board-camera'; camera: BoardCamera | null }
+  /**
+   * Player to GM, about ten a second while it moves: where the player's phone camera is in augmented reality over the
+   * scene they have (`tools/arViews.ts`), for the eye on the GM's board; null when the tracking is lost or AR ends.
+   */
+  | { v: 1; type: 'ar-view'; sceneId: string; pose: ArPose | null }
+  /** Player to GM: the marker sheets on the table as this phone learnt them (`tools/arTable.ts`), for the GM to place on the map. */
+  | { v: 1; type: 'ar-survey'; sceneId: string; survey: ArSurvey }
+  /** GM to every admitted player: the cutscene running now, whenever it changes (a step, a scene in live), and `null` when it ends. */
+  | { v: 1; type: 'cutscene'; cutscene: BoardCutscene | null }
+  /** Player to GM: this client can draw cutscenes; start (or stop) sending it the revealed scene of the run. */
+  | { v: 1; type: 'cutscene-ready'; on: boolean }
+  /** GM to a ready player: the revealed scene of the run's map `key` (no fog), for the length of the run only. */
+  | { v: 1; type: 'cutscene-scene'; runId: string; key: string; scene: PlayerScene }
+  /** GM to a ready player: the board extras of `key`'s scene, in parts of one `seq`. */
+  | { v: 1; type: 'cutscene-extras'; runId: string; key: string; seq: number; part: number; parts: number; extras: BoardExtras }
+  /** GM to a ready player, live runs only: the GM's camera, at most every 100 ms. */
+  | { v: 1; type: 'cutscene-camera'; runId: string; eye: Vec3; target: Vec3 };
+
+/** Why a template or a spell was not kept: the GM's Atlas holds another map, the player or the scene has as many as it may, or the level holds no more. */
+export type MeasureRefusal = 'not-held' | 'limit' | 'full';
+export const MEASURE_REFUSALS: readonly MeasureRefusal[] = ['not-held', 'limit', 'full'];
+
+type Vec3 = { x: number; y: number; z: number };
 
 /** What an admitted player may send besides `ping`, `pong` and `bye`; the GM drops every other type from a player. */
 export const PLAYER_MESSAGE_TYPES: ReadonlySet<ControlMessage['type']> = new Set<ControlMessage['type']>([
-  'scene-resync', 'token-move', 'dice-roll', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request',
+  'scene-resync', 'token-move', 'dice-roll', 'dice-result', 'laser', 'sheet-roll', 'map-ping', 'map-template', 'note-request', 'board-request', 'ar-view', 'ar-survey', 'map-spell', 'player-color', 'cutscene-ready',
 ]);
 
 export type Decoded =
@@ -158,7 +216,8 @@ function isTableProof(value: unknown): value is TableProof {
 const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   join: (m) => isString(m.name, 200) && isString(m.playerKey, 64) && m.playerKey.length > 0
     && isRecord(m.client) && (m.client.kind === 'web' || m.client.kind === 'obsidian') && isString(m.client.version, 32)
-    && (m.device === undefined || isDeviceProof(m.device)),
+    && (m.device === undefined || isDeviceProof(m.device))
+    && (m.fusion === undefined || (typeof m.fusion === 'number' && Number.isSafeInteger(m.fusion))),
   admitted: (m) => isString(m.playerId, 64) && isRecord(m.session) && isString(m.session.title, 200)
     && (m.table === undefined || isTableProof(m.table)),
   denied: (m) => DENY_REASONS.includes(m.reason as DenyReason),
@@ -182,20 +241,44 @@ const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
     && m.tokenIds.every((id) => isSceneId(id)),
   // Any number: one JSON reads as Infinity (`1e400`) is the GM's check to refuse, not a broken message.
   'token-move': (m) => isSceneId(m.sceneId) && isSceneId(m.tokenId) && typeof m.x === 'number' && typeof m.y === 'number',
-  'token-move-refused': (m) => isSceneId(m.tokenId),
-  'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier),
+  'token-move-refused': (m) => isSceneId(m.tokenId) && (m.reason === undefined || m.reason === 'not-held'),
+  'dice-roll': (m) => isDiceSelection(m.dice) && isDiceModifier(m.modifier) && (m.advantage === undefined || (ADVANTAGE_SIDES as readonly unknown[]).includes(m.advantage)),
+  'dice-result': (m) => isPhysicalRoll(m),
   'dice-log': (m) => isDiceLogEntries(m.entries) && typeof m.replay === 'boolean',
   laser: (m) => isSceneId(m.sceneId) && isLaserPoints(m.points) && typeof m.lifted === 'boolean'
-    && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from)),
+    && isLaserTimes(m.dt, m.points) && (m.color === undefined || isLaserColor(m.color)) && (m.from === undefined || isSceneId(m.from))
+    // Atlas's laser size, 8 to 100; an older page sends none and is drawn at the default.
+    && (m.size === undefined || (isNumber(m.size) && m.size >= 8 && m.size <= 100)),
   'token-sheets': (m) => isTokenSheets(m.entries),
   'sheet-roll': (m) => isSceneId(m.tokenId) && isSheetRollRef(m.roll),
   'map-template': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear].filter((part) => part !== undefined).length === 1
     && (m.add === undefined || (typeof m.add === 'object' && m.add !== null && isTemplateDraft(m.add)))
     && (m.remove === undefined || isTemplateId(m.remove)) && (m.clear === undefined || m.clear === true),
-  'map-templates': (m) => isSceneId(m.sceneId) && isMapTemplates(m.templates),
+  'map-spell': (m) => isSceneId(m.sceneId) && [m.add, m.remove, m.clear, m.decline].filter((part) => part !== undefined).length === 1
+    && (m.add === undefined || isSpell(m.add)) && (m.remove === undefined || isSpellId(m.remove)) && (m.clear === undefined || m.clear === true)
+    && (m.request === undefined || (m.add !== undefined && isSpellId(m.request))) && (m.decline === undefined || isSpellId(m.decline))
+    && (m.rules === undefined || (m.add !== undefined && isSpellRules(m.rules)))
+    && (m.name === undefined || (m.add !== undefined && isCastName(m.name))) && (m.about === undefined || (m.add !== undefined && isSpellAbout(m.about))),
+  'spell-asks': (m) => isSceneId(m.sceneId) && isSpellRequests(m.asks) && (m.askWords === undefined || isSpellWordsList(m.askWords)) && (m.askRules === undefined || isAskRulesList(m.askRules)),
+  'spell-flash': (m) => isSceneId(m.sceneId) && isMapSpells([m.cast]),
+  'map-refused': (m) => (m.what === 'template' || m.what === 'spell') && (MEASURE_REFUSALS as readonly unknown[]).includes(m.reason),
+  'player-color': (m) => isLaserColor(m.color),
   'map-ping': (m) => isSceneId(m.sceneId) && isPingPoint(m) && (m.from === undefined || isSceneId(m.from)) && (m.color === undefined || isLaserColor(m.color)),
   'note-request': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId),
   'pin-note': (m) => isSceneId(m.sceneId) && isSceneId(m.pinId) && (m.note === null || isPinNote(m.note)),
+  // The dice fields are optional extras: bad ones are dropped on decode (`decodeControl`), never the offer.
+  'board-offer': (m) => typeof m.available === 'boolean',
+  'board-request': (m) => typeof m.on === 'boolean',
+  'board-extras': (m) => isBoardPart(m) && (m.extras === null || isBoardExtras(m.extras)),
+  'board-camera': (m) => m.camera === null || isBoardCamera(m.camera),
+  'ar-view': (m) => isSceneId(m.sceneId) && (m.pose === null || isArPose(m.pose)),
+  'ar-survey': (m) => isSceneId(m.sceneId) && isArTable(m.survey),
+  cutscene: (m) => m.cutscene === null || isBoardCutscene(m.cutscene),
+  'cutscene-ready': (m) => typeof m.on === 'boolean',
+  'cutscene-scene': (m) => isCutsceneRunId(m.runId) && isCutsceneKeyName(m.key) && isPlayerSceneBody(m.scene)
+    && isFogRecords((m.scene as Fields).fog) && isDrawingRecords((m.scene as Fields).drawings),
+  'cutscene-extras': (m) => isCutsceneRunId(m.runId) && isCutsceneKeyName(m.key) && isBoardPart(m) && isBoardExtras(m.extras),
+  'cutscene-camera': (m) => isCutsceneRunId(m.runId) && isCutscenePose(m.eye) && isCutscenePose(m.target),
 };
 
 export function encodeControl(message: ControlMessage): string {
@@ -228,6 +311,10 @@ export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decode
   if (!validate(parsed)) return { kind: 'invalid', reason: `bad-${type}` };
   const message = parsed as unknown as ControlMessage;
   if (message.type === 'dice-log') cleanLoggedEntries(message.entries);
+  if (message.type === 'board-offer') {
+    if (message.diceResults !== true) delete message.diceResults;
+    if (message.diceRules !== undefined && !isOfferedDiceRules(message.diceRules)) delete message.diceRules;
+  }
   return { kind: 'message', message };
 }
 
@@ -235,7 +322,7 @@ export function decodeControl(raw: unknown, known?: ReadonlySet<string>): Decode
 export function normalizePlayerName(name: unknown): string | null {
   if (typeof name !== 'string') return null;
   const cleaned = name
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '') // delete non-whitespace control chars
+    .replace(/[^\P{Cc}\t\n\r]/gu, '') // delete non-whitespace control chars
     .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, '') // delete zero-width and bidi controls, so "G\u200BM" is "GM"
     .replace(/[\t\n\r]/g, ' ') // replace whitespace control chars with space
     .replace(/\s+/g, ' ') // collapse whitespace

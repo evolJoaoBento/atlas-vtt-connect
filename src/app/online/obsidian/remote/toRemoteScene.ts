@@ -10,6 +10,7 @@
 import type {
   DrawingStroke, FogOperation, GridState, InitiativeState, RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput, TextElement, TokenEntity,
 } from '@atlas-vtt/api-types';
+import { namedSidesOf } from '../../scene/initiativeSides';
 import { sameValue, setOwn } from '../../scene/sceneDiff';
 import { withMeasurementDefaults } from '../../scene/sceneLimits';
 import type { PlayerMeasurement, PlayerScene, ScenePoint } from '../../scene/sceneTypes';
@@ -79,7 +80,8 @@ export function atlasMeasurement(measurement: PlayerMeasurement): RemoteMeasurem
     // Atlas before API 1.14.0 checks only the fields it knows, so the extra one is harmless there. Atlas refuses one
     // that is not above 0; left out, it takes the distance per cell.
     ...(measurement.ruleDistance > 0 ? { ruleDistance: measurement.ruleDistance } : {}),
-    diagonalRule: measurement.diagonalRule,
+    // `manhattan` is Atlas 0.15's; the extension API's type is older and does not list it.
+    diagonalRule: measurement.diagonalRule as RemoteMeasurementInput['diagonalRule'],
     rangeBands: measurement.rangeBands.map((band) => ({ name: band.name, maxSquares: band.maxSquares })),
     coneAngle: measurement.coneAngle,
   };
@@ -118,11 +120,13 @@ export class RemoteSceneMemo {
     const tokenImages: Record<string, string | null> = {};
     for (const [id, token] of Object.entries(scene.tokens)) setOwn(tokenImages, id, images.token(token.image));
     const urlOf = (id: string): string => tokenImages[id] ?? '';
+    // A combatant of a named side is filed under it, which its token's own `side` cannot say.
+    const named = namedSidesOf(scene.initiative);
     const keyOf = (id: string): string => {
       const point = positionOf(id);
-      return `${urlOf(id)}|${point ? `${point.x},${point.y}` : ''}`;
+      return `${urlOf(id)}|${point ? `${point.x},${point.y}` : ''}|${named.get(id) ?? ''}`;
     };
-    const tokens = this.tokens.build(scene.tokens, keyOf, (id, token) => atlasToken(id, token, urlOf(id), positionOf(id)));
+    const tokens = this.tokens.build(scene.tokens, keyOf, (id, token) => atlasToken(id, token, urlOf(id), positionOf(id), named.get(id)));
     // An entry's avatar is its token's art.
     const avatars = (scene.initiative?.entries ?? []).map((entry) => urlOf(entry.tokenId)).join('|');
     return {

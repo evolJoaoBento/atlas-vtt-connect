@@ -279,3 +279,25 @@ describe('fog positive check against pixel truth', () => {
     expect(hidden).toBeGreaterThan(0);
   }, 60_000);
 });
+
+describe('what the GM hides from players (Atlas 0.16)', () => {
+  it('a drawing or text the GM hid is never sent, on an open scene or a fogged one; one not hidden is', () => {
+    const base = sceneWith({}, [[300, 300]]);
+    const hidden = {
+      ...base,
+      objects: {
+        ...base.objects,
+        texts: { shown: text('shown', 300, 300), secret: { ...text('secret', 300, 300), hidden: true } as TextElement, junk: { ...text('junk', 300, 300), hidden: 'yes' } as unknown as TextElement },
+        drawings: { shown: drawing('shown', 300, 300), secret: { ...drawing('secret', 300, 300), hidden: true } as DrawingStroke },
+      },
+    };
+    const open: ProjectionContext = { sceneId: 's', rules: RULES, coverage: coverageOfFog({}), assets: fakeAssetIds(), mapSize: MAP };
+    const scene = projectForPlayers(hidden, open);
+    // 0.15 records carry no flag, and a flag that is not true hides nothing (Atlas reads only `true`).
+    expect(Object.keys(scene.texts).sort()).toEqual(['junk', 'shown']);
+    expect(Object.keys(scene.drawings)).toEqual(['shown']);
+    const fog = fogOf(rect(0, 0, 700, 700), rect(0, 0, 700, 700, true));
+    const fogged = projectForPlayers({ ...hidden, objects: { ...hidden.objects, fog } }, { ...open, coverage: coverageOfFog(fog) });
+    expect([Object.keys(fogged.texts).sort(), Object.keys(fogged.drawings)]).toEqual([['junk', 'shown'], ['shown']]);
+  });
+});

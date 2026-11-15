@@ -1,9 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../../ui/primitives/Button';
+import { Dropdown, type DropdownOption } from '../../../../ui/primitives/Dropdown';
 import type { ConflictDefault } from '../../receive/PulledItems';
 import type { MergeChunk } from '../diff3';
 import { mergedText, type ConflictChoice } from '../mergeResult';
 import type { MergeAnswer } from '../noteUpdate';
+
+const CONFLICT_DEFAULTS: readonly DropdownOption[] = [
+  { value: 'both', label: 'Keep both' },
+  { value: 'mine', label: 'Keep mine' },
+  { value: 'theirs', label: 'Take theirs' },
+];
 
 interface MergeViewProps {
   chunks: readonly MergeChunk[];
@@ -81,14 +88,10 @@ export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel, 
           <Button size="sm" variant="default" onClick={() => setEdited(null)}>Discard my edits</Button>
         </div>
       )}
-      <label className="atlas-merge__default">
+      <div className="atlas-merge__default">
         <span>For conflicts next time</span>
-        <select className="dropdown" aria-label="For conflicts next time" value={nextDefault} onChange={(event) => setNextDefault(event.target.value as ConflictDefault)}>
-          <option value="both">Keep both</option>
-          <option value="mine">Keep mine</option>
-          <option value="theirs">Take theirs</option>
-        </select>
-      </label>
+        <Dropdown aria-label="For conflicts next time" value={nextDefault} options={CONFLICT_DEFAULTS} onChange={(value) => setNextDefault(value as ConflictDefault)} />
+      </div>
       <div className="modal-button-container">
         <Button variant="default" onClick={onCancel}>Cancel</Button>
         <Button variant="cta" onClick={() => onSave({ text: result, conflictDefault: nextDefault })}>Save merge</Button>

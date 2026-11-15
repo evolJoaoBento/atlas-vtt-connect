@@ -3,6 +3,7 @@ import { earlierOf, playerView, rejoinCheck, runReissue, sameDevice, setClient, 
 import { SESSION_LIMITS, type GmSessionOptions, type PlayerStatus, type SessionHandler } from './gmSessionTypes';
 import { randomId } from './ids';
 import { encodeControl, normalizePlayerName, type ControlMessage, type DenyReason } from './protocol';
+import { FUSION_PROTOCOL } from './scene/boardTypes';
 import type { PeerLink } from './transport/types';
 
 export type JoinMessage = Extract<ControlMessage, { type: 'join' }>;
@@ -24,6 +25,11 @@ export interface AdmissionHost {
 export function joinSession(host: AdmissionHost, link: PeerLink, state: LinkState, message: JoinMessage): void {
   if (state.joinTimer) window.clearTimeout(state.joinTimer);
   state.joinTimer = null;
+  // A page or player of another fusion step (or from before there was one) would read the scene wrongly: out of date.
+  if (message.fusion !== FUSION_PROTOCOL) {
+    host.refuse(link, 'version');
+    return;
+  }
   const name = normalizePlayerName(message.name);
   if (!name) {
     host.refuse(link, 'denied');

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
+import { watchDeletedTokens } from '../../../src/app/online/control/deletedTokens';
 import { MAX_CONTROLLED_TOKENS } from '../../../src/app/online/protocol';
 
 function watched(): { control: TokenControl; changes: string[][] } {
@@ -84,5 +85,26 @@ describe('TokenControl', () => {
     stop();
     control.set('hero', 'p1', true);
     expect(changes).toEqual([]);
+  });
+});
+
+describe('watchDeletedTokens', () => {
+  it('drops a token deleted from the shown scene', () => {
+    const control = new TokenControl();
+    control.set('hero', 'anna', true);
+    control.set('orc', 'ben', true);
+    let live: ((sceneId: string, snapshot: unknown) => void) | null = null;
+    const slot = { sceneId: 's1' };
+    const projection = {
+      shownSlot: () => slot,
+      shownSnapshot: () => ({ objects: { tokens: { hero: {}, orc: {} } } }),
+      onSlotChange: () => () => undefined,
+      watchLive: (listener: (sceneId: string, snapshot: unknown) => void) => { live = listener; return () => undefined; },
+    };
+    const stop = watchDeletedTokens(projection as never, control);
+    live!('s1', { loaded: true, objects: { tokens: { hero: {} } } });
+    expect(control.playersOf('hero')).toEqual(['anna']);
+    expect(control.playersOf('orc')).toEqual([]);
+    stop();
   });
 });

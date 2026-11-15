@@ -4,12 +4,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { useStore } from 'zustand';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../../ui/nativeModal';
 import { dismissPush, NO_SHARE_SESSION_TEXT, shareSessionStore } from '../../shareSessionStore';
+import { openPulledNote } from '../openPulled';
 import type { SharedWithMe } from '../SharedWithMe';
 import { SharedWithMeList } from './SharedWithMeList';
 
 export const SHARED_WITH_ME_LABEL = 'Shared with me';
 
-function Live({ service, onPulled, onProblem }: { service: SharedWithMe; onPulled: (path: string) => void; onProblem: (text: string) => void }): React.ReactElement {
+function Live({ service, onPulled, onProblem }: { service: SharedWithMe; onPulled: (path: string, kind: 'note' | 'map') => void; onProblem: (text: string) => void }): React.ReactElement {
   const people = useStore(shareSessionStore, (state) => state.people);
   const pushes = useStore(shareSessionStore, (state) => state.pushes);
   return <SharedWithMeList service={service} people={people} pushes={pushes} dismissPush={(push) => dismissPush(push.from, push.item)} onPulled={onPulled} onProblem={onProblem} />;
@@ -26,7 +27,11 @@ class SharedWithMeModal extends Modal {
   onOpen(): void {
     this.setTitle(SHARED_WITH_ME_LABEL);
     this.root = createRoot(this.contentEl);
-    this.root.render(<Live service={this.service} onPulled={(path) => new Notice(`Pulled into ${path}`)} onProblem={(text) => new Notice(text)} />);
+    this.root.render(<Live service={this.service} onPulled={(path, kind) => {
+      new Notice(`Pulled into ${path}`);
+      // One pull the user asked for: the note opens. A map goes to Atlas as a scene.
+      if (kind === 'note') void openPulledNote(this.app, path);
+    }} onProblem={(text) => new Notice(text)} />);
   }
 
   onClose(): void {

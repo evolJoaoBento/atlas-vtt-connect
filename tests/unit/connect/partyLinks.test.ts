@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileMemory, libraryTokenOf, PartyLinks, playerCharacterTokens, type LibraryToken, type PartyControl, type PartyPlayer, type Remembered } from '../../../src/connect/stockParty/partyLinks';
+import { fileMemory, libraryTokenOf, PartyLinks, playerCharacterTokens, tokenKey, type LibraryToken, type PartyControl, type PartyPlayer, type Remembered } from '../../../src/connect/stockParty/partyLinks';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 
 const LIBRARY: LibraryToken[] = [
@@ -12,7 +12,10 @@ const ana: PartyPlayer = { playerId: 'p-ana', name: 'Ana', status: 'admitted' };
 const bea: PartyPlayer = { playerId: 'p-bea', name: 'Bea', status: 'admitted' };
 
 /** A table with a session store, token control, a scene, and a library, as the stand-in wires them. */
-function table(options: { library?: LibraryToken[]; remembered?: Remembered; players?: PartyPlayer[]; hosting?: boolean } = {}) {
+function table(options: { library?: LibraryToken[] | null; remembered?: Remembered; players?: PartyPlayer[]; hosting?: boolean; mapPath?: string | null; live?: boolean; slowLibrary?: boolean } = {}) {
+  let mapPath = options.mapPath === undefined ? 'maps/inn.md' : options.mapPath;
+  const live = options.live ?? true;
+  let libraryDone: (() => void) | null = null;
   const listeners = new Set<() => void>();
   let players = options.players ?? [ana];
   let control: TokenControl | null = options.hosting === false ? null : new TokenControl();
@@ -22,19 +25,25 @@ function table(options: { library?: LibraryToken[]; remembered?: Remembered; pla
   let reads = 0;
   const links = new PartyLinks({
     session: { state: () => ({ players, tokenControl: control as PartyControl | null }), subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; } },
-    tokens: () => tokens,
+    scenes: () => (tokens ? [{ mapPath, tokens, live: live && mapPath !== null }] : []),
     watchScene: (listener) => { sceneListeners.add(listener); return () => { sceneListeners.delete(listener); }; },
-    library: () => { reads++; return Promise.resolve(options.library ?? LIBRARY); },
+    library: () => {
+      reads++;
+      const library = options.library === undefined ? LIBRARY : options.library;
+      if (!options.slowLibrary) return Promise.resolve(library);
+      return new Promise((resolve) => { libraryDone = () => resolve(library); });
+    },
     memory: { load: () => Promise.resolve(options.remembered ?? {}), save: (remembered) => { saved.push({ ...remembered }); return Promise.resolve(); } },
   }, () => 0);
   links.start();
   const settle = async (): Promise<void> => { await vi.advanceTimersByTimeAsync(0); await vi.advanceTimersByTimeAsync(0); };
   return {
     links, saved, settle, reads: () => reads,
+    finishLibrary: () => libraryDone?.(),
     control: () => control!,
     setControl: (next: TokenControl | null) => { control = next; for (const l of [...listeners]) l(); },
     setPlayers: (next: PartyPlayer[]) => { players = next; for (const l of [...listeners]) l(); },
-    setTokens: (next: typeof tokens) => { tokens = next; for (const l of [...sceneListeners]) l(); },
+    setTokens: (next: typeof tokens, map?: string | null) => { tokens = next; if (map !== undefined) mapPath = map; for (const l of [...sceneListeners]) l(); },
   };
 }
 
@@ -147,6 +156,157 @@ describe('player characters and online players', () => {
     });
   });
 
+  describe('tokens that are no player character', () => {
+    const orcKey = tokenKey('maps/inn.md', 't2');
+
+    it('remembers who a token was given to by its map and id, and gives it back in the next session', async () => {
+      vi.useFakeTimers();
+      const t = table();
+      await t.settle();
+      t.control().set('t2', 'p-ana', true);
+      await t.settle();
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      expect(t.saved.at(-1)).toEqual({ [orcKey]: 'Ana' });
+      // The GM stops the session and starts another; Ana joins again under a new id.
+      t.setControl(null);
+      t.setPlayers([]);
+      await t.settle();
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      t.setControl(new TokenControl());
+      t.setPlayers([{ ...ana, playerId: 'p-ana-new' }]);
+      await t.settle();
+      expect(t.control().controls('p-ana-new', 't2')).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('gives a remembered token back after a restart, from the memory file, only to a lone player of that name', async () => {
+      vi.useFakeTimers();
+      const t = table({ remembered: { [orcKey]: 'Bea' }, players: [ana, bea, { ...bea, playerId: 'p-bea-2' }] });
+      await t.settle();
+      expect(t.control().assignedTokens()).toEqual([]);
+      t.setPlayers([ana, bea]);
+      await t.settle();
+      expect(t.control().controls('p-bea', 't2')).toBe(true);
+      expect(t.control().controls('p-ana', 't2')).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it('is the token itself: the same id on another map is not given', async () => {
+      vi.useFakeTimers();
+      const t = table({ remembered: { [orcKey]: 'Ana' } });
+      await t.settle();
+      expect(t.control().controls('p-ana', 't2')).toBe(true);
+      t.setControl(new TokenControl());
+      t.setTokens({ t2: { assetId: 'orc' } }, 'maps/cave.md');
+      await t.settle();
+      expect(t.control().assignedTokens()).toEqual([]);
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      vi.useRealTimers();
+    });
+
+    it('keeps what was given when the GM stops the session: its players and their tokens go in one go', async () => {
+      vi.useFakeTimers();
+      const t = table({ remembered: { [orcKey]: 'Ana' } });
+      await t.settle();
+      expect(t.control().controls('p-ana', 't2')).toBe(true);
+      // As the session stops: token control drops the players, then the store has no players and no control.
+      t.control().retainPlayers(new Set());
+      t.setPlayers([]);
+      t.setControl(null);
+      await t.settle();
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      vi.useRealTimers();
+    });
+
+    it('forgets a token the GM takes from its player', async () => {
+      vi.useFakeTimers();
+      const t = table({ remembered: { [orcKey]: 'Ana' } });
+      await t.settle();
+      t.control().set('t2', 'p-ana', false);
+      await t.settle();
+      expect(t.links.links).toEqual({});
+      expect(t.control().assignedTokens()).toEqual([]);
+      vi.useRealTimers();
+    });
+
+    it('forgets a token deleted from its map', async () => {
+      vi.useFakeTimers();
+      const t = table({ remembered: { [orcKey]: 'Ana', [tokenKey('maps/cave.md', 'c1')]: 'Bea' } });
+      await t.settle();
+      t.setTokens({ t1: { assetId: 'cleric' } });
+      await t.settle();
+      // Only this map's tokens are known: the cave's stays.
+      expect(t.links.links).toEqual({ [tokenKey('maps/cave.md', 'c1')]: 'Bea' });
+      vi.useRealTimers();
+    });
+
+    it('keeps only player characters while the map is not known', async () => {
+      vi.useFakeTimers();
+      const t = table({ mapPath: null });
+      await t.settle();
+      t.control().set('t2', 'p-ana', true);
+      t.control().set('t1', 'p-ana', true);
+      await t.settle();
+      expect(t.links.links).toEqual({ cleric: 'Ana' });
+      vi.useRealTimers();
+    });
+  });
+
+  describe('without Atlas\'s view: the map\'s saved file (the GM on Tabletop\'s board after a restart)', () => {
+    const orcKey = tokenKey('maps/inn.md', 't2');
+
+    it('learns a token ticked on the board from the saved map, and gives it back in the next session', async () => {
+      vi.useFakeTimers();
+      const t = table({ live: false, library: null });
+      await t.settle();
+      t.control().set('t2', 'p-ana', true);
+      await t.settle();
+      expect(t.links.links).toEqual({ [orcKey]: 'Ana' });
+      t.setControl(null);
+      t.setPlayers([]);
+      await t.settle();
+      t.setControl(new TokenControl());
+      t.setPlayers([{ ...ana, playerId: 'p-ana-new' }]);
+      await t.settle();
+      expect(t.control().controls('p-ana-new', 't2')).toBe(true);
+      vi.useRealTimers();
+    });
+
+    it('never forgets a remembered token for missing from the saved file, which lacks tokens placed since', async () => {
+      vi.useFakeTimers();
+      const placed = tokenKey('maps/inn.md', 'new');
+      const t = table({ live: false, remembered: { [placed]: 'Ana' } });
+      await t.settle();
+      expect(t.links.links).toEqual({ [placed]: 'Ana' });
+      vi.useRealTimers();
+    });
+
+    it('gives back a player character remembered by its library token while the library cannot be read', async () => {
+      vi.useFakeTimers();
+      const t = table({ live: false, library: null, remembered: { cleric: 'Ana' } });
+      await t.settle();
+      expect(t.control().controls('p-ana', 't1')).toBe(true);
+      // Taken from Ana: the character is forgotten, not learned under its token.
+      t.control().set('t1', 'p-ana', false);
+      await t.settle();
+      expect(t.links.links).toEqual({});
+      vi.useRealTimers();
+    });
+  });
+
+  it('looks at a tick made while the library is being read, never dropping it', async () => {
+    vi.useFakeTimers();
+    const t = table({ slowLibrary: true });
+    await t.settle();
+    t.control().set('t2', 'p-ana', true);
+    await t.settle();
+    t.finishLibrary();
+    await t.settle();
+    await t.settle();
+    expect(t.links.links).toEqual({ [tokenKey('maps/inn.md', 't2')]: 'Ana' });
+    vi.useRealTimers();
+  });
+
   describe('where there is nothing to do', () => {
     it('does nothing without a hosted session, a scene, or a library that can be read', async () => {
       vi.useFakeTimers();
@@ -191,8 +351,8 @@ describe('player characters and online players', () => {
       const files: Record<string, string> = {};
       const memory = fileMemory(() => Promise.resolve('f.json'), adapter(files));
       await expect(memory.load()).resolves.toEqual({});
-      await memory.save({ cleric: 'Ana' });
-      await expect(memory.load()).resolves.toEqual({ cleric: 'Ana' });
+      await memory.save({ cleric: 'Ana', [tokenKey('maps/inn.md', 't2')]: 'Bea' });
+      await expect(memory.load()).resolves.toEqual({ cleric: 'Ana', [tokenKey('maps/inn.md', 't2')]: 'Bea' });
       files['f.json'] = JSON.stringify({ links: { cleric: 'Ana', rogue: 5, orc: '' } });
       await expect(memory.load()).resolves.toEqual({ cleric: 'Ana' });
       files['f.json'] = JSON.stringify({ links: 'x' });

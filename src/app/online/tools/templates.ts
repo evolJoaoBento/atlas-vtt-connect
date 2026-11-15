@@ -1,9 +1,12 @@
 /**
- * Lasting spell templates: a line, a circle, a square or a cone a player leaves on the map (the Template tool), seen by
- * everyone on that scene, the GM included, until its owner taps it again or clears theirs, or the GM erases it. The GM keeps each scene's list
- * and sends all of it to the scene's players whenever it changes (`map-templates`); players ask to add or remove one
- * of their own (`map-template`). Shared by the GM, the join page and Obsidian.
+ * Templates: an area a player leaves on the map (the Template tool: a line, a circle, a square or a cone), and every
+ * other area of the scene as the 2D views draw it. They are Atlas's kept measures (`objects.measures`), which reach
+ * players in the scene; `MapTemplate` is one of them as a view draws it (`sceneMeasures.ts`). A player asks to place
+ * or remove one of their own with `map-template`. Each lies as Atlas shapes it (`shapedArea`): a circle around its
+ * first point, a cone from it, a square from the middle of its near side, a line as wide as it says. Shared by the GM,
+ * the join page and Obsidian.
  */
+import { DEFAULT_CONE_END, shapedArea, type ShapedArea } from '../../../../packages/atlas-shared/src/index';
 import type { ScenePoint } from '../scene/sceneTypes';
 
 export const TEMPLATE_LIMITS = {
@@ -20,20 +23,28 @@ export const TEMPLATE_SHAPES = ['line', 'circle', 'square', 'cone'] as const;
 export type TemplateShape = typeof TEMPLATE_SHAPES[number];
 
 export interface MapTemplate {
+  /** The measure's id in Atlas (a kept ruler's legs: its id, a colon and the leg's number). */
   id: string;
-  /** The player who placed it (their session id). */
+  /** The player who made it (their session id); `gm` for the GM's and Atlas's own. */
   owner: string;
   shape: TemplateShape;
   start: ScenePoint;
   end: ScenePoint;
-  /** `#rrggbb`: its owner's colour. */
+  /** `#rrggbb`: its own colour, else the accent. */
   color: string;
+  /** A line's width, map pixels. */
+  width?: number;
+  /** A leg of a kept ruler: a thin line, no area. */
+  ruler?: true;
+  /** What the measure is: a player's template, a kept spell (the 3D board draws its shape itself), or an area made in Atlas. */
+  kind?: 'template' | 'spell' | 'area';
+  /** Atlas's look of the area. */
+  effect?: string;
 }
 
 const isCoordinate = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e7;
 const isPoint = (value: unknown): value is ScenePoint => typeof value === 'object' && value !== null
   && isCoordinate((value as ScenePoint).x) && isCoordinate((value as ScenePoint).y);
-const HEX = /^#[0-9a-f]{6}$/i;
 
 export function isTemplateShape(value: unknown): value is TemplateShape {
   return typeof value === 'string' && (TEMPLATE_SHAPES as readonly string[]).includes(value);
@@ -48,99 +59,51 @@ export function isTemplateDraft(value: { shape?: unknown; start?: unknown; end?:
   return isTemplateShape(value.shape) && isPoint(value.start) && isPoint(value.end);
 }
 
-export function isMapTemplates(value: unknown): value is MapTemplate[] {
-  return Array.isArray(value) && value.length <= TEMPLATE_LIMITS.perScene && value.every((template) => typeof template === 'object' && template !== null
-    && isTemplateId((template as MapTemplate).id) && typeof (template as MapTemplate).owner === 'string' && (template as MapTemplate).owner.length <= 128
-    && isTemplateDraft(template as MapTemplate) && typeof (template as MapTemplate).color === 'string' && HEX.test((template as MapTemplate).color));
+/** The area of a template as Atlas shapes it; null for a ruler's leg, and for one without a size. */
+function areaOf(template: Pick<MapTemplate, 'shape' | 'start' | 'end' | 'width' | 'ruler'>, coneAngleRadians: number): ShapedArea | null {
+  if (template.ruler) return null;
+  return shapedArea(
+    { shape: template.shape, points: [template.start, template.end], ...(template.width !== undefined ? { width: template.width } : {}) },
+    { coneAngle: (coneAngleRadians * 180) / Math.PI, coneEnd: DEFAULT_CONE_END, lineWidth: template.width ?? 0 },
+  );
 }
 
-/** Whether a world point lies on a template: within the circle or the cone, or near the line (`slack` world units). */
+function toSegment(point: ScenePoint, a: ScenePoint, b: ScenePoint): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const run = dx * dx + dy * dy;
+  const along = run === 0 ? 0 : Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / run));
+  return Math.hypot(point.x - (a.x + along * dx), point.y - (a.y + along * dy));
+}
+
+/** Whether a world point lies on a template: in its area, or within `slack` world units of its edge (of the line, for a ruler's leg). */
 export function templateContains(template: MapTemplate, point: ScenePoint, coneAngleRadians: number, slack: number): boolean {
-  const { start, end } = template;
-  const length = Math.hypot(end.x - start.x, end.y - start.y);
-  const distance = Math.hypot(point.x - start.x, point.y - start.y);
-  if (template.shape === 'circle') return distance <= length + slack;
-  if (template.shape === 'square') {
-    const corners = squareCorners(start, end);
-    const xs = corners.map((corner) => corner.x);
-    const ys = corners.map((corner) => corner.y);
-    return point.x >= Math.min(...xs) - slack && point.x <= Math.max(...xs) + slack && point.y >= Math.min(...ys) - slack && point.y <= Math.max(...ys) + slack;
-  }
-  if (template.shape === 'cone') {
-    if (distance > length + slack) return false;
-    if (distance <= slack) return true;
-    const direction = Math.atan2(end.y - start.y, end.x - start.x);
-    const angle = Math.atan2(point.y - start.y, point.x - start.x);
-    const off = Math.abs(Math.atan2(Math.sin(angle - direction), Math.cos(angle - direction)));
-    return off <= coneAngleRadians / 2 + slack / Math.max(distance, 1);
-  }
-  // A line: the distance to the segment.
-  if (length === 0) return distance <= slack;
-  const along = Math.max(0, Math.min(1, ((point.x - start.x) * (end.x - start.x) + (point.y - start.y) * (end.y - start.y)) / (length * length)));
-  return Math.hypot(point.x - (start.x + along * (end.x - start.x)), point.y - (start.y + along * (end.y - start.y))) <= slack;
+  const area = areaOf(template, coneAngleRadians);
+  if (!area) return toSegment(point, template.start, template.end) <= slack;
+  if (area.contains(point)) return true;
+  if (!(slack > 0)) return false;
+  if (template.shape === 'circle') return Math.hypot(point.x - template.start.x, point.y - template.start.y) <= area.reach + slack;
+  // Atlas's own points are untyped in the shared copy.
+  const rings = area.rings as ReadonlyArray<readonly ScenePoint[]>;
+  return rings.some((ring) => ring.some((corner, index) => toSegment(point, corner, ring[(index + 1) % ring.length]!) <= slack));
 }
 
-/** A square's side: as long as the drag's longer reach, so it grows from `start` towards the pointer. */
-export function squareSide(start: ScenePoint, end: ScenePoint): number {
-  return Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
-}
-
-/** The corners of a square from `start` (one corner) towards `end`. */
-export function squareCorners(start: ScenePoint, end: ScenePoint): ScenePoint[] {
-  const side = squareSide(start, end);
-  const x = start.x + (end.x < start.x ? -side : side);
-  const y = start.y + (end.y < start.y ? -side : side);
-  return [{ x: start.x, y: start.y }, { x, y: start.y }, { x, y }, { x: start.x, y }];
-}
-
-/** The closed outline of a square or a cone; null for a line or a circle, which are drawn from their two points. */
-export function templateOutline(template: Pick<MapTemplate, 'shape' | 'start' | 'end'>, coneAngle: number): ScenePoint[] | null {
-  if (template.shape === 'square') return squareCorners(template.start, template.end);
-  if (template.shape === 'cone') return conePoints(template.start, template.end, coneAngle);
-  return null;
+/** The closed outline of a square, a cone or a line with a width; null for a circle (drawn as one) and a ruler's leg (a line). */
+export function templateOutline(template: Pick<MapTemplate, 'shape' | 'start' | 'end' | 'width' | 'ruler'>, coneAngle: number): ScenePoint[] | null {
+  if (template.shape === 'circle') return null;
+  const ring = areaOf(template, coneAngle)?.rings[0] as readonly ScenePoint[] | undefined;
+  return ring ? ring.map((corner) => ({ x: corner.x, y: corner.y })) : null;
 }
 
 /** The two points a template's size is measured between: a line's or cone's length, a circle's radius, a square's side. */
 export function templateSpan(template: Pick<MapTemplate, 'shape' | 'start' | 'end'>): [ScenePoint, ScenePoint] {
-  const { start, end } = template;
-  if (template.shape === 'square') return [start, { x: start.x + squareSide(start, end), y: start.y }];
-  return [start, end];
+  return [template.start, template.end];
 }
 
-/** Where a template's size label sits: a circle's or square's middle, a line's midpoint, two thirds along a cone. */
+/** Where a template's size label sits: a circle's middle, a square's or a line's midpoint, two thirds along a cone. */
 export function templateLabelAt(template: Pick<MapTemplate, 'shape' | 'start' | 'end'>): ScenePoint {
   const { start, end } = template;
-  if (template.shape === 'square') {
-    const [, , far] = squareCorners(start, end);
-    return { x: (start.x + far!.x) / 2, y: (start.y + far!.y) / 2 };
-  }
   if (template.shape === 'circle') return { x: start.x, y: start.y };
   const share = template.shape === 'cone' ? 2 / 3 : 1 / 2;
   return { x: start.x + (end.x - start.x) * share, y: start.y + (end.y - start.y) * share };
-}
-
-/** Where the GM's erase button sits on a template, in world units: its far corner or end, on its edge. */
-export function templateHandleAt(template: Pick<MapTemplate, 'shape' | 'start' | 'end'>): ScenePoint {
-  const { start, end } = template;
-  if (template.shape === 'circle') {
-    const radius = Math.hypot(end.x - start.x, end.y - start.y);
-    return { x: start.x + radius * Math.SQRT1_2, y: start.y - radius * Math.SQRT1_2 };
-  }
-  if (template.shape === 'square') {
-    const corners = squareCorners(start, end);
-    return { x: Math.max(...corners.map((c) => c.x)), y: Math.min(...corners.map((c) => c.y)) };
-  }
-  return { x: end.x, y: end.y };
-}
-
-/** The outline of a cone from `start` towards `end`, opening by `angle` radians: its apex and arc. */
-export function conePoints(start: ScenePoint, end: ScenePoint, angle: number, segments = 24): ScenePoint[] {
-  const length = Math.hypot(end.x - start.x, end.y - start.y);
-  const direction = Math.atan2(end.y - start.y, end.x - start.x);
-  const points: ScenePoint[] = [{ x: start.x, y: start.y }];
-  for (let index = 0; index <= segments; index++) {
-    const at = direction - angle / 2 + (angle * index) / segments;
-    points.push({ x: start.x + Math.cos(at) * length, y: start.y + Math.sin(at) * length });
-  }
-  return points;
 }

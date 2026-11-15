@@ -4,6 +4,7 @@
  * players' dice and lasers (B7) are optional parts: each starts only when its dep is given, and without
  * it the session runs without that feature (no token assignments, no dice, no lasers relayed).
  */
+import { PlayerColors } from './tools/playerColors';
 import type { ViewsApi } from '@atlas-vtt/api-types';
 import { Notice } from 'obsidian';
 import { AssetServer } from './assets/AssetServer';
@@ -15,6 +16,14 @@ import { onlineSessionStore } from './onlineSessionStore';
 import { peerServerOptions, type OnlineSettings } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { AssetRegistry } from './scene/AssetRegistry';
+import { BoardSender } from './scene/BoardSender';
+import { CutsceneSender } from './scene/CutsceneSender';
+import { BoardSessionHub, type BoardSession } from './tools/BoardSessionHub';
+import type { HandoutSource } from './handouts';
+
+/** No handout source: nothing is ever shown. */
+const NO_HANDOUT: HandoutSource = { current: () => null, subscribe: () => () => undefined };
+import { MeasureHost } from './tools/MeasureHost';
 import { CameraSender } from './scene/CameraSender';
 import { SceneHub, type SceneProjectionOptions } from './scene/SceneHub';
 import type { ImageFiles, SceneSession } from './scene/sceneContracts';
@@ -29,9 +38,12 @@ import type { PeopleBook } from './sharing/people/PeopleBook';
 import type { PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import type { JoinRequestInfo } from './ui/joinRequestNotice';
-import type { SheetRollExtras } from './tools/DiceHost';
+import type { EditTokenSectionSpec } from './gm-ui/editTokenSection';
+import type { SheetRollExtras, SheetRollLabels } from './tools/DiceHost';
+import type { OfferedDiceRules } from './tools/toolMessages';
+import { ArViewRelay } from './tools/ArViewRelay';
 
-const BAD_PAGE_URL = "The player page address in Atlas VTT Connect's settings isn't a valid web address.";
+const BAD_PAGE_URL = "The player page address in Connect for Atlas VTT's settings isn't a valid web address.";
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
 
 /** Sharing joins a hosted session that has a table; `started` returns what stops it. */
@@ -44,6 +56,12 @@ export interface HostedContext {
   session: SceneSession;
   presented: SceneProjectionOptions['presented'];
   projection: SceneHub;
+  /** Tabletop's 3D board on the GM's side: what the relays accept reaches it too. */
+  board?: BoardSessionHub;
+  /** The colour each player picked (else their place's). */
+  colors?: PlayerColors;
+  /** Whether a cutscene runs: players' moves and templates are refused meanwhile. */
+  cutscene?: { running(): boolean };
 }
 
 export interface HostedPart {
@@ -58,17 +76,23 @@ export interface OptionalParts {
   /** Players move the tokens the GM assigns them, through Atlas's `tokens.move`. Without it nobody controls a token. */
   tokenControl?: (context: HostedContext) => HostedPart & { readonly control: TokenControl };
   /** Players' dice, rolled and logged through Atlas's dice (B7). Without it players cannot roll. */
-  dice?: (context: HostedContext) => HostedPart & { rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean };
+  dice?: (context: HostedContext) => HostedPart & {
+    rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean;
+    /** Names players' physical sheet rolls from the sheets part. */
+    useSheets?: (sheets: SheetRollLabels | null) => void;
+  };
+  /** The dice rules players' physical rolls are judged by; with `dice`, the board offer tells players the GM takes them. */
+  diceRules?: (mapPath: string | null) => OfferedDiceRules;
   /**
    * Players' own sheets: the tokens they control with their exact numbers and stat blocks, and rolls from them through
    * the dice part. Needs token control; without it no sheet is sent.
    */
-  sheets?: (context: HostedContext & { control: TokenControl; rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean }) => HostedPart;
+  sheets?: (context: HostedContext & { control: TokenControl; rollFor?: (player: SessionPlayer, formula: string, extras?: SheetRollExtras) => boolean }) => HostedPart & Partial<SheetRollLabels>;
   /** Players' lasers and the GM's (B7). Without it no laser is relayed. */
   laser?: (context: HostedContext) => HostedPart;
   /** Players' pings, relayed to their scene and shown in the GM's view where Connect can draw on it. */
   pings?: (context: HostedContext) => HostedPart;
-  /** Players' lasting templates, kept per scene and shown in the GM's view where Connect can draw on it. */
+  /** Players' templates and spells, kept in Atlas's own measures. */
   templates?: (context: HostedContext) => HostedPart & { clear(): void; hasAny(): boolean };
   /** The notes of readable pins, sent to a player who opens one. Without it opening a pin shows nothing. */
   notes?: (context: HostedContext) => HostedPart;
@@ -91,6 +115,10 @@ export interface HostEnvironment extends OptionalParts {
   };
   /** Whether this start is still the current one; a later stop or start makes it stale. */
   isCurrent(): boolean;
+  /** Hands the session to Tabletop's 3D board on the GM's side; returns the release. Without it the board knows no session. */
+  attachBoard?(session: BoardSession): () => void;
+  /** What players see of a token's resources (Atlas's Edit Token "Players see"), for Tabletop's token menu. */
+  resourceShows?(mapPath: string, tokenId: string): EditTokenSectionSpec | null;
 }
 
 /** A running session; `stop` releases everything it holds, the store is left to the caller. */
@@ -135,6 +163,8 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   let current: GmSession | null = null;
   // The scene hub, once made; the session tells it of player changes.
   let hubRef: SceneHub | null = null;
+  // The cutscene sender, once made: a kicked player is no longer ready for the reveal.
+  let cutsceneRef: CutsceneSender | null = null;
   const requests = new HostIdentity({
     desk: table && env.people ? new IdentityDesk({ people: env.people, table }) : null,
     session: () => current,
@@ -162,6 +192,7 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
       log.event('players', { players: players.map((player) => `${player.name}: ${player.status}`).join(', ') });
       // The hub first: a kicked player's assignment and scene go before the parts and the store hear of it.
       hubRef?.playersChanged(players);
+      cutsceneRef?.playersChanged(players);
       for (const part of parts) part.playersChanged?.(players);
       onlineSessionStore.setState({ players, error: null });
     },
@@ -181,32 +212,75 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
   const tabs = tabScenes?.() ?? null;
   const hub: SceneHub = new SceneHub({ ...sceneOptions, session: scenes, assets: registry, notify, tabs, assignments: new SceneAssignments() });
   hubRef = hub;
-  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub };
+  // Tabletop's board on the GM's side hears what players do, as Connect's own view does.
+  const boardHub = env.attachBoard ? new BoardSessionHub({
+    projection: hub,
+    handouts: env.scene.handout ?? NO_HANDOUT,
+    coneAngle: (mapPath) => env.scene.coneAngle?.(mapPath) ?? 90,
+    // Without scene tabs there is no live snapshot of a shot's map: Tabletop refuses Play for players.
+    cutscenes: tabs !== null,
+  }) : null;
+  // Each player's colour: started first, so the relays colour a player's first ping or template with it.
+  const colors = new PlayerColors(scenes);
+  colors.start();
+  // Tabletop's cutscenes to players: made here so the guards of the moves and templates can ask it; started after the board.
+  const cutsceneSender = new CutsceneSender({ session: scenes, tabs, board: env.scene.board ?? null, sceneOptions, assets: registry, notify });
+  cutsceneRef = cutsceneSender;
+  const context: HostedContext = { session: scenes, presented: env.scene.presented, projection: hub, ...(boardHub ? { board: boardHub } : {}), colors, cutscene: cutsceneSender };
   // The GM's view of the scene it shows, to that scene's players only; started after the scene hub.
   const cameraSender = new CameraSender({ session: scenes, presented: env.scene.presented, projection: hub, tabs });
+  // Tabletop's 3D board, to the players who show it: after the camera, so its camera follows the scene's.
+  const boardSender = new BoardSender({
+    session: scenes, projection: hub, board: env.scene.board ?? null,
+    ...(env.dice && env.diceRules ? { diceRules: env.diceRules } : {}),
+  });
   // Serves the images of the scene players have, over each player's assets channel.
-  const assetServer = new AssetServer({ session, projection: hub, files: registry });
+  const assetServer = new AssetServer({ session, projection: hub, files: registry, cutscene: cutsceneSender });
   // Started in this order, after the asset server: control lists follow snapshots and cameras, dice and lasers come last.
   const tokenControl = env.tokenControl?.(context) ?? null;
   const dice = env.dice?.(context) ?? null;
   const laser = env.laser?.(context) ?? null;
   const pings = env.pings?.(context) ?? null;
   const templates = env.templates?.(context) ?? null;
+  // Players in augmented reality, as eyes on Tabletop's board: only where there is one.
+  const arViews = boardHub ? new ArViewRelay({ session: scenes, projection: hub, board: boardHub, colorOf: (playerId) => colors.colorOf(playerId) }) : null;
+  boardHub?.useTemplates(templates instanceof MeasureHost ? templates : null);
+  // The GM asks a token's players for a spell: they are its controllers, and the GM hears how they answer.
+  if (templates instanceof MeasureHost) {
+    templates.useAsks(tokenControl ? { controls: (playerId, tokenId) => tokenControl.control.controls(playerId, tokenId), notify } : null);
+  }
+  // A token the GM moves to another scene on Tabletop's board stays its players', and they are shown that scene.
+  // The "Controlled by" menu on Tabletop's board, as on Atlas's own.
+  boardHub?.useControl(tokenControl ? { control: tokenControl.control, players: () => session.getPlayers() } : null);
+  // The "Present to" menu of Tabletop's scene tabs, as the eye's on Atlas's own (a split party needs Atlas's scene tabs).
+  boardHub?.useSplit(tabs ? { scenes: hub, players: () => session.getPlayers(), nameOf: (tab) => tabs.tab(tab)?.name ?? null } : null);
+  // And "Players see" in Tabletop's token menu, as in Atlas's Edit Token dialog.
+  boardHub?.useResourceShows(env.resourceShows ? (mapPath, tokenId) => env.resourceShows?.(mapPath, tokenId) ?? null : null);
+
   const notes = env.notes?.(context) ?? null;
   const rollFor = dice?.rollFor ? (player: SessionPlayer, formula: string, extras?: SheetRollExtras): boolean => dice.rollFor?.(player, formula, extras) ?? false : null;
   const sheets = tokenControl && env.sheets ? env.sheets({ ...context, control: tokenControl.control, ...(rollFor ? { rollFor } : {}) }) : null;
+  // Players' physical sheet rolls are named from the GM's own copy of their sheets.
+  dice?.useSheets?.(sheets && typeof sheets.rollLabel === 'function' ? { rollLabel: sheets.rollLabel.bind(sheets) } : null);
   const given = (list: Array<HostedPart | null>): HostedPart[] => list.filter((part): part is HostedPart => part !== null);
   let stopSharing: (() => void) | null = null;
   let stopLog: (() => void) | null = null;
   let stopSplit: (() => void) | null = null;
+  let stopBoard: (() => void) | null = null;
   const stop = (): void => {
+    stopBoard?.();
+    stopBoard = null;
+    boardHub?.stop();
     stopSplit?.();
     stopSplit = null;
     stopSharing?.();
     stopSharing = null;
     stopErrors();
     assetServer.stop();
-    for (const part of given([notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    for (const part of given([arViews, notes, templates, pings, sheets, tokenControl, laser, dice])) part.stop();
+    colors.stop();
+    cutsceneSender.stop();
+    boardSender.stop();
     cameraSender.stop();
     stopLog?.();
     stopLog = null;
@@ -223,12 +297,18 @@ export async function hostSession(env: HostEnvironment, sharing: HostedSharingHo
     // The GM's panel, eye menu and badges read who is assigned where from the store.
     stopSplit = syncSplitState(hub);
     cameraSender.start();
+    boardSender.start();
+    cutsceneSender.start();
     assetServer.start();
-    for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes])) {
+    for (const part of given([tokenControl, dice, laser, sheets, pings, templates, notes, arViews])) {
       part.start();
       parts.push(part);
     }
     if (table && sharing) stopSharing = sharing.started({ session, table });
+    if (boardHub && env.attachBoard) {
+      boardHub.start();
+      stopBoard = env.attachBoard(boardHub);
+    }
   } catch (error) {
     // No session may keep running without its scene hub; `start` reports the error.
     stop();

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cardRollFormula, isSheetCard, safeCss, type SheetCard } from '../../../src/app/online/tools/sheetCards';
+import { cardRollFormula, isSheetCard, safeCss, type SheetCard } from '../../../packages/atlas-host/src/sheets/sheetCards';
 import { renderCard, sanitizeCardHtml } from '../../../online-client/cardView.mts';
-import { isSheetRollRef, isTokenSheets } from '../../../src/app/online/tools/sheets';
+import { isSheetRollRef, isTokenSheets } from '../../../packages/atlas-host/src/sheets/sheets';
 
 const PIXEL = 'data:image/png;base64,iVBORw0KGgo=';
 const CARD: SheetCard = {

@@ -3,11 +3,15 @@ import {
   decodeControl, encodeControl, normalizePlayerName, MAX_CONTROL_MESSAGE_BYTES, MAX_CONTROLLED_TOKENS, PLAYER_MESSAGE_TYPES, type ControlMessage,
 } from '../../../src/app/online/protocol';
 import { randomId } from '../../../src/app/online/ids';
+import { isPhysicalRoll } from '../../../src/app/online/tools/toolMessages';
 
 describe('online protocol', () => {
   it('round-trips every message type', () => {
     const messages: ControlMessage[] = [
-      { v: 1, type: 'join', name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
+      { v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
+      { v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'k1', client: { kind: 'web', version: '0.5.0' } },
+      { v: 1, type: 'token-move-refused', tokenId: 'hero' },
+      { v: 1, type: 'token-move-refused', tokenId: 'hero', reason: 'not-held' },
       { v: 1, type: 'admitted', playerId: 'p1', session: { title: 'Vault' } },
       { v: 1, type: 'denied', reason: 'kicked' },
       { v: 1, type: 'presence', players: [{ playerId: 'p1', name: 'Anna', connected: true }] },
@@ -38,7 +42,9 @@ describe('online protocol', () => {
     expect(decodeControl('not json').kind).toBe('invalid');
     expect(decodeControl(42).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'denied', reason: 'bored' })).kind).toBe('invalid');
-    expect(decodeControl(JSON.stringify({ v: 1, type: 'join', name: 'A', playerKey: 7, client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
+    expect(decodeControl(JSON.stringify({ v: 1, type: 'join', fusion: 4, name: 'A', playerKey: 7, client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
+    expect(decodeControl(JSON.stringify({ v: 1, type: 'join', fusion: '1', name: 'A', playerKey: 'k', client: { kind: 'web', version: '1' } })).kind).toBe('invalid');
+    expect(decodeControl(JSON.stringify({ v: 1, type: 'token-move-refused', tokenId: 'hero', reason: 'because' })).kind).toBe('invalid');
     expect(decodeControl(JSON.stringify({ v: 1, type: 'presence', players: [{ playerId: 'p', name: 'A' }] })).kind).toBe('invalid');
   });
 
@@ -109,7 +115,100 @@ describe('online protocol', () => {
     });
   });
 
-  it('names what players may send: a resync, a token move, a dice roll, a laser, a roll from their sheet, a ping, a template and a pin they open', () => {
-    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['dice-roll', 'laser', 'map-ping', 'map-template', 'note-request', 'scene-resync', 'sheet-roll', 'token-move']);
+  it('names what players may send: a resync, a token move, a dice roll, a laser, a roll from their sheet, a ping, a template, a pin they open, the 3D board and their phone in AR and its survey of the table', () => {
+    expect([...PLAYER_MESSAGE_TYPES].sort()).toEqual(['ar-survey', 'ar-view', 'board-request', 'cutscene-ready', 'dice-result', 'dice-roll', 'laser', 'map-ping', 'map-spell', 'map-template', 'note-request', 'player-color', 'scene-resync', 'sheet-roll', 'token-move']);
+  });
+
+  describe('dice-result and the dice offer', () => {
+    const decode = (message: unknown) => decodeControl(JSON.stringify({ v: 1, type: 'dice-result', ...(message as object) }));
+    const ok = { rolls: [{ die: 'd6', value: 3 }, { die: 'd6', value: 6 }], modifier: 2 };
+
+    it('accepts a roll of 2d6, a d100 as one value, tags, a label and a sheet roll', () => {
+      expect(decode(ok).kind).toBe('message');
+      expect(decode({ rolls: [{ die: 'd100', value: 100 }, { die: 'd10', value: 10, exploded: true, dropped: true, color: '#aabbcc', colorName: 'Red' }], modifier: -999, label: 'x'.repeat(120) }).kind).toBe('message');
+      expect(decode({ ...ok, sheet: { tokenId: 't1', roll: { kind: 'check', index: 1 } } }).kind).toBe('message');
+      expect(PLAYER_MESSAGE_TYPES.has('dice-result')).toBe(true);
+    });
+
+    it('refuses what is not a read roll', () => {
+      const bad: unknown[] = [
+        { ...ok, rolls: [] },
+        { ...ok, rolls: Array.from({ length: 21 }, () => ({ die: 'd6', value: 1 })) },
+        { ...ok, rolls: [{ die: 'd6', value: 0 }] },
+        { ...ok, rolls: [{ die: 'd6', value: 7 }] },
+        { ...ok, rolls: [{ die: 'd100', value: 101 }] },
+        { ...ok, rolls: [{ die: 'd100', value: 0 }] },
+        { ...ok, rolls: [{ die: 'd6', value: Number.NaN }] },
+        { ...ok, rolls: [{ die: 'd6', value: 2.5 }] },
+        { ...ok, rolls: [{ die: 'd3', value: 1 }] },
+        { ...ok, modifier: 1000 },
+        { ...ok, modifier: -1000 },
+        { ...ok, modifier: 1.5 },
+        { ...ok, label: 'x'.repeat(121) },
+        { ...ok, rolls: [{ die: 'd6', value: 1, color: 'red' }] },
+        { ...ok, sheet: { tokenId: 't1', roll: { kind: 'nope' } } },
+      ];
+      for (const message of bad) expect(decode(message).kind, JSON.stringify(message)).toBe('invalid');
+    });
+
+    it('refuses rolls that are not a list of dice, dice that are not objects, unknown dice kinds and false flags', () => {
+      const bad: unknown[] = [
+        { ...ok, rolls: { 0: { die: 'd6', value: 3 }, length: 1 } },
+        { ...ok, rolls: 'd6' },
+        { ...ok, rolls: [3] },
+        { ...ok, rolls: [null] },
+        { ...ok, rolls: [[{ die: 'd6', value: 3 }]] },
+        { ...ok, rolls: [{ die: '__proto__', value: 1 }] },
+        { ...ok, rolls: [{ die: 'toString', value: 1 }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, exploded: false }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, dropped: false }] },
+        { ...ok, rolls: [{ die: 'd6', value: 3, negative: 'yes' }] },
+      ];
+      for (const message of bad) expect(decode(message).kind, JSON.stringify(message)).toBe('invalid');
+      // JSON carries no Infinity: the check itself refuses it.
+      expect(isPhysicalRoll({ ...ok, modifier: Number.POSITIVE_INFINITY })).toBe(false);
+      expect(isPhysicalRoll({ ...ok, rolls: [{ die: 'd6', value: Number.POSITIVE_INFINITY }] })).toBe(false);
+      expect(isPhysicalRoll({ ...ok, rolls: [{ die: 'd6', value: Number.NEGATIVE_INFINITY }] })).toBe(false);
+      expect(isPhysicalRoll(ok)).toBe(true);
+    });
+
+    it('an older page ignores dice-result', () => {
+      const older = new Set(['ping']);
+      expect(decodeControl(JSON.stringify({ v: 1, type: 'dice-result', ...ok }), older).kind).toBe('ignored');
+    });
+
+    it('reads board-offer with and without the dice fields', () => {
+      const offer = (extra: object) => decodeControl(JSON.stringify({ v: 1, type: 'board-offer', available: true, ...extra })).kind;
+      expect(offer({})).toBe('message');
+      expect(offer({ diceResults: true, diceRules: { defaultRoll: '1d20', crit: 'natural' } })).toBe('message');
+      expect(offer({ diceRules: { defaultRoll: '2d6', crit: 'none', explode: { dice: 'all', repeats: true, highFaces: 1, lowFaces: 0 } } })).toBe('message');
+    });
+
+    it('drops bad dice fields from a board-offer and keeps the offer', () => {
+      const read = (extra: object) => decodeControl(JSON.stringify({ v: 1, type: 'board-offer', available: true, ...extra }));
+      const rules = { defaultRoll: '1d20', crit: 'natural' };
+      expect(read({ diceResults: false, diceRules: { defaultRoll: '1d20', crit: 'sometimes' } })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true } });
+      expect(read({ diceRules: 'x', diceResults: true })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true, diceResults: true } });
+      expect(read({ diceResults: 1, diceRules: rules })).toEqual({ kind: 'message', message: { v: 1, type: 'board-offer', available: true, diceRules: rules } });
+      expect(read({ available: 'yes' }).kind).toBe('invalid');
+    });
+  });
+});
+
+describe('a tray roll with a side', () => {
+  const roll = { v: 1, type: 'dice-roll', dice: { d20: 1 }, modifier: 2 };
+
+  it('carries advantage or disadvantage, and is as before without one', () => {
+    for (const advantage of ['advantage', 'disadvantage']) {
+      const message = { ...roll, advantage } as ControlMessage;
+      expect(decodeControl(encodeControl(message))).toEqual({ kind: 'message', message });
+    }
+    expect(decodeControl(encodeControl(roll as ControlMessage))).toEqual({ kind: 'message', message: roll });
+  });
+
+  it('refuses a side that is neither', () => {
+    for (const advantage of ['sideways', '', 1, null, true]) {
+      expect(decodeControl(JSON.stringify({ ...roll, advantage })).kind).not.toBe('message');
+    }
   });
 });

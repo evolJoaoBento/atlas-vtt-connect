@@ -1,3 +1,4 @@
+import type { BoardSession } from './tools/BoardSessionHub';
 import { readPinNote } from './atlas/pinNoteReader';
 import { NoteHost } from './tools/NoteHost';
 import type { ResourceVisibilitySource } from './scene/resourceVisibility';
@@ -13,7 +14,8 @@ import type { PresentedSceneSource } from './atlas/presentedSource';
 import type { TabScenes } from './atlas/tabScenes';
 import type { ImageFiles } from './scene/sceneContracts';
 import type { LightingSource } from './scene/sceneLighting';
-import type { DiceLookSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
+import type { DiceLookSource, BoardSource, MiniSource, PlayerViewSettingsSource } from './scene/sceneSources';
+import type { ProjectedMovement } from './scene/projectForPlayers';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import type { HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
@@ -22,6 +24,7 @@ import type { TabKey } from './split/tabKey';
 import { createPeerHost, type PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
+import type { EditTokenSectionSpec } from './gm-ui/editTokenSection';
 
 export type { HostedSharingHooks } from './hostedSession';
 
@@ -52,6 +55,8 @@ export interface Deps extends OptionalParts {
   lighting?: LightingSource;
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
   coneAngle?: (mapPath: string | null) => number;
+  /** The movement of each map (Atlas 0.15): its rules and each token's speed, as the GM's Atlas reads them. */
+  movement?: (mapPath: string | null) => ProjectedMovement | null;
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
@@ -65,6 +70,12 @@ export interface Deps extends OptionalParts {
   resourceVisibility?: ResourceVisibilitySource;
   /** The 3D minis on tokens, from the Tabletop extension; without it no token carries one. */
   minis?: MiniSource;
+  /** Tabletop's 3D board, for players who show it; without it no board is sent. */
+  board?: BoardSource;
+  /** Hands the session to Tabletop's 3D board on the GM's side; without it the board knows no session. */
+  attachBoard?: (session: BoardSession) => () => void;
+  /** What players see of a token's resources (the Edit Token section), offered on Tabletop's board too. */
+  resourceShows?: (mapPath: string, tokenId: string) => EditTokenSectionSpec | null;
   /** The GM's scene tabs, one per hosted session (Atlas's `scene-tabs`); without it there is no split party. */
   tabScenes?: () => TabScenes;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -128,12 +139,15 @@ export class OnlineSessionService {
       const hosted = await hostSession({
         ...(deps.tokenControl ? { tokenControl: deps.tokenControl } : {}),
         ...(deps.dice ? { dice: deps.dice } : {}),
+        ...(deps.diceRules ? { diceRules: deps.diceRules } : {}),
         ...(deps.sheets ? { sheets: deps.sheets } : {}),
         ...(deps.pings ? { pings: deps.pings } : {}),
         ...(deps.templates ? { templates: deps.templates } : {}),
         // The vault's notes: a readable pin's note goes to the player who opens it.
         notes: deps.notes ?? (({ session, projection }) => new NoteHost({ session, projection, read: (notePath, mapPath) => readPinNote(this.app, notePath, mapPath) })),
         ...(deps.laser ? { laser: deps.laser } : {}),
+        ...(deps.attachBoard ? { attachBoard: deps.attachBoard } : {}),
+        ...(deps.resourceShows ? { resourceShows: deps.resourceShows } : {}),
         ...(deps.people ? { people: deps.people } : {}),
         settings: this.settings,
         vaultName: this.app.vault.getName(),
@@ -148,6 +162,7 @@ export class OnlineSessionService {
           ...(deps.lighting ? { lighting: deps.lighting } : {}),
           ...(deps.collectionGrid ? { collectionGrid: deps.collectionGrid } : {}),
           ...(deps.coneAngle ? { coneAngle: deps.coneAngle } : {}),
+          ...(deps.movement ? { movement: deps.movement } : {}),
           ...(deps.resources ? { resources: deps.resources } : {}),
           ...(deps.conditions ? { conditions: deps.conditions } : {}),
           ...(deps.initiativeRules ? { initiativeRules: deps.initiativeRules } : {}),
@@ -156,6 +171,7 @@ export class OnlineSessionService {
           ...(deps.handout ? { handout: deps.handout } : {}),
           ...(deps.resourceVisibility ? { resourceVisibility: deps.resourceVisibility } : {}),
           ...(deps.minis ? { minis: deps.minis } : {}),
+          ...(deps.board ? { board: deps.board } : {}),
           ...(deps.tabScenes ? { tabScenes: deps.tabScenes } : {}),
         },
         isCurrent: () => generation === this.generation,

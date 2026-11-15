@@ -1,9 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { diff3 } from '../../../../src/app/online/sharing/merge/diff3';
 import { MergeView } from '../../../../src/app/online/sharing/merge/ui/MergeView';
 import { UpdateChoiceForm } from '../../../../src/app/online/sharing/merge/ui/UpdateChoiceForm';
+import { pickOption } from '../../pickOption';
 
 describe('the update choice', () => {
   it('offers the five choices with remember and silent', () => {
@@ -30,7 +31,7 @@ describe('the merge page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Take theirs' }));
     expect(result.value).toBe('a\ntheirs\nc');
     fireEvent.change(result, { target: { value: 'a\nby hand\nc' } });
-    fireEvent.change(screen.getByLabelText('For conflicts next time'), { target: { value: 'mine' } });
+    act(() => { pickOption(screen.getByLabelText('For conflicts next time'), 'Keep mine'); });
     fireEvent.click(screen.getByRole('button', { name: 'Save merge' }));
     expect(save).toHaveBeenCalledWith({ text: 'a\nby hand\nc', conflictDefault: 'mine' });
   });

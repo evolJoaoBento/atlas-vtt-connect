@@ -6,10 +6,11 @@
  * fingerprint before it is decoded and shown; images the scene stops using
  * are cancelled and released. A mini's GLB is checked the same way, then kept as bytes (`model`) for the view to read.
  */
+import type { BoardExtras } from '../scene/boardTypes';
 import type { PlayerAssetHandler } from '../PlayerSession';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { AssetCache } from './AssetCache';
-import { ASSET_LIMITS, isModelMime, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
+import { ASSET_LIMITS, isModelMime, boardAssetIds, sceneAssetIds, sha256Id, type AssetMime, type Hasher } from './assetIds';
 import { decodeAsset, encodeAsset, type AssetChunk, type AssetMessage } from './assetProtocol';
 import { ProgressTally, type AssetProgress, type PendingImage } from './ProgressTally';
 import { TransferAssembler } from './TransferAssembler';
@@ -17,7 +18,8 @@ import { TransferAssembler } from './TransferAssembler';
 export type { AssetProgress };
 
 export interface DecodedImage {
-  image: ImageBitmap | HTMLImageElement;
+  /** A playing `<video>` for an animated map's video. */
+  image: ImageBitmap | HTMLImageElement | HTMLVideoElement;
   width: number;
   height: number;
   release(): void;
@@ -37,6 +39,8 @@ export interface AssetLoaderOptions {
    * Read on every scene; the web page never asks for them.
    */
   models?: () => boolean;
+  /** Whether to fetch an animated map's video too: only a view that plays it (the web page). */
+  video?: () => boolean;
 }
 
 /** `refused`: denied, broken twice or undecodable; not asked for again while it stays in the scene. */
@@ -50,6 +54,8 @@ interface Wanted {
   image: DecodedImage | null;
   /** A model's bytes (a mini's GLB), once checked; images have none. */
   model?: ArrayBuffer;
+  /** Only a cutscene's revealed scene wants it: not kept on the device. */
+  transient?: boolean;
 }
 
 type Outcome = 'shown' | 'mismatch' | 'undecodable' | 'gone';
@@ -85,9 +91,42 @@ export class AssetLoader implements PlayerAssetHandler {
     return this.tally.progress(pending);
   }
 
+  private scene: PlayerScene | null = null;
+  private board: BoardExtras | null = null;
+
   setScene(scene: PlayerScene | null): void {
+    this.scene = scene;
+    this.want();
+  }
+
+  private cutscene: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }> = [];
+  /** Files wanted only by a cutscene's revealed scenes. */
+  private transient = new Set<string>();
+
+  /** The revealed scenes of the running cutscene and their board files, wanted beside the player's own; empty once it ends. */
+  setCutscene(scenes: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }>): void {
+    this.cutscene = scenes;
+    this.want();
+  }
+
+  /** The files of Tabletop's 3D board of the scene (its materials' maps, door props and props); null for none. */
+  setBoard(board: BoardExtras | null): void {
+    this.board = board;
+    this.want();
+  }
+
+  /** Asks for what the scene and its board show and lets go of the rest. */
+  private want(): void {
     if (this.disposed) return;
-    const ids = sceneAssetIds(scene, { minis: this.options.models?.() === true });
+    // The board's files are wanted only by a player showing the board, which draws them (and the minis) in 3D.
+    const shown = { minis: this.options.models?.() === true, video: this.options.video?.() === true };
+    const own = new Set([...sceneAssetIds(this.scene, shown), ...boardAssetIds(this.board)]);
+    // A cutscene is drawn by the board, which draws minis and the board's files.
+    const revealed = this.cutscene.flatMap((each) => [...sceneAssetIds(each.scene, { ...shown, minis: true }), ...boardAssetIds(each.extras)]);
+    const ids = [...new Set([...own, ...revealed])];
+    // What only a cutscene shows lives in memory for the run: it is never written to the device's image store.
+    this.transient = new Set(revealed.filter((id) => !own.has(id)));
+    for (const [id, wanted] of this.wanted) wanted.transient = this.transient.has(id);
     const keep = new Set(ids);
     const cancelled: string[] = [];
     for (const [id, wanted] of [...this.wanted]) {
@@ -135,7 +174,7 @@ export class AssetLoader implements PlayerAssetHandler {
 
   /** New images: from the cache when this device has them, the others requested together. */
   private async lookUp(ids: readonly string[]): Promise<void> {
-    const entries = ids.map((id): [string, Wanted] => [id, { phase: 'checking', retried: false, size: null, image: null }]);
+    const entries = ids.map((id): [string, Wanted] => [id, { phase: 'checking', retried: false, size: null, image: null, transient: this.transient.has(id) }]);
     for (const [id, wanted] of entries) this.wanted.set(id, wanted);
     const cached = await Promise.all(entries.map(([id]) => this.options.cache.get(id).catch(() => null)));
     entries.forEach(([id, wanted], index) => {
@@ -164,7 +203,7 @@ export class AssetLoader implements PlayerAssetHandler {
       // Read by the view's mini layer, which parses it; nothing to decode here.
       wanted.model = bytes;
       wanted.phase = 'ready';
-      if (fromGm) void this.options.cache.put({ id, mime, bytes }).catch(() => undefined);
+      if (fromGm && wanted.transient !== true) void this.options.cache.put({ id, mime, bytes }).catch(() => undefined);
       this.changed();
       return 'shown';
     }
@@ -176,7 +215,7 @@ export class AssetLoader implements PlayerAssetHandler {
     if (!decoded) return 'undecodable';
     wanted.image = decoded;
     wanted.phase = 'ready';
-    if (fromGm) void this.options.cache.put({ id, mime, bytes }).catch(() => undefined);
+    if (fromGm && wanted.transient !== true) void this.options.cache.put({ id, mime, bytes }).catch(() => undefined);
     this.changed();
     return 'shown';
   }

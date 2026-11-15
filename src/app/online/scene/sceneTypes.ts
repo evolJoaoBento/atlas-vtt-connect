@@ -1,8 +1,10 @@
 /**
  * What online players receive of the presented scene. Shared with the web
- * player page, so this file imports nothing. Every field is `T | null`, never
+ * player page, so this file imports nothing but a type. Every field is `T | null`, never
  * optional: JSON drops `undefined`, and both sides compare by value.
  */
+import type { TabletopExtra } from '../../../../packages/atlas-host/src/spellMeasure';
+
 export interface ScenePoint {
   x: number;
   y: number;
@@ -21,6 +23,24 @@ export interface PlayerMap {
   height: number;
   /** Grid cell size in world pixels, sent even when the grid is hidden so tokens keep their size. */
   cellSize: number;
+  /**
+   * Where the image goes when Atlas aligned it turned or shifted (`mapPlacement.ts`): its unit square in the world, as a
+   * canvas matrix. Absent when the image just fills the width and height, so a page that does not know it draws that.
+   */
+  matrix?: readonly [number, number, number, number, number, number];
+  /** An animated map's video (an asset id), played over its still `asset` by a view that can; absent for any other map. */
+  video?: string;
+  /** The liquids of the map, drawn over its image and under the grid and the fog; absent without any, and from an older GM. */
+  liquids?: readonly PlayerLiquid[];
+}
+
+/** Water, lava or acid on the map (Atlas 0.10): an outline with holes, and the colours Atlas draws it in. */
+export interface PlayerLiquid {
+  liquid: 'water' | 'lava' | 'acid';
+  polygon: ScenePoint[];
+  holes?: ScenePoint[][];
+  /** `#rrggbb` each: the liquid's surface, its depths and the glint on it. */
+  colors: { surface: string; deep: string; glint: string };
 }
 
 export const PLAYER_GRID_TYPES = ['square', 'hex-horizontal', 'hex-vertical'] as const;
@@ -169,6 +189,14 @@ export interface PlayerToken {
   ringScale?: number;
   /** The 3D mini standing on the token; sent only for a token that has one. An older player ignores it. */
   mini?: PlayerMini;
+  /** How high the token stands over its level's floor, in game units (Atlas 0.15's `elevation`, read with `tokenHeight`); sent only when not 0. */
+  elevation?: number;
+  /**
+   * How far the token moves in one move, in game units, as the GM's Atlas reads it (`tokenSpeed`). Sent only for a
+   * token on the players' side (Atlas's `sideOf`), and only where the measurement carries movement steps: Atlas shows
+   * players the reading against a speed for their own tokens only.
+   */
+  speed?: number;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */
@@ -208,9 +236,20 @@ export interface PlayerDrawing {
   order: number;
   points: ScenePoint[];
   color: string;
+  /** 0 (Atlas 0.16): a fill without a line. */
   width: number;
   opacity: number;
   icon: string | null;
+  /** Atlas 0.16: a closed drawing's inside, in its colour (soft: a quarter of it); absent for none. */
+  fill?: 'solid' | 'soft';
+  /** Atlas 0.16: rings cut out of the fill. */
+  holes?: ScenePoint[][];
+  /** Atlas 0.16: a stamp's turn, degrees clockwise on screen. */
+  rotation?: number;
+  /** Atlas 0.16: its place in the one order of drawings (`order` there), before the time drawn; absent: 0. */
+  stack?: number;
+  /** Atlas 0.16: on the map's own layer, under the grid and the tokens; absent: above the tokens. */
+  layer?: 'map';
 }
 
 export const PLAYER_WIDGET_TYPES = ['counter', 'clock', 'timer'] as const;
@@ -238,6 +277,25 @@ export interface PlayerInitiativeEntry {
   isActive: boolean;
   /** The combatant does not act in the running round; the window fades it. Absent from an older GM. */
   sitsOut?: true;
+  /** The combatant delayed its turn (Atlas 0.9): the window lists it apart, under "Delayed", with no turn. Never sent by sides. Absent from an older GM. */
+  delayed?: true;
+  /** The combatant has no number yet (rolled for none, or dealt no card): the window shows a dash. Absent from an older GM, whose page shows the number. */
+  awaiting?: true;
+  /**
+   * The named side (not `players` or `opponents`) the list by sides files the combatant under; sent only by sides, and
+   * only for a named side. Its token's `side` then reads `opponents`, as an older page knows no other. Absent from an older GM.
+   */
+  sideId?: string;
+}
+
+/** One side of the list by sides, in the order the sides act (Atlas Online's own list). */
+export interface PlayerSideRow {
+  id: string;
+  name: string;
+  /** This round's roll, where the collection rolls for the order and the side has one. */
+  roll?: number;
+  /** The side acts now; several can, where their rolls are equal. */
+  turn?: true;
 }
 
 /** How the list is grouped while it is by sides; the combatants' sides are on their tokens. */
@@ -259,11 +317,38 @@ export interface PlayerInitiative {
    * the active one. Absent for a list in turn order, and from an older GM.
    */
   sides?: PlayerInitiativeSides;
+  /**
+   * With `sides`: every side that has a combatant in the list, in the order they act this round, as Atlas lists them. A
+   * side nobody is listed under is left out, so a name tells nothing of a hidden combatant. Absent from an older GM, whose
+   * page knows the two built-in sides by `sides` alone (`first` and `active` always read `players` or `opponents`).
+   */
+  sideList?: PlayerSideRow[];
 }
 
 export const PLAYER_MEASUREMENT_MODES = ['metric', 'abstract'] as const;
 export const PLAYER_UNIT_TYPES = ['feet', 'yards', 'meters', 'units', 'custom'] as const;
-export const PLAYER_DIAGONAL_RULES = ['equidistant', 'alternating', 'euclidean'] as const;
+/** Atlas's diagonal rules. `manhattan` (every diagonal counts 2) is Atlas 0.15's. */
+export const PLAYER_DIAGONAL_RULES = ['equidistant', 'alternating', 'euclidean', 'manhattan'] as const;
+
+/** When a dragged token shows its distance (Atlas 0.15's `dragDistance` setting): always, only while a fight runs, or never. */
+export const PLAYER_DRAG_DISTANCES = ['always', 'combat', 'never'] as const;
+export type PlayerDragDistance = typeof PLAYER_DRAG_DISTANCES[number];
+
+/** One movement step of the collection's rules (Atlas 0.15's `MovementStep`). */
+export interface PlayerMovementStep {
+  name: string;
+  /** How many times the token's speed the step reaches. */
+  multiple: number;
+  /** `#rrggbb`. */
+  color: string;
+}
+
+/** The collection's movement rules as a drag reads them (Atlas 0.15's `MovementRules`, without the speed: each token carries its own). */
+export interface PlayerMovement {
+  steps: PlayerMovementStep[];
+  /** Whether what a token moves adds up over a turn while a fight runs. */
+  countPerTurn: boolean;
+}
 
 export interface PlayerRangeBand {
   name: string;
@@ -291,6 +376,8 @@ export interface PlayerMeasurement {
    */
   ruleDistance: number;
   diagonalRule: typeof PLAYER_DIAGONAL_RULES[number];
+  /** The unit's name as the GM typed it ("mi"), shown after a distance in place of the unit type's own: the scene's, else the collection's for a custom unit. Absent: the unit type's. */
+  unitName?: string;
   rangeBands: PlayerRangeBand[];
   /** The GM's snap-to-grid: the drag ruler snaps to cell centres only when it is on. */
   snapToGrid: boolean;
@@ -302,6 +389,10 @@ export interface PlayerMeasurement {
    * grid, so nothing snaps. Absent from a GM before Atlas 0.5.1-beta.5.
    */
   snapGrid?: PlayerSnapGrid | null;
+  /** The collection's movement steps; sent only where it names one. A drag of a token with a speed reads against them. */
+  movement?: PlayerMovement;
+  /** When a drag shows its distance; sent only when it is not `always`. */
+  dragDistance?: PlayerDragDistance;
 }
 
 export interface PlayerScene {
@@ -316,10 +407,41 @@ export interface PlayerScene {
   widgets: PlayerWidget[];
   initiative: PlayerInitiative | null;
   measurement: PlayerMeasurement;
+  /**
+   * Atlas's kept measures players see (areas, rulers, auras, and the spells and templates kept there), by Atlas's ids,
+   * in the order they were made. The only place a spell or a template reaches players from.
+   */
+  measures: Record<string, PlayerMeasure>;
   /** The map pins the GM made readable, where players see them; absent from an older GM. */
   pins?: PlayerPin[];
   /** The image the GM shows players, or null; absent from an older GM. */
   handout?: PlayerHandout | null;
+}
+
+export const PLAYER_MEASURE_SHAPES = ['ruler', 'circle', 'cone', 'square', 'line'] as const;
+/** Atlas's looks of an area (`MeasureEffect`). */
+export const PLAYER_MEASURE_EFFECTS = ['fire', 'frost', 'lightning', 'mist', 'radiance', 'shadow'] as const;
+
+/**
+ * One of Atlas's kept measures as players get it (`projectMeasures`): what draws it, and no more. A ruler runs through
+ * its points; an area lies from its first point to its second, as Atlas shapes it (`shapedArea`).
+ */
+export interface PlayerMeasure {
+  shape: typeof PLAYER_MEASURE_SHAPES[number];
+  points: ScenePoint[];
+  /** A line's width, map pixels; one cell without it. */
+  width?: number;
+  /** `#rrggbb`; the accent without it. */
+  color?: string;
+  /** An area walls do not stop. */
+  walls?: false;
+  effect?: typeof PLAYER_MEASURE_EFFECTS[number];
+  /** The player who made it (their session id); absent: the GM, or nobody known. */
+  owner?: string;
+  /** A circle that follows a token players are sent: how far it reaches from the edge of the token's space, game units. */
+  aura?: { token: string; reach: number };
+  /** A spell's 3D shape and words, or a template's mark (`spellMeasure.ts`): known keys only. */
+  tabletop?: TabletopExtra;
 }
 
 /** The image the GM shows players: its asset (null while the GM is still reading it) and its title. */
@@ -336,8 +458,10 @@ export interface PlayerPin {
   y: number;
   /** The pin's number or letter, for pins that show one. */
   label: string | null;
-  /** The linked note's title (its file name, or its heading). */
+  /** The pin's name: the one the GM gave it (Atlas 0.14), else the linked note's title (its file name, or its heading). */
   title: string | null;
+  /** The name shown under the pin on the map, where the GM shows it (Atlas 0.14's Show name); absent otherwise. */
+  name?: string;
   /** Atlas's pin icon (`resolvePinIcon`), or `number` / `letter` for a labelled pin; absent from an older GM. */
   icon?: string;
 }
@@ -346,7 +470,7 @@ export interface PlayerPin {
 export type PlayerSceneBody = Omit<PlayerScene, 'fog' | 'drawings'>;
 
 /** Fields diffed per record, by id. */
-export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings'] as const;
+export const SCENE_RECORD_KEYS = ['tokens', 'fog', 'texts', 'drawings', 'measures'] as const;
 export type SceneRecordKey = typeof SCENE_RECORD_KEYS[number];
 /** Fields replaced as a whole when they differ. */
 export const SCENE_FIELD_KEYS = ['map', 'grid', 'widgets', 'initiative', 'measurement', 'pins', 'handout'] as const;

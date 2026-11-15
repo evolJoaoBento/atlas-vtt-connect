@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../../../ui/primitives/Button';
+import { Dropdown } from '../../../../ui/primitives/Dropdown';
 import { LabelTooltip } from '../../../../ui/primitives/LabelTooltip';
 import type { PeopleBook } from '../PeopleBook';
 import { GM_PERSON_ID, keyOf, type Person } from '../peopleTypes';
@@ -57,24 +58,20 @@ function PersonRow({ person, others, notMet, people, confirmRemove }: {
           onBlur={commit}
           onKeyDown={(event) => { if (event.key === 'Enter') commit(); }}
         />
-        <select
-          className="atlas-people__link dropdown"
+        <Dropdown
+          className="atlas-people__link"
           aria-label={`Link ${person.name} to`}
+          placeholder="Link to…"
           value=""
-          onChange={(event) => {
-            const { value } = event.target;
+          options={[
+            ...others.map((other) => ({ value: keyOf(other), label: other.name })),
+            ...notMet.map((placeholder) => ({ value: `${PLACEHOLDER_PREFIX}${placeholder.id}`, label: placeholder.name, group: NOT_MET_TEXT })),
+          ]}
+          onChange={(value) => {
             if (value.startsWith(PLACEHOLDER_PREFIX)) setProblem(people.linkPlaceholder(keyOf(person), value.slice(PLACEHOLDER_PREFIX.length)));
             else if (value) setProblem(people.merge(keyOf(person), value));
           }}
-        >
-          <option value="">Link to…</option>
-          {others.map((other) => <option key={keyOf(other)} value={keyOf(other)}>{other.name}</option>)}
-          {notMet.length > 0 && (
-            <optgroup label={NOT_MET_TEXT}>
-              {notMet.map((placeholder) => <option key={placeholder.id} value={`${PLACEHOLDER_PREFIX}${placeholder.id}`}>{placeholder.name}</option>)}
-            </optgroup>
-          )}
-        </select>
+        />
         <LabelTooltip label={`Remove ${person.name}`}>
           <Button
             variant="ghost" size="sm" aria-label={`Remove ${person.name}`}

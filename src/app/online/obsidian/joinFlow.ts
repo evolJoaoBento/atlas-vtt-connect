@@ -2,13 +2,16 @@
  * What happens inside one join: the state it keeps, the player session it runs against the GM, and
  * what a scene tab gets when it attaches. `OnlineJoinService` owns the join and calls these.
  */
-import type { TokenSheet } from '../tools/sheets';
+import type { MapSpell, SpellRequest } from '../tools/spells';
+import type { BoardCamera, BoardExtras } from '../scene/boardTypes';
+import type { TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { MapTemplate } from '../tools/templates';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { JoinTarget } from '../joinLink';
 import { mergeDiceLog, ownRolls } from '../page/diceLogModel';
-import type { PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
+import type { BoardDiceOffer, PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
+import { CutsceneKeeper } from '../scene/cutsceneKeeper';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { JoinIdentity } from '../sharing/identity/JoinIdentity';
@@ -36,6 +39,18 @@ export interface Joined {
   sheets: readonly TokenSheet[];
   /** The scene's lasting templates, as the GM last sent them; null before any. */
   templates: { sceneId: string; list: readonly MapTemplate[] } | null;
+  /** The scene's spells, cast through tokens' eyes on the 3D board. */
+  spells?: { sceneId: string; list: readonly MapSpell[]; asks: readonly SpellRequest[] };
+  /** Whether the GM can send Tabletop's 3D board, its board of the scene, and its 3D camera. */
+  boardOffer?: boolean;
+  /** The latest offer took thrown dice (`diceResults`), with the rules of the player's map; absent when it did not. */
+  boardDice?: BoardDiceOffer;
+  board?: BoardExtras | null;
+  boardCamera?: BoardCamera | null;
+  /** This admission asked the GM for the board (`board-request`): asked once, again after a new admission. */
+  boardAsked?: boolean;
+  /** The cutscene running now with its revealed scenes; made with the first session. */
+  cutscenes?: CutsceneKeeper;
   ids: JoinIdentity;
 }
 
@@ -48,12 +63,17 @@ export interface FlowHost {
   createClient(server: JoinTarget['server']): ClientTransport;
   clientVersion: string;
   shareHandler(): PlayerShareHandler | null;
+  /** The colour the player picked (kept by the vault), sent on each admission. */
+  playerColor?(): string | null;
+  /** The GM offered the board (or took it away): a tab that wants it asks now. */
+  boardOffered?(joined: Joined): void;
 }
 
 /** Starts the player session of `joined`; what it hears goes to the tab through `host.sink()`. */
 export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSession {
   const current = (): boolean => host.isCurrent(joined) && joined.session === session;
   const share = host.shareHandler();
+  const cutscenes = joined.cutscenes ??= new CutsceneKeeper(joined.loader, () => host.sink());
   const session: PlayerSession = createJoinSession({
     loader: joined.loader,
     hostId: joined.target.hostId,
@@ -61,10 +81,17 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
     playerKey: joined.playerKey,
     clientVersion: host.clientVersion,
     clientKind: 'obsidian',
+    // The colour the player picked last time goes to the GM on each admission.
+    color: () => host.playerColor?.() ?? null,
     ...(share ? { share } : {}),
     ...(joined.ids.device ? { device: joined.ids.device } : {}),
     transport: host.createClient(joined.target.server),
-    onChange: (state) => { if (current()) host.changed(joined, state); },
+    onChange: (state) => {
+      if (!current()) return;
+      // Out of the session the GM takes no thrown dice; the offer on the next admission says again whether it does.
+      if (state.status !== 'admitted') delete joined.boardDice;
+      host.changed(joined, state);
+    },
     onScene: (scene) => {
       if (!current()) return;
       joined.scene = scene;
@@ -80,7 +107,7 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.control = tokenIds;
       host.sink()?.control(tokenIds);
     },
-    onMoveRefused: (tokenId) => { if (current()) host.sink()?.moveRefused(tokenId); },
+    onMoveRefused: (tokenId, reason) => { if (current()) host.sink()?.moveRefused(tokenId, reason); },
     onSceneState: (paused) => {
       if (!current()) return;
       joined.paused = paused;
@@ -107,12 +134,42 @@ export function startJoinedSession(joined: Joined, host: FlowHost): PlayerSessio
       joined.templates = { sceneId, list };
       host.sink()?.templates?.(sceneId, list);
     },
+    onSpells: (sceneId, list, asks) => {
+      if (!current()) return;
+      joined.spells = { sceneId, list, asks };
+      host.sink()?.spells?.(sceneId, list, asks);
+    },
     onSheets: (entries) => {
       if (!current()) return;
       joined.sheets = entries;
       host.sink()?.sheets?.(entries);
     },
     onPinNote: (answer) => { if (current()) host.sink()?.pinNote?.(answer); },
+    onBoardOffer: (available, dice) => {
+      if (!current()) return;
+      joined.boardOffer = available;
+      if (dice) joined.boardDice = dice;
+      else delete joined.boardDice;
+      // Offered anew (a new admission, Tabletop back on the GM's side): the GM holds no request of ours.
+      joined.boardAsked = false;
+      host.sink()?.boardOffer?.(available, dice);
+      host.boardOffered?.(joined);
+    },
+    onBoardExtras: (extras) => {
+      if (!current()) return;
+      joined.board = extras;
+      joined.loader.setBoard(extras);
+      host.sink()?.boardExtras?.(extras);
+    },
+    onBoardCamera: (camera) => {
+      if (!current()) return;
+      joined.boardCamera = camera;
+      host.sink()?.boardCamera?.(camera);
+    },
+    onCutscene: (cutscene) => { if (current()) cutscenes.cutscene(cutscene); },
+    onCutsceneScene: (runId, key, scene) => { if (current()) cutscenes.scene(runId, key, scene); },
+    onCutsceneExtras: (runId, key, extras) => { if (current()) cutscenes.extras(runId, key, extras); },
+    onCutsceneCamera: (runId, camera) => { if (current()) cutscenes.camera(runId, camera); },
   });
   return session;
 }
@@ -132,8 +189,13 @@ export function catchUp(sink: OnlineSceneSink, joined: Joined, session: PlayerSe
     () => sink.diceLook?.(joined.diceLook),
     () => sink.sheets?.(joined.sheets),
     () => { if (joined.templates) sink.templates?.(joined.templates.sceneId, joined.templates.list); },
+    () => { if (joined.spells) sink.spells?.(joined.spells.sceneId, joined.spells.list, joined.spells.asks); },
     () => { if (joined.camera) sink.camera(joined.camera); },
+    () => { if (joined.boardOffer !== undefined) sink.boardOffer?.(joined.boardOffer, joined.boardDice); },
+    () => { if (joined.board !== undefined) sink.boardExtras?.(joined.board); },
+    () => { if (joined.boardCamera !== undefined) sink.boardCamera?.(joined.boardCamera); },
     () => sink.images(),
+    () => joined.cutscenes?.replay(sink),
   ];
   for (const step of steps) {
     try {

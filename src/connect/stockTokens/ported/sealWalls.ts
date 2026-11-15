@@ -1,7 +1,9 @@
 // Ported unchanged from Atlas VTT src/app/lighting/sealWalls.ts (0.8.0; identical in 0.7.1). AGPL-3.0, like this plugin. Only imports were rewritten.
 import type { Point } from './types';
 import type { WallSegment } from './types';
-import { sealTolerance } from './lightingConstants';
+import { lightingConstants } from '../../../../packages/atlas-shared/src/index';
+
+const { sealTolerance } = lightingConstants;
 import { PointTree } from './pointTree';
 import { BOTH, kindOfAll, shared, type BridgeKind } from './sealKinds';
 import { farthest, plugs } from './sealPlugs';

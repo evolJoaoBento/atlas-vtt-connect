@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '../../../ui/primitives/Button';
+import { Dropdown } from '../../../ui/primitives/Dropdown';
 import type { MapShareMode } from '../model/mapShare';
 import { TaggedText } from '../display/TaggedText';
 import { NOT_MET_TEXT } from '../people/ui/peopleCopy';
@@ -58,6 +59,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
   const [mode, setMode] = useState<MapShareMode>(refused ? 'full' : map?.mode ?? 'player-safe');
   const [notes, setNotes] = useState(map?.ticked ?? []);
   const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewAs, setPreviewAs] = useState('');
   const known = rows.filter((row) => row.known);
   // A player-safe share never offers notes only GM-only pins or hidden tokens link to.
   const offered = map ? map.notes.filter((note) => mode === 'full' || !note.hidden) : [];
@@ -105,14 +107,12 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
       )}
       {preview && (
         <section className="atlas-share__section">
-          <label className="atlas-share__preview-label">
+          <div className="atlas-share__preview-label">
             <span>Preview as</span>
-            <select className="dropdown" aria-label="Preview as" defaultValue=""
-              onChange={(event) => { const key = event.target.value; if (key) void preview(key).then(setPreviewText); }}>
-              <option value="" disabled>Pick a person</option>
-              {known.map((row) => <option key={row.key} value={row.key}>{row.placeholder ? `${row.name} (${NOT_MET_TEXT.toLowerCase()})` : row.name}</option>)}
-            </select>
-          </label>
+            <Dropdown aria-label="Preview as" placeholder="Pick a person" value={previewAs}
+              options={known.map((row) => ({ value: row.key, label: row.placeholder ? `${row.name} (${NOT_MET_TEXT.toLowerCase()})` : row.name }))}
+              onChange={(key) => { setPreviewAs(key); void preview(key).then(setPreviewText); }} />
+          </div>
           {previewText !== null && <pre className="atlas-share__preview"><TaggedText text={previewText} /></pre>}
           {hint && <p className="atlas-share__hint">{hint}</p>}
         </section>

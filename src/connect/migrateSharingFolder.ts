@@ -9,7 +9,7 @@ import { ensureAdapterFolder } from '../app/plugin/vaultFolders';
 
 /** The fork's sharing data, in Atlas's own data folder. */
 export const FORK_SHARING_DIR = 'atlas-vtt/.atlas-data/sharing';
-export const KEPT_FORK_COPY_NOTICE = "Atlas VTT Connect kept its sharing data and left the preview's copy in atlas-vtt/.atlas-data/sharing. Delete it once you've checked your people and shares.";
+export const KEPT_FORK_COPY_NOTICE = "Connect for Atlas VTT kept its sharing data and left the preview's copy in atlas-vtt/.atlas-data/sharing. Delete it once you've checked your people and shares.";
 /** Added to a copy until it is verified; an interrupted copy is overwritten next time. */
 const PENDING = '.migrating';
 

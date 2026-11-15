@@ -138,6 +138,13 @@ export class CameraController {
     this.breakAway(from, zoomAround(from, this.screen, point, factor, this.limits()));
   }
 
+  /** Glides to centre on the world point `point`, keeping the zoom (a click on a combatant in the initiative list); the player then looks for themselves. */
+  lookAt(point: ScreenPoint): void {
+    const from = this.current();
+    this.following = false;
+    this.glideTo(clampCamera({ ...from, centerX: point.x, centerY: point.y }, this.limits()));
+  }
+
   /** Back to following: glide to the GM's camera, or fit the map without one. */
   followGm(): void {
     this.following = true;

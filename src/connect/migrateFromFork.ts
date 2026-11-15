@@ -11,7 +11,7 @@ import { migrateForkSettings, type ForkSettingsStore, type Step } from './migrat
 import { FORK_SHARING_DIR, migrateSharingFolder, removePending, type MigrationAdapter, type SharingMigration } from './migrateSharingFolder';
 import type { ConnectSettingsStore } from './settingsStore';
 
-export const MIGRATED_NOTICE = 'Atlas VTT Connect brought over your online play settings, people and shares from the preview.';
+export const MIGRATED_NOTICE = 'Connect for Atlas VTT brought over your online play settings, people and shares from the preview.';
 /** Added when the sharing folder was copied: the preview's copy stays, and the user should know what it holds. */
 export const LEFTOVER_NOTICE = `The preview's copy stays in ${FORK_SHARING_DIR} and still holds the old text of notes shared with you. Delete it once you've checked your people and shares.`;
 

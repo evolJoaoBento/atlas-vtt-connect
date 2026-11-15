@@ -1,12 +1,14 @@
 /** What the scene hub needs of its neighbours, and the change detection its slots share with them. */
+import type { BoardLook, GmCutscene } from './sceneContracts';
 import type { HandoutSource } from '../handouts';
 import type { CollectionGridDefaults, ConditionDefinition, FogOperation, InitiativeRules, ResourceDefinition, SceneSnapshot } from '@atlas-vtt/api-types';
 import type { PresentedSceneSource } from '../atlas/presentedSource';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
+import { readAlignment } from './mapPlacement';
 import type { PlayerViewRules } from './playerViewRules';
-import type { MiniPlacement, ProjectionContext } from './projectForPlayers';
+import type { MiniPlacement, ProjectedMovement, ProjectionContext } from './projectForPlayers';
 import type { ResourceVisibilitySource } from './resourceVisibility';
 import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import type { SceneSession } from './sceneContracts';
@@ -44,6 +46,8 @@ export interface SceneProjectionOptions {
   conditions?: (mapPath: string | null) => readonly ConditionDefinition[];
   /** The initiative rules of the collection holding the map at `mapPath`, which say whether the list is by sides before a fight; without it the list is in turn order. */
   initiativeRules?: (mapPath: string | null) => InitiativeRules;
+  /** The movement of the map at `mapPath` (Atlas 0.15): its rules and each token's speed, as the GM's Atlas reads them; without it drags read as plain distances. */
+  movement?: (mapPath: string | null) => ProjectedMovement | null;
   /** Calls `listener` when a collection's rules change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
   watchResources?: (listener: () => void) => () => void;
   /** The dice look of each scene's collection, sent to its players; without it (an Atlas before API 1.18) none is sent. */
@@ -54,6 +58,32 @@ export interface SceneProjectionOptions {
   resourceVisibility?: ResourceVisibilitySource;
   /** The 3D minis on tokens (the Tabletop extension's); without it no token carries one. */
   minis?: MiniSource;
+  /** Tabletop's 3D board: what the GM gave each map, for players on the board; without it no board extras are made. */
+  board?: BoardSource;
+}
+
+/** A 3D pose in the board's world: x and z are the map's x and y in pixels, y is up. */
+export interface BoardPose { eye: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } }
+
+/** The Tabletop extension's board, as `connect/tabletopMinis.ts` reads it. */
+export interface BoardSource {
+  /** Whether a Tabletop that shares its board is there. */
+  available(): boolean;
+  /** What the GM gave the map on the board, for the floor Atlas shows; with `level`, for that floor of the scene. */
+  lookFor(mapPath: string, level?: string): BoardLook | null;
+  /** The GM's 3D view of the map (its players' window, else its board); null when none shows it. */
+  camera(mapPath: string): BoardPose | null;
+  /** Calls `listener` when Tabletop arrives or leaves, or a map's look changes; returns the stop. */
+  subscribe(listener: () => void): () => void;
+  /** Calls `listener` (often) while the GM's 3D camera moves; returns the stop. */
+  subscribeCamera(listener: () => void): () => void;
+  /** The cutscene running on the GM's board (Tabletop's `api.cutscene`), or null; absent without a Tabletop that offers one. */
+  cutscene?(): GmCutscene | null;
+  /** Calls `listener` when `cutscene()` changed (started, stepped, changed scene, ended); returns the stop. */
+  subscribeCutscene?(listener: () => void): () => void;
+  /** Live runs only: the GM's own board camera. */
+  cutsceneCamera?(): BoardPose | null;
+  subscribeCutsceneCamera?(listener: () => void): () => void;
 }
 
 /** The minis standing on each map's tokens, as the Tabletop extension keeps them (`connect/tabletopMinis.ts`). */
@@ -84,6 +114,8 @@ export function sliceOf(snapshot: SceneSnapshot): Slice {
     snapshot.background, snapshot.grid, snapshot.objects.tokens, snapshot.objects.texts, snapshot.objects.drawings,
     snapshot.objects.fog, snapshot.widgets.settings, snapshot.widgets.values, snapshot.initiative,
     snapshot.initiativeTrackerOpen, snapshot.lighting,
+    // Walls and lights: what players on Tabletop's 3D board see of them (`projectBoard`).
+    (snapshot.objects as { walls?: unknown }).walls, (snapshot.objects as { lights?: unknown }).lights,
     // A stock Atlas's snapshot carries its note pins (an Atlas API's has none): the readable ones go to players.
     (snapshot.objects as { pins?: unknown }).pins,
     // And its token settings: the instance badges and ring size players see follow them.
@@ -131,13 +163,15 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides the snapshot's slice. */
 export function sceneContext(
   snapshot: SceneSnapshot,
-  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis'> {
+  options: Pick<SceneProjectionOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceVisibility' | 'minis' | 'movement'>,
+): Pick<ProjectionContext, 'mapSize' | 'mapAlignment' | 'collectionGrid' | 'coneAngle' | 'resources' | 'conditions' | 'initiativeRules' | 'handout' | 'resourceShows' | 'minis' | 'movement'> {
   const { mapPath } = snapshot;
+  const mapAlignment = readAlignment((snapshot as { mapAlignment?: unknown }).mapAlignment);
   const coneAngle = options.coneAngle?.(mapPath);
   const initiativeRules = options.initiativeRules?.(mapPath);
   return {
     mapSize: snapshot.mapSize,
+    ...(mapAlignment ? { mapAlignment } : {}),
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
@@ -146,5 +180,6 @@ export function sceneContext(
     ...(options.handout ? { handout: options.handout.current() } : {}),
     ...(initiativeRules && { initiativeRules }),
     ...(options.minis ? { minis: options.minis.forMap(mapPath) } : {}),
+    ...(options.movement ? { movement: options.movement(mapPath) } : {}),
   };
 }

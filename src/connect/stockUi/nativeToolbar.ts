@@ -39,6 +39,11 @@ interface Bar {
   stops: Disposer[];
 }
 
+/** The Atlas view a bar's buttons act on: its own, or for a Tabletop board the Atlas view holding its map. */
+function actsOn(bar: Bar): string {
+  return bar.view.contextViewId ?? bar.view.viewId;
+}
+
 function make<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
   return createEl(tag, { cls, ...(text !== undefined && { text }) });
 }
@@ -78,6 +83,8 @@ export class NativeToolbar implements PanelHost {
   /** What each button does when pressed, kept by the button so the button itself is made once. */
   private readonly clicks = new WeakMap<HTMLElement, () => void>();
   private tip: HTMLElement | null = null;
+  /** The bar whose button is being answered: a panel it opens goes there (a Tabletop board's, for its Atlas view). */
+  private clickedBar: Bar | null = null;
   private tipTimer: number | null = null;
 
   constructor(
@@ -151,6 +158,8 @@ export class NativeToolbar implements PanelHost {
   }
 
   private barFor(viewId: string | undefined): Bar | undefined {
+    const clicked = this.clickedBar;
+    if (clicked?.group?.isConnected && (viewId === undefined || actsOn(clicked) === viewId)) return clicked;
     const id = viewId ?? this.env.activeView()?.viewId;
     return id === undefined ? undefined : this.bars.get(id);
   }
@@ -179,7 +188,7 @@ export class NativeToolbar implements PanelHost {
     shell.append(head, content);
     tray.appendChild(shell);
     bar.group?.appendChild(tray);
-    const ctx: ViewContext = { viewId: bar.view.viewId, kind: 'map', isPlayerView: false };
+    const ctx: ViewContext = { viewId: actsOn(bar), kind: 'map', isPlayerView: false };
     const unmount = guarded('A panel mount', null as Disposer | null, () => spec.mount(content, ctx));
     const win = bar.view.doc.defaultView ?? window;
     const place = (): void => keepInView(tray);
@@ -293,7 +302,7 @@ export class NativeToolbar implements PanelHost {
   private render(bar: Bar): void {
     const group = this.ensureGroup(bar);
     if (!group) return;
-    const ctx: ToolbarItemContext = { viewId: bar.view.viewId, kind: 'map', isPlayerView: false, ownRemote: false };
+    const ctx: ToolbarItemContext = { viewId: actsOn(bar), kind: 'map', isPlayerView: false, ownRemote: false };
     const wanted = [...this.records.toolbar.values()]
       .filter((item) => (item.views ?? ['map']).includes('map') && (item.isVisible === undefined || guarded(`Toolbar item ${item.id} isVisible`, false, () => item.isVisible?.(ctx)) === true))
       .sort((a, b) => (b.priority ?? 50) - (a.priority ?? 50));
@@ -303,7 +312,15 @@ export class NativeToolbar implements PanelHost {
       this.draw(bar, `item:${item.id}`, index, { icon: item.icon, label: item.shortcut ? `${item.label} (${item.shortcut})` : item.label,
         active: guarded(`Toolbar item ${item.id} isActive`, false, () => item.isActive?.(ctx) === true),
         badge: guarded<string | number | true | null>(`Toolbar item ${item.id} badge`, null, () => item.badge?.(ctx) ?? null),
-        onClick: () => guarded(`Toolbar item ${item.id}`, undefined, () => item.onClick(ctx)) });
+        onClick: () => {
+          // What the click opens (a panel for the Atlas view it acts on) opens where it was clicked.
+          this.clickedBar = bar;
+          try {
+            guarded(`Toolbar item ${item.id}`, undefined, () => item.onClick(ctx));
+          } finally {
+            this.clickedBar = null;
+          }
+        } });
     });
     // View menu items and palette sections have no button here: each is an Obsidian command too, and the panels and
     // menus beside it cover the rest.
@@ -547,7 +564,7 @@ export class NativeToolbar implements PanelHost {
 
   private tokenItems(view: DockView, tokens: DockToken[]): MenuItem[] {
     const forToken = (token: DockToken): MenuItem[] => {
-      const ctx: TokenMenuContext = { viewId: view.viewId, kind: 'map', isPlayerView: false, tokenId: token.id, tokenKind: token.kind };
+      const ctx: TokenMenuContext = { viewId: view.contextViewId ?? view.viewId, kind: 'map', isPlayerView: false, tokenId: token.id, tokenKind: token.kind };
       return [...this.records.tokenMenus].flatMap((provider) => guarded('A token menu provider', [] as MenuItem[], () => provider(ctx)));
     };
     if (tokens.length === 1) return forToken(tokens[0]!);
@@ -558,7 +575,7 @@ export class NativeToolbar implements PanelHost {
   }
 
   private editTokenSections(view: DockView, token: DockToken): EditTokenSectionSpec[] {
-    const ctx: TokenMenuContext = { viewId: view.viewId, kind: 'map', isPlayerView: false, tokenId: token.id, tokenKind: token.kind };
+    const ctx: TokenMenuContext = { viewId: view.contextViewId ?? view.viewId, kind: 'map', isPlayerView: false, tokenId: token.id, tokenKind: token.kind };
     return [...this.records.editTokenSections].flatMap((provider) => guarded('An Edit Token section', [] as EditTokenSectionSpec[], () => {
       const section = provider(ctx);
       return section ? [section] : [];
@@ -580,7 +597,7 @@ export class NativeToolbar implements PanelHost {
 
   /** The scene tab sections that give something for one tab, with their headings. */
   private tabSections(view: DockView, tab: DockTab): Array<{ heading: string; items: MenuItem[] }> {
-    const ctx: SceneTabMenuContext = { viewId: view.viewId, tabId: tab.tabId, mapPath: tab.mapPath, name: tab.name, active: tab.active, presented: tab.presented };
+    const ctx: SceneTabMenuContext = { viewId: view.contextViewId ?? view.viewId, tabId: tab.tabId, mapPath: tab.mapPath, name: tab.name, active: tab.active, presented: tab.presented };
     return [...this.records.sceneTabSections].flatMap((section) => {
       const items = guarded(`Scene tab section ${section.heading}`, [] as MenuItem[], () => section.items(ctx));
       return items.length === 0 ? [] : [{ heading: section.heading.slice(0, 40), items }];

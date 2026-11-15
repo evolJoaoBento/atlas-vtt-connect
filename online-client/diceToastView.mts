@@ -7,7 +7,7 @@
  * or leave at once when clicked. Text only, never markup: everything comes from the GM. Shared with the Obsidian tab.
  */
 import { dieLabel } from '@atlas-vtt/shared/rules';
-import { DICE_TOAST_MS, dieExtreme, entryRolls, rollerLabel } from '../src/app/online/page/diceLogModel';
+import { DICE_TOAST_MS, dieExtreme, dieMarks, entryRolls, rollerLabel } from '../src/app/online/page/diceLogModel';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import { DICE_TOAST_KNOT_PATHS } from '../src/app/online/page/diceToastOrnament';
 import { dieTagOf, dieTagText } from '../src/app/online/tools/diceTags';
@@ -166,11 +166,12 @@ export class DiceToastView {
     details.className = 'dice-card-details';
     details.hidden = true;
     const rolls = entryRolls(entry);
-    const dropping = entry.dice.some((die) => die.dropped === true);
+    const struck = (die: DiceLogEntry['dice'][number]): boolean => die.dropped === true || die.rerolled === true;
+    const dropping = entry.dice.some(struck);
     entry.dice.forEach((die, index) => {
       const badge = span(doc, 'dice-card-die', dieLabel(rolls, index));
-      if (die.dropped) badge.classList.add('is-dropped');
-      else {
+      badge.classList.add(...dieMarks(die));
+      if (!struck(die)) {
         const extreme = dieExtreme(die);
         if (extreme) badge.classList.add(`is-${extreme}`);
         if (dropping) badge.classList.add('is-kept');

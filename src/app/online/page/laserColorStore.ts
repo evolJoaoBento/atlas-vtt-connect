@@ -30,3 +30,24 @@ export function saveLaserColor(color: string, storage: Writer): void {
     // The pick still applies to this visit.
   }
 }
+
+export const LASER_SIZE_KEY = pageKey('laser-size');
+
+/** The remembered laser size (Atlas's 8 to 100), or null when there is none or storage is unavailable. */
+export function loadLaserSize(storage: Reader): number | null {
+  try {
+    const size = Number(readKept(storage(), 'laser-size'));
+    return Number.isFinite(size) && size >= 8 && size <= 100 ? Math.round(size) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLaserSize(size: number, storage: Writer): void {
+  if (!Number.isFinite(size)) return;
+  try {
+    storage().setItem(LASER_SIZE_KEY, String(Math.round(size)));
+  } catch {
+    // The pick still applies to this visit.
+  }
+}

@@ -28,10 +28,10 @@ describe("the player's Template and Ping tools", () => {
     t.tools.selectTemplateShape('cone');
     expect(t.tools.tool).toBe('template');
     expect(t.tools.grab({ x: 100, y: 100 }, 'mouse')).toBe(true);
-    t.tools.move({ x: 160, y: 100 });
+    t.tools.move({ x: 160, y: 105 });
     expect(t.tools.overlay().templates).toEqual([expect.objectContaining({ id: 'draft', shape: 'cone', start: { x: 105, y: 105 }, end: { x: 175, y: 105 }, label: '5ft' })]);
-    t.tools.drop({ x: 160, y: 100 });
-    // Snapped to cell centres, as a measurement is while the GM snaps to the grid.
+    t.tools.drop({ x: 160, y: 105 });
+    // Snapped as Atlas snaps an area: its origin to a cell's centre, corner or edge middle, its size to whole cells.
     expect(t.changes).toEqual([{ add: { shape: 'cone', start: { x: 105, y: 105 }, end: { x: 175, y: 105 } } }]);
     expect(t.tools.overlay().templates).toEqual([]);
   });
@@ -79,15 +79,16 @@ describe("the player's Template and Ping tools", () => {
     expect(t.changes).toEqual([{ clear: true }]);
   });
 
-  it('labels a square with its side and snaps its corners to the grid while snapping is on', () => {
+  it('labels a square with its side, and snaps its origin and its size as Atlas does while snapping is on', () => {
     const t = setup();
     const scene = playerScene();
     t.tools.setScene({ ...scene, measurement: { ...scene.measurement, snapToGrid: true } });
     t.tools.selectTemplateShape('square');
     t.tools.grab({ x: 72, y: 68 }, 'mouse');
-    t.tools.move({ x: 208, y: 141 });
+    t.tools.move({ x: 204, y: 70 });
     const [draft] = t.tools.overlay().templates;
-    expect(draft).toMatchObject({ shape: 'square', start: { x: 70, y: 70 }, end: { x: 210, y: 140 } });
+    // From a cell's corner, two whole cells along the drag: the square Atlas would make of the same drag.
+    expect(draft).toMatchObject({ shape: 'square', start: { x: 70, y: 70 }, end: { x: 210, y: 70 } });
     expect(draft!.label).toMatch(/10/);
   });
 

@@ -6,16 +6,24 @@
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
 import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneInbox } from './playerSessionScene';
+import type { BoardCamera, BoardCutscene, BoardExtras, CutsceneCamera } from './scene/boardTypes';
+import { CutsceneExtrasInbox, mergeBoardExtras } from './scene/cutsceneExtrasInbox';
 import type { SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
-import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
-import type { SheetRollRef, TokenSheet } from './tools/sheets';
+import type { DiceLogEntry, OfferedDiceRules, PhysicalRoll, PlayerLaser } from './tools/toolMessages';
+import type { AdvantageSide, SheetRollRef, TokenSheet } from '../../../packages/atlas-host/src/sheets/sheets';
 import type { PinNoteAnswer } from './tools/pinNotes';
 import type { PlayerPing } from './tools/pings';
 import type { MapTemplate } from './tools/templates';
+import type { MapSpell, SpellChange, SpellRequest } from './tools/spells';
+import { isCastName, isSpellAbout, type SpellAbout, isSpellRules, type SpellRules, joinAsks } from './tools/spells';
 import type { TemplateChange } from './view/tools/PlayerTools';
+import type { ArPose } from './tools/arViews';
+import type { ArSurvey } from './tools/arTable';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
+import { FUSION_PROTOCOL } from './scene/boardTypes';
+import { SceneMarks } from './tools/sceneMarks';
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -64,8 +72,8 @@ export interface PlayerSessionOptions {
   onCamera?(camera: SceneCamera): void;
   /** The tokens this player may move: the GM's latest `token-control` list; empty once the session is over. */
   onControl?(tokenIds: readonly string[]): void;
-  /** The GM refused this player's move of the token. */
-  onMoveRefused?(tokenId: string): void;
+  /** The GM refused this player's move of the token; `reason` where the GM gave one (`not-held`: its Atlas is on another map). */
+  onMoveRefused?(tokenId: string, reason?: 'not-held' | 'limit' | 'full'): void;
   /** The scene shown was paused (the GM is on another scene) or is live again. */
   onSceneState?(paused: boolean): void;
   /** The dice look the GM's collection throws in for the scene shown (a full look id), or null; the web page ignores it. */
@@ -78,16 +86,45 @@ export interface PlayerSessionOptions {
   onSheets?(entries: readonly TokenSheet[]): void;
   /** Someone else's ping, for the scene `sceneId`. */
   onPing?(ping: PlayerPing): void;
-  /** Every lasting template on the scene `sceneId`, whenever they change. */
+  /**
+   * The scene's measures flat on the map (Atlas's kept measures: areas, rulers, templates, spells), whenever they
+   * change: worked out from the scene (`SceneMarks`), never sent as a list.
+   */
   onTemplates?(sceneId: string, templates: readonly MapTemplate[]): void;
+  /**
+   * The scene's spells (those kept in its measures, and an instantaneous one while it goes off), whenever they change,
+   * and the spells the GM asks of the player's tokens there.
+   */
+  onSpells?(sceneId: string, spells: readonly MapSpell[], asks: readonly SpellRequest[]): void;
+  /** The player's own colour, sent on each admission (null: the one their place gives). */
+  color?(): string | null;
   /** The GM's answer to a pin this player opened: its note, or null when it cannot be read. */
   onPinNote?(answer: PinNoteAnswer): void;
+  /** Whether the GM can send the scene for Tabletop's 3D board (`board-offer`); `dice` when it also takes thrown dice (`diceResults`), with its rules (null for the default). */
+  onBoardOffer?(available: boolean, dice?: BoardDiceOffer): void;
+  /** The scene's board extras, whole once every part of one `seq` is here; null for none. */
+  onBoardExtras?(extras: BoardExtras | null): void;
+  /** The GM's 3D camera of the scene, or null. */
+  onBoardCamera?(camera: BoardCamera | null): void;
+  /** The cutscene running now (again whenever it changes); null when it ends, the link drops, the GM says bye or the player leaves. */
+  onCutscene?(cutscene: BoardCutscene | null): void;
+  /** The revealed scene of the run's map `key`. */
+  onCutsceneScene?(runId: string, key: string, scene: PlayerScene): void;
+  /** The board extras of the run's map `key`, whole once every part of one `seq` is here. */
+  onCutsceneExtras?(runId: string, key: string, extras: BoardExtras): void;
+  /** The GM's camera in a live run. */
+  onCutsceneCamera?(runId: string, camera: CutsceneCamera): void;
   /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
   assets?: PlayerAssetHandler;
   /** Sharing's end of the assets channel (Obsidian clients only). */
   share?: PlayerShareHandler;
+}
+
+/** The GM takes dice thrown on Tabletop's board (`dice-result`), judged by these rules; null for Atlas's defaults. */
+export interface BoardDiceOffer {
+  rules: OfferedDiceRules | null;
 }
 
 export class PlayerSession {
@@ -102,13 +139,25 @@ export class PlayerSession {
   private assetLink: PeerLink | null = null;
   private controlled: readonly string[] = [];
   private tableProof: TableProof | null = null;
+  /** The latest board offer took `dice-result`. */
+  private takesDiceResults = false;
+  /** A cutscene was announced and not yet ended: the next end tells the view. */
+  private cutsceneOn = false;
+  /** The client asked for the revealed scenes (`cutscene-ready`): asked again on every admission. */
+  private cutsceneReady = false;
+  private readonly cutsceneExtras = new CutsceneExtrasInbox();
 
   private readonly inbox: PlayerSceneInbox;
+  /** What the views draw of the scene's measures, worked out from each scene as it arrives. */
+  private readonly marks = new SceneMarks({
+    templates: (sceneId, templates) => this.options.onTemplates?.(sceneId, templates),
+    spells: (sceneId, spells, asks) => this.options.onSpells?.(sceneId, spells, asks),
+  });
 
   constructor(private readonly options: PlayerSessionOptions) {
     this.inbox = new PlayerSceneInbox({
       sendResync: (seq) => this.link?.send('control', encodeControl({ v: 1, type: 'scene-resync', seq })),
-      onScene: (scene) => this.options.onScene?.(scene),
+      onScene: (scene) => { this.options.onScene?.(scene); this.marks.scene(scene); },
       onCamera: (camera) => this.options.onCamera?.(camera),
       onPaused: (paused) => this.options.onSceneState?.(paused),
       onDiceLook: (look) => this.options.onDiceLook?.(look),
@@ -147,9 +196,19 @@ export class PlayerSession {
   }
 
   /** Asks the GM to roll; false when it cannot go (not admitted, no link). */
-  sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
+  sendDiceRoll(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean {
     if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier }));
+    this.link.send('control', encodeControl({ v: 1, type: 'dice-roll', dice, modifier, ...(advantage ? { advantage } : {}) }));
+    return true;
+  }
+
+  /** Sends dice thrown on Tabletop's board; false when it cannot go (not admitted, no link, or a GM that takes none). */
+  sendDiceResult(result: PhysicalRoll): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !this.takesDiceResults) return false;
+    const { rolls, modifier, label, sheet } = result;
+    this.link.send('control', encodeControl({
+      v: 1, type: 'dice-result', rolls, modifier, ...(label !== undefined ? { label } : {}), ...(sheet ? { sheet } : {}),
+    }));
     return true;
   }
 
@@ -158,6 +217,21 @@ export class PlayerSession {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
     this.link.send('control', encodeControl({ v: 1, type: 'map-template', sceneId: scene.sceneId, ...('add' in change ? { add: change.add } : 'remove' in change ? { remove: change.remove } : { clear: true as const }) }));
+    return true;
+  }
+
+  /** The player picked their colour: the GM is told (it colours their laser, pings, templates and spells). */
+  sendColor(color: string): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'player-color', color }));
+    return true;
+  }
+
+  /** Asks the GM to cast a spell on the scene the player has, take one of theirs off or clear theirs; false when it cannot go. */
+  sendSpell(change: SpellChange): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'map-spell', sceneId: scene.sceneId, ...spellParts(change) }));
     return true;
   }
 
@@ -185,11 +259,32 @@ export class PlayerSession {
   }
 
   /** Sends new points of this player's laser for the scene they have; false when it cannot go. */
-  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string): boolean {
+  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string, size?: number): boolean {
     const scene = this.inbox.scene;
     if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
-    this.link.send('control', encodeControl({ v: 1, type: 'laser', sceneId: scene.sceneId, points: [...points], lifted, ...(dt ? { dt: [...dt] } : {}), ...(color ? { color } : {}) }));
+    this.link.send('control', encodeControl({
+      v: 1, type: 'laser', sceneId: scene.sceneId, points: [...points], lifted, ...(dt ? { dt: [...dt] } : {}), ...(color ? { color } : {}), ...(size !== undefined ? { size } : {}),
+    }));
     return true;
+  }
+
+  /**
+   * This client can draw cutscenes: asks the GM to send (or stop sending) the revealed scenes of the run. Remembered, and
+   * asked again on every admission (a reconnect's GM has forgotten it); false when it cannot go now.
+   */
+  sendCutsceneReady(on: boolean): boolean {
+    this.cutsceneReady = on;
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'cutscene-ready', on }));
+    return true;
+  }
+
+  /** The cutscene is over for this client (it ended, the link dropped, the GM left or the player did): the view is told once. */
+  private endCutscene(): void {
+    this.cutsceneExtras.clear();
+    if (!this.cutsceneOn) return;
+    this.cutsceneOn = false;
+    this.options.onCutscene?.(null);
   }
 
   start(): void {
@@ -204,9 +299,32 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.marks.dispose();
+    this.endCutscene();
     this.leaveAssets();
     this.link?.send('control', encodeControl({ v: 1, type: 'bye', reason: 'left' }));
     this.link?.close();
+  }
+
+  /**
+   * The player asks to connect again at once (the page's Reconnect): the link in use, which may look open while carrying
+   * nothing, is let go and a new one made now, without waiting for the next retry. False once the session has ended or
+   * before the player was ever let in.
+   */
+  reconnect(): boolean {
+    if (this.finished || !this.started || !this.wasAdmitted) return false;
+    if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    const old = this.link;
+    this.link = null;
+    this.endCutscene();
+    if (old && this.assetLink === old) this.leaveAssets();
+    old?.close();
+    this.attempt = 0;
+    this.droppedAt = Date.now();
+    this.update({ status: 'connecting' });
+    void this.connect();
+    return true;
   }
 
   private async connect(): Promise<void> {
@@ -231,10 +349,10 @@ export class PlayerSession {
     });
     link.onClose(() => {
       if (this.assetLink === link) this.leaveAssets();
-      if (this.link === link) { this.link = null; this.dropped(); }
+      if (this.link === link) { this.link = null; this.endCutscene(); this.dropped(); }
     });
     link.send('control', encodeControl({
-      v: 1, type: 'join', name: this.options.name, playerKey: this.options.playerKey,
+      v: 1, type: 'join', fusion: FUSION_PROTOCOL, name: this.options.name, playerKey: this.options.playerKey,
       client: { kind: this.options.clientKind ?? 'web', version: this.options.clientVersion },
       ...(this.options.device ? { device: this.options.device } : {}),
     }));
@@ -252,8 +370,15 @@ export class PlayerSession {
       case 'admitted':
         this.wasAdmitted = true;
         this.attempt = 0;
+        // A new admission takes no thrown dice until the GM offers them again (it does right after).
+        this.takesDiceResults = false;
+        if (this.cutsceneReady) link.send('control', encodeControl({ v: 1, type: 'cutscene-ready', on: true }));
         this.tableProof = message.table ?? null;
         this.update({ status: 'admitted', playerId: message.playerId, title: message.session.title, reason: null });
+        {
+          const color = this.options.color?.() ?? null;
+          if (color) link.send('control', encodeControl({ v: 1, type: 'player-color', color }));
+        }
         if (this.assetLink !== link) {
           // A repeated admission on the same link must not start the handler over.
           this.assetLink = link;
@@ -280,7 +405,7 @@ export class PlayerSession {
         this.setControlled(message.tokenIds);
         break;
       case 'token-move-refused':
-        this.options.onMoveRefused?.(message.tokenId);
+        this.options.onMoveRefused?.(message.tokenId, message.reason);
         break;
       case 'dice-log':
         this.options.onDiceLog?.(message.entries, message.replay);
@@ -288,8 +413,15 @@ export class PlayerSession {
       case 'token-sheets':
         this.options.onSheets?.(message.entries);
         break;
-      case 'map-templates':
-        this.options.onTemplates?.(message.sceneId, message.templates);
+      case 'spell-asks':
+        this.marks.asks(message.sceneId, joinAsks(message.asks, message.askWords, message.askRules));
+        break;
+      case 'spell-flash':
+        this.marks.flash(message.sceneId, message.cast);
+        break;
+      case 'map-refused':
+        // Said as a refused move is, with the reason's own words: Atlas is on another map, a limit, a full level.
+        this.options.onMoveRefused?.('', message.reason);
         break;
       case 'pin-note':
         this.options.onPinNote?.({ sceneId: message.sceneId, pinId: message.pinId, note: message.note });
@@ -300,15 +432,85 @@ export class PlayerSession {
           this.options.onPing?.({ from: message.from, sceneId: message.sceneId, x: message.x, y: message.y, color: message.color });
         }
         break;
+      case 'board-offer':
+        // Offered on every admission: a GM hosting anew counts its board from 1 again.
+        this.board = null;
+        this.takesDiceResults = message.diceResults === true;
+        this.options.onBoardOffer?.(message.available, message.diceResults === true ? { rules: message.diceRules ?? null } : undefined);
+        break;
+      case 'board-extras':
+        this.boardPart(message.seq, message.part, message.parts, message.extras);
+        break;
+      case 'board-camera':
+        this.options.onBoardCamera?.(message.camera);
+        break;
+      case 'cutscene':
+        if (message.cutscene === null) this.endCutscene();
+        else {
+          this.cutsceneOn = true;
+          this.options.onCutscene?.(message.cutscene);
+        }
+        break;
+      case 'cutscene-scene':
+        this.options.onCutsceneScene?.(message.runId, message.key, message.scene);
+        break;
+      case 'cutscene-extras': {
+        const whole = this.cutsceneExtras.part(message.runId, message.key, message.seq, message.part, message.parts, message.extras);
+        if (whole) this.options.onCutsceneExtras?.(message.runId, message.key, whole);
+        break;
+      }
+      case 'cutscene-camera':
+        this.options.onCutsceneCamera?.(message.runId, { eye: message.eye, target: message.target });
+        break;
       case 'laser':
         // Only the GM's relays carry `from`.
         if (message.from !== undefined) {
-          this.options.onLaser?.({ from: message.from, sceneId: message.sceneId, points: message.points, lifted: message.lifted, ...(message.dt ? { dt: message.dt } : {}), ...(message.color ? { color: message.color } : {}) });
+          this.options.onLaser?.({
+            from: message.from, sceneId: message.sceneId, points: message.points, lifted: message.lifted,
+            ...(message.dt ? { dt: message.dt } : {}), ...(message.color ? { color: message.color } : {}), ...(message.size !== undefined ? { size: message.size } : {}),
+          });
         }
         break;
       default:
         break;
     }
+  }
+
+  /** Tells the GM where this phone's camera is in augmented reality over the scene the player has (null: not tracking); false when it cannot go. */
+  sendArView(pose: ArPose | null): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'ar-view', sceneId: scene.sceneId, pose }));
+    return true;
+  }
+
+  /** Sends the GM this phone's survey of the table's marker sheets, for the scene the player has; false when it cannot go. */
+  sendArSurvey(survey: ArSurvey): boolean {
+    const scene = this.inbox.scene;
+    if (this.finished || this.state.status !== 'admitted' || !this.link || !scene) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'ar-survey', sceneId: scene.sceneId, survey }));
+    return true;
+  }
+
+  /** Asks the GM to send (or stop sending) the board extras of this player's scene; false while not admitted. */
+  sendBoardRequest(on: boolean): boolean {
+    if (this.finished || this.state.status !== 'admitted' || !this.link) return false;
+    this.link.send('control', encodeControl({ v: 1, type: 'board-request', on }));
+    return true;
+  }
+
+  /** The parts of the newest board seen; an older seq's parts are dropped. */
+  private board: { seq: number; parts: Array<BoardExtras | null | undefined> } | null = null;
+
+  private boardPart(seq: number, part: number, parts: number, extras: BoardExtras | null): void {
+    if (this.board && seq < this.board.seq) return;
+    if (!this.board || seq > this.board.seq) this.board = { seq, parts: new Array<BoardExtras | null | undefined>(parts).fill(undefined) };
+    if (this.board.parts.length !== parts || part >= parts) return;
+    this.board.parts[part] = extras;
+    if (this.board.parts.some((entry) => entry === undefined)) return;
+    const [first, ...rest] = this.board.parts as Array<BoardExtras | null>;
+    const whole = first ? mergeBoardExtras(first, rest.filter((next): next is BoardExtras => next !== null)) : null;
+    this.options.onBoardExtras?.(whole);
   }
 
   /** The link closed or could not be made: retry if we were in, else stop. */
@@ -334,6 +536,8 @@ export class PlayerSession {
     if (this.retryTimer !== null) window.clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.inbox.dispose();
+    this.marks.dispose();
+    this.endCutscene();
     this.leaveAssets();
     this.setControlled([]);
     this.update({ status, reason });
@@ -357,4 +561,17 @@ export class PlayerSession {
     this.state = { ...this.state, ...partial };
     this.options.onChange(this.state);
   }
+}
+
+/** A spell change as `map-spell` carries it. */
+function spellParts(change: SpellChange): { add: MapSpell['spell']; request?: string; rules?: SpellRules; name?: string; about?: SpellAbout } | { remove: string } | { clear: true } | { decline: string } {
+  if ('add' in change) {
+    return {
+      add: change.add, ...(change.request !== undefined ? { request: change.request } : {}), ...(change.rules !== undefined && isSpellRules(change.rules) ? { rules: change.rules } : {}),
+      ...(isCastName(change.name) ? { name: change.name } : {}), ...(change.about !== undefined && isSpellAbout(change.about) ? { about: change.about } : {}),
+    };
+  }
+  if ('remove' in change) return { remove: change.remove };
+  if ('decline' in change) return { decline: change.decline };
+  return { clear: true };
 }

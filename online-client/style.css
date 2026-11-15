@@ -85,6 +85,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .connection { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .connection::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #d29922; }
 .connection[data-state="ok"]::before { background: #3fb950; }
+.reconnect-button { padding: 2px 10px; font-size: 12px; border-radius: 999px; }
+.reconnect-button[hidden], .rejoin-button[hidden] { display: none; }
+.rejoin-button { margin-top: 12px; }
 .image-progress { flex: 1; min-width: 80px; display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
 .image-progress progress { width: 100%; height: 6px; accent-color: var(--accent); }
 .icon-button {
@@ -245,6 +248,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tray-modifier-label { margin-right: auto; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .tray-step { width: 32px; height: 32px; }
 .tray-modifier-value { width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+.tray-sides { display: flex; gap: 4px; }
+.tray-sides.is-off { opacity: 0.5; }
+.tray-side { flex: 1; min-height: 32px; padding: 0 8px; font-size: 12px; }
+.tray-side.is-chosen { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .tray-formula {
   margin: 0; padding: 4px var(--inset); border: 1px solid var(--border); border-radius: 8px; background: var(--hover);
   text-align: center; font-variant-numeric: tabular-nums;
@@ -277,6 +284,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .die-badge.is-max { color: #2f9e44; }
 .die-badge.is-min { color: #e03131; }
 .die-badge.is-more { color: var(--muted); }
+.die-badge.is-dropped, .die-badge.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); text-decoration: line-through; }
+.die-badge.is-success { color: #2f9e44; }
+.die-badge.is-failure { color: #e03131; }
 .die-tag { color: var(--muted); }
 .die-tag-dot { color: var(--die-tag-colour, currentColor); }
 /* A critical roll, as Atlas's log marks it: a coloured edge. */
@@ -367,7 +377,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .dice-card-die.is-max { background: color-mix(in oklch, #22c55e 15%, transparent); color: #22c55e; }
 .dice-card-die.is-min { background: color-mix(in oklch, #ef4444 15%, transparent); color: #ef4444; }
-.dice-card-die.is-dropped { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); text-decoration: line-through; }
+.dice-card-die.is-dropped, .dice-card-die.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); text-decoration: line-through; }
+.dice-card-die.is-success { background: color-mix(in oklch, #22c55e 15%, transparent); color: #22c55e; }
+.dice-card-die.is-failure { background: color-mix(in oklch, #ef4444 15%, transparent); color: #ef4444; }
 @media (prefers-reduced-motion: reduce) {
   .dice-card, .dice-card-avatar, .dice-card-content, .dice-card-result, .dice-card-total { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 }
@@ -529,6 +541,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .initiative-list::-webkit-scrollbar { display: none; }
 .initiative-side-label { text-align: center; color: var(--muted); font-size: 12px; font-weight: 600; }
 .initiative-side.is-active .initiative-side-label { color: var(--accent); }
+.initiative-side-roll { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--hover); font-weight: 600; }
 .initiative-card {
   display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
   background: var(--hover); border: 1px solid var(--border); border-radius: 12px;
@@ -539,9 +552,19 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .initiative-card.is-active, .initiative-side.is-active .initiative-card:not(.is-sitting-out) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .initiative-card.is-sitting-out { opacity: 0.45; }
+.initiative-card.is-defeated { position: relative; opacity: 0.45; filter: grayscale(70%); }
+.initiative-defeated { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.initiative-defeated svg { width: 24px; height: 24px; }
+.initiative-defeated--over { position: absolute; top: var(--inset); left: var(--inset); right: var(--inset); aspect-ratio: 1; border-radius: 50%; background: #0009; }
+.initiative-card.is-findable { cursor: pointer; }
+.initiative-card.is-findable:hover { border-color: var(--accent); }
 .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
 .initiative-value { font-weight: 600; }
 .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 12px; }
+.initiative-instance { font-size: 11px; color: var(--muted); font-weight: 600; }
+.initiative-conditions { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+.initiative-condition { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--condition, var(--muted)); color: #fff; font-size: 10px; font-weight: 700; line-height: 1; }
+.initiative-condition--more { background: var(--hover); color: var(--muted); border: 1px solid var(--border); }
 .initiative-hp { width: 100%; height: 4px; accent-color: #22c55e; }
 .initiative-round { text-align: center; color: var(--muted); font-size: 12px; }
 
@@ -625,3 +648,129 @@ button:disabled { opacity: 0.5; cursor: default; }
 .note-body table { border-collapse: collapse; }
 .note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--border); text-align: left; }
 .note-body .note-status { color: var(--muted); font-style: italic; }
+/* The Move group's tools, above the laser's colours, as in Atlas's Move menu. */
+.swatch-menu .menu-section { display: flex; flex-direction: column; gap: 2px; margin: -4px -4px 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+/* The Move menu, as Atlas's: ticked tools, Laser colour (a row of squares, the chosen one ticked) and Laser size. */
+.swatch-menu { width: 248px; padding: 6px; gap: 6px; }
+.swatch-menu .menu-entry { height: 32px; padding: 0 10px 0 6px; gap: 8px; font-weight: 600; font-size: 13px; }
+.menu-check { width: 14px; height: 14px; display: inline-flex; visibility: hidden; }
+.menu-check .tool-icon { width: 14px; height: 14px; }
+.menu-entry.is-checked .menu-check { visibility: visible; }
+.menu-label { display: block; padding: 2px 6px 0; font-size: 13px; font-weight: 600; }
+.swatch-menu .swatch-grid { grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 0 6px; }
+.swatch-menu .swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.swatch-menu .swatch.is-selected { border-color: transparent; box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--accent); }
+.swatch-check { display: none; width: 16px; height: 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); align-items: center; justify-content: center; }
+.swatch-check .tool-icon { width: 12px; height: 12px; background: #fff; }
+.swatch.is-selected .swatch-check { display: inline-flex; }
+.swatch-menu .menu-hint { padding: 0 6px; }
+.menu-slider { display: flex; flex-direction: column; gap: 6px; padding: 2px 6px 6px; }
+.menu-slider-head { display: flex; align-items: center; justify-content: space-between; }
+.menu-slider-head .menu-label { padding: 0; }
+.menu-slider-value { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.menu-slider input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+/* Tabletop's 3D board, where the 2D map is, while the GM offers it. */
+#map[hidden] { display: none; }
+.board-3d { grid-row: 1 / -1; grid-column: 1; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; touch-action: none; }
+.board-3d[hidden] { display: none; }
+/* A cutscene: the black the 2D map fades into (the board sits above it), and the curtain of a client that cannot draw it. */
+.cutscene-overlay { grid-row: 1 / -1; grid-column: 1; z-index: 30; background: #000; opacity: 0; transition: opacity 600ms linear; pointer-events: auto; }
+.cutscene-overlay.is-black { opacity: 1; }
+.cutscene-overlay[hidden], .cutscene-curtain[hidden] { display: none; }
+.board-3d.is-cutscene { position: relative; z-index: 31; }
+.cutscene-curtain {
+  grid-row: 1 / -1; grid-column: 1; z-index: 40; background: #000; color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 18px; text-align: center; padding: 16px; pointer-events: auto;
+}
+/* The tools are locked while a cutscene runs. */
+.table.is-cutscene .toolbar, .table.is-cutscene .sheet-panel, .table.is-cutscene .dice-tray, .table.is-cutscene #sheet-button, .table.is-cutscene .view-buttons { display: none !important; }
+/* The top bar (the menu, the dice log) stays reachable over the board and the black. */
+.table.is-cutscene .top-bar { z-index: 50; }
+.back-to-ar { grid-row: 2; grid-column: 1; align-self: end; justify-self: center; z-index: 5; margin-bottom: 72px; }
+.back-to-ar[hidden] { display: none; }
+.board-buttons { display: flex; align-items: center; gap: var(--inset); }
+/* In the toolbar: a rule before them, and nothing while none shows (the 2D map). */
+.toolbar-group { position: relative; padding-left: var(--inset); border-left: 1px solid var(--border); }
+.toolbar-group:not(:has(> button:not([hidden]))) { display: none; }
+.toolbar-group .toolbar-menu[hidden] { display: none; }
+.eye-menu { min-width: 160px; }
+/* Augmented reality: the camera's picture under the board, the board see-through round the map. */
+.ar-video { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; object-fit: cover; background: #000; pointer-events: none; }
+.ar-video[hidden] { display: none; }
+.board-3d.is-ar canvas { transition: opacity 0.25s; }
+.board-3d.is-ar-searching canvas { opacity: 0; }
+.board-3d.is-ar-lost canvas { opacity: 0.35; }
+/* AR's menu, above its button: the settings, Leave AR at the bottom. */
+.ar-panel { width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 180px); overflow-y: auto; padding: 8px; gap: 6px; border-radius: var(--panel-radius); }
+.ar-panel .menu-label { font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 8px 0; }
+.ar-panel .menu-hint { padding: 0 8px; }
+.ar-field { display: flex; flex-direction: column; gap: 4px; padding: 0 8px; font-size: 13px; }
+.ar-field select { width: 100%; }
+.ar-range { display: flex; align-items: center; gap: 6px; }
+.ar-range input { flex: 1; }
+.ar-check { display: flex; align-items: center; gap: 8px; padding: 4px 8px; font-size: 13px; }
+.ar-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin: 0 4px; padding: 2px; border-radius: 12px; background: var(--hover); }
+.ar-segmented button { min-height: 32px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font-size: 13px; }
+.ar-segmented button.is-selected { background: var(--card); box-shadow: var(--shadow); font-weight: 600; }
+.ar-prints { padding: 0 8px; font-size: 13px; }
+.ar-prints summary { cursor: pointer; padding: 6px 0; }
+.ar-prints .ar-print { display: block; padding: 4px 0; color: var(--accent); }
+.ar-leave { color: #d9534f; }
+/* What to do now: over the top of the picture, never in the way of taps. */
+.ar-hint {
+  position: absolute; z-index: 7; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 60px); transform: translateX(-50%);
+  width: max-content; max-width: min(420px, calc(100% - 32px)); margin: 0; padding: 10px 14px; border-radius: 14px;
+  background: rgba(20, 20, 24, 0.86); color: #f4f4f6; font-size: 14px; line-height: 1.4; text-align: center; pointer-events: none;
+}
+.ar-hint[hidden] { display: none; }
+/* The tracking numbers, in the top left corner. */
+.ar-debug {
+  position: absolute; z-index: 7; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 120px);
+  margin: 0; padding: 8px 10px; border-radius: 10px; background: rgba(20, 20, 24, 0.8); color: #f4f4f6;
+  font: 11px/1.35 ui-monospace, monospace; white-space: pre-wrap; max-width: calc(100% - 24px); pointer-events: none;
+}
+.ar-debug[hidden] { display: none; }
+/* Calibrating: a card in the middle, step by step. */
+.ar-wizard {
+  position: absolute; z-index: 8; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(380px, calc(100% - 32px)); max-height: calc(100% - 140px); overflow-y: auto;
+  display: grid; gap: 10px; padding: 16px; border-radius: var(--panel-radius);
+  background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); box-shadow: var(--shadow);
+}
+.ar-wizard__dots { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; justify-content: center; }
+.ar-wizard__dots li { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.ar-wizard__dots li.is-done { background: var(--accent); opacity: 0.5; }
+.ar-wizard__dots li.is-current { background: var(--accent); }
+.ar-wizard__title { margin: 0; font-size: 17px; }
+.ar-wizard__text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.ar-wizard__diagram { width: 100%; max-height: 120px; }
+.ar-wizard__page { fill: #fff; stroke: var(--border); stroke-width: 1; }
+.ar-wizard__marker { fill: #222; }
+.ar-wizard__label { font: 600 8px sans-serif; fill: var(--muted); }
+.ar-wizard__phone { fill: var(--accent); }
+.ar-wizard__phone.is-above { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 3 2; }
+.ar-wizard__arrow { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
+.ar-wizard__checks { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.ar-wizard__checks li { display: flex; gap: 8px; align-items: baseline; }
+.ar-wizard__checks li::before { content: '○'; color: var(--muted); }
+.ar-wizard__checks li.is-ok::before { content: '✓'; color: #2e9d58; font-weight: 700; }
+.ar-wizard__checks li.is-off { color: var(--muted); }
+.ar-wizard__progress { width: 100%; }
+.ar-wizard__actions { display: flex; justify-content: space-between; gap: 8px; }
+.ar-wizard__actions button { flex: 1; min-height: 40px; }
+/* The board draws the camera's picture itself (each with its own pose): the live video steps back, still playing. */
+.ar-video.is-behind { opacity: 0; }
+/* Room tracking: the session shows the board; the page's canvas would cover it. */
+.board-3d.is-room-ar canvas { visibility: hidden; }
+/* Room tracking's overlay is laid over the camera: see-through but for the page's buttons and panels. */
+.table.is-room-ar-overlay { background: transparent; }
+/* Following the GM or fitting the map moves the usual camera: in AR the phone is the camera. */
+.table:has(.board-3d.is-ar) .view-buttons { display: none; }
+
+/* Through a token's eyes Tabletop's spell toolbar takes the toolbar's place (sceneSwitch's onSeeing). */
+.toolbar[hidden] { display: none; }
+
+/* A toolbar button whose face is a word (AR) rather than an icon. */
+.tool-word { font-weight: 700; font-size: 13px; letter-spacing: 0.04em; line-height: 1; }

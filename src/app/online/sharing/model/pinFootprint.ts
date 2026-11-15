@@ -9,7 +9,7 @@
  * size Atlas lays it out in.
  */
 import { pinSize } from '@atlas-vtt/shared/draw';
-import { axialToPixel, createHexLayout, hexVertices, isHexGridType, pixelToAxial } from '@atlas-vtt/shared/grid';
+import { axialToPixel, createHexLayout, hexVertices, isHexGridType, pixelToAxial } from '../../../../../packages/atlas-shared/src/index';
 import type { GridState } from '@atlas-vtt/api-types';
 import type { WorldBounds } from '../../scene/FogCoverage';
 import type { NotePin } from './sharedMapFile';

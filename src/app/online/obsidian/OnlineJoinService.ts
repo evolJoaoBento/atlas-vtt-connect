@@ -5,7 +5,10 @@
  * Images stay until the session is left, so the tab keeps the last scene after the session ends and
  * Reconnect still has them. Nothing here reads or writes the vault.
  */
-import type { SheetRollRef } from '../tools/sheets';
+import { swatchLaserColor } from '../tools/laserColors';
+import type { SpellChange } from '../tools/spells';
+import type { AdvantageSide, SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
+import type { PhysicalRoll } from '../tools/toolMessages';
 import type { TemplateChange } from '../view/tools/PlayerTools';
 import { Notice, type App } from 'obsidian';
 import type { DiceSelection } from '@atlas-vtt/shared/rules';
@@ -31,7 +34,11 @@ import { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink, type RemoteI
 import { decodeToObjectUrls, urlsOf } from './objectUrlImages';
 import { openOnlineSceneTab } from './onlineSceneTab';
 import type { MiniPainter } from '../view/minis/miniLayer';
+import type { PlayerBoardFactory } from './playerBoardContract';
 
+
+/** Where the vault keeps the player's colour. */
+const PLAYER_COLOR_KEY = 'atlas-connect-player-color';
 export type { SessionIdentity };
 
 export { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink } from './onlineJoinTypes';
@@ -51,7 +58,7 @@ export interface OnlineJoinDeps {
   /** One key per GM host, kept by the plugin across Atlas reloads; the service makes its own unless given one. */
   playerKeyFor?: (hostId: string) => string;
   /** The Tabletop extension's painter for the minis, null without it: their GLBs are fetched only while there is one. */
-  minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void };
+  minis?: { current(): MiniPainter | null; subscribe(listener: () => void): () => void; board?(): PlayerBoardFactory | null };
 }
 
 type JoinSettings = Pick<ConnectSettingsStore, 'get' | 'set' | 'onChange'>;
@@ -94,6 +101,7 @@ export class OnlineJoinService {
   constructor(private readonly app: App, private readonly settings: JoinSettings, clientVersion: string, deps: OnlineJoinDeps = {}) {
     this.playerKeyFor = deps.playerKeyFor ?? keyPerHost();
     this.minis = deps.minis ? () => deps.minis?.current() ?? null : (): null => null;
+    this.boardOf = (): PlayerBoardFactory | null => deps.minis?.board?.() ?? null;
     // Tabletop arrived or left while joined: the scene's minis are asked for (or let go) now, not at the GM's next change.
     this.stopMinis = deps.minis?.subscribe(() => {
       const joined = this.joined;
@@ -118,6 +126,8 @@ export class OnlineJoinService {
       createClient: (server) => this.createClient(server),
       clientVersion,
       shareHandler: () => this.shareHandler,
+      playerColor: () => this.playerColor(),
+      boardOffered: (joined) => this.askBoard(joined),
     };
     // Switching keeping off deletes the stored images at once, joined or not.
     this.keepImages = settings.get().keepImages;
@@ -224,9 +234,42 @@ export class OnlineJoinService {
   }
 
   /** A mini's GLB bytes, once they are here and checked. */
+  /** Tabletop's 3D player board; null without Tabletop, or one that offers none. */
+  boardPainter(): PlayerBoardFactory | null {
+    return this.boardOf();
+  }
+
+  private readonly boardOf: () => PlayerBoardFactory | null = () => null;
+
   /** The Tabletop extension's painter for the minis; null without it. */
   miniPainter(): MiniPainter | null {
     return this.minis();
+  }
+
+  /** Whether the GM of the joined session can send Tabletop's 3D board. */
+  boardOffered(): boolean {
+    return this.joined?.boardOffer === true;
+  }
+
+  /** Whether the tab shows Tabletop's 3D board: the GM is asked for the board, once per admission, while it is offered. */
+  wantBoard(on: boolean): void {
+    this.boardWanted = on;
+    const joined = this.joined;
+    if (!joined) return;
+    if (on) this.askBoard(joined);
+    else if (joined.boardAsked) {
+      joined.boardAsked = false;
+      joined.session?.sendBoardRequest(false);
+      joined.board = null;
+      joined.loader.setBoard(null);
+    }
+  }
+
+  private boardWanted = false;
+
+  private askBoard(joined: Joined): void {
+    if (!this.boardWanted || joined.boardOffer !== true || joined.boardAsked) return;
+    joined.boardAsked = joined.session?.sendBoardRequest(true) === true;
   }
 
   model(assetId: string | null): ArrayBuffer | null {
@@ -237,13 +280,49 @@ export class OnlineJoinService {
     return this.joined?.session?.sendTokenMove(tokenId, x, y) ?? false;
   }
 
-  sendDiceRoll(dice: DiceSelection, modifier: number): boolean {
-    return this.joined?.session?.sendDiceRoll(dice, modifier) ?? false;
+  sendDiceRoll(dice: DiceSelection, modifier: number, advantage?: AdvantageSide): boolean {
+    return this.joined?.session?.sendDiceRoll(dice, modifier, advantage) ?? false;
+  }
+
+  /** Sends dice the player threw on Tabletop's board; false when the GM takes none or it cannot go. */
+  sendDiceResult(result: PhysicalRoll): boolean {
+    return this.joined?.session?.sendDiceResult(result) ?? false;
+  }
+
+  /** This tab can draw cutscenes: asks the GM to send (or stop sending) the revealed scenes of the run; false when it cannot go. */
+  sendCutsceneReady(on: boolean): boolean {
+    return this.joined?.session?.sendCutsceneReady(on) ?? false;
   }
 
   /** Asks the GM to add a template or remove one of the player's own. */
   sendTemplate(change: TemplateChange): boolean {
     return this.joined?.session?.sendTemplate(change) ?? false;
+  }
+
+  /** The colour the player picked last (kept in the vault's local storage), or null. */
+  playerColor(): string | null {
+    try {
+      return swatchLaserColor(this.app.loadLocalStorage(PLAYER_COLOR_KEY));
+    } catch {
+      return null;
+    }
+  }
+
+  /** The player picked their colour: it is kept, and the GM is told. */
+  sendColor(color: string): boolean {
+    const swatch = swatchLaserColor(color);
+    if (!swatch) return false;
+    try {
+      this.app.saveLocalStorage(PLAYER_COLOR_KEY, swatch);
+    } catch {
+      // It still applies to this session.
+    }
+    return this.joined?.session?.sendColor(swatch) ?? false;
+  }
+
+  /** Asks the GM to cast a spell through a token's eyes, or take the player's off. */
+  sendSpell(change: SpellChange): boolean {
+    return this.joined?.session?.sendSpell(change) ?? false;
   }
 
   /** Sends a ping at a world point of the scene shown. */
@@ -261,8 +340,8 @@ export class OnlineJoinService {
     return this.joined?.session?.sendSheetRoll(tokenId, roll) ?? false;
   }
 
-  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string): boolean {
-    return this.joined?.session?.sendLaser(points, lifted, dt, color) ?? false;
+  sendLaser(points: readonly ScenePoint[], lifted: boolean, dt?: readonly number[], color?: string, size?: number): boolean {
+    return this.joined?.session?.sendLaser(points, lifted, dt, color, size) ?? false;
   }
 
   /** The plugin unloads. */

@@ -165,6 +165,13 @@ describe('scene value bounds', () => {
     const withMeasurement = (overrides: object): unknown => ({ ...body, measurement: { ...body.measurement, ...overrides } });
     expect(valid(snapshot(withMeasurement({ unitDistance: 1_000_000 })))).toBe(true);
     expect(valid(snapshot(withMeasurement({ unitDistance: -1 })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ diagonalRule: 'manhattan' })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ diagonalRule: 'taxicab' })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitType: 'custom', unitName: 'mi' })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ unitName: 'x'.repeat(12) })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ unitName: 'x'.repeat(13) })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitName: '' })))).toBe(false);
+    expect(valid(snapshot(withMeasurement({ unitName: 5 })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ ruleDistance: -1 })))).toBe(false);
     expect(valid(snapshot(withMeasurement({ ruleDistance: '5' })))).toBe(false);
     const { ruleDistance: _rule, ...noRule } = body.measurement;
@@ -298,5 +305,29 @@ describe('scene limits', () => {
       expect(patch(list({}), { t: { ...playerToken(), side: 'opponents' } }).kind).toBe('message');
       for (const side of ['both', '', 1, null]) expect(patch(list({}), { t: { ...playerToken(), side } }).kind, String(side)).toBe('invalid');
     });
+  });
+});
+
+describe('token height and speed, movement steps and the drag-distance choice (Atlas 0.15)', () => {
+  const patchToken = (extra: object): ReturnType<typeof decodeControl> => decodeRaw({ v: 1, type: 'scene-patch', seq: 2, set: {}, upsert: { tokens: { t1: { ...playerToken(), ...extra } } }, remove: {} });
+  const patchMeasurement = (extra: object): ReturnType<typeof decodeControl> => decodeRaw({ v: 1, type: 'scene-patch', seq: 2, upsert: {}, remove: {}, set: { measurement: { ...playerScene().measurement, ...extra } } });
+  const step = { name: 'Move', multiple: 1, color: '#22c55e' };
+
+  it("checks a token's height and speed", () => {
+    for (const ok of [{ elevation: 10 }, { elevation: -5 }, { speed: 30 }, { elevation: 0.5, speed: 7.5 }]) expect(patchToken(ok).kind, JSON.stringify(ok)).toBe('message');
+    for (const bad of [{ elevation: 'x' }, { elevation: 1e9 }, { speed: 0 }, { speed: -5 }, { speed: '30' }]) expect(patchToken(bad).kind, JSON.stringify(bad)).toBe('invalid');
+  });
+
+  it('checks the movement steps and the drag-distance choice', () => {
+    for (const ok of [{ movement: { steps: [step], countPerTurn: true } }, { dragDistance: 'combat' }, { dragDistance: 'never' }]) expect(patchMeasurement(ok).kind, JSON.stringify(ok)).toBe('message');
+    const bad = [
+      { movement: { steps: [{ name: 'Move', multiple: 1 }], countPerTurn: true } },
+      { movement: { steps: [{ ...step, color: 'red' }], countPerTurn: true } },
+      { movement: { steps: [{ ...step, multiple: 0 }], countPerTurn: true } },
+      { movement: { steps: Array.from({ length: 5 }, () => step), countPerTurn: true } },
+      { movement: { steps: [step] } },
+      { dragDistance: 'sometimes' },
+    ];
+    for (const extra of bad) expect(patchMeasurement(extra).kind, JSON.stringify(extra)).toBe('invalid');
   });
 });

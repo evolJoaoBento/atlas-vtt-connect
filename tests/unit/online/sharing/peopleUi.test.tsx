@@ -9,6 +9,7 @@ import { parsePeopleData, personKey } from '../../../../src/app/online/sharing/p
 import { PeopleList } from '../../../../src/app/online/sharing/people/ui/PeopleList';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { PATHS } from './sharingPathsFixture';
+import { pickOption } from '../../pickOption';
 
 /** No scene is presented: the list names no characters. */
 const NOTHING_PRESENTED = { tabId: null, name: null, characters: [] };
@@ -52,7 +53,7 @@ describe('People list', () => {
     fireEvent.change(input, { target: { value: 'Anna' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(people.get(T, ana.personId)?.name).toBe('Anna');
-    fireEvent.change(screen.getByLabelText('Link Ben to'), { target: { value: personKey(T, ana.personId) } });
+    act(() => { pickOption(screen.getByLabelText('Link Ben to'), 'Anna'); });
     expect(people.list()).toHaveLength(1);
     expect(people.byKey(personKey(T, ben.personId))?.personId).toBe(ana.personId);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove Anna' })); });

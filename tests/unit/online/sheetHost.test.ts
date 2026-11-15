@@ -3,7 +3,7 @@ import type { SessionHandler, SessionPlayer } from '../../../src/app/online/GmSe
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import type { ControlMessage } from '../../../src/app/online/protocol';
 import { SheetHost } from '../../../src/app/online/tools/SheetHost';
-import type { SheetCard } from '../../../src/app/online/tools/sheetCards';
+import type { SheetCard } from '../../../packages/atlas-host/src/sheets/sheetCards';
 
 const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
@@ -94,6 +94,17 @@ describe('players\' own sheets', () => {
     w.handler().onMessage?.(BEN, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'check', index: 0 } });
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'ogre', roll: { kind: 'check', index: 0 } });
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'save', index: 0 } });
+    expect(w.rollFor).not.toHaveBeenCalled();
+  });
+
+  it("names a roll of the player's sheet from the GM's own copy, and nothing for a token they do not control or a roll not there", () => {
+    const w = world();
+    w.control.set('hero', 'p1', true);
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'text', section: 0, item: 0, index: 1, text: '1d8 + 3' })).toBe('Sword');
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'check', index: 1 })).toBe('DEX check');
+    expect(w.host.rollLabel(BEN, 'hero', { kind: 'check', index: 1 })).toBeNull();
+    expect(w.host.rollLabel(ANA, 'ogre', { kind: 'check', index: 1 })).toBeNull();
+    expect(w.host.rollLabel(ANA, 'hero', { kind: 'save', index: 0 })).toBeNull();
     expect(w.rollFor).not.toHaveBeenCalled();
   });
 

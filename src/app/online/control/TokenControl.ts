@@ -51,6 +51,11 @@ export class TokenControl {
     this.emit([playerId]);
   }
 
+/** The players controlling `tokenId`, in the order they were given it. */
+  playersOf(tokenId: string): string[] {
+    return [...(this.byToken.get(tokenId) ?? [])];
+  }
+
   /** Tokens deleted from the scene lose their controllers. */
   dropTokens(tokenIds: readonly string[]): void {
     const affected = new Set<string>();

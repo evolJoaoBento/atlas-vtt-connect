@@ -64,13 +64,15 @@ export function emptySceneState(isMapLoading = false): ViewState {
 /** The snapshot Atlas would give of a store in this state; the records by reference. */
 export function snapshotOfState(state: ViewState, mapSize: { width: number; height: number }, tabMap: string): Omit<SceneSnapshot, 'viewId'> {
   const { tokens, texts, drawings, fog } = state.objects;
+  // Walls and lights by reference too, for Tabletop's board extras (`projectBoard`).
+  const { walls, lights } = state.objects as { walls?: unknown; lights?: unknown };
   return {
     mapPath: state.mapPath === undefined ? tabMap : state.mapPath,
     loaded: state.mapLoaded !== false && !state.isMapLoading,
     mapSize,
     background: state.background,
     grid: state.grid,
-    objects: { tokens, texts, drawings, fog },
+    objects: { tokens, texts, drawings, fog, ...(walls !== undefined ? { walls } : {}), ...(lights !== undefined ? { lights } : {}) } as SceneSnapshot['objects'],
     widgets: { settings: state.widgetSettings, values: state.widgetValues },
     initiative: state.initiative,
     initiativeTrackerOpen: state.initiativeTrackerOpen,

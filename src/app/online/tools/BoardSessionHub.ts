@@ -1,0 +1,455 @@
+/**
+ * The online session as Tabletop's 3D board on the GM's side shows it (`BoardSession`, handed to Tabletop's
+ * `api.attachSession`): whether the GM is hosting, the presented map, the cone angle of each map and the handout shown,
+ * and the pings, lasers and instantaneous spells players send, as marks of their map. Templates and kept spells are no
+ * part of it: they are Atlas's measures, which the board reads from Atlas's store as it reads tokens. The relays hand
+ * it what they accept (`PingRelay`, `LaserRelay`, `MeasureHost`), so the board shows exactly what players see.
+ */
+import type { TokenControl } from '../control/TokenControl';
+import type { SessionPlayer } from '../GmSession';
+import type { HandoutSource } from '../handouts';
+import type { SlotChange, SlotProjection } from '../scene/slotViews';
+import type { MeasureHost } from './MeasureHost';
+import { type CastWords, isSpellRules, type SpellRules, isSpell, isSpellAsk, type MapSpell, type Spell, type SpellAsk } from './spells';
+import type { ArPose } from './arViews';
+import type { ArSurvey } from './arTable';
+import type { EditTokenSectionSpec } from '../gm-ui/editTokenSection';
+import { presentToMenu, type PresentToMenu, type SplitActions, type SplitView } from '../gm-ui/presentToRows';
+import { NO_PLAYERS_ROW } from '../split/splitCopy';
+import type { AssignResult } from '../split/SceneAssignments';
+import type { TabKey } from '../split/tabKey';
+import { FUSION_PROTOCOL } from '../scene/boardTypes';
+
+type Point = { x: number; y: number };
+
+export type BoardMark =
+  | { kind: 'ping'; mapPath: string; x: number; y: number; color: string }
+  | { kind: 'laser'; mapPath: string; from: string; points: Point[]; lifted: boolean; color: string }
+  /** A player's instantaneous spell: cast now, kept nowhere; the board shows it go off and applies what it does. */
+  | { kind: 'spell'; mapPath: string; cast: MapSpell };
+
+/**
+ * A player's phone in augmented reality over a map, for the GM's board (an eye where its camera is): its pose in board
+ * units, null when they left AR or lost the tracking. `from` is their session id.
+ */
+export interface BoardViewer {
+  mapPath: string;
+  from: string;
+  name: string;
+  color: string;
+  pose: ArPose | null;
+}
+
+/** A player's survey of the table's marker sheets, for the GM to place on `mapPath` (Tabletop asks first). */
+export interface BoardSurvey {
+  mapPath: string;
+  from: string;
+  name: string;
+  survey: ArSurvey;
+}
+
+export interface BoardOverlay {
+  /** Radians a cone opens by on this map. */
+  coneAngle: number;
+  handout: { path: string; title: string } | null;
+}
+
+/** What Tabletop reads of the session (its `connectContract.ts` keeps the same shape). */
+export interface BoardSession {
+  /** The fusion step this Connect is a build of (`FUSION_PROTOCOL`): Tabletop takes only a session of its own step. */
+  readonly fusion: number;
+  hosting(): boolean;
+  /** Carries cutscenes to players; absent from a session that cannot (no scene tabs). */
+  readonly cutscenes?: true;
+  presentedMap(): string | null;
+  overlay(mapPath: string): BoardOverlay;
+  onChange(listener: () => void): () => void;
+  onMark(listener: (mark: BoardMark) => void): () => void;
+  /** Players' phones in augmented reality, as they move (a Tabletop that draws them listens). */
+  onViewer(listener: (viewer: BoardViewer) => void): () => void;
+  /** Players' surveys of the table's marker sheets (a Tabletop that places them listens). */
+  onSurvey(listener: (survey: BoardSurvey) => void): () => void;
+  /**
+   * Asks the players of `tokenId` to cast `ask` from it (they aim it; the rest is the GM's). The number of its players
+   * on the map's scene now; null when no session hands out tokens. Absent from an older Connect.
+   */
+  requestSpell?(mapPath: string, tokenId: string, ask: SpellAsk): number | null;
+  /** The ask waiting for `tokenId` on the map's scene, or null. */
+  spellRequest?(mapPath: string, tokenId: string): SpellAsk | null;
+  cancelSpellRequest?(mapPath: string, tokenId: string): void;
+  /**
+   * The GM's instantaneous spell (cast on Tabletop's board): shown to the players of the map's scene, kept nowhere. A
+   * kept spell is never sent here: the board writes it to Atlas's measures, and players get it in the scene.
+   */
+  flashSpell?(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean;
+  /**
+   * The players who may control `tokenId` (every admitted one) and whether each does, for the "Controlled by" menu;
+   * null while no session hands out tokens. Absent from an older Connect.
+   */
+  controllers?(tokenId: string): Array<{ playerId: string; name: string; controls: boolean }> | null;
+  /** Gives `tokenId` to a player or takes it away. */
+  setController?(tokenId: string, playerId: string, controls: boolean): void;
+  /**
+   * The split party for a scene tab of the GM's Atlas view (`viewId`, `tabId` as Atlas has them), as the eye's "Present
+   * to" menu offers it: a row per player (ticked where they see it), the cap note and "Everyone back"; null while no
+   * session runs, on an Atlas without scene tabs, or for a tab Connect does not know. Absent from an older Connect.
+   */
+  presentTo?(viewId: string, tabId: string): BoardPresentTo | null;
+  /** Chooses `playerId`'s row of that menu: shows them the tab, or (ticked) sends them back to the presented scene. */
+  choosePresentTo?(viewId: string, tabId: string, playerId: string): void;
+  /** Everyone follows the presented scene again. */
+  everyoneBack?(): void;
+  /**
+   * What players see of each resource of a character token (Atlas's Edit Token "Players see"): a row per resource, one
+   * choice per column (this token, every token of its statblock), each with its options; null while no session runs,
+   * no Atlas view holds the map, or the token has none. Absent from an older Connect.
+   */
+  resourceShows?(mapPath: string, tokenId: string): BoardResourceShows | null;
+  /** Sets one choice of `resourceShows` (its `id`) to one of its options' values. */
+  setResourceShow?(mapPath: string, tokenId: string, choiceId: string, value: string): void;
+}
+
+/** The "Present to" menu of a scene tab, as plain data (`presentTo`). */
+export interface BoardPresentTo {
+  heading: string;
+  rows: Array<{ playerId: string; label: string; checked: boolean; disabled: boolean }>;
+  /** Shown in place of the rows when there are none. */
+  noPlayers: string;
+  capNote: string | null;
+  everyoneBack: { label: string; disabled: boolean };
+}
+
+/** The "Players see" choices of a token, as plain data (`resourceShows`). */
+export interface BoardResourceShows {
+  title: string;
+  columns: string[];
+  rows: Array<{ label: string; choices: Array<{ id: string; label: string; value: string; options: Array<{ value: string; label: string }> }> }>;
+}
+
+/** What the hub reads of the split party: the scene hub's actions and assignments, the players and each tab's name. */
+export interface BoardSplitSource {
+  scenes: {
+    splitSupported(): boolean;
+    assign(playerId: string, tab: TabKey): Promise<AssignResult | 'couldnt-open'>;
+    unassign(playerId: string): void;
+    everyoneBack(): void;
+    wouldExceedCap(playerId: string, tab: TabKey): boolean;
+    assignedTabs(): Record<string, TabKey>;
+    presented(): TabKey | null;
+  };
+  players(): readonly SessionPlayer[];
+  /** A tab's name; null for a tab of no open view. */
+  nameOf(tab: TabKey): string | null;
+}
+
+/** What relays tell the board. */
+export interface BoardSessionSink {
+  templatesChanged(): void;
+  /** A player's instantaneous spell on the map the GM's view shows. */
+  flash(mapPath: string, cast: MapSpell): void;
+  ping(mapPath: string, x: number, y: number, color: string): void;
+  laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void;
+  viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void;
+  survey(mapPath: string, from: string, name: string, survey: ArSurvey): void;
+}
+
+export interface BoardSessionHubOptions {
+  projection: Pick<SlotProjection, 'shownSlot' | 'onSlotChange'>;
+  handouts: HandoutSource;
+  /** The cone angle of the map's collection, in degrees. */
+  coneAngle(mapPath: string): number;
+  /**
+   * Whether this session carries cutscenes to players: it needs the GM's scene tabs (a shot's map is read from its tab's
+   * live snapshot). Told to Tabletop (`cutscenes`), which otherwise refuses Play for players.
+   */
+  cutscenes: boolean;
+}
+
+export class BoardSessionHub implements BoardSession, BoardSessionSink {
+  /** Set only when the session carries cutscenes. */
+  readonly cutscenes?: true;
+  readonly fusion = FUSION_PROTOCOL;
+  private readonly changes = new Set<() => void>();
+  private readonly marks = new Set<(mark: BoardMark) => void>();
+  private readonly viewers = new Set<(viewer: BoardViewer) => void>();
+  private readonly surveys = new Set<(survey: BoardSurvey) => void>();
+  private readonly stops: Array<() => void> = [];
+  /** The scene in use of each map, as the hub last told of it. */
+  private readonly scenes = new Map<string, string>();
+  private templates: MeasureHost | null = null;
+  private control: { control: TokenControl; players: () => readonly SessionPlayer[] } | null = null;
+  private split: BoardSplitSource | null = null;
+  private shows: ((mapPath: string, tokenId: string) => EditTokenSectionSpec | null) | null = null;
+  private started = false;
+
+  constructor(private readonly options: BoardSessionHubOptions) {
+    if (options.cutscenes) this.cutscenes = true;
+  }
+
+  useTemplates(templates: MeasureHost | null): void {
+    this.templates = templates;
+  }
+
+  /** Who controls which token (the session's `TokenControl`) and the session's players, for the "Controlled by" menu. */
+  useControl(source: { control: TokenControl; players: () => readonly SessionPlayer[] } | null): void {
+    this.control = source;
+  }
+
+  controllers(tokenId: string): Array<{ playerId: string; name: string; controls: boolean }> | null {
+    const source = this.control;
+    if (!this.started || !source || typeof tokenId !== 'string') return null;
+    return source.players().filter((player) => player.status === 'admitted')
+      .map((player) => ({ playerId: player.playerId, name: player.name, controls: source.control.controls(player.playerId, tokenId) }));
+  }
+
+  setController(tokenId: string, playerId: string, controls: boolean): void {
+    const source = this.control;
+    if (!this.started || !source || typeof tokenId !== 'string' || typeof playerId !== 'string') return;
+    if (!source.players().some((player) => player.playerId === playerId && player.status === 'admitted')) return;
+    source.control.set(tokenId, playerId, controls === true);
+  }
+
+  /** The split party, for the "Present to" menu of Tabletop's scene tabs. */
+  useSplit(source: BoardSplitSource | null): void {
+    this.split = source;
+  }
+
+  /** What players see of a token's resources (the Edit Token section's choices), for Tabletop's token menu. */
+  useResourceShows(source: ((mapPath: string, tokenId: string) => EditTokenSectionSpec | null) | null): void {
+    this.shows = source;
+  }
+
+  presentTo(viewId: string, tabId: string): BoardPresentTo | null {
+    const menu = this.presentMenu(viewId, tabId);
+    if (!menu) return null;
+    return {
+      heading: menu.heading,
+      rows: menu.rows.map(({ playerId, label, checked, disabled }) => ({ playerId, label, checked, disabled })),
+      noPlayers: NO_PLAYERS_ROW,
+      capNote: menu.capNote,
+      everyoneBack: { label: menu.everyoneBack.label, disabled: menu.everyoneBack.disabled },
+    };
+  }
+
+  choosePresentTo(viewId: string, tabId: string, playerId: string): void {
+    const row = this.presentMenu(viewId, tabId)?.rows.find((each) => each.playerId === playerId);
+    if (row && !row.disabled) row.choose();
+  }
+
+  everyoneBack(): void {
+    if (!this.started || !this.split?.scenes.splitSupported()) return;
+    this.split.scenes.everyoneBack();
+  }
+
+  resourceShows(mapPath: string, tokenId: string): BoardResourceShows | null {
+    const spec = this.showsSpec(mapPath, tokenId);
+    if (!spec) return null;
+    return {
+      title: spec.title,
+      columns: [...spec.columns],
+      rows: spec.rows.map((row) => ({
+        label: row.label,
+        choices: row.choices.map((choice) => ({ id: choice.id, label: choice.label, value: choice.value, options: choice.options.map(({ value, label }) => ({ value, label })) })),
+      })),
+    };
+  }
+
+  setResourceShow(mapPath: string, tokenId: string, choiceId: string, value: string): void {
+    const spec = this.showsSpec(mapPath, tokenId);
+    const choice = spec?.rows.flatMap((row) => row.choices).find((each) => each.id === choiceId);
+    if (!spec || !choice || typeof value !== 'string' || !choice.options.some((option) => option.value === value)) return;
+    // The section applies only the choices it is given, those changed.
+    spec.save(new Map([[choiceId, value]]));
+  }
+
+  private showsSpec(mapPath: string, tokenId: string): EditTokenSectionSpec | null {
+    if (!this.started || !this.shows || typeof mapPath !== 'string' || typeof tokenId !== 'string') return null;
+    return this.shows(mapPath, tokenId);
+  }
+
+  /** The eye's "Present to" menu for a tab, with its actions; null where there is none. */
+  private presentMenu(viewId: string, tabId: string): PresentToMenu | null {
+    const source = this.split;
+    if (!this.started || !source || typeof viewId !== 'string' || typeof tabId !== 'string' || !source.scenes.splitSupported()) return null;
+    const tab: TabKey = { viewId, tabId };
+    const name = source.nameOf(tab);
+    if (name === null) return null;
+    const assignments = source.scenes.assignedTabs();
+    const view: SplitView = {
+      players: source.players(), assignments, assignedCount: Object.keys(assignments).length,
+      presented: source.scenes.presented(), nameOf: (each) => source.nameOf(each) ?? '',
+    };
+    const actions: SplitActions = {
+      assign: (playerId, to) => {
+        source.scenes.assign(playerId, to).catch((error: unknown) => console.error('[Atlas VTT Connect] Could not assign the player to the scene:', error));
+      },
+      unassign: (playerId) => source.scenes.unassign(playerId),
+      everyoneBack: () => source.scenes.everyoneBack(),
+      wouldExceedCap: (playerId, to) => source.scenes.wouldExceedCap(playerId, to),
+    };
+    return presentToMenu({ ...tab, name }, view, actions);
+  }
+
+  start(): void {
+    if (this.started) return;
+    this.started = true;
+    this.stops.push(
+      this.options.projection.onSlotChange((change) => this.slotChanged(change)),
+      this.options.handouts.subscribe(() => this.emit()),
+    );
+    this.emit();
+  }
+
+  stop(): void {
+    if (!this.started) return;
+    this.started = false;
+    this.stops.splice(0).forEach((stop) => stop());
+    this.scenes.clear();
+    this.emit();
+  }
+
+  hosting(): boolean {
+    return this.started;
+  }
+
+  presentedMap(): string | null {
+    return this.started ? this.options.projection.shownSlot()?.mapPath ?? null : null;
+  }
+
+  overlay(mapPath: string): BoardOverlay {
+    return {
+      coneAngle: (this.options.coneAngle(mapPath) * Math.PI) / 180,
+      handout: this.started ? this.options.handouts.current() : null,
+    };
+  }
+
+  onChange(listener: () => void): () => void {
+    this.changes.add(listener);
+    return () => { this.changes.delete(listener); };
+  }
+
+  onMark(listener: (mark: BoardMark) => void): () => void {
+    this.marks.add(listener);
+    return () => { this.marks.delete(listener); };
+  }
+
+  onViewer(listener: (viewer: BoardViewer) => void): () => void {
+    this.viewers.add(listener);
+    return () => { this.viewers.delete(listener); };
+  }
+
+  onSurvey(listener: (survey: BoardSurvey) => void): () => void {
+    this.surveys.add(listener);
+    return () => { this.surveys.delete(listener); };
+  }
+
+  flashSpell(mapPath: string, spell: Spell, rules?: SpellRules, words?: CastWords): boolean {
+    const sceneId = this.sceneOf(mapPath);
+    if (!sceneId || !this.templates || !isSpell(spell)) return false;
+    this.templates.flashGm(sceneId, spell, rules !== undefined && isSpellRules(rules) ? rules : undefined, words);
+    return true;
+  }
+
+  requestSpell(mapPath: string, tokenId: string, ask: SpellAsk): number | null {
+    const sceneId = this.sceneOf(mapPath);
+    if (!sceneId || !this.templates || !this.control || typeof tokenId !== 'string' || !isSpellAsk(ask)) return null;
+    return this.templates.requestSpell(sceneId, tokenId, ask);
+  }
+
+  spellRequest(mapPath: string, tokenId: string): SpellAsk | null {
+    const sceneId = this.sceneOf(mapPath);
+    return sceneId && this.templates ? this.templates.requestOf(sceneId, tokenId) : null;
+  }
+
+  cancelSpellRequest(mapPath: string, tokenId: string): void {
+    const sceneId = this.sceneOf(mapPath);
+    if (sceneId) this.templates?.cancelSpellRequest(sceneId, tokenId);
+  }
+
+  templatesChanged(): void {
+    this.emit();
+  }
+
+  flash(mapPath: string, cast: MapSpell): void {
+    this.mark({ kind: 'spell', mapPath, cast });
+  }
+
+  ping(mapPath: string, x: number, y: number, color: string): void {
+    this.mark({ kind: 'ping', mapPath, x, y, color });
+  }
+
+  laser(mapPath: string, from: string, points: readonly Point[], lifted: boolean, color: string): void {
+    this.mark({ kind: 'laser', mapPath, from, points: points.map(({ x, y }) => ({ x, y })), lifted, color });
+  }
+
+  viewer(mapPath: string, from: string, name: string, color: string, pose: ArPose | null): void {
+    if (!this.started) return;
+    const viewer: BoardViewer = {
+      mapPath, from, name, color,
+      pose: pose ? { position: [...pose.position], quaternion: [...pose.quaternion] } : null,
+    };
+    for (const listener of [...this.viewers]) {
+      try {
+        listener(viewer);
+      } catch (error) {
+        console.error('[Atlas VTT Connect] The board could not show a player in AR:', error);
+      }
+    }
+  }
+
+  survey(mapPath: string, from: string, name: string, survey: ArSurvey): void {
+    if (!this.started) return;
+    const heard: BoardSurvey = {
+      mapPath, from, name,
+      survey: { squareMm: survey.squareMm, groups: survey.groups.map(({ group, x, y, heading, w, h }) => ({ group, x, y, heading, w, h })) },
+    };
+    for (const listener of [...this.surveys]) {
+      try {
+        listener(heard);
+      } catch (error) {
+        console.error('[Atlas VTT Connect] The board could not take a table survey:', error);
+      }
+    }
+  }
+
+  private sceneOf(mapPath: string): string | null {
+    if (!this.started) return null;
+    const shown = this.options.projection.shownSlot();
+    if (shown?.mapPath === mapPath) return shown.sceneId;
+    return this.scenes.get(mapPath) ?? null;
+  }
+
+  private slotChanged(change: SlotChange): void {
+    // Most projections (a token moved) change nothing the board shows: it hears only of a new scene or presented map.
+    const before = `${this.presentedMap()}|${JSON.stringify([...this.scenes])}`;
+    if (change.kind === 'freed') {
+      if (this.scenes.get(change.slot.mapPath) === change.slot.sceneId) this.scenes.delete(change.slot.mapPath);
+    } else if (change.kind === 'projected' || change.kind === 'state') {
+      this.scenes.set(change.slot.mapPath, change.slot.sceneId);
+    } else if (change.kind === 'moved' && change.to) {
+      this.scenes.set(change.to.mapPath, change.to.sceneId);
+    }
+    if (`${this.presentedMap()}|${JSON.stringify([...this.scenes])}` !== before) this.emit();
+  }
+
+  private mark(mark: BoardMark): void {
+    if (!this.started) return;
+    for (const listener of [...this.marks]) {
+      try {
+        listener(mark);
+      } catch (error) {
+        console.error('[Atlas VTT Connect] The board could not show a mark:', error);
+      }
+    }
+  }
+
+  private emit(): void {
+    for (const listener of [...this.changes]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error('[Atlas VTT Connect] A board session listener failed:', error);
+      }
+    }
+  }
+}

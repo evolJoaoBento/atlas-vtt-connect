@@ -11,7 +11,7 @@
  * per-token definitions and the initiative health.
  */
 import type { ResourceDefinition, ResourceValue } from '@atlas-vtt/api-types';
-import { BAR_SLOTS } from '@atlas-vtt/shared/rules';
+import { BAR_SLOTS } from '../../../../packages/atlas-shared/src/index';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerResource, PlayerToken } from '../scene/sceneTypes';
 

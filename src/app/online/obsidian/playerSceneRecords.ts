@@ -5,6 +5,7 @@
  * (`remote/toRemoteScene.ts`) shows the same records. Only fields players are sent are read; nothing else can reach Atlas.
  */
 import type { GridState, InitiativeState, SavedMapInput } from '@atlas-vtt/api-types';
+import { namedSidesOf } from '../scene/initiativeSides';
 import { playerCellNumbers } from '../scene/playerCellNumbers';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerMeasurement, PlayerScene } from '../scene/sceneTypes';
@@ -38,11 +39,14 @@ export function mapRecords<S, A>(records: Readonly<Record<string, S>>, convert: 
 }
 
 /** The grid's measurement fields; Atlas's ruler reads the full settings from the measurement players get. */
-export function gridUnits(measurement: PlayerMeasurement): Pick<GridState, 'snapToGrid' | 'measurementType' | 'unitType' | 'unitDistance'> {
+export function gridUnits(measurement: PlayerMeasurement): Pick<GridState, 'snapToGrid' | 'measurementType' | 'unitType' | 'unitDistance'> & { unitNameOverride?: string } {
   return {
     snapToGrid: measurement.snapToGrid,
     measurementType: measurement.mode === 'metric' ? 'units' : 'abstract',
-    ...(measurement.unitType !== 'custom' ? { unitType: measurement.unitType } : {}),
+    // `custom` is Atlas's own unit type; the extension API's type is older and does not list it.
+    unitType: measurement.unitType as NonNullable<GridState['unitType']>,
+    // Atlas 0.15 shows a scene's own unit name after a distance ("8 mi"); the collection's name reaches a player's Atlas this way.
+    ...(measurement.unitName !== undefined ? { unitNameOverride: measurement.unitName } : {}),
     unitDistance: measurement.unitDistance,
   };
 }
@@ -84,7 +88,8 @@ export function atlasGrid(scene: Pick<PlayerScene, 'grid' | 'map' | 'measurement
 }
 
 export function playerSceneRecords(scene: PlayerScene, images: PlayerImages): PlayerSceneRecords {
-  const tokens = mapRecords(scene.tokens, (id, token) => atlasToken(id, token, images.token(token.image) ?? ''));
+  const named = namedSidesOf(scene.initiative);
+  const tokens = mapRecords(scene.tokens, (id, token) => atlasToken(id, token, images.token(token.image) ?? '', null, named.get(id)));
   const { widgetSettings, widgetValues } = atlasWidgets(scene.widgets);
   const { initiative, initiativeTrackerOpen } = atlasInitiative(scene.initiative, tokens);
   return {

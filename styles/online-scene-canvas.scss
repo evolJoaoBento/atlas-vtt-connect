@@ -26,6 +26,25 @@
   }
   /* The map sits below the top bar, so the GM's framing is never hidden behind it. */
   .atlas-connect-scene__map { grid-row: 1 / -1; grid-column: 1; display: block; width: 100%; height: 100%; touch-action: none; cursor: default; }
+  // Tabletop's 3D board takes the map's place while the player shows it (its own canvas fills it).
+  .atlas-connect-scene__board { grid-row: 1 / -1; grid-column: 1; position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; touch-action: none; }
+  .atlas-connect-scene__board[hidden], .atlas-connect-scene__map[hidden] { display: none; }
+  /* A cutscene: the black the 2D map fades into (the board sits above it), and the curtain of a client that cannot draw it. */
+  .atlas-connect-scene__cutscene-overlay { grid-row: 1 / -1; grid-column: 1; z-index: 30; background: #000; opacity: 0; transition: opacity 600ms linear; pointer-events: auto; }
+  .atlas-connect-scene__cutscene-overlay.is-black { opacity: 1; }
+  .atlas-connect-scene__cutscene-overlay[hidden], .atlas-connect-scene__cutscene-curtain[hidden] { display: none; }
+  .atlas-connect-scene__board.is-cutscene { z-index: 31; }
+  .atlas-connect-scene__cutscene-curtain {
+    grid-row: 1 / -1; grid-column: 1; z-index: 40; background: #000; color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; text-align: center; padding: 16px; pointer-events: auto;
+  }
+  /* The tools are locked while a cutscene runs. */
+  &.is-cutscene {
+    .toolbar, .sheet-panel, .dice-tray, button[aria-label="Your sheets"], .view-buttons { display: none !important; }
+    /* The top bar (the dice log) stays reachable over the board and the black. */
+    .top-bar { z-index: 50; }
+  }
+  .atlas-connect-scene__dimension { font-weight: 600; font-size: var(--font-ui-smaller); min-width: 32px; }
   /* A grab hand over the player's own tokens; grabbing while a token or the map is dragged. */
   .atlas-connect-scene__map.can-grab { cursor: grab; }
   .atlas-connect-scene__map:active, .atlas-connect-scene__map.is-grabbing { cursor: grabbing; }
@@ -214,6 +233,10 @@
   .tray-modifier-label { margin-right: auto; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
   .tray-step { width: 32px; height: 32px; }
   .tray-modifier-value { width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+  .tray-sides { display: flex; gap: 4px; }
+  .tray-sides.is-off { opacity: 0.5; }
+  .tray-side { flex: 1; min-height: 32px; padding: 0 8px; font-size: 12px; }
+  .tray-side.is-chosen { border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
   .tray-formula {
     margin: 0; padding: 4px var(--inset); border: 1px solid var(--border); border-radius: 8px; background: var(--hover);
     text-align: center; font-variant-numeric: tabular-nums;
@@ -254,6 +277,9 @@
   .die-badge.is-max { color: #2f9e44; }
   .die-badge.is-min { color: #e03131; }
   .die-badge.is-more { color: var(--muted); }
+  .die-badge.is-dropped, .die-badge.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .die-badge.is-success { color: #2f9e44; }
+  .die-badge.is-failure { color: #e03131; }
   .die-tag { color: var(--muted); }
   .die-tag-dot { color: var(--die-tag-colour, currentColor); }
   /* A critical roll, as Atlas's log marks it: a coloured edge. */
@@ -344,7 +370,9 @@
   }
   .dice-card-die.is-max { background: color-mix(in oklch, var(--color-green) 15%, transparent); color: var(--color-green); }
   .dice-card-die.is-min { background: color-mix(in oklch, var(--color-red) 15%, transparent); color: var(--color-red); }
-  .dice-card-die.is-dropped { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .dice-card-die.is-dropped, .dice-card-die.is-rerolled { background: transparent; box-shadow: inset 0 0 0 1px var(--background-modifier-border); color: var(--text-faint); text-decoration: line-through; }
+  .dice-card-die.is-success { background: color-mix(in oklch, var(--color-green) 15%, transparent); color: var(--color-green); }
+  .dice-card-die.is-failure { background: color-mix(in oklch, var(--color-red) 15%, transparent); color: var(--color-red); }
   @media (prefers-reduced-motion: reduce) {
     .dice-card, .dice-card-avatar, .dice-card-content, .dice-card-result, .dice-card-total { animation-duration: 1ms !important; animation-delay: 0ms !important; }
   }
@@ -476,6 +504,7 @@
   .initiative-list::-webkit-scrollbar { display: none; }
   .initiative-side-label { text-align: center; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
   .initiative-side.is-active .initiative-side-label { color: var(--interactive-accent); }
+  .initiative-side-roll { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--background-modifier-hover); font-weight: var(--font-semibold); }
   .initiative-card {
     display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
     background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l);
@@ -488,6 +517,12 @@
     border-color: var(--interactive-accent); box-shadow: inset 0 0 0 1px var(--interactive-accent);
   }
   .initiative-card.is-sitting-out { opacity: 0.45; }
+  .initiative-card.is-defeated { position: relative; opacity: 0.45; filter: grayscale(70%); }
+  .initiative-defeated { display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .initiative-defeated svg { width: 24px; height: 24px; }
+  .initiative-defeated--over { position: absolute; top: var(--inset); left: var(--inset); right: var(--inset); aspect-ratio: 1; border-radius: 50%; background: #0009; }
+  .initiative-card.is-findable { cursor: pointer; }
+  .initiative-card.is-findable:hover { border-color: var(--interactive-accent); }
   .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
   .initiative-value { font-weight: var(--font-semibold); }
   .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: var(--font-ui-smaller); }
@@ -579,3 +614,37 @@
   .note-body th, .note-body td { padding: 4px 8px; border: 1px solid var(--background-modifier-border); text-align: left; }
   .note-body .note-status { color: var(--text-muted); font-style: italic; }
 }
+/* The Move group's tools, above the laser's colours, as in Atlas's Move menu. */
+.atlas-connect-scene .swatch-menu .menu-section { display: flex; flex-direction: column; gap: 2px; margin: -4px -4px 0; padding-bottom: 6px; border-bottom: 1px solid var(--background-modifier-border); }
+.atlas-connect-scene 
+/* The Move menu, as Atlas's: ticked tools, Laser colour (a row of squares, the chosen one ticked) and Laser size. */
+.atlas-connect-scene .swatch-menu { width: 248px; padding: 6px; gap: 6px; }
+.atlas-connect-scene .swatch-menu .menu-entry { height: 32px; padding: 0 10px 0 6px; gap: 8px; font-weight: 600; font-size: 13px; }
+.atlas-connect-scene .menu-check { width: 14px; height: 14px; display: inline-flex; visibility: hidden; }
+.atlas-connect-scene .menu-check .tool-icon { width: 14px; height: 14px; }
+.atlas-connect-scene .menu-entry.is-checked .menu-check { visibility: visible; }
+.atlas-connect-scene .menu-label { display: block; padding: 2px 6px 0; font-size: 13px; font-weight: 600; }
+.atlas-connect-scene .swatch-menu .swatch-grid { grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 0 6px; }
+.atlas-connect-scene .swatch-menu .swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--background-modifier-border); position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.atlas-connect-scene .swatch-menu .swatch.is-selected { border-color: transparent; box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 3px var(--interactive-accent); }
+.atlas-connect-scene .swatch-check { display: none; width: 16px; height: 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); align-items: center; justify-content: center; }
+.atlas-connect-scene .swatch-check .tool-icon { width: 12px; height: 12px; background: #fff; }
+.atlas-connect-scene .swatch.is-selected .swatch-check { display: inline-flex; }
+.atlas-connect-scene .swatch-menu .menu-hint { padding: 0 6px; }
+.atlas-connect-scene .menu-slider { display: flex; flex-direction: column; gap: 6px; padding: 2px 6px 6px; }
+.atlas-connect-scene .menu-slider-head { display: flex; align-items: center; justify-content: space-between; }
+.atlas-connect-scene .menu-slider-head .menu-label { padding: 0; }
+.atlas-connect-scene .menu-slider-value { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.atlas-connect-scene .menu-slider input[type="range"] { width: 100%; accent-color: var(--interactive-accent); margin: 0; }
+
+// The token picked to see through (CanvasScene's eye button, several tokens).
+.atlas-connect-scene__eye-menu {
+  position: absolute;
+  z-index: 30;
+  min-width: 140px;
+  &[hidden] { display: none; }
+}
+.atlas-connect-scene__eye.is-active { color: var(--interactive-accent); }
+
+// Through a token's eyes Tabletop's spell toolbar takes the toolbar's place (CanvasScene's showEyes).
+.atlas-connect-scene .toolbar[hidden] { display: none; }

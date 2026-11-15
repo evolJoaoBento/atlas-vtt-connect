@@ -12,11 +12,11 @@ import { parseJoinFragment } from '../src/app/online/joinLink';
 import { keptPlayerKey, pageKey, readKept } from '../src/app/online/page/pageStorage';
 import { createOnlineLog } from '../src/app/online/onlineLog';
 import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
-import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
+import { loadLaserColor, loadLaserSize, saveLaserColor, saveLaserSize } from '../src/app/online/page/laserColorStore';
 import { OwnRollThrows } from '../src/app/online/page/ownRollThrows';
 import { browserDomHost } from './dice3d/browserDomHost.mts';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
-import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
+import type { BoardDiceOffer, PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
 import { playerLines, widgetLines } from '../src/app/online/preview/sceneSummary';
 import { normalizePlayerName } from '../src/app/online/protocol';
@@ -30,7 +30,12 @@ import { SheetView } from './sheetView.mts';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
-import { MapView } from './mapView.mts';
+import { MapView, type MapViewOptions } from './mapView.mts';
+import { SceneSwitch } from './sceneSwitch.mts';
+import { CutsceneKeeper } from '../src/app/online/scene/cutsceneKeeper';
+import { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
+import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
+import type { AssetMime } from '../src/app/online/assets/assetIds';
 import { Menu } from './menu.mts';
 import { PageToolbar } from './toolbar.mts';
 
@@ -49,6 +54,10 @@ const waitingLoader = element<HTMLElement>('loader');
 const table = element<HTMLElement>('table');
 const sessionName = element<HTMLElement>('session-name');
 const connection = element<HTMLElement>('connection');
+const reconnectButton = element<HTMLButtonElement>('reconnect-button');
+/** The name to join under again after Reconnect reloaded the page (this tab only). */
+const REJOIN_KEY = 'atlas-vtt-connect:rejoin';
+const rejoinButton = element<HTMLButtonElement>('rejoin-button');
 const playerList = element<HTMLUListElement>('players');
 const widgetList = element<HTMLUListElement>('widgets');
 const canvas = element<HTMLCanvasElement>('map');
@@ -57,20 +66,28 @@ const cache = new AssetCache({ keep: rememberedKeep(), openStore: openIndexedDbI
 const panel = new AssetsPanel(cache);
 new Menu(element<HTMLButtonElement>('menu-button'), element<HTMLElement>('menu'), element<HTMLButtonElement>('menu-close'));
 const surface = createCanvasSurface(canvas);
+const boardEl = element<HTMLElement>('board-3d');
+const followButton = element<HTMLButtonElement>('follow-gm');
+const fitButton = element<HTMLButtonElement>('fit-map');
 /** Set once the player joins; until then a drop, a laser or a roll has nowhere to go. */
 let session: PlayerSession | null = null;
+/** A cutscene runs: the tools are locked. */
+let cutsceneLocked = false;
+/** Whether the GM takes dice thrown on the board, and its rules: the board's Roll dice (the one tool a cutscene leaves) throws and sends them. */
+let boardDice: BoardDiceOffer | null = null;
 // The lookup runs at draw time, in a later animation frame, so `loader` below is already set;
 // it asks the loader every time, so a released image is never drawn.
-const map = surface
-  ? new MapView({
-    canvas, surface, images: (id) => loader.image(id),
-    viewButtons: element('view-buttons'), followButton: element('follow-gm'), fitButton: element('fit-map'),
+const mapOptions = (): MapViewOptions => ({
+    canvas, surface: createCanvasSurface(canvas) ?? surface!, images: (id) => loader.image(id),
+    viewButtons: element('view-buttons'), followButton, fitButton,
     sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
-    sendLaser: (points, lifted, dt, color) => session?.sendLaser(points, lifted, dt, color) ?? false,
+    sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
     sendPing: (x, y) => session?.sendPing(x, y) ?? false,
     sendTemplate: (change) => session?.sendTemplate(change) ?? false,
     laserColor: loadLaserColor(() => localStorage),
     onLaserColor: (color) => saveLaserColor(color, () => localStorage),
+    laserSize: loadLaserSize(() => localStorage),
+    onLaserSize: (size) => saveLaserSize(size, () => localStorage),
     notice: element('move-notice'),
     hoverCard: element('hover-card'),
     turnNotice: element('turn-notice'),
@@ -83,11 +100,86 @@ const map = surface
     note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
     requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
     onToolsChange: () => syncToolbar(),
+  });
+/** An image's URL, for Tabletop's board (which loads its textures by URL): the page's decoder gives one. */
+const urlOf = (image: (DecodedImage & { url?: string }) | null): string | null => image?.url ?? null;
+// The 2D map, or Tabletop's 3D board while the GM offers it (its code loads with the first offer).
+const map: SceneSwitch | null = surface
+  ? new SceneSwitch({
+    // Through a token's eyes, Tabletop's spell toolbar takes the place of the page's.
+    onSeeing: (seeing) => {
+      element('toolbar').hidden = seeing || cutsceneLocked;
+      // Follow GM and Fit map move a camera the eyes do not use.
+      element('view-buttons').style.display = seeing ? 'none' : '';
+    },
+    makeMap: () => new MapView(mapOptions()),
+    makeBoard: (factory, parent, over) => new BoardSceneView({
+      parent, factory,
+      ...(over ? { onCutsceneOver: over } : {}),
+      image: (id) => loader.image(id),
+      imageUrl: (id) => urlOf(loader.image(id)),
+      model: (id) => loader.model(id),
+      sendMove: (tokenId, x, y) => session?.sendTokenMove(tokenId, x, y) ?? false,
+      sendLaser: (points, lifted, dt, color, size) => session?.sendLaser(points, lifted, dt, color, size) ?? false,
+      sendPing: (x, y) => session?.sendPing(x, y) ?? false,
+      sendTemplate: (change) => session?.sendTemplate(change) ?? false,
+      sendSpell: (change) => session?.sendSpell(change) ?? false,
+      sendDiceResult: (result) => session?.sendDiceResult(result) ?? false,
+      diceRules: () => boardDice?.rules ?? null,
+      onEyeChange: () => map?.eyesChanged(),
+      requestNote: (pinId) => session?.sendNoteRequest(pinId) ?? false,
+      onToolsChange: () => syncToolbar(),
+      hoverCard: element('hover-card'),
+      statblockPreview: element('statblock-preview'),
+      initiative: element('initiative-panel'),
+      turnNotice: element('turn-notice'),
+      handout: {
+        panel: element('handout'), title: element('handout-title'), canvas: element('handout-canvas'),
+        status: element('handout-status'), closeButton: element('handout-close'), openButton: element('handout-button'),
+      },
+      note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
+      doc: document,
+    }),
+    loadBoard: () => import('./tabletopBoard.mts').then((chunk) => chunk.webPlayerBoard()),
+    canvas, boardEl,
+    dimensionButton: element('dimension-button'),
+    eyeButton: element('eye-button'),
+    eyeMenu: element('eye-menu'),
+    ar: { button: element('ar-button'), panel: element('ar-panel'), video: element('ar-video'), overlay: element('table') },
+    cutscene: {
+      overlay: element('cutscene-overlay'), curtain: element('cutscene-curtain'), backButton: element('back-to-ar'),
+      sendReady: (on) => session?.sendCutsceneReady(on) ?? false,
+      // The toolbar, the sheets drawer and the dice tray hide while a cutscene runs (the board's Roll dice stays).
+      onLock: (locked) => {
+        cutsceneLocked = locked;
+        table.classList.toggle('is-cutscene', locked);
+        if (locked) setDiceOpen(false);
+        element('toolbar').hidden = locked;
+      },
+    },
+    viewButtons: element('view-buttons'),
+    requestBoard: (on) => {
+      // Back to 2D: the board's materials and models are let go.
+      if (!on) loader.setBoard(null);
+      return session?.sendBoardRequest(on) ?? false;
+    },
+    onViewChange: () => {
+      // The board draws minis: their models are asked for now (or let go).
+      if (scene) loader.setScene(scene);
+      syncToolbar();
+    },
+    tokenName: (tokenId) => scene?.tokens[tokenId]?.name ?? 'Token',
+    sendArView: (pose) => session?.sendArView(pose) ?? false,
+    sendArSurvey: (survey) => session?.sendArSurvey(survey) ?? false,
+    onError: (message, error) => { console.warn(message, error); },
   })
   : null;
+// On the board, Follow GM and Fit map are the board's (the 2D map listens to them itself).
+followButton.addEventListener('click', () => { if (map?.showsBoard) map.followGm(); });
+fitButton.addEventListener('click', () => { if (map?.showsBoard) map.fitMap(); });
 const diceTray = new DiceTrayView({
   root: element('dice-tray'),
-  roll: (dice, modifier) => session?.sendDiceRoll(dice, modifier) ?? false,
+  roll: (dice, modifier, advantage) => session?.sendDiceRoll(dice, modifier, advantage) ?? false,
   onClose: () => setDiceOpen(false),
 });
 const diceDisplay = new DiceDisplayView(element('dice-display'), loadDiceDisplay(() => localStorage), (display) => {
@@ -122,13 +214,31 @@ const toolbar = new PageToolbar({
   onShape: (shape) => map?.selectShape(shape),
   onTemplateShape: (shape) => map?.selectTemplateShape(shape),
   onClearTemplates: () => map?.clearOwnTemplates(),
-  onLaserColor: (color) => map?.selectLaserColor(color),
+  onLaserColor: (color) => {
+    map?.selectLaserColor(color);
+    saveLaserColor(color, () => localStorage);
+    session?.sendColor(color);
+  },
+  onLaserSize: (size) => map?.selectLaserSize(size),
   onDice: () => setDiceOpen(!diceTray.isOpen),
 });
+// The board's own buttons (2D/3D, Eyes, AR) at the toolbar's end.
+toolbar.addGroup(element('board-buttons'));
 let assetsFrame: number | null = null;
-const loader = new AssetLoader({
+/** The page's images, each with a URL of its bytes too (Tabletop's board loads textures by URL). */
+async function decodeWithUrl(bytes: ArrayBuffer, mime: AssetMime): Promise<DecodedImage | null> {
+  const decoded = await decodeImage(bytes, mime);
+  if (!decoded) return null;
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  return { ...decoded, url, release: () => { decoded.release?.(); URL.revokeObjectURL(url); } } as DecodedImage;
+}
+const loader: AssetLoader = new AssetLoader({
   cache,
-  decode: decodeImage,
+  decode: decodeWithUrl,
+  // Minis' and props' models only while Tabletop's board draws them.
+  models: () => map?.showsBoard === true,
+  // This page plays an animated map's video.
+  video: () => true,
   // Chunks arrive many times a second: the bar and the map update at most once per frame.
   onChange: () => {
     if (assetsFrame !== null) return;
@@ -139,6 +249,8 @@ const loader = new AssetLoader({
     });
   },
 });
+/** The cutscene running now with its revealed scenes: the view plays it, the loader fetches its files. */
+const cutscenes = new CutsceneKeeper(loader, () => map);
 let sessionState: PlayerSessionState | null = null;
 let scene: PlayerScene | null = null;
 let started = false;
@@ -198,6 +310,8 @@ function show(view: PageScreen): void {
   if (view.kind === 'message') status.textContent = view.text;
   // A spinner while the page waits on the GM or the connection, so it does not look stuck.
   waitingLoader.hidden = !(view.kind === 'message' && view.loading === true);
+  rejoinButton.hidden = !(view.kind === 'message' && view.rejoin === true);
+  reconnectButton.hidden = !(view.kind === 'table' && view.reconnect === true);
   if (view.kind === 'table') {
     sessionName.textContent = view.title;
     connection.textContent = view.connection;
@@ -283,6 +397,8 @@ if (!target) {
     form.hidden = true;
     session = createJoinSession({
       loader,
+      // The colour the player picked last time goes to the GM on each admission.
+      color: () => loadLaserColor(() => localStorage),
       hostId: target.hostId,
       name,
       // One key per GM session, so different GMs cannot recognise or pose as the same player.
@@ -303,9 +419,9 @@ if (!target) {
         log.event('control', { tokens: tokenIds.length });
         map.setControlled(tokenIds);
       },
-      onMoveRefused: (tokenId) => {
-        log.event('move refused', { tokenId });
-        map.moveRefused(tokenId);
+      onMoveRefused: (tokenId, reason) => {
+        log.event('move refused', { tokenId, reason: reason ?? null });
+        map.moveRefused(tokenId, reason);
       },
       onSceneState: (paused) => {
         log.event('scene state', { paused });
@@ -319,12 +435,46 @@ if (!target) {
       onLaser: (laser) => map.receiveLaser(laser),
       onPing: (ping) => map.receivePing(ping),
       onTemplates: (sceneId, templates) => map.receiveTemplates(sceneId, templates),
+      onSpells: (sceneId, spells, asks) => map.receiveSpells(sceneId, spells, asks),
       onSheets: (entries) => {
         sheets.receive(entries);
         map.setSheets(entries);
       },
       onPinNote: (answer) => map.receiveNote(answer),
+      onBoardOffer: (available, dice) => {
+        log.event('board offer', { available });
+        boardDice = dice ?? null;
+        map.boardOffer(available);
+      },
+      onBoardExtras: (extras) => {
+        loader.setBoard(extras);
+        map.boardExtras(extras);
+      },
+      onBoardCamera: (camera) => map.setBoardCamera(camera),
+      onCutscene: (cutscene) => {
+        log.event('cutscene', { runId: cutscene?.runId ?? null });
+        cutscenes.cutscene(cutscene);
+      },
+      onCutsceneScene: (runId, key, scene) => cutscenes.scene(runId, key, scene),
+      onCutsceneExtras: (runId, key, extras) => cutscenes.extras(runId, key, extras),
+      onCutsceneCamera: (runId, camera) => cutscenes.camera(runId, camera),
     });
     session.start();
   });
+  // Reconnecting: try again at once, without waiting for the next retry.
+  reconnectButton.addEventListener('click', () => { session?.reconnect(); });
+  // Lost for good: the page starts afresh and joins again under the same name (the GM knows the player by their key).
+  rejoinButton.addEventListener('click', () => {
+    try { sessionStorage.setItem(REJOIN_KEY, normalizePlayerName(nameInput.value) ?? ''); } catch { /* private window */ }
+    location.reload();
+  });
+  let rejoin: string | null = null;
+  try {
+    rejoin = sessionStorage.getItem(REJOIN_KEY);
+    sessionStorage.removeItem(REJOIN_KEY);
+  } catch { /* private window */ }
+  if (rejoin) {
+    nameInput.value = rejoin;
+    form.requestSubmit();
+  }
 }

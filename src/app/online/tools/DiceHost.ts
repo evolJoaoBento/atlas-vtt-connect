@@ -5,8 +5,10 @@
  * the GM's and players', goes to every admitted player as `dice-log`, marked `mine` for the player who rolled it; each
  * admission replays the latest 50, newest first. Every entry is worked out per recipient (P5): a roll named after a
  * token keeps that name only for the players of the scene the GM's view showed it on; everyone else reads "GM". While
- * more than one scene is in use a player's roll carries the roller's scene name (D7, P9). More than 2 rolls a second
- * from one player are ignored. A `GmSession` handler, started after the token control host.
+ * more than one scene is in use a player's roll carries the roller's scene name (D7, P9). A player's physical roll
+ * (`dice-result`, thrown on Tabletop's board) is judged by the same rules (`physicalRolls.ts`) and published into that
+ * log; a roll of their sheet is named from the GM's own copy of it, never by the player. More than 2 rolls a second
+ * from one player, of either kind, are ignored. A `GmSession` handler, started after the token control host.
  */
 import type { DiceRollRequest, DiceRollResult, Disposer } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
@@ -15,8 +17,9 @@ import { RateLimit } from '../rateLimit';
 import type { SceneSession } from '../scene/sceneSources';
 import { admitted } from '../scene/slotAudience';
 import type { SlotProjection } from '../scene/slotViews';
-import { cleanSceneLabel, DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry } from './toolMessages';
-import type { AdvantageSide } from './sheets';
+import { cleanSceneLabel, DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, playerRollFormula, type DiceLogEntry, type OfferedDiceRules, type PhysicalRoll } from './toolMessages';
+import { physicalRollResult, rerollExpectation, type RerollExpectation } from './physicalRolls';
+import type { AdvantageSide, SheetRollRef } from '../../../../packages/atlas-host/src/sheets/sheets';
 
 /** What a roll from a player's sheet adds: the ability Atlas's toast names it after, and the side it is rolled with. */
 export interface SheetRollExtras {
@@ -65,6 +68,20 @@ export interface DiceHostOptions {
   /** Rolls and logs by the rules of the collection holding `mapPath` (`dice.roll`); the feed hears the roll before this returns. */
   roll(request: PlayerRollRequest): DiceRollResult;
   feed: DiceFeed;
+  /** The dice rules of the collection holding `mapPath`, as the GM offers them; without it players' physical rolls are ignored. */
+  rules?: (mapPath: string | null) => OfferedDiceRules;
+  /**
+   * Whether the GM's own rolls reach players (Atlas's "Show my rolls to players", the `showDiceRolls` rule of its player
+   * view): asked at each roll. Without it they do, as before Atlas 0.7 made them private unless shared.
+   */
+  gmRollsShared?: () => boolean;
+}
+
+/** Names a roll of a player's sheet from the GM's own copy of it; null when the player has no such roll there. */
+export interface SheetRollLabels {
+  rollLabel(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null;
+  /** The formula of that roll on the GM's copy; without it a thrown sheet roll expects no reroll, so a rerolled die in it is refused. */
+  rollFormula?(player: SessionPlayer, tokenId: string, roll: SheetRollRef): string | null;
 }
 
 /** Longest name Atlas takes for who rolled (`DiceRollRequest.rolledBy`). */
@@ -110,8 +127,14 @@ export class DiceHost implements SessionHandler {
   /** The player whose roll Atlas is rolling now: the feed hears it before `roll` returns, so before its id is known. */
   private rolling: { playerId: string; name: string } | null = null;
   private readonly stops: Array<() => void> = [];
+  private sheets: SheetRollLabels | null = null;
 
   constructor(private readonly options: DiceHostOptions) {}
+
+  /** The sheets players' physical sheet rolls are named from; without them such a roll is ignored. */
+  useSheets(sheets: SheetRollLabels | null): void {
+    this.sheets = sheets;
+  }
 
   start(): void {
     if (this.stops.length > 0) return;
@@ -133,13 +156,18 @@ export class DiceHost implements SessionHandler {
    * decides which dice are the default dice a crit or a `default` explosion looks at.
    */
   onMessage(player: SessionPlayer, message: ControlMessage): void {
+    if (message.type === 'dice-result') {
+      this.takeThrown(player, message);
+      return;
+    }
     if (message.type !== 'dice-roll') return;
     const formula = playerRollFormula(message.dice, message.modifier);
     if (formula === null) {
       console.warn('[Atlas VTT Connect] A player roll was ignored: Atlas does not roll that formula.');
       return;
     }
-    this.rollFor(player, formula);
+    // A side the player chose in the tray goes with the roll, as one from a sheet does.
+    this.rollFor(player, formula, message.advantage ? { advantage: message.advantage } : {});
   }
 
   /**
@@ -164,12 +192,43 @@ export class DiceHost implements SessionHandler {
     }
   }
 
+  /**
+   * Publishes a player's physical roll into Atlas's log, judged by the rules of the collection holding their scene's
+   * map and named after them (and after the ability of their sheet it was thrown for, read from the GM's copy).
+   */
+  private takeThrown(player: SessionPlayer, message: PhysicalRoll): void {
+    const { rules } = this.options;
+    if (!rules || !this.limit.allow(player.playerId, Date.now())) return;
+    const label = player.name.slice(0, MAX_ROLLED_BY);
+    this.rolling = { playerId: player.playerId, name: label };
+    try {
+      let ability: string | undefined;
+      // The rerolls the roll may hold are those of the sheet roll on the GM's copy; a free roll from the tray holds none.
+      let rerolls: RerollExpectation = {};
+      if (message.sheet) {
+        const found = this.sheets?.rollLabel(player, message.sheet.tokenId, message.sheet.roll) ?? null;
+        if (!found) throw new Error('it is for a sheet roll the player does not have');
+        ability = found;
+        rerolls = rerollExpectation(this.sheets?.rollFormula?.(player, message.sheet.tokenId, message.sheet.roll) ?? undefined);
+      }
+      const result = physicalRollResult(message, rules(this.options.projection.slotOf(player.playerId)?.mapPath || null), label, ability, rerolls);
+      this.options.feed.publish(result);
+    } catch (error) {
+      // A roll the rules refuse, or Atlas does not take, must not stop the session's other messages.
+      console.warn("[Atlas VTT Connect] A player's thrown dice were ignored:", error);
+    } finally {
+      this.rolling = null;
+    }
+  }
+
   /** Drops the windows of players who left the session: a reconnect must not reset one. */
   playersChanged(players: readonly SessionPlayer[]): void {
     this.limit.retain(new Set(players.map((player) => player.playerId)));
   }
 
   private rolled(result: DiceRollResult): void {
+    // The GM's own rolls are private unless the GM shares them; a roll made for a player is always the table's.
+    if (!result.rolledBy && !(this.options.gmRollsShared?.() ?? true)) return;
     // A roll from a player's sheet reads "Anna: Dagger" in the players' log, as Atlas's toast names its ability.
     const ability = result.rolledBy ? result.source?.abilityName?.trim() : undefined;
     const roller = result.rolledBy ? playerName(result.rolledBy) : GM_ROLLER_NAME;

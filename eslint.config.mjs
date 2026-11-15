@@ -12,7 +12,7 @@ import obsidianmd from "eslint-plugin-obsidianmd";
 const SCRIPT_FILES = ["**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}"];
 
 export default defineConfig([
-  globalIgnores(["dist/", "dist-page/", "node_modules/", "vendor/", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
+  globalIgnores(["dist/", "dist-page/", ".page-test/", "node_modules/", "vendor/", "packages/atlas-shared/src/app/", "packages/**/*.mjs", "tests/", "scripts/", "docs/", "vite/", "**/*.test.*", "*.js", "*.cjs", "*.mjs", "*.config.mts", "*.config.ts"]),
   ...obsidianmd.configs.recommended,
   {
     files: SCRIPT_FILES,
@@ -56,8 +56,8 @@ export default defineConfig([
   },
   {
     // The page's own entry, its saved-images panel and the shim that gives a plain page Obsidian's globals run only in
-    // a browser, where `localStorage` and `globalThis` are the right names.
-    files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts"],
+    // a browser, where `localStorage` and `globalThis` are the right names; so does augmented reality (the page only).
+    files: ["online-client/main.mts", "online-client/assetsPanel.mts", "online-client/dice3d/obsidianShim.mts", "online-client/ar/**"],
     rules: { "no-restricted-globals": "off", "obsidianmd/no-global-this": "off" },
   },
   {

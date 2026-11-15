@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Square } from 'lucide-react';
+import { Copy, QrCode, Square } from 'lucide-react';
 import { Notice } from 'obsidian';
 import type { ViewContext } from '@atlas-vtt/api-types';
 import { Button } from '../../ui/primitives/Button';
@@ -8,6 +8,7 @@ import { TOKENS_UNAVAILABLE_NOTICE } from '../control/TokenControlHost';
 import type { OnlineSessionService } from '../OnlineSessionService';
 import type { OnlineSessionState } from '../onlineSessionStore';
 import { JOIN_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../ui/onlineCopy';
+import { JoinQrCode } from './JoinQrCode';
 import { OnlinePlayerList } from './OnlinePlayerList';
 import { OnlinePresenting } from './OnlinePresenting';
 import { tabNameIn, type PresentingEnv } from './presentingHere';
@@ -61,6 +62,7 @@ function StartView({ session, env }: { session: OnlineSessionState; env: PanelEn
 
 function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: PanelEnv; ctx: ViewContext }): React.ReactElement {
   const url = session.joinUrl;
+  const [qr, setQr] = React.useState(false);
   useViewTabsKey(env.views, ctx.viewId, env.tabsChanged); // renders again when a tab is renamed: chips and rows name tabs
   // The split party's chip on each assigned player's row: "On {scene}".
   const chips = Object.fromEntries(Object.entries(session.assignments).map(([playerId, tab]) => [playerId, sceneChip(tabNameIn(env.views, tab))]));
@@ -86,8 +88,14 @@ function HostingView({ session, env, ctx }: { session: OnlineSessionState; env: 
                 <Copy />
               </Button>
             </LabelTooltip>
+            <LabelTooltip label={qr ? 'Hide QR code' : 'Show QR code'}>
+              <Button variant="ghost" size="sm" aria-label={qr ? 'Hide QR code' : 'Show QR code'} aria-pressed={qr} onClick={() => setQr(!qr)}>
+                <QrCode />
+              </Button>
+            </LabelTooltip>
           </div>
         )}
+        {url && qr && <JoinQrCode url={url} />}
       </section>
       <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={env.service} summaries={env.summaries} sceneChips={chips} />
       <OnlinePresenting env={env} ctx={ctx} actions={env.service} />

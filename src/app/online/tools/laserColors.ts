@@ -3,12 +3,12 @@
  * player's by their place in the session (join order, as `presence` lists them). The GM and
  * every page compute the same colours from the same order. Shared with the web page.
  */
-import { LASER_COLOR_SWATCHES } from '@atlas-vtt/shared/rules';
+import { LASER_COLORS } from '../../../../packages/atlas-shared/src/index';
 
 /** The `from` of the GM's own laser. */
 export const GM_LASER_ID = 'gm';
 
-export const LASER_PALETTE: readonly string[] = LASER_COLOR_SWATCHES.map((swatch) => swatch.value);
+export const LASER_PALETTE: readonly string[] = LASER_COLORS;
 
 /** `from`'s colour among `order`, the session's players; someone not in it gets the last colour. */
 export function laserColor(from: string, order: readonly string[]): string {

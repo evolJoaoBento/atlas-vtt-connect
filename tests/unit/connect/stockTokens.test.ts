@@ -113,6 +113,14 @@ describe('tokens on a stock Atlas', () => {
       expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }], { allowHidden: true }).ok).toBe(true);
     });
 
+    it('refuses a token kept beside the map (Atlas 0.9\'s `offMap`): it is no part of the map', () => {
+      const t = setup();
+      (t.tokens[CLERIC] as { offMap?: true }).offMap = true;
+      expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }])).toEqual({ ok: false, reason: 'unknown-token' });
+      expect(t.api.move('v1', [{ tokenId: CLERIC, x: 100, y: 100 }], { allowHidden: true })).toEqual({ ok: false, reason: 'unknown-token' });
+      expect(t.writes).toEqual([]);
+    });
+
     it('refuses a token named like an object\'s own method, a view that is loading, one the GM is dragging in, and a closed view', () => {
       const t = setup();
       expect(t.api.move('v1', [{ tokenId: 'constructor', x: 1, y: 1 }])).toEqual({ ok: false, reason: 'unknown-token' });
@@ -202,6 +210,19 @@ describe('tokens on a stock Atlas', () => {
         wide.tokens[CLERIC]!.y = 100;
         wide.api.move('v1', [{ tokenId: CLERIC, x: 330, y: 500 }], { snap: false });
         expect(wide.tokens[CLERIC]!.y).toBeGreaterThan(300);
+      });
+
+      it("a 0.15 scene's room walls stop a token", () => {
+        // Atlas 0.15 turns rooms into real walls on load (ids `room_<level>_x1_y1_x2_y2`, one chain per level) and
+        // drops `objects.rooms`: they stop a token as any wall does, with no rooms outline worked out here.
+        const rooms = {
+          room__0_2400_6400_2400: { id: 'room__0_2400_6400_2400', kind: 'wall', type: 'solid', closed: true, chainId: 'rooms_', floor: 'left', p1: { x: 0, y: 300 }, p2: { x: 800, y: 300 } },
+        };
+        const lit = setup({ lit: true, walls: rooms });
+        lit.tokens[CLERIC]!.x = 296;
+        lit.tokens[CLERIC]!.y = 100;
+        lit.api.move('v1', [{ tokenId: CLERIC, x: 296, y: 500 }], { snap: false });
+        expect(lit.tokens[CLERIC]!.y).toBeLessThan(300);
       });
 
       it('reads a wall that is no wall as none, as Atlas does', () => {

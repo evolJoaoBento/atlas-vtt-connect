@@ -32,6 +32,20 @@ describe('the join page dice log', () => {
     for (const view of views.splice(0)) view.dispose();
   });
 
+  it('strikes through a die counted for nothing and marks successes, as Atlas 0.8 does, and shows a Fate die', () => {
+    const { view, element } = setup();
+    view.receive([{
+      id: 'x', name: 'GM', formula: '4d10>=8', modifier: 0, total: 2, at: 0,
+      dice: [{ die: 'd10', value: 3, rerolled: true }, { die: 'd10', value: 9, success: true }, { die: 'd10', value: 2, failure: true }, { die: 'd10', value: 10, dropped: true }, { die: 'dF', value: -1 }, { die: 'dF', value: 1 }],
+    }], true);
+    const badges = [...element('dice-log-list').querySelectorAll('.die-badge')].map((badge) => [badge.textContent, badge.className]);
+    expect(badges).toEqual([
+      ['d10: 3', 'die-badge is-rerolled'], ['d10: 9', 'die-badge is-success'], ['d10: 2', 'die-badge is-failure'],
+      // A die counted for nothing is not also coloured as the highest face.
+      ['d10: 10', 'die-badge is-dropped'], ['dF: -1', 'die-badge'], ['dF: 1', 'die-badge'],
+    ]);
+  });
+
   it('lists rolls newest first as text, never as markup', () => {
     const { view, element } = setup();
     expect(element('dice-log-empty').hidden).toBe(false);

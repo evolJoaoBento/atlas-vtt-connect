@@ -3,12 +3,12 @@
  * clips its grid to the map), dashed or dotted by line type, and cell numbers when the
  * GM shows them and they are large enough to read, numbered as `GridSystem` numbers them.
  */
-import { createHexLayout, isHexGridType } from '@atlas-vtt/shared/grid';
+import { createHexLayout, isHexGridType } from '../../../../../packages/atlas-shared/src/index';
 import {
   cellNumberAnchor, cellNumberFontSize, numberCells, type CellLattice, type CellNumberStyle, type NumberedCell,
-} from '@atlas-vtt/shared/grid';
-import { hexLattice } from '@atlas-vtt/shared/grid';
-import { squareLattice } from '@atlas-vtt/shared/grid';
+} from '../../../../../packages/atlas-shared/src/index';
+import { hexLattice } from '../../../../../packages/atlas-shared/src/index';
+import { squareLattice } from '../../../../../packages/atlas-shared/src/index';
 import { gridLines, type GridLimits, type GridLines } from '../../preview/previewShapes';
 import { playerCellNumbers } from '../../scene/playerCellNumbers';
 import type { PlayerGrid, PlayerMap } from '../../scene/sceneTypes';

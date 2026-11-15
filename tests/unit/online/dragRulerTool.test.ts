@@ -69,6 +69,18 @@ describe('DragRulerTool', () => {
     expect(ruler.overlay()?.points).toEqual([{ x: 140, y: 140 }, { x: 210, y: 70 }]);
   });
 
+  it('labels a path by the Manhattan rule and with a custom unit name, as Atlas 0.15 does', () => {
+    const scene = playerScene();
+    const size = scene.grid?.size ?? scene.map.cellSize;
+    const at = (cx: number, cy: number) => ({ x: size / 2 + size * cx, y: size / 2 + size * cy });
+    const path = [at(0, 0), at(3, 3), at(5, 3)];
+    const label = (measurement: Partial<typeof scene.measurement>): string => toolGridOf({ ...scene, measurement: { ...scene.measurement, ...measurement } }).label(path);
+    expect(label({ diagonalRule: 'manhattan', unitType: 'feet', unitDistance: 5 })).toBe('40ft');
+    expect(label({ diagonalRule: 'manhattan', unitType: 'custom', unitName: 'mi', unitDistance: 1 })).toBe('8 mi');
+    expect(label({ diagonalRule: 'equidistant', unitType: 'feet', unitDistance: 5 })).toBe('25ft');
+    expect(label({ diagonalRule: 'alternating', unitType: 'feet', unitDistance: 5 })).toBe('30ft');
+  });
+
   it("labels distances with a scene's own distance per cell, not the collection's rules square", () => {
     const scene = playerScene();
     const label = (measurement: Partial<typeof scene.measurement>): string | undefined => {
@@ -79,5 +91,39 @@ describe('DragRulerTool', () => {
     };
     expect(label({})).toBe('10ft');
     expect(label({ unitDistance: 10, ruleDistance: 5 })).toBe('20ft');
+  });
+});
+
+describe('the drag ruler under the movement rules (Atlas 0.15)', () => {
+  const steps = [{ name: 'Move', multiple: 1, color: '#22c55e' }, { name: 'Dash', multiple: 2, color: '#eab308' }];
+  const sceneWith = (measurement: object = {}, extra: object = {}) => {
+    const scene = playerScene(extra);
+    return { ...scene, measurement: { ...scene.measurement, movement: { steps, countPerTurn: false }, ...measurement } };
+  };
+  const drag = (grid: ReturnType<typeof toolGridOf>, cells: number, speed: number | null) => {
+    const ruler = new DragRulerTool(() => {});
+    ruler.begin({ x: 105, y: 105 }, grid, 'mouse', 1, speed);
+    ruler.update({ x: 105 + 70 * cells, y: 105 }, { x: 0, y: 0 });
+    return ruler.overlay();
+  };
+
+  it("reads a move against the token's speed, in its step's colour, as Atlas words it", () => {
+    const grid = toolGridOf(sceneWith());
+    expect(drag(grid, 4, 30)).toMatchObject({ label: '20 / 30ft', color: '#22c55e' });
+    expect(drag(grid, 8, 30)).toMatchObject({ label: '40 / 60ft', color: '#eab308' });
+    expect(drag(grid, 13, 30)).toMatchObject({ label: '65 / 60ft', color: 'beyond' });
+  });
+
+  it('reads a plain distance without a speed, or without steps', () => {
+    const plain = drag(toolGridOf(sceneWith()), 4, null);
+    expect(plain).toMatchObject({ label: '20ft' });
+    expect(plain).not.toHaveProperty('color');
+    expect(drag(toolGridOf(playerScene()), 4, 30)).not.toHaveProperty('color');
+  });
+
+  it("shows no ruler where the GM's choice hides it: never, or in a fight only", () => {
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'never' })), 4, 30)).toBeNull();
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'combat' }, { initiative: null })), 4, 30)).toBeNull();
+    expect(drag(toolGridOf(sceneWith({ dragDistance: 'combat' })), 4, 30)).toMatchObject({ label: '20 / 30ft' });
   });
 });

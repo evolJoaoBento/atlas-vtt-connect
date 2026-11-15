@@ -6,7 +6,8 @@
  * are the web page's (`online/view/TokenMoves.ts`).
  */
 import type { PlayerScene, PlayerToken, ScenePoint } from '../../scene/sceneTypes';
-import { CONFIRM_TIMEOUT_MS, MOVE_REFUSED_TEXT, REFUSED_NOTICE_MS } from '../../view/TokenMoves';
+import { CONFIRM_TIMEOUT_MS, REFUSED_NOTICE_MS, refusedText } from '../../view/TokenMoves';
+import type { MoveRefusedReason } from '../../protocol';
 
 interface Pending {
   position: ScenePoint;
@@ -79,11 +80,11 @@ export class RemoteTokenMoves {
   }
 
   /** The GM refused the move: the token goes back, and the notice shows for a while. */
-  refused(tokenId: string): void {
+  refused(tokenId: string, reason?: MoveRefusedReason | 'limit' | 'full'): void {
     this.settle(tokenId);
     // Intended (the brief): Atlas already returned the dropped token, so this ends any drag the player began since.
     this.options.cancelDrag();
-    this.setNotice(MOVE_REFUSED_TEXT);
+    this.setNotice(refusedText(reason));
     if (this.noticeTimer !== null) window.clearTimeout(this.noticeTimer);
     this.noticeTimer = window.setTimeout(() => {
       this.noticeTimer = null;

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -30,7 +30,8 @@ function firstScript(): { files: string[]; heavy: string[] } {
       if (HEAVY.test(spec)) heavy.push(`${relative(ROOT, file)}: ${spec}`);
       if (!spec.startsWith('.') || /\.(webp|png|css)(\?|$)/.test(spec)) continue;
       const base = resolve(dirname(file), spec);
-      const next = ['', '.ts', '.mts', '.tsx'].map((ext) => base + ext).find((candidate) => existsSync(candidate) && !candidate.endsWith('/'));
+      // A file by its name or extension, else a folder's index (atlas-shared's stand-in for Atlas's texts is one).
+      const next = ['.ts', '.mts', '.tsx', '/index.ts', ''].map((ext) => base + ext).find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
       if (!next) throw new Error(`cannot resolve ${spec} from ${relative(ROOT, file)}`);
       visit(next);
     }

@@ -49,7 +49,7 @@ async function hosting() {
     const deviceKeys = keys ?? await crypto.generate();
     const proof = await makeDeviceProof(crypto, deviceKeys, table.id, hostId, nonce);
     const device = badSig ? { ...proof, sig: 'A'.repeat(86) } : proof;
-    link.send('control', encodeControl({ v: 1, type: 'join', name, playerKey, client: { kind: 'obsidian', version: '1' }, device }));
+    link.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name, playerKey, client: { kind: 'obsidian', version: '1' }, device }));
     await flush();
     return { link, received, deviceKeys, deviceId: await crypto.keyId(deviceKeys.publicKey) };
   };

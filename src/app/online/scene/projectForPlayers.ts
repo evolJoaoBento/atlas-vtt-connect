@@ -6,14 +6,17 @@
  * fields a later Atlas adds, is left out.
  */
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
-import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle, resolveMeasurementSettings } from '@atlas-vtt/shared/grid';
+import { DEFAULT_CELL_NUMBER_OPACITY, DEFAULT_CONE_ANGLE, isCellNumberFormat, isHexGridType, isValidConeAngle } from '../../../../packages/atlas-shared/src/index';
+import { readDragDistance, readUnitName, resolveMeasurementSettings, showsDragDistance, sideOf, tokenHeight, type MovementRules } from '../../../../packages/atlas-shared/src/index';
 import type { Character, CollectionGridDefaults, ConditionDefinition, GridState, InitiativeRules, ResourceDefinition, SceneSnapshot, TokenEntity, TokenSettings } from '@atlas-vtt/api-types';
 import { resolvePinIcon } from '../view/pinIcons';
-import { badgeNumberInView, NO_INSTANCE_NUMBERS, numberTokensInView, type TokenInView } from './instanceNumbers';
 import type { AssetIds } from './sceneContracts';
 import type { Handout } from '../handouts';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage, Shows } from './FogCoverage';
+import { mapMatrix, type MapAlignment } from './mapPlacement';
+import { projectLiquids } from './projectLiquids';
+import { projectMeasures } from './projectMeasures';
 import { closedFrame, type LightingFrame } from './lightingFrame';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -51,6 +54,8 @@ export interface ProjectionContext {
   lighting?: LightingFrame | null;
   assets: AssetIds;
   mapSize: MapSize;
+  /** How Atlas aligned the map image (`mapPlacement.ts`); unset or null where it is drawn as it is. */
+  mapAlignment?: MapAlignment | null;
   /** The grid defaults of the map's collection, which decide the measurement; without them the map's grid does. */
   collectionGrid?: CollectionGridDefaults | null;
   /** The cone angle the GM's measure tool opens on this map (`mapConeAngle`); without it, the collection's grid defaults decide. */
@@ -76,6 +81,16 @@ export interface ProjectionContext {
   initiativeRules?: InitiativeRules;
   /** The minis standing on the map's tokens (the Tabletop extension's), by token id; without it no token carries one. */
   minis?: Readonly<Record<string, MiniPlacement>>;
+  /** The map's movement (Atlas 0.15): the collection's rules and each token's speed, as the GM's Atlas reads them; without it a drag reads as a plain distance. */
+  movement?: ProjectedMovement | null;
+}
+
+/** A map's movement as the GM's Atlas reads it: its rules, and a token's speed in game units (null without one). */
+export interface ProjectedMovement {
+  readonly rules: MovementRules;
+  speedOf(token: unknown): number | null;
+  /** Whether Atlas knows the token as one of the players' characters, whatever it holds itself; without it, none is. */
+  isPlayers?(token: unknown): boolean;
 }
 
 /** A mini on a token as the Tabletop extension places it: its GLB's vault path (never sent), size and turn. */
@@ -89,6 +104,19 @@ const DEFAULT_RING = '#ffffff';
 const NO_RESOURCES: readonly ResourceDefinition[] = [];
 const DEFAULT_GRID_OPACITY = 0.7;
 
+/**
+ * What players may see of the scene, as `projectForPlayers` decides it for texts and drawings: the GM's fog and, on a
+ * lit scene, the lighting's darkness. Null when the lighting cannot be read (a closed frame): players then see nothing
+ * but the dark map. Tabletop's board extras (`projectBoard`) are checked against the same.
+ */
+export function visibleShows(state: Pick<ProjectionInput, 'lighting'>, context: Pick<ProjectionContext, 'lighting' | 'coverage' | 'mapSize'>): Shows | null {
+  const lit = state.lighting?.enabled === true;
+  if (context.lighting?.closed === true || (lit && !context.lighting)) return null;
+  const fogShows = context.coverage.within(context.mapSize);
+  const lighting = context.lighting?.open === true ? null : context.lighting ?? null;
+  return lighting ? darkCovers(fogShows, lighting) : fogShows;
+}
+
 export function projectForPlayers(state: ProjectionInput, context: ProjectionContext, memo: ProjectionMemo): PlayerScene {
   const objects = state.objects;
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
@@ -96,32 +124,76 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // A scene saved lit whose lighting is missing, or whose frame is closed, shows players nothing but the dark map;
   // one Atlas says its lighting hides nothing (an open frame: dynamic lighting off) projects as unlit.
   const lit = state.lighting?.enabled === true;
-  const closed = context.lighting?.closed === true || (lit && !context.lighting);
+  // The curtain (Atlas 0.12's "Hide the map", or Connect's own) shows players black: the closed frame, and no map, grid, widgets, initiative or handout.
+  const curtained = context.rules.curtain === true;
+  const closed = curtained || context.lighting?.closed === true || (lit && !context.lighting);
   const lighting = closed ? closedFrame(context.mapSize) : context.lighting?.open === true ? null : context.lighting ?? null;
   const fogShows = context.coverage.within(context.mapSize);
   const visible: Shows = lighting ? darkCovers(fogShows, lighting) : fogShows;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
-  // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
-  const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
-  const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
-  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state, memo);
+  // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars; nor is
+  // one kept beside the map (Atlas 0.9's `offMap`), which is no part of the map.
+  const seen = projectRecord(onMapTokens(objects?.tokens), (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
+  const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
+  const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state);
   const fog = projectFog(objects?.fog, memo);
   return {
     sceneId: context.sceneId,
-    map: projectMap(state.background, cellSize, context),
-    grid: projectGrid(state.grid, context.rules),
+    map: projectMap(curtained ? null : state.background, cellSize, context, curtained ? undefined : (objects as { liquids?: unknown } | undefined)?.liquids),
+    grid: curtained ? null : projectGrid(state.grid, context.rules),
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
     texts: closed ? {} : projectTexts(objects?.texts, visible),
     drawings: closed ? {} : projectDrawings(objects?.drawings, visible, memo),
-    widgets: projectWidgets(state, context.rules),
-    initiative,
-    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
+    // Atlas's kept measures (areas, rulers, auras, kept spells and templates), as Atlas's players' picture shows them.
+    measures: projectMeasures((objects as { measures?: unknown } | undefined)?.measures, { closed, seen: (tokenId) => Object.hasOwn(tokens, tokenId) }),
+    widgets: curtained ? [] : projectWidgets(state, context.rules),
+    initiative: curtained ? null : initiative,
+    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle, context.movement?.rules, context.rules, state.initiative?.isActive === true),
     // Only where the snapshot has pins (a stock Atlas's): an Atlas API's have none, and its stream stays as it was.
     ...(hasPins(objects) ? { pins: closed ? [] : projectPins(objects, visible, cellSize) } : {}),
-    ...(context.handout !== undefined ? { handout: context.handout ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
+    ...(context.handout !== undefined ? { handout: context.handout && !curtained ? { asset: context.assets.idFor(context.handout.path), title: context.handout.title } : null } : {}),
   };
+}
+
+/** Whether a token is kept beside the map (Atlas 0.9's `offMap`): only `true` counts, as in Atlas's `isOffMap`. */
+export function isOffMap(token: unknown): boolean {
+  return typeof token === 'object' && token !== null && (token as { offMap?: unknown }).offMap === true;
+}
+
+const onMapMemo = new WeakMap<object, Readonly<Record<string, unknown>>>();
+
+/**
+ * The tokens on the map, without those kept beside it, as Atlas's `mapTokens`: the very record while none is beside
+ * it, and the same filtered record for as long as the source record is the same, so a reader comparing records by
+ * reference sees no change where there is none.
+ */
+export function onMapTokens<T>(tokens: Readonly<Record<string, T>> | undefined): Readonly<Record<string, T>> | undefined {
+  if (!tokens) return tokens;
+  const known = onMapMemo.get(tokens) as Readonly<Record<string, T>> | undefined;
+  if (known) return known;
+  let kept: Record<string, T> | null = null;
+  for (const [id, token] of Object.entries(tokens)) {
+    if (!isOffMap(token)) continue;
+    kept ??= { ...tokens };
+    delete kept[id];
+  }
+  const result = kept ?? tokens;
+  onMapMemo.set(tokens, result);
+  return result;
+}
+
+/**
+ * The tokens whose entries the players' initiative list keeps, as Atlas's own share numbers them (`TokenShare`): the
+ * tokens sent, and the combatants beside the map that are not hidden. None beside the map where the scene shows
+ * players nothing (a lit scene failing closed).
+ */
+function listedTokenIds(sent: Readonly<Record<string, unknown>>, tokens: Readonly<Record<string, TokenEntity>> | undefined, closed: boolean): Set<string> {
+  const ids = new Set(Object.keys(sent));
+  if (closed || !tokens) return ids;
+  for (const [id, token] of Object.entries(tokens)) if (isOffMap(token) && !token.isHidden) ids.add(id);
+  return ids;
 }
 
 function hasPins(objects: unknown): boolean {
@@ -130,6 +202,12 @@ function hasPins(objects: unknown): boolean {
 }
 
 /** A pin's title from its note link: the heading when it names one, else the file name, without folders or extension. */
+/** The name the GM gave a pin (Atlas 0.14's `ownPinName`), trimmed and cut to Atlas's longest; null where it has none. */
+function ownPinName(name: unknown): string | null {
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  return trimmed === '' ? null : trimmed.slice(0, SCENE_LIMITS.pinName);
+}
+
 function pinTitle(notePath: string): string | null {
   const [path = '', heading] = notePath.split('#');
   const name = heading?.trim() || (path.split('/').pop() ?? '').replace(/\.md$/i, '').trim();
@@ -157,8 +235,8 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
   for (const [, value] of entries) {
     if (found.length >= SCENE_LIMITS.pins) break;
     if (typeof value !== 'object' || value === null) continue;
-    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; gmOnly?: unknown; icon?: unknown };
-    if (pin.readable !== true || pin.gmOnly === true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
+    const pin = value as { x?: unknown; y?: unknown; notePath?: unknown; label?: unknown; readable?: unknown; icon?: unknown; name?: unknown; showName?: unknown };
+    if (pin.readable !== true || typeof pin.notePath !== 'string' || /\.atlasmap(#|$)/i.test(pin.notePath)) continue;
     const x = finiteOrNull(pin.x);
     const y = finiteOrNull(pin.y);
     const around = { x: (x ?? 0) - cellSize / 4, y: (y ?? 0) - cellSize / 4, width: cellSize / 2, height: cellSize / 2 };
@@ -168,9 +246,12 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
       x: finiteOr(x, 0, SCENE_RANGES.coordinate),
       y: finiteOr(y, 0, SCENE_RANGES.coordinate),
       label: typeof pin.label === 'string' && pin.label.trim() ? pin.label.trim().slice(0, SCENE_LIMITS.pinLabel) : null,
-      title: pinTitle(pin.notePath),
+      title: ownPinName(pin.name) ?? pinTitle(pin.notePath),
       icon: resolvePinIcon(pin.icon),
     };
+    // Atlas 0.14: the pin's name under it, where the GM shows it (`showsPinName`): the GM's name, else the note's.
+    const shownName = pin.showName === true ? (ownPinName(pin.name) ?? pinTitle(pin.notePath)) : null;
+    if (shownName) sent.name = shownName.slice(0, SCENE_LIMITS.pinName);
     pinNotePaths.set(sent, pin.notePath);
     found.push(sent);
   }
@@ -182,15 +263,25 @@ function projectPins(objects: unknown, visible: Shows, cellSize: number): Player
  * every cell of their in-map part (`LightingFrame.shows`, ruling L-POS) and the fog proves every cell revealed (F-POS).
  */
 function darkCovers(fog: Shows, lighting: LightingFrame): Shows {
-  return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds) };
+  // A fill is sent where any part of it is out of the fog, dark or not: the players' darkness is drawn over it.
+  return { shows: (bounds) => lighting.shows(bounds) && fog.shows(bounds), showsSome: (bounds) => (fog.showsSome ?? fog.shows)(bounds) };
 }
 
-function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {
+function projectMap(background: string | null, cellSize: number, context: ProjectionContext, liquidRecord: unknown): PlayerMap {
+  const width = finiteOr(context.mapSize.width, 0, SCENE_RANGES.mapSize);
+  const height = finiteOr(context.mapSize.height, 0, SCENE_RANGES.mapSize);
+  // Only an image Atlas turned or shifted needs its place sent; one that fills its world rect is drawn as ever.
+  const matrix = background === null ? null : mapMatrix(context.mapAlignment ?? null, { width, height });
+  const liquids = projectLiquids(liquidRecord);
+  const video = background === null ? null : context.assets.videoIdFor?.(background) ?? null;
   return {
     asset: context.assets.idFor(background),
-    width: finiteOr(context.mapSize.width, 0, SCENE_RANGES.mapSize),
-    height: finiteOr(context.mapSize.height, 0, SCENE_RANGES.mapSize),
+    ...(video !== null ? { video } : {}),
+    width,
+    height,
     cellSize: positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize),
+    ...(matrix ? { matrix } : {}),
+    ...(liquids.length > 0 ? { liquids } : {}),
   };
 }
 
@@ -221,8 +312,10 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
  * The settings Atlas's ruler and measure tool use for this map, field by field. A scene's own distance per cell
  * (`unitDistanceOverride`) is in `unitDistance`; the collection's stays as `ruleDistance`.
  */
-function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number): PlayerMeasurement {
-  const settings = resolveMeasurementSettings(collection ?? undefined, grid);
+function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number, movement?: MovementRules, rules?: PlayerViewRules, fight = false): PlayerMeasurement {
+  // Atlas 0.15's own reading: the extension API's types are older, and know neither `manhattan` nor a unit's name.
+  const settings = resolveMeasurementSettings((collection ?? undefined), grid);
+  const unitName = readUnitName(settings.unitName);
   // `mapConeAngle` gives only valid angles; one the page would refuse (from a share's raw grid defaults) opens a quarter circle.
   const cone = coneAngle ?? settings.coneAngle;
   const rangeBands: unknown = settings.rangeBands;
@@ -233,6 +326,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     unitDistance: finiteOr(settings.unitDistance, 5, SCENE_RANGES.unitDistance),
     ruleDistance: finiteOr(settings.ruleDistance, 5, SCENE_RANGES.unitDistance),
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
+    ...(unitName !== undefined ? { unitName } : {}),
     snapToGrid: grid?.snapToGrid ?? true,
     coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,
     snapGrid: projectSnapGrid(grid),
@@ -240,6 +334,11 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };
     }),
+    // Atlas 0.15: the steps a drag reads against (only where the rules name one), and when a drag shows its distance.
+    ...(movement && movement.steps.length > 0 ? { movement: { steps: movement.steps.map(({ name, multiple, color }) => ({ name, multiple, color })), countPerTurn: movement.countPerTurn } } : {}),
+    // Whether a fight runs is the GM's to say, as Atlas asks it (players may be sent no initiative list): a drag that
+    // shows no distance now is sent as 'never', one that does as nothing.
+    ...(showsDragDistance(readDragDistance(rules?.dragDistance), fight) ? {} : { dragDistance: 'never' as const }),
   };
 }
 
@@ -301,7 +400,24 @@ function projectToken(token: TokenEntity, id: string, context: ProjectionContext
     ...(wheels.length > 0 ? { wheels } : {}),
     downed: isDowned(token, definitions),
     ...projectMini(context.minis?.[id], context),
+    ...projectMovement(token, context),
   };
+}
+
+/**
+ * A token's height (Atlas 0.15's `tokenHeight`, sent when not 0) and its speed: only for a token on the players' side
+ * (Atlas's `sideOf`) and only where the rules name steps, since Atlas shows players the reading against a speed for
+ * their own tokens only, and a speed is no use without steps.
+ */
+function projectMovement(token: TokenEntity, context: ProjectionContext): Pick<PlayerToken, 'elevation' | 'speed'> {
+  const height = tokenHeight(token as { elevation?: unknown });
+  const movement = context.movement;
+  // The players' tokens as Atlas reads them (`sideOf`: a side given, a token that sees), and the players' characters it
+  // knows from its library, which the copied `sideOf` cannot ask Atlas about.
+  const players = movement ? sideOf(token as never) === 'players' || movement.isPlayers?.(token) === true : false;
+  const counted = movement && players && movement.rules.steps.length > 0 ? movement.speedOf(token) : null;
+  const speed = counted !== null && Number.isFinite(counted) && counted > 0 ? Math.min(counted, SCENE_RANGES.speed[1]) : null;
+  return { ...(height !== 0 ? { elevation: height } : {}), ...(speed !== null ? { speed } : {}) };
 }
 
 /** A token's mini, for a token players are sent (a hidden or fogged one never is); the GLB goes by its fingerprint only. */
@@ -317,30 +433,40 @@ function projectMini(placement: MiniPlacement | undefined, context: ProjectionCo
   };
 }
 
+/** The art a token's look-alikes share: its image path, `''` for a token with none (Atlas groups by the value as it is). */
+const artOf = (token: { imagePath?: unknown }): string => (typeof token.imagePath === 'string' ? token.imagePath : '');
+
+/** How many tokens of the scene share each art, the hidden, fogged and kept-beside-the-map ones too. */
+function tokensByArt(tokens: Readonly<Record<string, TokenEntity>> | undefined): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const token of Object.values(tokens ?? {})) counts.set(artOf(token), (counts.get(artOf(token)) ?? 0) + 1);
+  return counts;
+}
+
+/** The number a token holds (`instanceNumber`, 1 where it has none), as a whole number the wire accepts. */
+function storedNumber(value: unknown): number {
+  return finiteOr(Math.trunc(finiteOr(value, 1)), 1, SCENE_RANGES.instance);
+}
+
 /**
- * The instance badges and ring size of the tokens players see, as Atlas's players' picture shows them
- * (`PlayerInstanceBadges`): look-alikes numbered among the tokens sent, each keeping its number while it stays in view.
+ * The instance badges and ring size of the tokens players see, by Atlas VTT 0.10.2's rule for its players' picture
+ * (`K2e`, AGPL-3.0-only): a token whose art
+ * two or more tokens of the scene share, counting those players cannot see, shows its own stored number. Nothing is
+ * numbered again for what players see, so players read the numbers the GM does.
  */
-function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput, memo: ProjectionMemo): Record<string, PlayerToken> {
+function withTokenLooks(tokens: Record<string, PlayerToken>, state: ProjectionInput): Record<string, PlayerToken> {
   const settings = state.tokenSettings;
   const ring = finiteOr(settings?.tokenRingSize, 1, SCENE_RANGES.ringScale);
-  const previous = memo.instances?.map === state.mapPath ? memo.instances.numbers : NO_INSTANCE_NUMBERS;
-  const inView: TokenInView[] = [];
-  for (const id of Object.keys(tokens)) {
-    const token = state.objects?.tokens?.[id];
-    if (token) inView.push({ id, art: typeof token.imagePath === 'string' ? token.imagePath : '', rank: finiteOr(token.instanceNumber, 1) });
-  }
-  const numbers = numberTokensInView(previous, inView);
-  memo.instances = { map: state.mapPath, numbers };
-  const badgesOn = settings?.showInstanceBadges ?? true;
+  const counts = (settings?.showInstanceBadges ?? true) ? tokensByArt(state.objects?.tokens) : null;
   let changed: Record<string, PlayerToken> | null = null;
   for (const [id, token] of Object.entries(tokens)) {
-    const number = badgeNumberInView(numbers, id, badgesOn);
+    const raw = state.objects?.tokens?.[id];
+    const number = counts && raw && (counts.get(artOf(raw)) ?? 0) >= 2 ? storedNumber(raw.instanceNumber) : null;
     if (number === null && ring === 1) continue;
     changed ??= { ...tokens };
     changed[id] = {
       ...token,
-      ...(number !== null ? { instance: finiteOr(number, 1, SCENE_RANGES.instance) } : {}),
+      ...(number !== null ? { instance: number } : {}),
       ...(ring !== 1 ? { ringScale: ring } : {}),
     };
   }

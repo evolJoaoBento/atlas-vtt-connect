@@ -49,9 +49,9 @@ describe('which app a player joins from', () => {
   it('marks Obsidian players for the GM and leaves web players unmarked', async () => {
     const { network, players } = gm();
     const atlas = await network.client().connect('gm');
-    atlas.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'ka', client: { kind: 'obsidian', version: '1' } }));
+    atlas.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'ka', client: { kind: 'obsidian', version: '1' } }));
     const web = await network.client().connect('gm');
-    web.send('control', encodeControl({ v: 1, type: 'join', name: 'Ben', playerKey: 'kb', client: { kind: 'web', version: '1' } }));
+    web.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Ben', playerKey: 'kb', client: { kind: 'web', version: '1' } }));
     expect(players().map((player) => [player.name, player.client])).toEqual([['Anna', 'obsidian'], ['Ben', undefined]]);
     expect(players()[1]).not.toHaveProperty('client');
   });
@@ -59,11 +59,11 @@ describe('which app a player joins from', () => {
   it('follows the app of a returning player', async () => {
     const { network, session, players, requests } = gm();
     const first = await network.client().connect('gm');
-    first.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'ka', client: { kind: 'obsidian', version: '1' } }));
+    first.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'ka', client: { kind: 'obsidian', version: '1' } }));
     session.allow(requests[0]!.playerId);
     first.close();
     const again = await network.client().connect('gm');
-    again.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'ka', client: { kind: 'web', version: '1' } }));
+    again.send('control', encodeControl({ v: 1, type: 'join', fusion: 4, name: 'Anna', playerKey: 'ka', client: { kind: 'web', version: '1' } }));
     expect(players()).toEqual([{ playerId: requests[0]!.playerId, name: 'Anna', status: 'admitted' }]);
   });
 });

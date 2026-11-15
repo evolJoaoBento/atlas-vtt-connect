@@ -21,6 +21,8 @@ export interface ShapeStyle {
   round?: boolean;
   /** Cuts the shape out of what was drawn before (fog erasing). */
   erase?: boolean;
+  /** Fills by the even-odd rule: a path inside another is a hole in it (a liquid's holes). */
+  evenOdd?: boolean;
   /** Fills with a linear gradient from `from` to `to` (current frame) instead of `fill`: offsets 0 to 1 and colours. */
   gradient?: { from: ScenePoint; to: ScenePoint; stops: ReadonlyArray<readonly [offset: number, color: string]> };
 }
@@ -38,7 +40,7 @@ export interface TextStyle {
 
 /** A decoded image (`DecodedImage.image`): an `ImageBitmap` or a loaded `<img>`. */
 /** A canvas is the minis' picture (`minis/miniLayer.ts`). */
-export type SurfaceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+export type SurfaceImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
 
 /** How an image or a token ring is drawn: its opacity, and greyed as Atlas greys a downed token (`DownedTokenOverlay`). */
 export interface ImageLook {
@@ -75,6 +77,8 @@ export interface ViewSurface {
   circle(x: number, y: number, radius: number, style: ShapeStyle): void;
   /** Several open or closed paths stroked or filled as one shape: grid lines, hexes, ink. */
   paths(paths: ReadonlyArray<readonly ScenePoint[]>, closed: boolean, style: ShapeStyle): void;
+  /** `image` drawn with its unit square mapped by `matrix` (`[a, b, c, d, e, f]`, as a canvas takes it): a map Atlas aligned turned or shifted. */
+  imageMatrix(image: SurfaceImage, matrix: readonly [number, number, number, number, number, number]): void;
   /** `image` stretched over the rectangle, clipped to `clip` when given. */
   image(image: SurfaceImage, x: number, y: number, width: number, height: number, clip: ImageClip | null, look?: ImageLook): void;
   /**
