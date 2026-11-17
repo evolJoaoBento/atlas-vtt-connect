@@ -275,4 +275,52 @@ describe('projectBoard', () => {
       expect(JSON.stringify(extras.layers).length).toBeLessThan(115 * 1024);
     });
   });
+
+  describe('raised shapes and the ground', () => {
+    const roof = { id: 'roof', outline: [{ x: 100, y: 100, h: 0 }, { x: 300, y: 100, h: 0 }, { x: 300, y: 300, h: 0 }], inner: [{ x: 200, y: 200, h: 2.456 }], material: 'mat/wood', sides: 'mat/brick' as const };
+    const far = { id: 'far', outline: [{ x: 700, y: 100, h: 0 }, { x: 900, y: 100, h: 1 }, { x: 900, y: 300, h: 0 }], inner: [] };
+    const ground = { mode: 'horizon' as const, material: 'mat/wood', noise: 'dunes', strength: 0.7, fog: 55, margin: 12, tile: 3, water: { kind: 'waves', amount: 0.4, direction: 45, tint: '#2D6B78', clarity: 0.5 } };
+
+    it('a shape players see any of goes, with its corners as x, y, h and its materials by asset id; one under fog does not', () => {
+      const extras = projectBoard(state([]), 's1', leftHalf, {}, { ...look, shapes: [roof, far] }, assets);
+      expect(extras.shapes).toEqual([{ id: 'roof', outline: [100, 100, 0, 300, 100, 0, 300, 300, 0], inner: [200, 200, 2.46], material: 'id:mat/wood/c.jpg', sides: 'id:mat/brick/c.jpg' }]);
+      expect(extras.materials.map((entry) => entry.id).sort()).toEqual(['id:mat/brick/c.jpg', 'id:mat/wood/c.jpg']);
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it('a shape whose material is not hashed yet wears the map image, its sides plain; a broken one does not go', () => {
+      const unhashed = { idFor: (path: string | null | undefined) => (path?.startsWith('mat/') ? null : path ? `id:${path}` : null) };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, shapes: [roof, { ...far, outline: far.outline.slice(0, 2) }, { ...far, id: 'nan', outline: [...far.outline, { x: Number.NaN, y: 0, h: 0 }] }] }, unhashed);
+      expect(extras.shapes).toEqual([{ id: 'roof', outline: [100, 100, 0, 300, 100, 0, 300, 300, 0], inner: [200, 200, 2.46], sides: true }]);
+    });
+
+    it("a stacked scene's shapes go whole, as its walls do", () => {
+      const upstairs = { elevation: 3, stands: { x: 0, y: 0, turn: 0 }, image: 'maps/up.png', grid: { size: 70, offsetX: 0, offsetY: 0 }, walls: [], lights: [], props: [], materials: [{ id: 'mat/wood', scale: 1, maps: { color: 'mat/wood/c.jpg' } }], fogHeight: null, wallThickness: null, shapes: [roof, far] };
+      const extras = projectBoard(state([]), 's1', leftHalf, {}, { ...look, layers: [upstairs] }, assets);
+      expect(extras.layers![0]!.shapes!.map((shape) => shape.id)).toEqual(['roof', 'far']);
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it('the ground goes whatever players see, its material by asset id; the plain map board with no extra board does not', () => {
+      const extras = projectBoard(state([]), 's1', { shows: () => false }, {}, { ...look, ground }, assets);
+      expect(extras.ground).toEqual({ ...ground, material: 'id:mat/wood/c.jpg', water: { ...ground.water, tint: '#2d6b78' } });
+      expect(isBoardExtras(extras)).toBe(true);
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, mode: 'board', margin: 0 } }, assets)).not.toHaveProperty('ground');
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, mode: 'board', margin: 5 } }, assets).ground).toMatchObject({ mode: 'board', margin: 5 });
+      // Out of range, it is held to its range.
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, fog: 400, tile: 0, strength: -1, noise: 'lava' } }, assets).ground).toMatchObject({ fog: 100, tile: 1, strength: 0, noise: 'rolling' });
+    });
+
+    it('the checks refuse broken shapes and ground', () => {
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, shapes: [roof], ground }, assets);
+      expect(isBoardExtras(extras)).toBe(true);
+      const shape = extras.shapes![0]!;
+      for (const bad of [{ ...shape, outline: [0, 0, 0, 1, 1, 1] }, { ...shape, outline: [0, 0, 0, 1, 1, 1, 2, 2] }, { ...shape, inner: [0, 0, 5000] }, { ...shape, sides: false }, { ...shape, material: '' }]) {
+        expect(isBoardExtras({ ...extras, shapes: [bad] }), JSON.stringify(bad)).toBe(false);
+      }
+      for (const bad of [{ ...extras.ground!, mode: 'lava' }, { ...extras.ground!, margin: 500 }, { ...extras.ground!, noise: 'x' }, { ...extras.ground!, water: { ...extras.ground!.water, tint: 'red' } }]) {
+        expect(isBoardExtras({ ...extras, ground: bad }), JSON.stringify(bad)).toBe(false);
+      }
+    });
+  });
 });

@@ -8,6 +8,7 @@ import type { BoardExtras } from './boardTypes';
 export function mergeBoardExtras(first: BoardExtras, rest: readonly BoardExtras[]): BoardExtras {
   return rest.reduce<BoardExtras>((sum, next) => ({
     ...sum, walls: [...sum.walls, ...next.walls], lights: [...sum.lights, ...next.lights], props: [...sum.props, ...next.props],
+    ...(sum.shapes || next.shapes ? { shapes: [...(sum.shapes ?? []), ...(next.shapes ?? [])] } : {}),
   }), first);
 }
 

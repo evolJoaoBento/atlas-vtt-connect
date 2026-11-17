@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 import { isArTable } from '../tools/arTable';
 
@@ -92,6 +92,36 @@ function isWater(value: unknown, longest: number): boolean {
     && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity));
 }
 
+/** Corners as the wire carries them: x, y, h triples, places within the world and heights within reach. */
+function isCorners(value: unknown, least: number): boolean {
+  if (!Array.isArray(value) || value.length < least * 3 || value.length % 3 !== 0 || value.length > BOARD_SHAPE_LIMITS.corners * 3) return false;
+  return value.every((n, index) => isNumber(n) && Math.abs(n) < (index % 3 === 2 ? BOARD_SHAPE_LIMITS.height : 1e7));
+}
+
+function isShape(value: unknown): boolean {
+  if (!isFields(value) || !isSceneId(value.id) || !isCorners(value.outline, 3)) return false;
+  if (value.inner !== undefined && !isCorners(value.inner, 1)) return false;
+  if ((Array.isArray(value.inner) ? value.inner.length : 0) + (value.outline as unknown[]).length > BOARD_SHAPE_LIMITS.corners * 3) return false;
+  if (value.material !== undefined && !isSceneId(value.material)) return false;
+  return value.sides === undefined || value.sides === true || isSceneId(value.sides);
+}
+
+/** A scene's (or a layer's) shapes: a list within the limits, all of it within `longest` as text. */
+const isShapes = (value: unknown, longest: number): boolean => isList(value, BOARD_SHAPE_LIMITS.shapes, isShape) && JSON.stringify(value).length <= longest;
+
+const NOISES = new Set(['flat', 'gentle', 'rolling', 'rough', 'dunes']);
+
+function isGround(value: unknown): boolean {
+  if (!isFields(value) || (value.mode !== 'board' && value.mode !== 'horizon' && value.mode !== 'water')) return false;
+  if (value.material !== undefined && !isSceneId(value.material)) return false;
+  if (typeof value.noise !== 'string' || !NOISES.has(value.noise)) return false;
+  const within = (n: unknown, low: number, high: number): boolean => isNumber(n) && n >= low && n <= high;
+  if (!within(value.strength, 0, 1) || !within(value.fog, 0, 100) || !within(value.margin, 0, 100) || !within(value.tile, 1, 8)) return false;
+  const water = value.water;
+  return isFields(water) && typeof water.kind === 'string' && water.kind.length <= 20 && isNumber(water.amount) && isNumber(water.direction)
+    && typeof water.tint === 'string' && /^#[0-9a-f]{6}$/i.test(water.tint) && isNumber(water.clarity);
+}
+
 /** A level's fit as Atlas keeps it: positive factors (a scale may be under one), a turn of at most five degrees, an offset of the corner never left of or above it. */
 function isFit(value: unknown): boolean {
   if (!isFields(value) || !isNumber(value.x) || !isNumber(value.y) || !(value.x > 0 && value.x <= 40) || !(value.y > 0 && value.y <= 40)) return false;
@@ -107,7 +137,8 @@ function isLayer(value: unknown): boolean {
     && isFields(grid) && isNumber(grid.size) && grid.size > 0 && isNumber(grid.offsetX) && isNumber(grid.offsetY) && (grid.mapStretch === undefined || isFit(grid.mapStretch))
     && isList(value.walls, BOARD_LAYER_LIMITS.walls, isWall) && isList(value.lights, BOARD_LAYER_LIMITS.lights, isLight) && isList(value.props, BOARD_LAYER_LIMITS.props, isProp)
     && isNullable(isNumber)(value.fogHeight) && isNullable(isNumber)(value.wallThickness)
-    && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.layer));
+    && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.layer))
+    && (value.shapes === undefined || isShapes(value.shapes, BOARD_SHAPE_LIMITS.layerBytes));
 }
 
 /** One part of a scene's board extras. */
@@ -121,6 +152,8 @@ export function isBoardExtras(value: unknown): value is BoardExtras {
     && (value.water === undefined || isWater(value.water, BOARD_WATER_LIMITS.scene))
     && (value.layerLook === undefined || value.layerLook === 'solid' || value.layerLook === 'faded' || value.layerLook === 'transparent')
     && (value.arTable === undefined || isArTable(value.arTable))
+    && (value.shapes === undefined || isShapes(value.shapes, BOARD_SHAPE_LIMITS.bytes))
+    && (value.ground === undefined || isGround(value.ground))
     && isFields(lighting) && typeof lighting.enabled === 'boolean' && isNumber(lighting.ambient) && isNullable(isText)(lighting.ambientColor);
 }
 

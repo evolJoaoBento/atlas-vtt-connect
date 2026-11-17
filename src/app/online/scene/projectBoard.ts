@@ -3,11 +3,12 @@
  * players may see goes, by the rules of the scene's own projection (`visible`: the GM's fog and the lighting's
  * darkness), as the GM's player window shows it: a wall or door by its middle, a prop or a light by where it stands. A
  * closed secret door is plain wall. A light a token carries goes only with that token. Vault paths never leave: materials, door props and props go as asset ids,
- * and one whose file is not hashed yet is left out until it is (the registry asks for another projection).
+ * and one whose file is not hashed yet is left out until it is (the registry asks for another projection). The raised
+ * shapes of the level shown go where players see any of them; the ground round the map always (it shows nothing of it).
  */
 import type { Shows } from './FogCoverage';
-import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
-import type { AssetIds, BoardLayerLook, BoardLook } from './sceneContracts';
+import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import type { AssetIds, BoardGroundLook, BoardLayerLook, BoardLook, BoardShapeLook } from './sceneContracts';
 import { isArTable, type ArTable } from '../tools/arTable';
 
 type Raw = Record<string, unknown>;
@@ -71,6 +72,12 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
   if (layers.length > 0) extras.layers = layers;
   const water = waterOf(look?.water, BOARD_WATER_LIMITS.scene);
   if (water) extras.water = water;
+  // The raised shapes of the level shown: one goes where players see any corner of it, or its middle.
+  const seen = (look?.shapes ?? []).filter((shape) => shapeSeen(shape, visible));
+  const shapes = shapesOf(seen, material, BOARD_SHAPE_LIMITS.bytes);
+  if (shapes.length > 0) extras.shapes = shapes;
+  const ground = groundOf(look?.ground, material);
+  if (ground) extras.ground = ground;
   extras.materials = [...new Map([...materialIds.values()].filter((entry): entry is BoardMaterialRecord => entry !== null).map((entry) => [entry.id, entry])).values()];
   for (const raw of items(objects.lights)) {
     // Only a light players could find: switched on, and standing where they see.
@@ -91,6 +98,74 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
     if (asset) extras.props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) } satisfies BoardPropRecord);
   }
   return extras;
+}
+
+/** Whether players see any of a shape: a corner of its outline, or the middle of its corners. */
+function shapeSeen(shape: BoardShapeLook, visible: Shows): boolean {
+  if (shape.outline.some((corner) => visible.shows(at(corner.x, corner.y)))) return true;
+  const n = shape.outline.length;
+  if (n === 0) return false;
+  const middle = shape.outline.reduce((sum, corner) => ({ x: sum.x + corner.x / n, y: sum.y + corner.y / n }), { x: 0, y: 0 });
+  return visible.shows(at(middle.x, middle.y));
+}
+
+/** Corners as the wire carries them (x, y, h to the hundredth); null for any that is not a place. */
+function cornersOf(corners: BoardShapeLook['outline']): number[] | null {
+  const out: number[] = [];
+  for (const corner of corners) {
+    const { x, y, h } = corner;
+    if (![x, y, h].every((n) => typeof n === 'number' && Number.isFinite(n)) || Math.abs(x) >= 1e7 || Math.abs(y) >= 1e7 || Math.abs(h) >= BOARD_SHAPE_LIMITS.height) return null;
+    out.push(Math.round(x * 100) / 100, Math.round(y * 100) / 100, Math.round(h * 100) / 100);
+  }
+  return out;
+}
+
+/**
+ * Shapes as the wire carries them, in order while they fit in `longest` as text: materials by their asset id (one not
+ * hashed yet is left off: the top wears the map image, the sides stay plain until it is).
+ */
+function shapesOf(shapes: ReadonlyArray<BoardShapeLook>, material: (id: string | null) => string | null, longest: number): BoardShapeRecord[] {
+  const out: BoardShapeRecord[] = [];
+  let length = 2;
+  for (const shape of shapes) {
+    if (out.length >= BOARD_SHAPE_LIMITS.shapes) break;
+    if (typeof shape.id !== 'string' || shape.id === '' || shape.outline.length < 3 || shape.outline.length + shape.inner.length > BOARD_SHAPE_LIMITS.corners) continue;
+    const outline = cornersOf(shape.outline);
+    const inner = cornersOf(shape.inner);
+    if (!outline || !inner) continue;
+    const top = shape.material ? material(shape.material) : null;
+    const sides = shape.sides === true ? true : typeof shape.sides === 'string' ? (material(shape.sides) ?? true) : null;
+    const record: BoardShapeRecord = { id: shape.id, outline, ...(inner.length > 0 ? { inner } : {}), ...(top ? { material: top } : {}), ...(sides !== null ? { sides } : {}) };
+    const size = JSON.stringify(record).length + 1;
+    if (length + size > longest) continue;
+    length += size;
+    out.push(record);
+  }
+  return out;
+}
+
+const NOISES = new Set(['flat', 'gentle', 'rolling', 'rough', 'dunes']);
+const within = (value: unknown, low: number, high: number, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? Math.min(high, Math.max(low, value)) : fallback);
+
+/** The ground as the wire carries it, its values held to their ranges and its material by asset id; none for the plain map board. */
+function groundOf(ground: BoardGroundLook | undefined, material: (id: string | null) => string | null): BoardGround | null {
+  if (!ground || (ground.mode !== 'board' && ground.mode !== 'horizon' && ground.mode !== 'water')) return null;
+  const margin = Math.round(within(ground.margin, 0, 100, 0));
+  // The map on its table with no extra board is what a board without ground does: nothing to send.
+  if (ground.mode === 'board' && margin === 0) return null;
+  const tiled = ground.material ? material(ground.material) : null;
+  const water = ground.water;
+  const tint = typeof water?.tint === 'string' && /^#[0-9a-f]{6}$/i.test(water.tint) ? water.tint.toLowerCase() : '#2d6b78';
+  return {
+    mode: ground.mode,
+    ...(tiled ? { material: tiled } : {}),
+    noise: NOISES.has(ground.noise) ? ground.noise : 'rolling',
+    strength: within(ground.strength, 0, 1, 0.5),
+    fog: Math.round(within(ground.fog, 0, 100, 40)),
+    margin,
+    tile: Math.round(within(ground.tile, 1, 8, 2)),
+    water: { kind: typeof water?.kind === 'string' ? water.kind.slice(0, 20) : 'ripples', amount: within(water?.amount, 0, 1, 0.5), direction: within(water?.direction, 0, 360, 90), tint, clarity: within(water?.clarity, 0, 1, 0.6) },
+  };
 }
 
 /** The AR table, copied field by field (nothing else the look carries goes). */
@@ -175,10 +250,13 @@ function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 
     if (asset) props.push({ id: prop.id, asset, x: prop.x, y: prop.y, scale: prop.scale, turn: prop.turn, ...(prop.solid ? { solid: true as const } : {}), ...(prop.lift ? { lift: prop.lift } : {}) });
   }
   const water = waterOf(layer.water, BOARD_WATER_LIMITS.layer);
+  // A layer's shapes go whole, as its walls do: it shows only its form.
+  const shapes = shapesOf(layer.shapes ?? [], material, BOARD_SHAPE_LIMITS.layerBytes);
   return {
     id, elevation: layer.elevation, stands: { ...layer.stands }, image, grid: { ...layer.grid }, walls, lights, props,
     fogHeight: layer.fogHeight, wallThickness: layer.wallThickness,
     ...(water ? { water } : {}),
+    ...(shapes.length > 0 ? { shapes } : {}),
   };
 }
 

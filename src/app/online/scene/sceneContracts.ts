@@ -94,6 +94,29 @@ export interface BoardLayerLook {
   wallThickness: number | null;
   /** The layer's painted water; absent from an older Tabletop. */
   water?: BoardWater;
+  /** The layer's raised shapes (material folders are ids of `materials`); absent for none, or from an older Tabletop. */
+  shapes?: ReadonlyArray<BoardShapeLook>;
+}
+
+/** A raised shape as Tabletop hands it: corners in map pixels with heights in grid squares; materials by their vault folder (ids of the look's `materials`). */
+export interface BoardShapeLook {
+  readonly id: string;
+  readonly outline: ReadonlyArray<{ x: number; y: number; h: number }>;
+  readonly inner: ReadonlyArray<{ x: number; y: number; h: number }>;
+  readonly material?: string;
+  readonly sides?: true | string;
+}
+
+/** The ground round a map as Tabletop hands it (its Ground panel); the material by its vault folder (an id of the look's `materials`). */
+export interface BoardGroundLook {
+  readonly mode: 'board' | 'horizon' | 'water';
+  readonly material?: string;
+  readonly noise: string;
+  readonly strength: number;
+  readonly fog: number;
+  readonly margin: number;
+  readonly tile: number;
+  readonly water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
 export interface BoardLook {
@@ -113,6 +136,10 @@ export interface BoardLook {
   readonly layers?: ReadonlyArray<BoardLayerLook>;
   /** The map's painted water and its motion; absent for none, or from an older Tabletop. */
   readonly water?: BoardWater;
+  /** The raised shapes on the level shown; absent for none, or from an older Tabletop. */
+  readonly shapes?: ReadonlyArray<BoardShapeLook>;
+  /** The ground round the map; absent from an older Tabletop. */
+  readonly ground?: BoardGroundLook;
   /** How the GM draws the scenes stacked above (Upper layers); absent from an older Tabletop. */
   readonly layerLook?: 'solid' | 'faded' | 'transparent';
   /** Where the marker sheets lie on the players' table, placed on this map (`tools/arTable.ts`); absent for none, or from an older Tabletop. */

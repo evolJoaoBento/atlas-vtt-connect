@@ -129,6 +129,44 @@ export interface BoardLayerRecord {
   wallThickness: number | null;
   /** The layer's painted water; absent for none. */
   water?: BoardWater;
+  /** The raised shapes standing on the layer (roofs, hills); absent for none. */
+  shapes?: BoardShapeRecord[];
+}
+
+/**
+ * A raised shape of Tabletop's Shapes tool (a roof, a hill, irregular ground) on its level: its corners in the level's
+ * map pixels, each with its height above the level's floor in grid squares, as flat lists of x, y, h. The board spreads
+ * its surface between them.
+ */
+export interface BoardShapeRecord {
+  id: string;
+  /** The corners round it, in the order drawn: x, y, h, x, y, h… (three corners at least). */
+  outline: number[];
+  /** Corners inside it (a ridge, a hilltop), the same way; absent for none. */
+  inner?: number[];
+  /** A material of `BoardExtras.materials` its top is painted with; absent: it wears its level's map image from above. */
+  material?: string;
+  /** Closed sides: walls from each edge down to the floor, plain (`true`) or painted with a material of `BoardExtras.materials`. */
+  sides?: true | string;
+}
+
+/** How a scene's ground lies round its map on Tabletop's board (Tabletop's Ground panel). */
+export interface BoardGround {
+  /** The map on its table, a plane to the horizon, or water to the horizon. */
+  mode: 'board' | 'horizon' | 'water';
+  /** A material of `BoardExtras.materials` the plane is tiled with; absent: plain ground. */
+  material?: string;
+  /** The height pattern past the board (`flat`, `gentle`, `rolling`, `rough`, `dunes`), 0 to 1 strong. */
+  noise: string;
+  strength: number;
+  /** Distance fog, 0 (none) to 100. */
+  fog: number;
+  /** Extra board round the map, in grid squares (0 to 100). */
+  margin: number;
+  /** Squares one tile of the material spans (1 to 8). */
+  tile: number;
+  /** The water to the horizon, moving as painted water does. */
+  water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
 /** One patch of water: its outline and what stands dry inside it, each ring a flat list of x, y in the scene's world. */
@@ -168,6 +206,10 @@ export interface BoardExtras {
   layerLook?: 'solid' | 'faded' | 'transparent';
   /** Where the marker sheets lie on the players' table, as the GM placed them on this map; absent for none. Sent with the first part only. */
   arTable?: ArTable;
+  /** The raised shapes on the scene's level players are shown, where players see them; absent for none. Sent with the first part only. */
+  shapes?: BoardShapeRecord[];
+  /** The ground round the map; absent: the map on its table, as before. Sent with the first part only. */
+  ground?: BoardGround;
 }
 
 export interface BoardCamera {
@@ -188,6 +230,12 @@ export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights:
  * layer's (which counts towards the layers' bytes). An outline has at most Atlas's corners, an area its holes, a scene its areas.
  */
 export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048, corners: 2048, holes: 256, areas: 256 });
+
+/**
+ * The most the shapes may carry: shapes a scene or a layer, corners a shape (outline and inner together), and all of a
+ * scene's (or a layer's) shapes as JSON (a shape that would pass it is left out).
+ */
+export const BOARD_SHAPE_LIMITS = Object.freeze({ shapes: 200, corners: 512, height: 1000, bytes: 100 * 1024, layerBytes: 40 * 1024 });
 
 export const BOARD_PART_LIMITS = Object.freeze({ walls: 1500, lights: 1000, props: 1000, materials: 200, maps: 8, parts: 64, text: 200 });
 

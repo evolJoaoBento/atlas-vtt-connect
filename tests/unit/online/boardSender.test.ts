@@ -7,7 +7,8 @@ import { AssetServer } from '../../../src/app/online/assets/AssetServer';
 import { isBoardExtras } from '../../../src/app/online/scene/boardValidation';
 import { boardAssetIds } from '../../../src/app/online/assets/assetIds';
 import { BOARD_CAMERA_INTERVAL_MS, BoardSender, boardParts } from '../../../src/app/online/scene/BoardSender';
-import { BOARD_LAYER_LIMITS, BOARD_WATER_LIMITS } from '../../../src/app/online/scene/boardTypes';
+import { mergeBoardExtras } from '../../../src/app/online/scene/cutsceneExtrasInbox';
+import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS } from '../../../src/app/online/scene/boardTypes';
 import { SceneHub } from '../../../src/app/online/scene/SceneHub';
 import type { BoardSource, BoardPose } from '../../../src/app/online/scene/sceneSources';
 import type { BoardLook } from '../../../src/app/online/scene/sceneContracts';
@@ -299,6 +300,28 @@ describe('board layers', () => {
     const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: 0, parts: parts.length, extras: parts[0]! });
     expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(MAX_CONTROL_MESSAGE_BYTES);
     expect(decodeControl(text).kind).toBe('message');
+  });
+
+  it('shapes fill the parts after the props and are joined again whole; the ground rides on the first part; each part fits one message', () => {
+    // As much as a scene sends (`BOARD_SHAPE_LIMITS.bytes`), behind more walls than one part holds.
+    const shapes = Array.from({ length: 75 }, (_, i) => ({ id: `shape-${i}`, outline: Array.from({ length: 150 }, (_, k) => (k % 3 === 2 ? 1.25 : 1000.25 + k + i)), material: 'M'.repeat(43) }));
+    expect(JSON.stringify(shapes).length).toBeLessThan(BOARD_SHAPE_LIMITS.bytes);
+    const walls = Array.from({ length: 1400 }, (_, i) => ({ id: `wall-${i.toString(36)}-${'x'.repeat(30)}`, type: 'solid' as const, p1: { x: 1234.5678901234 + i, y: 987.6543210987 }, p2: { x: 1304.5678901234 + i, y: 987.6543210987 }, height: 2.5, material: 'M'.repeat(43) }));
+    const ground = { mode: 'horizon' as const, noise: 'rolling', strength: 0.5, fog: 40, margin: 10, tile: 2, water: { kind: 'ripples', amount: 0.5, direction: 90, tint: '#2d6b78', clarity: 0.6 } };
+    const water = { mask: { width: 2048, height: 2048, data: 'A'.repeat(BOARD_WATER_LIMITS.scene) } };
+    const parts = boardParts({ ...base, walls, shapes, ground, water });
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts[0]!.ground).toEqual(ground);
+    for (const part of parts.slice(1)) expect(part).not.toHaveProperty('ground');
+    for (const [index, part] of parts.entries()) {
+      expect(isBoardExtras(part), `part ${index}`).toBe(true);
+      const text = encodeControl({ v: 1, type: 'board-extras', seq: 1, part: index, parts: parts.length, extras: part });
+      expect(new TextEncoder().encode(text).length).toBeLessThanOrEqual(MAX_CONTROL_MESSAGE_BYTES);
+    }
+    const [first, ...rest] = parts;
+    expect(parts[0]!.shapes ?? []).toHaveLength(0);
+    expect(mergeBoardExtras(first!, rest).shapes).toEqual(shapes);
+    expect(boardParts(base)[0]).not.toHaveProperty('shapes');
   });
 
   it('extras without layers are valid and have no layers key', () => {

@@ -11,7 +11,7 @@ import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
 import { offeredDiceRules } from '../tools/physicalRolls';
 import type { OfferedDiceRules } from '../tools/toolMessages';
-import { BOARD_PART_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
+import { BOARD_PART_LIMITS, BOARD_SHAPE_LIMITS, type BoardCamera, type BoardExtras } from './boardTypes';
 import type { BoardSource, SceneSession } from './sceneSources';
 import type { SlotChange, SlotProjection, SlotView } from './slotViews';
 
@@ -34,27 +34,34 @@ export const BOARD_PART_BYTES = 180 * 1024;
  * first part carries the materials and the scene's light; walls, then lights, then props fill the parts in order.
  */
 export function boardParts(extras: BoardExtras): BoardExtras[] {
-  // The layers, the water, the AR table and the materials ride on the first part.
-  const { layers: _layers, water: _water, arTable: _arTable, ...whole } = extras;
-  const empty = (first: boolean): BoardExtras => ({ ...whole, ...(first && extras.layers ? { layers: extras.layers } : {}), ...(first && extras.water ? { water: extras.water } : {}), ...(first && extras.arTable ? { arTable: extras.arTable } : {}), walls: [], lights: [], props: [], materials: first ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [] });
+  // The layers, the water, the AR table, the ground and the materials ride on the first part; the shapes fill the parts
+  // after the props, as walls do (each part's own are joined again: `mergeBoardExtras`).
+  const { layers: _layers, water: _water, arTable: _arTable, shapes: _shapes, ground: _ground, ...whole } = extras;
+  const empty = (first: boolean): BoardExtras => ({
+    ...whole, ...(first && extras.layers ? { layers: extras.layers } : {}), ...(first && extras.water ? { water: extras.water } : {}), ...(first && extras.arTable ? { arTable: extras.arTable } : {}),
+    ...(first && extras.ground ? { ground: extras.ground } : {}),
+    walls: [], lights: [], props: [], materials: first ? extras.materials.slice(0, BOARD_PART_LIMITS.materials) : [],
+  });
   const size = (value: unknown): number => JSON.stringify(value).length + 1;
   const parts: BoardExtras[] = [empty(true)];
   let current = parts[0]!;
   let used = size(current);
-  const place = <K extends 'walls' | 'lights' | 'props'>(key: K, item: BoardExtras[K][number], cap: number): void => {
-    const weight = size(item);
-    if (used + weight > BOARD_PART_BYTES || (current[key] as unknown[]).length >= cap) {
+  const place = <K extends 'walls' | 'lights' | 'props' | 'shapes'>(key: K, item: NonNullable<BoardExtras[K]>[number], cap: number): void => {
+    const weight = size(item) + (key === 'shapes' && !current.shapes ? 12 : 0);
+    if (used + weight > BOARD_PART_BYTES || (current[key] ?? []).length >= cap) {
       if (parts.length >= BOARD_PART_LIMITS.parts) return;
       current = empty(false);
       parts.push(current);
       used = size(current);
     }
+    if (key === 'shapes') current.shapes ??= [];
     (current[key] as unknown[]).push(item);
     used += weight;
   };
   for (const wall of extras.walls) place('walls', wall, BOARD_PART_LIMITS.walls);
   for (const light of extras.lights) place('lights', light, BOARD_PART_LIMITS.lights);
   for (const prop of extras.props) place('props', prop, BOARD_PART_LIMITS.props);
+  for (const shape of extras.shapes ?? []) place('shapes', shape, BOARD_SHAPE_LIMITS.shapes);
   return parts;
 }
 
