@@ -81,7 +81,7 @@ async function run(engine, label, device) {
     const board = window.pageTest.inner();
     const layer = board.layerViews?.get('layer-1');
     const shown = (object) => { for (let node = object; node; node = node.parent) if (!node.visible) return false; return true; };
-    return { layer: !!layer && shown(layer.object3d), layerWater: !!layer?.water && shown(layer.water.object3d), water: !!board.water && shown(board.water.object3d) };
+    return { layer: !!layer && shown(layer.object3d), layerWater: !!layer?.liquids?.get('water') && shown(layer.liquids.get('water').object3d), water: !!board.water && shown(board.water.object3d) };
   });
   check(tag('the scene stacked above shows on the board'), stacked.layer, JSON.stringify(stacked));
   check(tag('the floors above are drawn as the GM draws them (faded here)'), await page.evaluate(() => window.pageTest.inner().quality.layerLook === 'faded'));
