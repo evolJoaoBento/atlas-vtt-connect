@@ -409,7 +409,7 @@ describe('projectBoard', () => {
 
     it("each outline goes as the liquid it is, with the lava and acid motions beside the water's", () => {
       const areas = [{ polygon: [0, 0, 0, 70, 70, 70] }, { polygon: [100, 0, 100, 70, 170, 70], liquid: 'lava' as const }, { polygon: [200, 0, 200, 70, 270, 70], liquid: 'acid' as const }];
-      const acid = { kind: 'ripples', amount: 0.35, direction: 90, tint: '#8bd630', clarity: 0.3 };
+      const acid: { kind: string; amount: number; direction: number; tint: string; clarity: number; style?: string } = { kind: 'ripples', amount: 0.35, direction: 90, tint: '#8bd630', clarity: 0.3 };
       const sent = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava, acid } }, assets);
       expect(sent.water).toEqual({ areas, motion, lava, acid });
       expect(isBoardExtras(sent)).toBe(true);
@@ -420,8 +420,8 @@ describe('projectBoard', () => {
       expect(isBoardExtras({ ...sent, water: { ...sent.water, lava: { ...lava, tint: 'red' } } })).toBe(false);
       // The kind of lava goes as it is; one Tabletop does not draw is its default kind; none on water or acid.
       expect(sent.water!.lava!.style).toBe('magma');
-      const odd2 = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava: { ...lava, style: 'plasma' }, acid: { ...acid, style: 'magma' } } }, assets);
-      expect([odd2.water!.lava!.style, odd2.water!.acid!.style]).toEqual(['crust', undefined]);
+      const odd2 = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava: { ...lava, style: 'plasma' }, acid: { ...acid, style: 'magma' } as typeof acid } }, assets);
+      expect([odd2.water!.lava!.style, (odd2.water!.acid as { style?: string }).style]).toEqual(['crust', undefined]);
       expect(isBoardExtras({ ...sent, water: { ...sent.water, lava: { ...lava, style: 'x'.repeat(40) } } })).toBe(false);
     });
 

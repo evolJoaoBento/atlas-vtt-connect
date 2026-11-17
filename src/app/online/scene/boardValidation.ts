@@ -135,7 +135,7 @@ const PATTERN_SHAPES = new Set(['smooth', 'ridged', 'terraced', 'craters']);
 
 function isPattern(value: unknown): boolean {
   return isFields(value) && typeof value.name === 'string' && value.name.length <= 60 && isNumber(value.scale) && value.scale >= 4 && value.scale <= 200
-    && isNumber(value.height) && value.height >= 0 && value.height <= 40 && Number.isInteger(value.roughness) && (value.roughness as number) >= 1 && value.roughness <= 6
+    && isNumber(value.height) && value.height >= 0 && value.height <= 40 && Number.isInteger(value.roughness) && (value.roughness as number) >= 1 && (value.roughness as number) <= 6
     && typeof value.shape === 'string' && PATTERN_SHAPES.has(value.shape);
 }
 
