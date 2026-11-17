@@ -10,6 +10,7 @@ import type { Shows } from './FogCoverage';
 import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardGroundLook, BoardLayerLook, BoardLook, BoardShapeLook } from './sceneContracts';
 import { isArTable, type ArTable } from '../tools/arTable';
+import { isSceneId } from './sceneValidation';
 
 type Raw = Record<string, unknown>;
 
@@ -64,10 +65,18 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
       if (!materialIds.has(id)) materialIds.set(id, materialOf(layer.materials.find((entry) => entry.id === id), assets));
       return materialIds.get(id)?.id ?? null;
     });
-    const weight = record ? JSON.stringify(record).length + 1 : 0;
-    if (!record || layerBytes + weight > BOARD_LAYER_LIMITS.bytes) continue;
+    if (!record) continue;
+    let kept: BoardLayerRecord = record;
+    let weight = JSON.stringify(kept).length + 1;
+    // Its shapes give way first: the level's floor and walls matter more than its roofs.
+    if (kept.shapes && layerBytes + weight > BOARD_LAYER_LIMITS.bytes) {
+      const { shapes: _shapes, ...bare } = kept;
+      kept = bare;
+      weight = JSON.stringify(kept).length + 1;
+    }
+    if (layerBytes + weight > BOARD_LAYER_LIMITS.bytes) continue;
     layerBytes += weight;
-    layers.push(record);
+    layers.push(kept);
   }
   if (layers.length > 0) extras.layers = layers;
   const water = waterOf(look?.water, BOARD_WATER_LIMITS.scene);
@@ -113,9 +122,11 @@ function shapeSeen(shape: BoardShapeLook, visible: Shows): boolean {
 function cornersOf(corners: BoardShapeLook['outline']): number[] | null {
   const out: number[] = [];
   for (const corner of corners) {
-    const { x, y, h } = corner;
-    if (![x, y, h].every((n) => typeof n === 'number' && Number.isFinite(n)) || Math.abs(x) >= 1e7 || Math.abs(y) >= 1e7 || Math.abs(h) >= BOARD_SHAPE_LIMITS.height) return null;
-    out.push(Math.round(x * 100) / 100, Math.round(y * 100) / 100, Math.round(h * 100) / 100);
+    if (![corner.x, corner.y, corner.h].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+    // Rounded first, then held to what the players' check takes (a height a hair under the limit may round onto it).
+    const [x, y, h] = [corner.x, corner.y, corner.h].map((n) => Math.round(n * 100) / 100) as [number, number, number];
+    if (Math.abs(x) >= 1e7 || Math.abs(y) >= 1e7 || Math.abs(h) >= BOARD_SHAPE_LIMITS.height) return null;
+    out.push(x, y, h);
   }
   return out;
 }
@@ -129,7 +140,8 @@ function shapesOf(shapes: ReadonlyArray<BoardShapeLook>, material: (id: string |
   let length = 2;
   for (const shape of shapes) {
     if (out.length >= BOARD_SHAPE_LIMITS.shapes) break;
-    if (typeof shape.id !== 'string' || shape.id === '' || shape.outline.length < 3 || shape.outline.length + shape.inner.length > BOARD_SHAPE_LIMITS.corners) continue;
+    // An id the players' check refuses would cost them the whole part it rides in.
+    if (!isSceneId(shape.id) || shape.outline.length < 3 || shape.outline.length + shape.inner.length > BOARD_SHAPE_LIMITS.corners) continue;
     const outline = cornersOf(shape.outline);
     const inner = cornersOf(shape.inner);
     if (!outline || !inner) continue;

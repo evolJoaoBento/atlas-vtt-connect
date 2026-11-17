@@ -311,6 +311,22 @@ describe('projectBoard', () => {
       expect(projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, fog: 400, tile: 0, strength: -1, noise: 'lava' } }, assets).ground).toMatchObject({ fog: 100, tile: 1, strength: 0, noise: 'rolling' });
     });
 
+    it('a shape whose id the players would refuse, or a height that rounds onto the limit, is not sent', () => {
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, shapes: [{ ...far, id: 'x'.repeat(300) }, { ...far, id: 'tall', inner: [{ x: 800, y: 200, h: 999.996 }] }, far] }, assets);
+      expect(extras.shapes!.map((shape) => shape.id)).toEqual(['far']);
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
+    it("a level whose shapes would not fit still goes, without its shapes", () => {
+      const roofs = Array.from({ length: 150 }, (_, i) => ({ ...roof, id: `roof-${i}`, outline: Array.from({ length: 40 }, (_, k) => ({ x: 100 + k, y: 100 + i, h: 1.25 })) }));
+      const level = (n: number) => ({ elevation: n, stands: { x: 0, y: 0, turn: 0 }, image: `maps/l${n}.png`, grid: { size: 70, offsetX: 0, offsetY: 0 }, walls: [], lights: [], props: [], materials: [], fogHeight: null, wallThickness: null, shapes: roofs });
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, layers: [level(1), level(2), level(3), level(4)] }, assets);
+      expect(extras.layers!.map((layer) => layer.elevation)).toEqual([1, 2, 3, 4]);
+      expect(extras.layers!.some((layer) => layer.shapes === undefined)).toBe(true);
+      expect(JSON.stringify(extras.layers).length).toBeLessThan(115 * 1024);
+      expect(isBoardExtras(extras)).toBe(true);
+    });
+
     it('the checks refuse broken shapes and ground', () => {
       const extras = projectBoard(state([]), 's1', all, {}, { ...look, shapes: [roof], ground }, assets);
       expect(isBoardExtras(extras)).toBe(true);
