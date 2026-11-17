@@ -127,7 +127,7 @@ function isGround(value: unknown): boolean {
   if (typeof value.noise !== 'string' || !NOISES.has(value.noise)) return false;
   const within = (n: unknown, low: number, high: number): boolean => isNumber(n) && n >= low && n <= high;
   if (!within(value.strength, 0, 1) || !within(value.fog, 0, 100) || !within(value.margin, 0, 100) || !within(value.tile, 1, 8)) return false;
-  if (value.painted === undefined ? value.mode === 'painted' : !isPainted(value.painted)) return false;
+  if (value.painted === undefined ? value.mode === 'painted' : value.mode !== 'painted' || !isPainted(value.painted)) return false;
   return isMotion(value.water) && (value.lava === undefined || isMotion(value.lava)) && (value.acid === undefined || isMotion(value.acid));
 }
 
@@ -135,7 +135,7 @@ const PATTERN_SHAPES = new Set(['smooth', 'ridged', 'terraced', 'craters']);
 
 function isPattern(value: unknown): boolean {
   return isFields(value) && typeof value.name === 'string' && value.name.length <= 60 && isNumber(value.scale) && value.scale >= 4 && value.scale <= 200
-    && isNumber(value.height) && value.height >= 0 && value.height <= 40 && isNumber(value.roughness) && value.roughness >= 1 && value.roughness <= 6
+    && isNumber(value.height) && value.height >= 0 && value.height <= 40 && Number.isInteger(value.roughness) && (value.roughness as number) >= 1 && value.roughness <= 6
     && typeof value.shape === 'string' && PATTERN_SHAPES.has(value.shape);
 }
 
@@ -146,7 +146,7 @@ function isPainted(value: unknown): boolean {
   const settings = value.settings;
   if (!isFields(settings) || !isList(settings.patterns, BOARD_PAINTED_LIMITS.patterns, isPattern)) return false;
   const range = settings.height;
-  if (!isFields(range) || !isNumber(range.low) || !isNumber(range.high) || Math.abs(range.low) > 100 || Math.abs(range.high) > 100) return false;
+  if (!isFields(range) || !isNumber(range.low) || !isNumber(range.high) || Math.abs(range.low) > 100 || Math.abs(range.high) > 100 || range.low > range.high) return false;
   const liquids = settings.liquids;
   return isFields(liquids) && isMotion(liquids.water) && isMotion(liquids.lava) && isMotion(liquids.acid);
 }

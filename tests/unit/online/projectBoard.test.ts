@@ -394,6 +394,12 @@ describe('projectBoard', () => {
         expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: bad } }), JSON.stringify(bad)).toBe(false);
       }
       expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: undefined } })).toBe(false);
+      const settings = block.settings;
+      for (const bad of [{ ...block, settings: { ...settings, patterns: [{ ...pattern, roughness: 2.5 }] } }, { ...block, settings: { ...settings, height: { low: 5, high: -5 } } }]) {
+        expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: bad } }), JSON.stringify(bad)).toBe(false);
+      }
+      // A painted block on a ground that is not painted is refused.
+      expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, mode: 'horizon' } })).toBe(false);
     });
   });
 
