@@ -421,6 +421,11 @@
   color: var(--text-normal);
 }
 
+/* A field the panel puts away (the ground's rows of another background): its flex must not show it. */
+.atlas-tabletop-palette__field[hidden] {
+  display: none;
+}
+
 .atlas-tabletop-palette__label {
   flex: 1;
 }
@@ -540,6 +545,11 @@ body.atlas-tabletop-player-window .view-header {
   padding-top: 0;
   margin-top: 0;
   border-top: none;
+}
+
+/* A section the menu puts away (the lava types while the brush paints water or acid). */
+.atlas-tabletop-atlas .atlas-dropdown-section[hidden] {
+  display: none;
 }
 
 .atlas-tabletop-atlas .atlas-dropdown-label {
@@ -1853,6 +1863,31 @@ body.atlas-tabletop-player-window .view-header {
   color: var(--text-on-accent);
 }
 
+/* A field whose control takes the panel's width under its label (the ground's five backgrounds). */
+.atlas-tabletop-palette__field--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* The ground's backgrounds: buttons of their own that wrap, three to a row, all inside the panel. */
+.atlas-tabletop-ground-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+  margin-left: 0;
+  border: 0;
+  overflow: visible;
+}
+
+.atlas-tabletop-ground-modes .atlas-tabletop-palette__choice,
+.atlas-tabletop-ground-modes .atlas-tabletop-palette__choice + .atlas-tabletop-palette__choice {
+  flex: 1 1 30%;
+  padding: 4px 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  white-space: nowrap;
+}
+
 /* The chip that says whose point of view the board is shown from, and stops it. */
 .atlas-tabletop-pov {
   position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 6;
@@ -1935,6 +1970,8 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-bar--cinematic .atlas-tabletop-extensions > :not(.atlas-tabletop-cinema-tools) { display: none !important; }
 /* The paint tool's materials. */
 .atlas-tabletop-paint-options { width: 300px; max-height: 360px; overflow-y: auto; padding: 8px; }
+/* The liquid brush's menu (liquid, lava type, modes, motion, tint): taller than a small board, so it scrolls in place. */
+.atlas-tabletop-water-options { max-height: min(520px, calc(100vh - 140px)); overflow-y: auto; }
 .atlas-tabletop-paint-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin-top: 6px; }
 .atlas-tabletop-paint-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; height: auto; border: 1px solid transparent; border-radius: 6px; background: transparent; cursor: pointer; color: var(--text-normal); }
 .atlas-tabletop-paint-card:hover { background: var(--background-modifier-hover); }
