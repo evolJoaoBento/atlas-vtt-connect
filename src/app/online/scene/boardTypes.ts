@@ -161,7 +161,7 @@ export interface BoardShapeRecord {
 /** How a scene's ground lies round its map on Tabletop's board (Tabletop's Ground panel). */
 export interface BoardGround {
   /** The map on its table, a plane to the horizon, or water, lava or acid to the horizon. */
-  mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid';
+  mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid' | 'painted';
   /** A material of `BoardExtras.materials` the plane is tiled with; absent: plain ground. */
   material?: string;
   /** The height pattern past the board (`flat`, `gentle`, `rolling`, `rough`, `dunes`), 0 to 1 strong. */
@@ -177,6 +177,42 @@ export interface BoardGround {
   water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
   lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; /** The kind of lava (`crust`, `ropey`, `rubble`, `lake`, `magma`); absent from an older Tabletop. */ style?: string };
   acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  /** The painted background of the `painted` mode; the mode never goes without it. */
+  painted?: BoardPainted;
+}
+
+/** A custom ground pattern of a painted background. */
+export interface BoardPaintedPattern {
+  name: string;
+  /** 4 to 200 squares. */
+  scale: number;
+  /** 0 to 40 squares. */
+  height: number;
+  /** A whole number, 1 to 6. */
+  roughness: number;
+  shape: 'smooth' | 'ridged' | 'terraced' | 'craters';
+}
+
+/**
+ * A painted background for players: the asset ids of its three layer pictures (terrain, material, height), its material
+ * ids by slot (an id of `BoardExtras.materials`, or '' for a slot without one; at most four) and its settings.
+ */
+export interface BoardPainted {
+  terrain: string;
+  material: string;
+  height: string;
+  materials: string[];
+  settings: {
+    /** At most four. */
+    patterns: BoardPaintedPattern[];
+    /** Squares, each within ±100. */
+    height: { low: number; high: number };
+    liquids: {
+      water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+      lava: { kind: string; amount: number; direction: number; tint: string; clarity: number; style?: string };
+      acid: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+    };
+  };
 }
 
 /** One patch of water: its outline and what stands dry inside it, each ring a flat list of x, y in the scene's world. */
@@ -245,6 +281,9 @@ export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights:
  * layer's (which counts towards the layers' bytes). An outline has at most Atlas's corners, an area its holes, a scene its areas.
  */
 export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048, corners: 2048, holes: 256, areas: 256 });
+
+/** A painted background's most: custom patterns, and material slots. */
+export const BOARD_PAINTED_LIMITS = Object.freeze({ patterns: 4, materials: 4 });
 
 /**
  * The most the shapes may carry: shapes a scene or a layer, corners a shape (outline and inner together), and all of a

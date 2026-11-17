@@ -349,6 +349,54 @@ describe('projectBoard', () => {
     });
   });
 
+  describe('painted backgrounds', () => {
+    const liquid = { kind: 'ripples', amount: 0.5, direction: 90, tint: '#2D6B78', clarity: 0.6 };
+    const painted = {
+      terrain: 'bg/t.png', material: 'bg/m.png', height: 'bg/h.png', materials: ['mat/wood', '', 'mat/brick'],
+      settings: {
+        v: 1, name: 'Wasteland', materials: ['mat/wood', '', 'mat/brick'], height: { low: -300, high: 5 },
+        patterns: [{ name: 'Dunes', scale: 2, height: 99, roughness: 3.4, shape: 'ridged' }, { name: 'x'.repeat(100), scale: 40, height: 6, roughness: 3, shape: 'weird' }],
+        liquids: { water: liquid, lava: { ...liquid, kind: 'flow', style: 'magma' }, acid: liquid },
+      },
+    };
+    const ground = { mode: 'painted' as const, noise: 'rolling', strength: 0.5, fog: 40, margin: 0, tile: 2, water: liquid, lava: liquid, acid: liquid, painted };
+
+    it('goes with asset ids, its materials by slot, and its settings clamped', () => {
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets).ground!;
+      expect(sent.mode).toBe('painted');
+      expect(sent.painted).toMatchObject({ terrain: 'id:bg/t.png', material: 'id:bg/m.png', height: 'id:bg/h.png', materials: ['id:mat/wood/c.jpg', '', 'id:mat/brick/c.jpg'] });
+      const settings = sent.painted!.settings;
+      expect(settings.height).toEqual({ low: -100, high: 5 });
+      expect(settings.patterns).toEqual([
+        { name: 'Dunes', scale: 4, height: 40, roughness: 3, shape: 'ridged' },
+        { name: 'x'.repeat(60), scale: 40, height: 6, roughness: 3, shape: 'smooth' },
+      ]);
+      expect(settings.liquids.water.tint).toBe('#2d6b78');
+      expect(settings.liquids.lava.style).toBe('magma');
+      expect(isBoardExtras(projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets))).toBe(true);
+    });
+
+    it('a slot whose material is not hashed yet keeps its place; a missing picture sends the horizon instead', () => {
+      const unhashed = { idFor: (path: string | null | undefined) => (path?.startsWith('mat/') ? null : path ? `id:${path}` : null) };
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, ground }, unhashed).ground!.painted!.materials).toEqual(['', '', '']);
+      const noPicture = { idFor: (path: string | null | undefined) => (path === 'bg/h.png' ? null : path ? `id:${path}` : null) };
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, ground }, noPicture).ground!;
+      expect(sent.mode).toBe('horizon');
+      expect(sent).not.toHaveProperty('painted');
+    });
+
+    it('the checks refuse a painted block with a bad id or too many patterns', () => {
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets);
+      const block = extras.ground!.painted!;
+      const pattern = block.settings.patterns[0]!;
+      for (const bad of [{ ...block, terrain: '' }, { ...block, height: 7 }, { ...block, materials: ['a', 'b', 'c', 'd', 'e'] }, { ...block, materials: [''] .concat(['x'.repeat(300)]) },
+        { ...block, settings: { ...block.settings, patterns: [pattern, pattern, pattern, pattern, pattern] } }]) {
+        expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: bad } }), JSON.stringify(bad)).toBe(false);
+      }
+      expect(isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: undefined } })).toBe(false);
+    });
+  });
+
   describe('lava and acid', () => {
     const motion = { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 };
     const lava = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0, style: 'magma' };

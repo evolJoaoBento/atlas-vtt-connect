@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PAINTED_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 import { isArTable } from '../tools/arTable';
 
@@ -127,10 +127,31 @@ function isGround(value: unknown): boolean {
   if (typeof value.noise !== 'string' || !NOISES.has(value.noise)) return false;
   const within = (n: unknown, low: number, high: number): boolean => isNumber(n) && n >= low && n <= high;
   if (!within(value.strength, 0, 1) || !within(value.fog, 0, 100) || !within(value.margin, 0, 100) || !within(value.tile, 1, 8)) return false;
+  if (value.painted === undefined ? value.mode === 'painted' : !isPainted(value.painted)) return false;
   return isMotion(value.water) && (value.lava === undefined || isMotion(value.lava)) && (value.acid === undefined || isMotion(value.acid));
 }
 
-const GROUND_MODES = new Set(['board', 'horizon', 'water', 'lava', 'acid']);
+const PATTERN_SHAPES = new Set(['smooth', 'ridged', 'terraced', 'craters']);
+
+function isPattern(value: unknown): boolean {
+  return isFields(value) && typeof value.name === 'string' && value.name.length <= 60 && isNumber(value.scale) && value.scale >= 4 && value.scale <= 200
+    && isNumber(value.height) && value.height >= 0 && value.height <= 40 && isNumber(value.roughness) && value.roughness >= 1 && value.roughness <= 6
+    && typeof value.shape === 'string' && PATTERN_SHAPES.has(value.shape);
+}
+
+/** A painted background: three picture ids, material ids by slot ('' for none) and settings within their ranges. */
+function isPainted(value: unknown): boolean {
+  if (!isFields(value) || !isSceneId(value.terrain) || !isSceneId(value.material) || !isSceneId(value.height)) return false;
+  if (!isList(value.materials, BOARD_PAINTED_LIMITS.materials, (id) => id === '' || isSceneId(id))) return false;
+  const settings = value.settings;
+  if (!isFields(settings) || !isList(settings.patterns, BOARD_PAINTED_LIMITS.patterns, isPattern)) return false;
+  const range = settings.height;
+  if (!isFields(range) || !isNumber(range.low) || !isNumber(range.high) || Math.abs(range.low) > 100 || Math.abs(range.high) > 100) return false;
+  const liquids = settings.liquids;
+  return isFields(liquids) && isMotion(liquids.water) && isMotion(liquids.lava) && isMotion(liquids.acid);
+}
+
+const GROUND_MODES = new Set(['board', 'horizon', 'water', 'lava', 'acid', 'painted']);
 
 /** A level's fit as Atlas keeps it: positive factors (a scale may be under one), a turn of at most five degrees, an offset of the corner never left of or above it. */
 function isFit(value: unknown): boolean {

@@ -111,7 +111,7 @@ export interface BoardShapeLook {
 
 /** The ground round a map as Tabletop hands it (its Ground panel); the material by its vault folder (an id of the look's `materials`). */
 export interface BoardGroundLook {
-  readonly mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid';
+  readonly mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid' | 'painted';
   readonly material?: string;
   readonly noise: string;
   readonly strength: number;
@@ -121,6 +121,8 @@ export interface BoardGroundLook {
   readonly water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
   readonly lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; style?: string };
   readonly acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  /** The painted background of the `painted` mode: vault paths of its three pictures, its settings as saved, and its material folder by slot ('' for none). */
+  readonly painted?: { terrain: string; material: string; height: string; settings: unknown; materials: string[] };
 }
 
 export interface BoardLook {

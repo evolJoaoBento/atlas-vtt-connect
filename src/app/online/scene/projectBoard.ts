@@ -7,7 +7,7 @@
  * shapes of the level shown go where players see any of them; the ground round the map always (it shows nothing of it).
  */
 import type { Shows } from './FogCoverage';
-import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PAINTED_LIMITS, type BoardPainted, type BoardPaintedPattern, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardGroundLook, BoardLayerLook, BoardLook, BoardShapeLook } from './sceneContracts';
 import { isArTable, type ArTable } from '../tools/arTable';
 import { isSceneId } from './sceneValidation';
@@ -85,7 +85,7 @@ export function projectBoard(state: BoardInput, sceneId: string, visible: Shows 
   const seen = (look?.shapes ?? []).filter((shape) => shapeSeen(shape, visible));
   const shapes = shapesOf(seen, material, BOARD_SHAPE_LIMITS.bytes);
   if (shapes.length > 0) extras.shapes = shapes;
-  const ground = groundOf(look?.ground, material);
+  const ground = groundOf(look?.ground, material, assets);
   if (ground) extras.ground = ground;
   extras.materials = [...new Map([...materialIds.values()].filter((entry): entry is BoardMaterialRecord => entry !== null).map((entry) => [entry.id, entry])).values()];
   for (const raw of items(objects.lights)) {
@@ -160,14 +160,17 @@ const NOISES = new Set(['flat', 'gentle', 'rolling', 'rough', 'dunes']);
 const within = (value: unknown, low: number, high: number, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? Math.min(high, Math.max(low, value)) : fallback);
 
 /** The ground as the wire carries it, its values held to their ranges and its material by asset id; none for the plain map board. */
-function groundOf(ground: BoardGroundLook | undefined, material: (id: string | null) => string | null): BoardGround | null {
+function groundOf(ground: BoardGroundLook | undefined, material: (id: string | null) => string | null, assets: Pick<AssetIds, 'idFor'>): BoardGround | null {
   if (!ground || !GROUND_MODES.has(ground.mode)) return null;
   const margin = Math.round(within(ground.margin, 0, 100, 0));
   // The map on its table with no extra board is what a board without ground does: nothing to send.
   if (ground.mode === 'board' && margin === 0) return null;
   const tiled = ground.material ? material(ground.material) : null;
+  // A painted background whose pictures are not hashed yet shows as the plain horizon until they are.
+  const painted = ground.mode === 'painted' ? paintedOf(ground.painted, material, assets) : null;
   return {
-    mode: ground.mode,
+    mode: ground.mode === 'painted' && !painted ? 'horizon' : ground.mode,
+    ...(painted ? { painted } : {}),
     ...(tiled ? { material: tiled } : {}),
     noise: NOISES.has(ground.noise) ? ground.noise : 'rolling',
     strength: within(ground.strength, 0, 1, 0.5),
@@ -180,7 +183,53 @@ function groundOf(ground: BoardGroundLook | undefined, material: (id: string | n
   };
 }
 
-const GROUND_MODES = new Set<string>(['board', 'horizon', 'water', 'lava', 'acid']);
+/**
+ * A painted background for the wire: its three pictures by asset id (none if any is not hashed yet), its material
+ * folders by id ('' keeps the place of a slot with none), its settings copied field by field and held to their ranges.
+ */
+function paintedOf(painted: BoardGroundLook['painted'], material: (id: string | null) => string | null, assets: Pick<AssetIds, 'idFor'>): BoardPainted | null {
+  if (!painted) return null;
+  const terrain = assets.idFor(painted.terrain);
+  const layer = assets.idFor(painted.material);
+  const height = assets.idFor(painted.height);
+  if (!terrain || !layer || !height) return null;
+  const settings: Raw = isObj(painted.settings) ? painted.settings : {};
+  const range: Raw = isObj(settings.height) ? settings.height : {};
+  const a = within(range.low, -100, 100, -2);
+  const b = within(range.high, -100, 100, 6);
+  const liquids: Raw = isObj(settings.liquids) ? settings.liquids : {};
+  const slots = Array.isArray(painted.materials) ? painted.materials.slice(0, BOARD_PAINTED_LIMITS.materials) : [];
+  return {
+    terrain, material: layer, height,
+    materials: slots.map((folder) => (typeof folder === 'string' && folder !== '' ? material(folder) ?? '' : '')),
+    settings: {
+      patterns: (Array.isArray(settings.patterns) ? settings.patterns : []).slice(0, BOARD_PAINTED_LIMITS.patterns).map(patternOf),
+      height: { low: Math.min(a, b), high: Math.max(a, b) },
+      liquids: {
+        water: motionOf(liquids.water as Partial<Motion>, WATER_MOTION),
+        lava: motionOf(liquids.lava as Partial<Motion>, LAVA_MOTION),
+        acid: motionOf(liquids.acid as Partial<Motion>, ACID_MOTION),
+      },
+    },
+  };
+}
+
+const PATTERN_SHAPES = new Set<string>(['smooth', 'ridged', 'terraced', 'craters']);
+
+/** A custom pattern copied field by field, each held to its range (a name to 60 letters, an unknown shape smooth). */
+function patternOf(raw: unknown): BoardPaintedPattern {
+  const value: Raw = isObj(raw) ? raw : {};
+  const name = typeof value.name === 'string' ? value.name.trim().slice(0, 60) : '';
+  return {
+    name: name || 'Background',
+    scale: within(value.scale, 4, 200, 40),
+    height: within(value.height, 0, 40, 6),
+    roughness: Math.round(within(value.roughness, 1, 6, 3)),
+    shape: (PATTERN_SHAPES.has(value.shape as string) ? value.shape : 'smooth') as BoardPaintedPattern['shape'],
+  };
+}
+
+const GROUND_MODES = new Set<string>(['board', 'horizon', 'water', 'lava', 'acid', 'painted']);
 type Motion = NonNullable<BoardGround['lava']>;
 /** How each liquid starts, Tabletop's own: what a broken field of its motion falls back to. */
 const WATER_MOTION: Motion = { kind: 'ripples', amount: 0.5, direction: 90, tint: '#2d6b78', clarity: 0.6 };
