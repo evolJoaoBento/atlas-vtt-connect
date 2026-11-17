@@ -184,7 +184,9 @@ const GROUND_MODES = new Set<string>(['board', 'horizon', 'water', 'lava', 'acid
 type Motion = NonNullable<BoardGround['lava']>;
 /** How each liquid starts, Tabletop's own: what a broken field of its motion falls back to. */
 const WATER_MOTION: Motion = { kind: 'ripples', amount: 0.5, direction: 90, tint: '#2d6b78', clarity: 0.6 };
-const LAVA_MOTION: Motion = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0 };
+const LAVA_MOTION: Motion = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0, style: 'crust' };
+/** The kinds of lava Tabletop draws. */
+const LAVA_STYLES = new Set(['crust', 'ropey', 'rubble', 'lake', 'magma']);
 const ACID_MOTION: Motion = { kind: 'ripples', amount: 0.45, direction: 90, tint: '#8bd630', clarity: 0.35 };
 
 /** A liquid's motion copied field by field, each held to its range (`fallback`'s where it is broken). */
@@ -194,6 +196,8 @@ function motionOf(motion: Partial<Motion> | null | undefined, fallback: Motion):
     kind: typeof motion?.kind === 'string' ? motion.kind.slice(0, 20) : fallback.kind,
     amount: within(motion?.amount, 0, 1, fallback.amount), direction: within(motion?.direction, 0, 360, fallback.direction), tint,
     clarity: within(motion?.clarity, 0, 1, fallback.clarity),
+    // The kind of lava, where the motion is lava's.
+    ...(fallback.style ? { style: typeof motion?.style === 'string' && LAVA_STYLES.has(motion.style) ? motion.style : fallback.style } : {}),
   };
 }
 

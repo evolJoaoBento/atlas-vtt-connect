@@ -52,7 +52,8 @@ const isLightArea = (value: unknown): boolean => Array.isArray(value) && value.l
 
 /** How a liquid moves: plain values. */
 const isMotion = (motion: unknown): boolean => isFields(motion) && typeof motion.kind === 'string' && motion.kind.length <= 20
-  && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity);
+  && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity)
+  && (motion.style === undefined || (typeof motion.style === 'string' && motion.style.length <= 20));
 
 function isProp(value: unknown): boolean {
   return isFields(value) && isSceneId(value.id) && isSceneId(value.asset) && isNumber(value.x) && isNumber(value.y)

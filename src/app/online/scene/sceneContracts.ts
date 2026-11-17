@@ -119,7 +119,7 @@ export interface BoardGroundLook {
   readonly margin: number;
   readonly tile: number;
   readonly water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
-  readonly lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  readonly lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; style?: string };
   readonly acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 

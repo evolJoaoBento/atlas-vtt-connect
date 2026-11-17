@@ -175,7 +175,7 @@ export interface BoardGround {
   tile: number;
   /** The water, lava and acid to the horizon, each moving as its painted liquid does (lava and acid absent from an older Tabletop). */
   water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
-  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; /** The kind of lava (`crust`, `ropey`, `rubble`, `lake`, `magma`); absent from an older Tabletop. */ style?: string };
   acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
@@ -198,7 +198,7 @@ export interface BoardWater {
   mask?: { width: number; height: number; data: string };
   motion?: { kind: string; amount: number; direction: number; tint: string; clarity: number } | null;
   /** How the lava and the acid move, where there are some. */
-  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; /** The kind of lava (`crust`, `ropey`, `rubble`, `lake`, `magma`); absent from an older Tabletop. */ style?: string };
   acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 

@@ -351,18 +351,24 @@ describe('projectBoard', () => {
 
   describe('lava and acid', () => {
     const motion = { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 };
-    const lava = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0 };
+    const lava = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0, style: 'magma' };
 
     it("each outline goes as the liquid it is, with the lava and acid motions beside the water's", () => {
       const areas = [{ polygon: [0, 0, 0, 70, 70, 70] }, { polygon: [100, 0, 100, 70, 170, 70], liquid: 'lava' as const }, { polygon: [200, 0, 200, 70, 270, 70], liquid: 'acid' as const }];
-      const sent = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava, acid: { ...lava, kind: 'ripples' } } }, assets);
-      expect(sent.water).toEqual({ areas, motion, lava, acid: { ...lava, kind: 'ripples' } });
+      const acid = { kind: 'ripples', amount: 0.35, direction: 90, tint: '#8bd630', clarity: 0.3 };
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava, acid } }, assets);
+      expect(sent.water).toEqual({ areas, motion, lava, acid });
       expect(isBoardExtras(sent)).toBe(true);
       // What is no liquid of Atlas's is not sent as one; the checks refuse it.
       const odd = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas: [{ polygon: [0, 0, 0, 70, 70, 70], liquid: 'slime' as never }], motion } }, assets);
       expect(odd.water!.areas).toEqual([{ polygon: [0, 0, 0, 70, 70, 70] }]);
       expect(isBoardExtras({ ...sent, water: { areas: [{ polygon: [0, 0, 0, 70, 70, 70], liquid: 'slime' }] } })).toBe(false);
       expect(isBoardExtras({ ...sent, water: { ...sent.water, lava: { ...lava, tint: 'red' } } })).toBe(false);
+      // The kind of lava goes as it is; one Tabletop does not draw is its default kind; none on water or acid.
+      expect(sent.water!.lava!.style).toBe('magma');
+      const odd2 = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava: { ...lava, style: 'plasma' }, acid: { ...acid, style: 'magma' } } }, assets);
+      expect([odd2.water!.lava!.style, odd2.water!.acid!.style]).toEqual(['crust', undefined]);
+      expect(isBoardExtras({ ...sent, water: { ...sent.water, lava: { ...lava, style: 'x'.repeat(40) } } })).toBe(false);
     });
 
     it("lava's light glows from its surface: it goes with its outline, fewer corners than Atlas keeps, and no beam", () => {
