@@ -334,9 +334,50 @@ describe('projectBoard', () => {
       for (const bad of [{ ...shape, outline: [0, 0, 0, 1, 1, 1] }, { ...shape, outline: [0, 0, 0, 1, 1, 1, 2, 2] }, { ...shape, inner: [0, 0, 5000] }, { ...shape, sides: false }, { ...shape, material: '' }]) {
         expect(isBoardExtras({ ...extras, shapes: [bad] }), JSON.stringify(bad)).toBe(false);
       }
-      for (const bad of [{ ...extras.ground!, mode: 'lava' }, { ...extras.ground!, margin: 500 }, { ...extras.ground!, noise: 'x' }, { ...extras.ground!, water: { ...extras.ground!.water, tint: 'red' } }]) {
+      for (const bad of [{ ...extras.ground!, mode: 'magma' }, { ...extras.ground!, margin: 500 }, { ...extras.ground!, noise: 'x' }, { ...extras.ground!, water: { ...extras.ground!.water, tint: 'red' } }, { ...extras.ground!, lava: { ...extras.ground!.water, tint: 'red' } }]) {
         expect(isBoardExtras({ ...extras, ground: bad }), JSON.stringify(bad)).toBe(false);
       }
+    });
+
+    it("lava or acid to the horizon goes with its own motion; a broken field of it takes the liquid's own start", () => {
+      const lava = { kind: 'flow', amount: 0.3, direction: 120, tint: '#FF5A1F', clarity: 0 };
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, mode: 'lava', lava, acid: { ...lava, amount: 'x' as never, tint: 'green' } } }, assets);
+      expect(sent.ground).toMatchObject({ mode: 'lava', lava: { ...lava, tint: '#ff5a1f' }, acid: { kind: 'flow', amount: 0.45, tint: '#8bd630' } });
+      expect(isBoardExtras(sent)).toBe(true);
+      // From an older Tabletop: no lava or acid at all.
+      expect(projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets).ground).not.toHaveProperty('lava');
+    });
+  });
+
+  describe('lava and acid', () => {
+    const motion = { kind: 'still', amount: 0.3, direction: 90, tint: '#2a6f8a', clarity: 0.5 };
+    const lava = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0 };
+
+    it("each outline goes as the liquid it is, with the lava and acid motions beside the water's", () => {
+      const areas = [{ polygon: [0, 0, 0, 70, 70, 70] }, { polygon: [100, 0, 100, 70, 170, 70], liquid: 'lava' as const }, { polygon: [200, 0, 200, 70, 270, 70], liquid: 'acid' as const }];
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas, motion, lava, acid: { ...lava, kind: 'ripples' } } }, assets);
+      expect(sent.water).toEqual({ areas, motion, lava, acid: { ...lava, kind: 'ripples' } });
+      expect(isBoardExtras(sent)).toBe(true);
+      // What is no liquid of Atlas's is not sent as one; the checks refuse it.
+      const odd = projectBoard(state([]), 's1', all, {}, { ...look, water: { areas: [{ polygon: [0, 0, 0, 70, 70, 70], liquid: 'slime' as never }], motion } }, assets);
+      expect(odd.water!.areas).toEqual([{ polygon: [0, 0, 0, 70, 70, 70] }]);
+      expect(isBoardExtras({ ...sent, water: { areas: [{ polygon: [0, 0, 0, 70, 70, 70], liquid: 'slime' }] } })).toBe(false);
+      expect(isBoardExtras({ ...sent, water: { ...sent.water, lava: { ...lava, tint: 'red' } } })).toBe(false);
+    });
+
+    it("lava's light glows from its surface: it goes with its outline, fewer corners than Atlas keeps, and no beam", () => {
+      const ring = Array.from({ length: 200 }, (_, k) => ({ x: 250 + 100 * Math.cos(k / 200 * Math.PI * 2), y: 250 + 100 * Math.sin(k / 200 * Math.PI * 2) }));
+      const glow = { id: 'glow', x: 250, y: 250, emission: { bright: 5, dim: 20, color: '#ff963c', intensity: 1, animation: 'smoulder', angle: 90 }, area: ring };
+      const sent = projectBoard(state([], [glow]), 's1', leftHalf, {}, look, assets);
+      const light = sent.lights[0]!;
+      expect(light).toMatchObject({ id: 'glow', animation: 'smoulder', angle: null });
+      expect(light.area!.length).toBe(64);
+      expect([light.area![0], light.area![1]]).toEqual([350, 250]);
+      expect(isBoardExtras(sent)).toBe(true);
+      expect(isBoardExtras({ ...sent, lights: [{ ...light, area: [0, 0, 1, 1] }] })).toBe(false);
+      expect(isBoardExtras({ ...sent, lights: [{ ...light, area: Array.from({ length: 70 }, () => 1) }] })).toBe(false);
+      // A light with no area of its own goes as before.
+      expect(projectBoard(state([], [{ ...glow, area: undefined }]), 's1', leftHalf, {}, look, assets).lights[0]).not.toHaveProperty('area');
     });
   });
 });

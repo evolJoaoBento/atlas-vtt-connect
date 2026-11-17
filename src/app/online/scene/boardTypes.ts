@@ -82,7 +82,15 @@ export interface BoardLightRecord {
   /** A light that darkens, and the ambient level below which it shines (Atlas's `activeBelowAmbient`). */
   darkness: boolean;
   activeBelowAmbient: number | null;
+  /**
+   * A light that glows from a whole surface (lava, acid: Atlas's `area`): its outline as a flat list of x, y, at most
+   * `BOARD_LIGHT_AREA_CORNERS` corners (fewer than Atlas keeps: the board spreads a few lamps over it). Absent for any other.
+   */
+  area?: number[];
 }
+
+/** The most corners a surface light's outline goes with. */
+export const BOARD_LIGHT_AREA_CORNERS = 32;
 
 /** How strongly a material shows its texture on Tabletop's board (the GM's sliders); players' boards draw it the same way. */
 export interface BoardMaterialTuning {
@@ -152,27 +160,31 @@ export interface BoardShapeRecord {
 
 /** How a scene's ground lies round its map on Tabletop's board (Tabletop's Ground panel). */
 export interface BoardGround {
-  /** The map on its table, a plane to the horizon, or water to the horizon. */
-  mode: 'board' | 'horizon' | 'water';
+  /** The map on its table, a plane to the horizon, or water, lava or acid to the horizon. */
+  mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid';
   /** A material of `BoardExtras.materials` the plane is tiled with; absent: plain ground. */
   material?: string;
   /** The height pattern past the board (`flat`, `gentle`, `rolling`, `rough`, `dunes`), 0 to 1 strong. */
   noise: string;
   strength: number;
-  /** Distance fog, 0 (none) to 100. */
+  /** Distance fog, 0 (none) to 100 (Tabletop reads anything from 1 to 79 as 80, its thinnest). */
   fog: number;
   /** Extra board round the map, in grid squares (0 to 100). */
   margin: number;
   /** Squares one tile of the material spans (1 to 8). */
   tile: number;
-  /** The water to the horizon, moving as painted water does. */
+  /** The water, lava and acid to the horizon, each moving as its painted liquid does (lava and acid absent from an older Tabletop). */
   water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
 /** One patch of water: its outline and what stands dry inside it, each ring a flat list of x, y in the scene's world. */
 export interface BoardWaterArea {
   polygon: number[];
   holes?: number[][];
+  /** The liquid it is when it is no water; an older player's board draws it as water. */
+  liquid?: 'lava' | 'acid';
 }
 
 /**
@@ -185,6 +197,9 @@ export interface BoardWater {
   areas?: BoardWaterArea[];
   mask?: { width: number; height: number; data: string };
   motion?: { kind: string; amount: number; direction: number; tint: string; clarity: number } | null;
+  /** How the lava and the acid move, where there are some. */
+  lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
 export interface BoardExtras {

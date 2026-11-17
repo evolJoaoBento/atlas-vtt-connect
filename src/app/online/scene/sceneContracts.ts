@@ -87,6 +87,8 @@ export interface BoardLayerLook {
   lights: ReadonlyArray<{
     id: string; x: number; y: number; height: number | null; bright: number; dim: number; color: string; intensity: number;
     animation: string | null; angle: number | null; rotation: number; darkness: boolean; activeBelowAmbient: number | null;
+    /** A surface light's outline (lava, acid). */
+    area?: ReadonlyArray<{ x: number; y: number }>;
   }>;
   props: ReadonlyArray<{ id: string; path: string; x: number; y: number; scale: number; turn: number; solid?: boolean; lift?: number }>;
   materials: ReadonlyArray<{ id: string; scale: number; maps: Record<string, string>; tuning?: { relief: number; occlusion: number; shine: number; depth: number; displace: number; outward: number } }>;
@@ -109,7 +111,7 @@ export interface BoardShapeLook {
 
 /** The ground round a map as Tabletop hands it (its Ground panel); the material by its vault folder (an id of the look's `materials`). */
 export interface BoardGroundLook {
-  readonly mode: 'board' | 'horizon' | 'water';
+  readonly mode: 'board' | 'horizon' | 'water' | 'lava' | 'acid';
   readonly material?: string;
   readonly noise: string;
   readonly strength: number;
@@ -117,6 +119,8 @@ export interface BoardGroundLook {
   readonly margin: number;
   readonly tile: number;
   readonly water: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  readonly lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
+  readonly acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
 }
 
 export interface BoardLook {

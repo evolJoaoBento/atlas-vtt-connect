@@ -2,7 +2,7 @@
  * Checks for the board messages (`boardTypes.ts`). Shared with the web player page, so it imports only wire files.
  * Ids that assignment treats specially are refused, as for the scene.
  */
-import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PART_LIMITS, CUTSCENE_LIMITS, type BoardCamera, type BoardCutscene, type BoardExtras } from './boardTypes';
 import { isSceneId } from './sceneValidation';
 import { isArTable } from '../tools/arTable';
 
@@ -42,8 +42,17 @@ function isLight(value: unknown): boolean {
   return isFields(value) && isSceneId(value.id) && isNumber(value.x) && isNumber(value.y) && isNullable(isNumber)(value.height)
     && isText(value.color) && isNumber(value.bright) && isNumber(value.dim) && isNumber(value.intensity)
     && isNullable(isText)(value.animation) && isNullable(isNumber)(value.angle) && isNumber(value.rotation)
-    && typeof value.darkness === 'boolean' && isNullable(isNumber)(value.activeBelowAmbient);
+    && typeof value.darkness === 'boolean' && isNullable(isNumber)(value.activeBelowAmbient)
+    && (value.area === undefined || isLightArea(value.area));
 }
+
+/** A surface light's outline: a flat list of x, y, three to `BOARD_LIGHT_AREA_CORNERS` corners within the world. */
+const isLightArea = (value: unknown): boolean => Array.isArray(value) && value.length >= 6 && value.length % 2 === 0 && value.length <= BOARD_LIGHT_AREA_CORNERS * 2
+  && value.every((n) => isNumber(n) && Math.abs(n) < 1e7);
+
+/** How a liquid moves: plain values. */
+const isMotion = (motion: unknown): boolean => isFields(motion) && typeof motion.kind === 'string' && motion.kind.length <= 20
+  && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity);
 
 function isProp(value: unknown): boolean {
   return isFields(value) && isSceneId(value.id) && isSceneId(value.asset) && isNumber(value.x) && isNumber(value.y)
@@ -78,6 +87,7 @@ function isWater(value: unknown, longest: number): boolean {
     if (!Array.isArray(areas) || areas.length === 0 || areas.length > BOARD_WATER_LIMITS.areas || JSON.stringify(areas).length > longest) return false;
     for (const area of areas) {
       if (!isFields(area) || !isWaterRing(area.polygon)) return false;
+      if (area.liquid !== undefined && area.liquid !== 'lava' && area.liquid !== 'acid') return false;
       if (area.holes !== undefined && (!Array.isArray(area.holes) || area.holes.length === 0 || area.holes.length > BOARD_WATER_LIMITS.holes || !area.holes.every(isWaterRing))) return false;
     }
   }
@@ -88,8 +98,7 @@ function isWater(value: unknown, longest: number): boolean {
     if (!side(width) || !side(height) || typeof data !== 'string' || data.length > longest || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return false;
   }
   const motion = value.motion;
-  return motion === undefined || motion === null || (isFields(motion) && typeof motion.kind === 'string' && motion.kind.length <= 20
-    && isNumber(motion.amount) && isNumber(motion.direction) && typeof motion.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) && isNumber(motion.clarity));
+  return (motion === undefined || motion === null || isMotion(motion)) && (value.lava === undefined || isMotion(value.lava)) && (value.acid === undefined || isMotion(value.acid));
 }
 
 /** Corners as the wire carries them: x, y, h triples, places within the world and heights within reach. */
@@ -112,15 +121,15 @@ const isShapes = (value: unknown, longest: number): boolean => isList(value, BOA
 const NOISES = new Set(['flat', 'gentle', 'rolling', 'rough', 'dunes']);
 
 function isGround(value: unknown): boolean {
-  if (!isFields(value) || (value.mode !== 'board' && value.mode !== 'horizon' && value.mode !== 'water')) return false;
+  if (!isFields(value) || !GROUND_MODES.has(value.mode as string)) return false;
   if (value.material !== undefined && !isSceneId(value.material)) return false;
   if (typeof value.noise !== 'string' || !NOISES.has(value.noise)) return false;
   const within = (n: unknown, low: number, high: number): boolean => isNumber(n) && n >= low && n <= high;
   if (!within(value.strength, 0, 1) || !within(value.fog, 0, 100) || !within(value.margin, 0, 100) || !within(value.tile, 1, 8)) return false;
-  const water = value.water;
-  return isFields(water) && typeof water.kind === 'string' && water.kind.length <= 20 && isNumber(water.amount) && isNumber(water.direction)
-    && typeof water.tint === 'string' && /^#[0-9a-f]{6}$/i.test(water.tint) && isNumber(water.clarity);
+  return isMotion(value.water) && (value.lava === undefined || isMotion(value.lava)) && (value.acid === undefined || isMotion(value.acid));
 }
+
+const GROUND_MODES = new Set(['board', 'horizon', 'water', 'lava', 'acid']);
 
 /** A level's fit as Atlas keeps it: positive factors (a scale may be under one), a turn of at most five degrees, an offset of the corner never left of or above it. */
 function isFit(value: unknown): boolean {

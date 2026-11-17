@@ -7,7 +7,7 @@
  * shapes of the level shown go where players see any of them; the ground round the map always (it shows nothing of it).
  */
 import type { Shows } from './FogCoverage';
-import { BOARD_LAYER_LIMITS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardGroundLook, BoardLayerLook, BoardLook, BoardShapeLook } from './sceneContracts';
 import { isArTable, type ArTable } from '../tools/arTable';
 import { isSceneId } from './sceneValidation';
@@ -161,13 +161,11 @@ const within = (value: unknown, low: number, high: number, fallback: number): nu
 
 /** The ground as the wire carries it, its values held to their ranges and its material by asset id; none for the plain map board. */
 function groundOf(ground: BoardGroundLook | undefined, material: (id: string | null) => string | null): BoardGround | null {
-  if (!ground || (ground.mode !== 'board' && ground.mode !== 'horizon' && ground.mode !== 'water')) return null;
+  if (!ground || !GROUND_MODES.has(ground.mode)) return null;
   const margin = Math.round(within(ground.margin, 0, 100, 0));
   // The map on its table with no extra board is what a board without ground does: nothing to send.
   if (ground.mode === 'board' && margin === 0) return null;
   const tiled = ground.material ? material(ground.material) : null;
-  const water = ground.water;
-  const tint = typeof water?.tint === 'string' && /^#[0-9a-f]{6}$/i.test(water.tint) ? water.tint.toLowerCase() : '#2d6b78';
   return {
     mode: ground.mode,
     ...(tiled ? { material: tiled } : {}),
@@ -176,8 +174,41 @@ function groundOf(ground: BoardGroundLook | undefined, material: (id: string | n
     fog: Math.round(within(ground.fog, 0, 100, 40)),
     margin,
     tile: Math.round(within(ground.tile, 1, 8, 2)),
-    water: { kind: typeof water?.kind === 'string' ? water.kind.slice(0, 20) : 'ripples', amount: within(water?.amount, 0, 1, 0.5), direction: within(water?.direction, 0, 360, 90), tint, clarity: within(water?.clarity, 0, 1, 0.6) },
+    water: motionOf(ground.water, WATER_MOTION),
+    ...(ground.lava ? { lava: motionOf(ground.lava, LAVA_MOTION) } : {}),
+    ...(ground.acid ? { acid: motionOf(ground.acid, ACID_MOTION) } : {}),
   };
+}
+
+const GROUND_MODES = new Set<string>(['board', 'horizon', 'water', 'lava', 'acid']);
+type Motion = NonNullable<BoardGround['lava']>;
+/** How each liquid starts, Tabletop's own: what a broken field of its motion falls back to. */
+const WATER_MOTION: Motion = { kind: 'ripples', amount: 0.5, direction: 90, tint: '#2d6b78', clarity: 0.6 };
+const LAVA_MOTION: Motion = { kind: 'flow', amount: 0.35, direction: 90, tint: '#ff5a1f', clarity: 0 };
+const ACID_MOTION: Motion = { kind: 'ripples', amount: 0.45, direction: 90, tint: '#8bd630', clarity: 0.35 };
+
+/** A liquid's motion copied field by field, each held to its range (`fallback`'s where it is broken). */
+function motionOf(motion: Partial<Motion> | null | undefined, fallback: Motion): Motion {
+  const tint = typeof motion?.tint === 'string' && /^#[0-9a-f]{6}$/i.test(motion.tint) ? motion.tint.toLowerCase() : fallback.tint;
+  return {
+    kind: typeof motion?.kind === 'string' ? motion.kind.slice(0, 20) : fallback.kind,
+    amount: within(motion?.amount, 0, 1, fallback.amount), direction: within(motion?.direction, 0, 360, fallback.direction), tint,
+    clarity: within(motion?.clarity, 0, 1, fallback.clarity),
+  };
+}
+
+/** A surface light's outline for the wire: at most `BOARD_LIGHT_AREA_CORNERS` of its corners, evenly taken, to the hundredth; null for none. */
+function lightArea(area: unknown): number[] | null {
+  if (!Array.isArray(area) || area.length < 3) return null;
+  const corners = area.filter((p): p is { x: number; y: number } => isObj(p) && typeof p.x === 'number' && typeof p.y === 'number' && Number.isFinite(p.x) && Number.isFinite(p.y) && Math.abs(p.x) < 1e7 && Math.abs(p.y) < 1e7);
+  if (corners.length < 3) return null;
+  const step = corners.length / Math.min(corners.length, BOARD_LIGHT_AREA_CORNERS);
+  const out: number[] = [];
+  for (let k = 0; k < corners.length && out.length < BOARD_LIGHT_AREA_CORNERS * 2; k += step) {
+    const p = corners[Math.floor(k)]!;
+    out.push(Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100);
+  }
+  return out.length >= 6 ? out : null;
 }
 
 /** The AR table, copied field by field (nothing else the look carries goes). */
@@ -217,7 +248,8 @@ function waterOf(water: BoardWater | undefined, longest: number): BoardWater | n
     const polygon = typeof area === 'object' && area !== null ? waterRing(area.polygon) : null;
     if (!polygon) continue;
     const holes = (Array.isArray(area.holes) ? area.holes : []).map(waterRing).filter((ring): ring is number[] => ring !== null).slice(0, BOARD_WATER_LIMITS.holes);
-    const kept = { polygon, ...(holes.length > 0 ? { holes } : {}) };
+    const liquid = area.liquid === 'lava' || area.liquid === 'acid' ? area.liquid : null;
+    const kept = { polygon, ...(holes.length > 0 ? { holes } : {}), ...(liquid ? { liquid } : {}) };
     const size = JSON.stringify(kept).length + 1;
     if (length + size > longest) continue;
     length += size;
@@ -226,7 +258,10 @@ function waterOf(water: BoardWater | undefined, longest: number): BoardWater | n
   const mask = waterMask(water.mask, longest);
   if (areas.length === 0 && !mask) return null;
   const motion = water.motion;
-  return { ...(areas.length > 0 ? { areas } : {}), ...(mask ? { mask } : {}), ...(motion ? { motion: { kind: motion.kind, amount: motion.amount, direction: motion.direction, tint: motion.tint, clarity: motion.clarity } } : {}) };
+  return {
+    ...(areas.length > 0 ? { areas } : {}), ...(mask ? { mask } : {}), ...(motion ? { motion: { kind: motion.kind, amount: motion.amount, direction: motion.direction, tint: motion.tint, clarity: motion.clarity } } : {}),
+    ...(water.lava ? { lava: motionOf(water.lava, LAVA_MOTION) } : {}), ...(water.acid ? { acid: motionOf(water.acid, ACID_MOTION) } : {}),
+  };
 }
 
 function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 'idFor'>, material: (id: string | null) => string | null): BoardLayerRecord | null {
@@ -255,6 +290,7 @@ function projectLayer(layer: BoardLayerLook, id: string, assets: Pick<AssetIds, 
     id: light.id, x: light.x, y: light.y, height: light.height, color: light.color, bright: Math.min(light.dim, Math.max(0, light.bright)), dim: Math.max(0, light.dim),
     intensity: Math.max(0, light.intensity), animation: light.animation, angle: light.angle !== null && light.angle > 0 && light.angle < 360 ? light.angle : null,
     rotation: light.rotation, darkness: light.darkness, activeBelowAmbient: light.activeBelowAmbient !== null && light.activeBelowAmbient < 1 ? light.activeBelowAmbient : null,
+    ...withArea(lightArea(light.area)),
   }));
   const props: BoardPropRecord[] = [];
   for (const prop of layer.props.slice(0, BOARD_LAYER_LIMITS.props)) {
@@ -330,5 +366,9 @@ function projectLight(raw: Raw, emission: unknown, where: { x: number; y: number
     rotation: num(raw.rotation, 0),
     darkness: emission.darkness === true,
     activeBelowAmbient: gate,
+    ...withArea(lightArea(raw.area)),
   };
 }
+
+/** A surface light's area field, where it has one (a light over an area has no beam). */
+const withArea = (area: number[] | null): { area?: number[]; angle?: null } => (area ? { area, angle: null } : {});
