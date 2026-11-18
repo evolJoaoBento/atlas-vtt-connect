@@ -139,12 +139,20 @@ function isPattern(value: unknown): boolean {
     && typeof value.shape === 'string' && PATTERN_SHAPES.has(value.shape);
 }
 
+/** A prop brush: a name, up to four model ids (none is fine), a density and a scale within their ranges. */
+function isBrush(value: unknown): boolean {
+  return isFields(value) && typeof value.name === 'string' && value.name.length <= 60 && isList(value.props, BOARD_PAINTED_LIMITS.brushProps, isSceneId)
+    && isNumber(value.density) && value.density >= 0.1 && value.density <= 200 && isNumber(value.scale) && value.scale >= 0.1 && value.scale <= 20;
+}
+
 /** A painted background: three picture ids, material ids by slot ('' for none) and settings within their ranges. */
 function isPainted(value: unknown): boolean {
   if (!isFields(value) || !isSceneId(value.terrain) || !isSceneId(value.material) || !isSceneId(value.height)) return false;
   if (!isList(value.materials, BOARD_PAINTED_LIMITS.materials, (id) => id === '' || isSceneId(id))) return false;
+  if (value.props !== undefined && !isSceneId(value.props)) return false;
   const settings = value.settings;
   if (!isFields(settings) || !isList(settings.patterns, BOARD_PAINTED_LIMITS.patterns, isPattern)) return false;
+  if (settings.props !== undefined && !isList(settings.props, BOARD_PAINTED_LIMITS.brushes, isBrush)) return false;
   const range = settings.height;
   if (!isFields(range) || !isNumber(range.low) || !isNumber(range.high) || Math.abs(range.low) > 100 || Math.abs(range.high) > 100 || range.low > range.high) return false;
   const liquids = settings.liquids;

@@ -122,7 +122,7 @@ export interface BoardGroundLook {
   readonly lava?: { kind: string; amount: number; direction: number; tint: string; clarity: number; style?: string };
   readonly acid?: { kind: string; amount: number; direction: number; tint: string; clarity: number };
   /** The painted background of the `painted` mode: vault paths of its three pictures, its settings as saved, and its material folder by slot ('' for none). */
-  readonly painted?: { terrain: string; material: string; height: string; settings: unknown; materials: string[] };
+  readonly painted?: { terrain: string; material: string; height: string; settings: unknown; materials: string[]; /** The props picture's path; absent from an older Tabletop. */ props?: string };
 }
 
 export interface BoardLook {

@@ -145,7 +145,11 @@ export function boardAssetIds(board: BoardExtras | null): string[] {
   for (const prop of board.props) if (isAssetId(prop.asset)) ids.add(prop.asset);
   // A painted background's three pictures (its materials are among `board.materials`, listed above).
   const painted = board.ground?.painted;
-  if (painted) for (const id of [painted.terrain, painted.material, painted.height]) if (isAssetId(id)) ids.add(id);
+  if (painted) {
+    for (const id of [painted.terrain, painted.material, painted.height, painted.props]) if (isAssetId(id)) ids.add(id);
+    // The props picture and the models of its brushes.
+    for (const brush of painted.settings?.props ?? []) for (const id of brush.props) if (isAssetId(id)) ids.add(id);
+  }
   for (const layer of board.layers ?? []) {
     if (isAssetId(layer.image)) ids.add(layer.image);
     for (const wall of layer.walls) if (isAssetId(wall.door?.prop)) ids.add(wall.door.prop);

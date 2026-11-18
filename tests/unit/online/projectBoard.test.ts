@@ -385,6 +385,45 @@ describe('projectBoard', () => {
       expect(sent).not.toHaveProperty('painted');
     });
 
+    it('its props picture and brushes go too: models by asset id, unknown ones dropped, brushes clamped', () => {
+      const brushes = [
+        { name: 'Pines', props: ['gal/pine.glb', 'gal/missing.glb', 'gal/oak.glb'], density: 999, scale: 0 },
+        { name: 'Gone', props: ['gal/missing.glb'], density: 5, scale: 2 },
+        ...[3, 4, 5, 6, 7, 8].map((n) => ({ name: `B${n}`, props: [], density: 1, scale: 1 })),
+      ];
+      const withProps = { ...ground, painted: { ...painted, props: 'bg/p.png', settings: { ...painted.settings, props: brushes } } };
+      const known = { idFor: (path: string | null | undefined) => (!path || path.includes('missing') ? null : `id:${path}`) };
+      const sent = projectBoard(state([]), 's1', all, {}, { ...look, ground: withProps }, known).ground!.painted!;
+      expect(sent.props).toBe('id:bg/p.png');
+      expect(sent.settings.props).toHaveLength(6);
+      expect(sent.settings.props![0]).toEqual({ name: 'Pines', props: ['id:gal/pine.glb', 'id:gal/oak.glb'], density: 200, scale: 0.1 });
+      expect(sent.settings.props![1]).toEqual({ name: 'Gone', props: [], density: 5, scale: 2 });
+      expect(isBoardExtras(projectBoard(state([]), 's1', all, {}, { ...look, ground: withProps }, known))).toBe(true);
+      // Not hashed yet: no props picture sent, the rest still goes. An older Tabletop sends none of it.
+      const unhashed = { idFor: (path: string | null | undefined) => (path === 'bg/p.png' || !path ? null : `id:${path}`) };
+      const late = projectBoard(state([]), 's1', all, {}, { ...look, ground: withProps }, unhashed).ground!.painted!;
+      expect(late).not.toHaveProperty('props');
+      const old = projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets).ground!.painted!;
+      expect(old).not.toHaveProperty('props');
+      expect(old.settings).not.toHaveProperty('props');
+    });
+
+    it('the checks refuse a bad props picture or brush', () => {
+      const brush = { name: 'Pines', props: ['A'], density: 10, scale: 1 };
+      const extras = projectBoard(state([]), 's1', all, {}, { ...look, ground: { ...ground, painted: { ...painted, props: 'bg/p.png', settings: { ...painted.settings, props: [brush] } } } }, assets);
+      const block = extras.ground!.painted!;
+      expect(isBoardExtras(extras)).toBe(true);
+      const bad = (patch: object): boolean => isBoardExtras({ ...extras, ground: { ...extras.ground!, painted: { ...block, ...patch } } });
+      const withBrushes = (props: unknown[]): boolean => bad({ settings: { ...block.settings, props } });
+      expect(bad({ props: 7 })).toBe(false);
+      expect(withBrushes([brush, brush, brush, brush, brush, brush, brush])).toBe(false);
+      expect(withBrushes([{ ...brush, props: ['a', 'b', 'c', 'd', 'e'] }])).toBe(false);
+      expect(withBrushes([{ ...brush, props: [''] }])).toBe(false);
+      expect(withBrushes([{ ...brush, density: 500 }])).toBe(false);
+      expect(withBrushes([{ ...brush, scale: 0 }])).toBe(false);
+      expect(withBrushes([{ ...brush, props: [] }])).toBe(true);
+    });
+
     it('the checks refuse a painted block with a bad id or too many patterns', () => {
       const extras = projectBoard(state([]), 's1', all, {}, { ...look, ground }, assets);
       const block = extras.ground!.painted!;

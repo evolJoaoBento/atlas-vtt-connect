@@ -193,6 +193,16 @@ export interface BoardPaintedPattern {
   shape: 'smooth' | 'ridged' | 'terraced' | 'craters';
 }
 
+/** A prop brush of a painted background: the models it scatters (asset ids, at most four), how thick and how big. */
+export interface BoardPaintedBrush {
+  name: string;
+  props: string[];
+  /** 0.1 to 200 a square. */
+  density: number;
+  /** 0.1 to 20. */
+  scale: number;
+}
+
 /**
  * A painted background for players: the asset ids of its three layer pictures (terrain, material, height), its material
  * ids by slot (an id of `BoardExtras.materials`, or '' for a slot without one; at most four) and its settings.
@@ -201,8 +211,12 @@ export interface BoardPainted {
   terrain: string;
   material: string;
   height: string;
+  /** The asset id of the props picture (which brush stands in each cell); absent from an older Tabletop, or until it is hashed. */
+  props?: string;
   materials: string[];
   settings: {
+    /** The prop brushes, at most six, their models by asset id; absent from an older Tabletop. */
+    props?: BoardPaintedBrush[];
     /** At most four. */
     patterns: BoardPaintedPattern[];
     /** Squares, each within ±100. */
@@ -282,8 +296,8 @@ export const BOARD_LAYER_LIMITS = Object.freeze({ layers: 8, walls: 400, lights:
  */
 export const BOARD_WATER_LIMITS = Object.freeze({ scene: 60 * 1024, layer: 40 * 1024, side: 2048, corners: 2048, holes: 256, areas: 256 });
 
-/** A painted background's most: custom patterns, and material slots. */
-export const BOARD_PAINTED_LIMITS = Object.freeze({ patterns: 4, materials: 4 });
+/** A painted background's most: custom patterns, material slots, prop brushes, and models a brush. */
+export const BOARD_PAINTED_LIMITS = Object.freeze({ patterns: 4, materials: 4, brushes: 6, brushProps: 4 });
 
 /**
  * The most the shapes may carry: shapes a scene or a layer, corners a shape (outline and inner together), and all of a

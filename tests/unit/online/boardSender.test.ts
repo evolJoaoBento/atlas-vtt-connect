@@ -249,6 +249,22 @@ describe('board assets', () => {
     expect(ids.sort()).toEqual([ID.tex1, ID.tex2, ID.glb1].sort());
   });
 
+  it("a painted background's props picture and its brushes' models are the board's files too", () => {
+    const ground = {
+      mode: 'painted' as const, noise: 'flat', strength: 0, fog: 0, margin: 0, tile: 1,
+      water: { kind: 'calm', amount: 0, direction: 0, tint: '#fff', clarity: 1 },
+      painted: {
+        terrain: ID.tex1, material: ID.tex1, height: ID.tex1, materials: [], props: ID.tex2,
+        settings: { patterns: [], height: { low: 0, high: 1 }, liquids: {} as never, props: [{ name: 'Pines', props: [ID.glb1, ID.glb2, 'nope'], density: 1, scale: 1 }] },
+      },
+    };
+    const ids = boardAssetIds({
+      sceneId: 's', lights: [], fogHeight: null, wallThickness: null, lighting: { enabled: false, ambient: 1, ambientColor: null },
+      walls: [], props: [], materials: [], ground,
+    } as never);
+    expect(ids.sort()).toEqual([ID.tex1, ID.tex2, ID.glb1, ID.glb2].sort());
+  });
+
   it('a player may fetch the files of its scene\'s board, as of its scene\'s images', () => {
     const scene = { sceneId: 's', map: { asset: null }, tokens: {} } as never;
     const board = { sceneId: 's', walls: [], lights: [], props: [{ id: 'p', asset: ID.glb2, x: 0, y: 0, scale: 1, turn: 0 }], materials: [], ambient: null, fogHeight: null, wallThickness: null, lighting: { enabled: false, ambient: 1, ambientColor: null } };

@@ -7,7 +7,7 @@
  * shapes of the level shown go where players see any of them; the ground round the map always (it shows nothing of it).
  */
 import type { Shows } from './FogCoverage';
-import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PAINTED_LIMITS, type BoardPainted, type BoardPaintedPattern, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
+import { BOARD_LAYER_LIMITS, BOARD_LIGHT_AREA_CORNERS, BOARD_SHAPE_LIMITS, BOARD_WATER_LIMITS, BOARD_PAINTED_LIMITS, type BoardPainted, type BoardPaintedPattern, type BoardPaintedBrush, type BoardExtras, type BoardGround, type BoardShapeRecord, type BoardWater, type BoardLayerRecord, type BoardLightRecord, type BoardMaterialRecord, type BoardPropRecord, type BoardWallRecord } from './boardTypes';
 import type { AssetIds, BoardGroundLook, BoardLayerLook, BoardLook, BoardShapeLook } from './sceneContracts';
 import { isArTable, type ArTable } from '../tools/arTable';
 import { isSceneId } from './sceneValidation';
@@ -199,10 +199,15 @@ function paintedOf(painted: BoardGroundLook['painted'], material: (id: string | 
   const b = within(range.high, -100, 100, 6);
   const liquids: Raw = isObj(settings.liquids) ? settings.liquids : {};
   const slots = Array.isArray(painted.materials) ? painted.materials.slice(0, BOARD_PAINTED_LIMITS.materials) : [];
+  // The props picture and the brushes are optional: an older Tabletop sends neither, and a picture not hashed yet leaves the forest out for now.
+  const propsPicture = typeof painted.props === 'string' ? assets.idFor(painted.props) : null;
+  const brushes = Array.isArray(settings.props) ? settings.props.slice(0, BOARD_PAINTED_LIMITS.brushes).map((brush) => brushOf(brush, assets)) : null;
   return {
     terrain, material: layer, height,
+    ...(propsPicture ? { props: propsPicture } : {}),
     materials: slots.map((folder) => (typeof folder === 'string' && folder !== '' ? material(folder) ?? '' : '')),
     settings: {
+      ...(brushes ? { props: brushes } : {}),
       patterns: (Array.isArray(settings.patterns) ? settings.patterns : []).slice(0, BOARD_PAINTED_LIMITS.patterns).map(patternOf),
       height: { low: Math.min(a, b), high: Math.max(a, b) },
       liquids: {
@@ -212,6 +217,19 @@ function paintedOf(painted: BoardGroundLook['painted'], material: (id: string | 
       },
     },
   };
+}
+
+/** A prop brush copied field by field and held to its range: its models by asset id (one that is missing or not hashed is dropped), at most four. */
+function brushOf(raw: unknown, assets: Pick<AssetIds, 'idFor'>): BoardPaintedBrush {
+  const value: Raw = isObj(raw) ? raw : {};
+  const name = typeof value.name === 'string' ? value.name.trim().slice(0, 60) : '';
+  const ids: string[] = [];
+  for (const path of Array.isArray(value.props) ? value.props : []) {
+    const id = typeof path === 'string' ? assets.idFor(path) : null;
+    if (id && !ids.includes(id)) ids.push(id);
+    if (ids.length >= BOARD_PAINTED_LIMITS.brushProps) break;
+  }
+  return { name: name || 'Props', props: ids, density: within(value.density, 0.1, 200, 10), scale: within(value.scale, 0.1, 20, 1) };
 }
 
 const PATTERN_SHAPES = new Set<string>(['smooth', 'ridged', 'terraced', 'craters']);
