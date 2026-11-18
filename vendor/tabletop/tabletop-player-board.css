@@ -2470,6 +2470,11 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-bg-canvaswrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #14110f; }
 .atlas-tabletop-bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 .atlas-tabletop-bg-palette { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; max-height: 124px; overflow-y: auto; border-top: 1px solid var(--background-modifier-border, #363636); }
+.atlas-tabletop-bg-palette.is-props { flex-direction: column; flex-wrap: nowrap; max-height: 270px; }
+.atlas-tabletop-bg-brushes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.atlas-tabletop-bg-brushcard { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 5px 24px; padding: 8px; border-radius: var(--radius-m, 8px); background: var(--background-primary, #1e1e1e); border: 1px solid var(--background-modifier-border, #363636); }
+.atlas-tabletop-bg-brushcol { display: flex; flex-direction: column; gap: 5px; align-content: start; }
+.atlas-tabletop-bg-brushcard .atlas-tabletop-bg-pattern__head { grid-column: 1 / -1; justify-content: flex-start; gap: 12px; }
 .atlas-tabletop-bg-swatch { display: inline-flex; align-items: center; gap: 6px; }
 .atlas-tabletop-bg-swatch__dot { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.5); flex: none; }
 .atlas-tabletop-bg-slot { display: flex; flex-direction: column; gap: 4px; }
