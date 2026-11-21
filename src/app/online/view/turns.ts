@@ -3,7 +3,7 @@
  * a fight in turn order, or the side whose turn it is in a fight by sides. Nothing while no fight runs or the list is
  * not shown. Shared with the web page.
  */
-import { listedSide, sidesActing, sidesNext } from '../scene/initiativeSides';
+import { entryTokenId, listedSide, sidesActing, sidesNext } from '../scene/initiativeSides';
 import type { PlayerScene } from '../scene/sceneTypes';
 
 export interface Turn {
@@ -31,9 +31,10 @@ export function turnOf(scene: PlayerScene | null, controlled: ReadonlySet<string
   }
   const entry = initiative.entries.find((candidate) => candidate.isActive);
   // A combatant without a token (a player at the table, an enemy added by name) has the turn, but no token of theirs does.
-  if (!entry || entry.tokenId === undefined || !scene.tokens[entry.tokenId]) return NO_TURN;
-  const mine = controlled.has(entry.tokenId);
-  return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
+  const tokenId = entry ? entryTokenId(entry) : undefined;
+  if (!entry || tokenId === undefined || !scene.tokens[tokenId]) return NO_TURN;
+  const mine = controlled.has(tokenId);
+  return { tokenId, mine, name: mine ? scene.tokens[tokenId]?.name ?? entry.name : null };
 }
 
 /**
@@ -59,10 +60,11 @@ export function nextTurnOf(scene: PlayerScene | null, controlled: ReadonlySet<st
     const entry = initiative.entries[(acting + step) % count]!;
     if (entry.sitsOut === true) continue;
     // The next to act has no token of theirs: it is not this player's turn that comes.
-    if (entry.tokenId === undefined) return NO_TURN;
-    if (!scene.tokens[entry.tokenId]) continue;
-    const mine = controlled.has(entry.tokenId);
-    return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
+    const tokenId = entryTokenId(entry);
+    if (tokenId === undefined) return NO_TURN;
+    if (!scene.tokens[tokenId]) continue;
+    const mine = controlled.has(tokenId);
+    return { tokenId, mine, name: mine ? scene.tokens[tokenId]?.name ?? entry.name : null };
   }
   return NO_TURN;
 }

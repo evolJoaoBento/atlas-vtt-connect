@@ -267,8 +267,9 @@ export interface PlayerWidget {
 export interface PlayerInitiativeEntry {
   id: string;
   /**
-   * The combatant's token. Absent for a combatant without one (Atlas 0.18: a player at the table, an enemy added by
-   * name), which carries its `side` and `image` instead. Always present from an older GM.
+   * The combatant's token. Empty (or absent) for a combatant without one (Atlas 0.18: a player at the table, an enemy added
+   * by name), which carries its `side` and `image` instead: the GM sends an empty id because an older page requires text
+   * there (`entryTokenId` reads both). Always a token's id from an older GM.
    */
   tokenId?: string;
   /**

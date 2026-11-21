@@ -223,12 +223,12 @@ describe("Atlas 0.9's fights", () => {
     expect(project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries.map((e) => e.isActive)).toEqual([false, false]);
   });
 
-  it('show the card each combatant was dealt in a fight by cards, where a fight in turn order shows the number', () => {
+  it('send no card dealt in a fight by cards, and no number in a fight in turn order (Atlas 0.18: art only)', () => {
     const entries = [entry('orc', 21, 0, { isActive: true, card: 2 } as Partial<InitiativeEntry>), entry('hero', 17, 1, { card: 5 } as Partial<InitiativeEntry>), entry('ally', 3, 2)];
     const cards = { mode: 'cards', roll: '1d20', firstSide: 'players' } as unknown as InitiativeRules;
     const sent = project(state({ isActive: true, entries, cards: { deck: 10 } } as Partial<InitiativeState>), cards);
-    expect(sent.initiative?.entries.map((e) => [e.tokenId, e.initiative, e.isActive])).toEqual([['orc', 2, true], ['hero', 5, false], ['ally', 0, false]]);
+    expect(sent.initiative?.entries.map((e) => [e.tokenId, e.initiative, e.isActive])).toEqual([['orc', 0, true], ['hero', 0, false], ['ally', 0, false]]);
     expect(sent.initiative).not.toHaveProperty('sides');
-    expect(project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries.map((e) => e.initiative)).toEqual([21, 17, 3]);
+    expect(project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries.map((e) => e.initiative)).toEqual([0, 0, 0]);
   });
 });

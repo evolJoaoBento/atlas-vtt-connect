@@ -24,6 +24,6 @@ export function movesOutOfTurn(state: TurnState, definitions: readonly ResourceD
   const initiative = state.initiative as unknown as FightState | undefined;
   if (!initiative?.isActive || !Array.isArray(initiative.entries) || !inFight(initiative, tokenId)) return false;
   const tokens = (state.objects?.tokens ?? {}) as Parameters<typeof turnEntries>[2];
-  const defeated = defeatedCombatants(initiative.entries, tokens, definitions as never);
+  const defeated = defeatedCombatants(initiative.entries, tokens, definitions);
   return !turnEntries(currentTurn(initiative), initiative, tokens, defeated).some((entry) => entry.tokenId === tokenId);
 }

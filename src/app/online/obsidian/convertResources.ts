@@ -12,6 +12,7 @@
  */
 import type { ResourceDefinition, ResourceValue } from '@atlas-vtt/api-types';
 import { BAR_SLOTS } from '../../../../packages/atlas-shared/src/index';
+import { entryTokenId } from '../scene/initiativeSides';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerResource, PlayerToken } from '../scene/sceneTypes';
 
@@ -77,7 +78,8 @@ export function atlasResourceDefinitions(tokens: Readonly<Record<string, PlayerT
 export function atlasInitiativeHealth(initiative: PlayerInitiative | null): Record<string, { value: number; max: number }> {
   const health: Record<string, { value: number; max: number }> = {};
   for (const entry of initiative?.entries ?? []) {
-    if (entry.tokenId !== undefined && typeof entry.hpShare === 'number') setOwn(health, entry.tokenId, { value: Math.round(entry.hpShare * SHARE_SCALE), max: SHARE_SCALE });
+    const tokenId = entryTokenId(entry);
+    if (tokenId !== undefined && typeof entry.hpShare === 'number') setOwn(health, tokenId, { value: Math.round(entry.hpShare * SHARE_SCALE), max: SHARE_SCALE });
   }
   return health;
 }

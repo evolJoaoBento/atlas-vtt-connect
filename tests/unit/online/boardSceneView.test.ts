@@ -387,4 +387,11 @@ describe('a sheet roll as the board throws it', () => {
     expect(sheetThrow(textSheet('Hit: 20d6 fire.'), ref('20d6', 'advantage'), null)).toBeNull();
     expect(sheetThrow(textSheet('Hit: 19d6 fire.'), ref('19d6', 'disadvantage'), null)).toMatchObject({ dice: { d6: 19 }, advantage: 'disadvantage' });
   });
+
+  it('throws a roll with a side written into the text (`adv`, Atlas 0.18) with that side, and lets the opposite side asked for cancel it', () => {
+    const sheet = textSheet('Hit: 1d20 + 5 adv.');
+    expect(sheetThrow(sheet, ref('1d20 + 5 adv'), null)).toMatchObject({ dice: { d20: 1 }, modifier: 5, advantage: 'advantage' });
+    expect(sheetThrow(sheet, ref('1d20 + 5 adv', 'advantage'), null)).toMatchObject({ advantage: 'advantage' });
+    expect(sheetThrow(sheet, ref('1d20 + 5 adv', 'disadvantage'), null)).not.toHaveProperty('advantage');
+  });
 });

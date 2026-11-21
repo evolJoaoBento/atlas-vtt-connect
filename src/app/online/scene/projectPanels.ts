@@ -31,7 +31,10 @@ function hpShareOf(tokens: Readonly<Record<string, TokenEntity>>, tokenId: strin
 /** The fields of an initiative entry Atlas 0.18 added (`tokenId` became optional); the API's type predates them. */
 type AtlasEntry = { tokenId?: unknown; partyMemberId?: unknown; hiddenFromPlayers?: unknown; imagePath?: unknown; name?: unknown };
 
-/** The entry's token id; none for a player at the table or an enemy added by name (Atlas's `entryToken`). */
+/**
+ * The entry's token id; none for a player at the table (whatever else it holds) or an enemy added by name (Atlas's
+ * `entryToken`). An id that is no text names no token and no combatant players see (`playersSee`).
+ */
 function tokenOfEntry(entry: object): string | undefined {
   const { tokenId, partyMemberId } = entry as AtlasEntry;
   return partyMemberId !== undefined || typeof tokenId !== 'string' ? undefined : tokenId;
@@ -44,19 +47,22 @@ function tokenOfEntry(entry: object): string | undefined {
  */
 function playersSee(entry: object, visibleTokenIds: ReadonlySet<string>): boolean {
   if ((entry as AtlasEntry).hiddenFromPlayers) return false;
-  const tokenId = tokenOfEntry(entry);
-  return tokenId === undefined || visibleTokenIds.has(tokenId);
+  const { tokenId: given, partyMemberId } = entry as AtlasEntry;
+  // As Atlas: a party member and an entry with no token are shown; one whose token id is not an id of a token is not.
+  if (partyMemberId !== undefined || given === undefined) return true;
+  return typeof given === 'string' && visibleTokenIds.has(given);
 }
 
 /**
  * What players are told of a combatant without a token, as Atlas's list draws it: its art, the players' side for a
- * player at the table and the opponents' for an enemy, and its name only where it has no art (`renderPlayerCard`'s
- * `shownName`: art says who it is). The art is sent by the id the page loads it by, as a token's is.
+ * player at the table and the opponents' for an enemy, and its name (Atlas draws it where there is no art, `renderPlayerCard`'s
+ * `shownName`; the page does the same, and an older page, which draws a name wherever there is one, shows no blank card). The
+ * art is sent by the id the page loads it by, as a token's is.
  */
 function tokenlessLook(entry: object, assets: Pick<AssetIds, 'idFor'> | undefined): { side: PlayerSide; image: string | null; name: string | null } {
   const { partyMemberId, imagePath, name } = entry as AtlasEntry;
   const image = typeof imagePath === 'string' && imagePath !== '' ? assets?.idFor(imagePath) ?? null : null;
-  return { side: partyMemberId !== undefined ? 'players' : 'opponents', image, name: image === null ? textOrNull(name) : null };
+  return { side: partyMemberId !== undefined ? 'players' : 'opponents', image, name: textOrNull(name) };
 }
 
 /** The group each side acts in, by its roll: sides with an equal roll share a group, counted from 0 in the order the sides act. Only the sides that have a roll. */
@@ -145,7 +151,7 @@ export function withCombatantSides(
   if (!initiative?.sides) return result;
   for (const { tokenId, sideId } of initiative.entries) {
     // A combatant without a token (a player at the table, an enemy added by name) has none to file.
-    if (tokenId === undefined) continue;
+    if (tokenId === undefined || tokenId === '') continue;
     // A named side reads as the opponents' to an older page, which knows no other (the entry carries the real one).
     if (Object.hasOwn(result, tokenId) && source && Object.hasOwn(source, tokenId)) setOwn(result, tokenId, { ...result[tokenId]!, side: sideId !== undefined ? 'opponents' : sideOf(source[tokenId] as never) });
   }
@@ -198,7 +204,8 @@ export function projectInitiative(
       // Atlas 0.18: the list shows art only. No number, no card, no "not rolled yet" dash: `initiative` is 0 (an older page requires one).
       return {
         id: entry.id,
-        ...(tokenId !== undefined && { tokenId }),
+        // A combatant without a token sends an empty id, which an older page (its validator requires text) reads as a card with no token; it never matches one.
+        tokenId: tokenId ?? '',
         initiative: 0,
         name: tokenless ? tokenless.name : rules.showTokenNameplates ? textOrNull(entry.name) : null,
         // Entries keep no HP since Atlas 0.5: the bar is the token's `hp` resource, as the player window draws it.

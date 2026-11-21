@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { Character } from '@atlas-vtt/api-types';
 import { InitiativeView } from '../../../online-client/initiativeView.mts';
 import { sceneAssetIds } from '../../../src/app/online/assets/assetIds';
+import { entryTokenId } from '../../../src/app/online/scene/initiativeSides';
 import { atlasInitiative } from '../../../src/app/online/obsidian/convertPanels';
 import { initiativeLines } from '../../../src/app/online/preview/sceneSummary';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
@@ -35,7 +36,7 @@ const sceneBody = (initiative: PlayerInitiative | null) => ({
   measurement: { mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true },
 });
 const entryOf = (tokenId: string, patch: Partial<PlayerInitiativeEntry> = {}): PlayerInitiativeEntry => ({ id: `e-${tokenId}`, tokenId, initiative: 0, name: tokenId, hp: null, isActive: false, ...patch });
-const tokenless = (patch: Partial<PlayerInitiativeEntry> = {}): PlayerInitiativeEntry => ({ id: 'e-imp', initiative: 0, name: 'Imp', hp: null, isActive: false, side: 'opponents', image: null, ...patch });
+const tokenless = (patch: Partial<PlayerInitiativeEntry> = {}): PlayerInitiativeEntry => ({ id: 'e-imp', tokenId: '', initiative: 0, name: 'Imp', hp: null, isActive: false, side: 'opponents', image: null, ...patch });
 
 describe('hidden from players (Atlas 0.18 playersEntryToken)', () => {
   it('drops an entry the GM hid, whatever its token, and keeps the others', () => {
@@ -88,12 +89,12 @@ describe('combatants without a token (Atlas 0.18 party members and enemies added
   const enemy = { id: 'e-imp', name: 'Imp', initiative: 0, initiativeModifier: 0, imagePath: '', isActive: true, isNPC: true, order: 2 };
 
   it("lists them always: a party member on the players' side with its art, an enemy on the opponents' with its name", () => {
-    // Nameplates are off: a token's name is not told; a combatant without a token and without art is named, as Atlas's list does.
+    // Nameplates are off: a token's name is not told; a combatant without a token is named (the page draws it where there is no art, as Atlas does).
     const projected = projectInitiative(stateOf([raw('ana', 0), party, enemy]), visible, { ...RULES, showTokenNameplates: false }, [], undefined, undefined, fakeAssetIds());
     expect(projected?.entries).toEqual([
       { id: 'e-ana', tokenId: 'ana', initiative: 0, name: null, hp: null, hpShare: null, isActive: false },
-      { id: 'e-zed', initiative: 0, name: null, hp: null, hpShare: null, isActive: false, side: 'players', image: 'asset-1' },
-      { id: 'e-imp', initiative: 0, name: 'Imp', hp: null, hpShare: null, isActive: true, side: 'opponents', image: null },
+      { id: 'e-zed', tokenId: '', initiative: 0, name: 'Zed', hp: null, hpShare: null, isActive: false, side: 'players', image: 'asset-1' },
+      { id: 'e-imp', tokenId: '', initiative: 0, name: 'Imp', hp: null, hpShare: null, isActive: true, side: 'opponents', image: null },
     ]);
     expect(isPlayerSceneBody(sceneBody(projected))).toBe(true);
   });
@@ -109,6 +110,29 @@ describe('combatants without a token (Atlas 0.18 party members and enemies added
     expect(projected?.sideList?.map((row) => row.id)).toEqual(['players', 'opponents']);
     expect(projected?.entries.map((line) => line.side)).toEqual(['players', 'opponents']);
     expect(withCombatantSides({ ana: playerToken() }, projected, undefined)).toEqual({ ana: playerToken() });
+  });
+
+  it('is a well formed entry to a page of before 0.18: text for a token id, the old fields, nothing it would refuse', () => {
+    // The rule of main before Atlas 0.18 (sceneValidation.ts `isInitiativeEntry` and `isSideRow`), transcribed: a text `tokenId` is required.
+    const text = (value: unknown, max: number): boolean => typeof value === 'string' && value.length <= max;
+    const nullableText = (value: unknown): boolean => value === null || typeof value === 'string';
+    const oldEntry = (entry: Record<string, unknown>): boolean => text(entry.id, 200) && text(entry.tokenId, 200) && Number.isFinite(entry.initiative) && nullableText(entry.name)
+      && (entry.hp === undefined || entry.hp === null) && (entry.hpShare === undefined || entry.hpShare === null || typeof entry.hpShare === 'number') && typeof entry.isActive === 'boolean'
+      && [entry.sitsOut, entry.delayed, entry.awaiting].every((flag) => flag === undefined || flag === true) && (entry.sideId === undefined || (typeof entry.sideId === 'string' && entry.sideId !== ''));
+    const fight = { first: 'players', active: 'players', order: [{ id: 'players' }, { id: 'opponents' }], roll: '1d20', rolls: { 2: { players: 12, opponents: 12 } } };
+    const projected = projectInitiative(stateOf([raw('ana', 0), party, enemy], { sides: fight }), visible, RULES, [], SIDES_RULES, undefined, fakeAssetIds());
+    expect(projected?.entries).toHaveLength(3);
+    for (const entry of projected!.entries) expect(oldEntry(entry as unknown as Record<string, unknown>), JSON.stringify(entry)).toBe(true);
+    for (const row of projected!.sideList!) expect(text(row.id, 64) && text(row.name, 40) && (row.roll === undefined || Number.isFinite(row.roll))).toBe(true);
+    // The new page reads both the empty id and an absent one as no token.
+    expect(entryTokenId({ tokenId: '' })).toBeUndefined();
+    expect(entryTokenId({})).toBeUndefined();
+    expect(entryTokenId({ tokenId: 'ana' })).toBe('ana');
+  });
+
+  it('shows no entry whose token id is not an id, as Atlas finds no token for it', () => {
+    const entries = [raw('ana', 0), { ...raw('orc', 1), tokenId: null }, { ...raw('lich', 2), tokenId: 7 }];
+    expect(projectInitiative(stateOf(entries), visible, RULES)?.entries.map((line) => line.id)).toEqual(['e-ana']);
   });
 
   it('is not shown while the list is not shown, like any entry', () => {

@@ -143,16 +143,22 @@ export function tokenSideId(token: unknown, ids: readonly string[]): string {
   return isRecord(token.vision) && token.vision.enabled === true ? 'players' : 'opponents';
 }
 
+/** The token an entry stands for; none (undefined) for a combatant without one, whose id is empty or absent. */
+export function entryTokenId(entry: Pick<PlayerInitiativeEntry, 'tokenId'>): string | undefined {
+  return entry.tokenId === undefined || entry.tokenId === '' ? undefined : entry.tokenId;
+}
+
 /** The side a combatant is listed under on a player's scene: its named side, else its token's, else the opponents' (as the window files it). */
 export function listedSide(tokens: Readonly<Record<string, Pick<PlayerToken, 'side'>>>, entry: Pick<PlayerInitiativeEntry, 'tokenId' | 'sideId' | 'side'>): string {
-  const own = entry.tokenId !== undefined && Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.side : undefined;
+  const tokenId = entryTokenId(entry);
+  const own = tokenId !== undefined && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.side : undefined;
   // A combatant without a token carries its side (`side`); Atlas's `entrySide`.
   return entry.sideId ?? own ?? entry.side ?? 'opponents';
 }
 
 /** The named side (not `players` or `opponents`) each combatant of the list is filed under, by token. */
 export function namedSidesOf(initiative: Pick<PlayerInitiative, 'entries'> | null): ReadonlyMap<string, string> {
-  return new Map((initiative?.entries ?? []).flatMap((entry): Array<[string, string]> => (entry.sideId !== undefined && entry.tokenId !== undefined ? [[entry.tokenId, entry.sideId]] : [])));
+  return new Map((initiative?.entries ?? []).flatMap((entry): Array<[string, string]> => (entry.sideId !== undefined && entryTokenId(entry) !== undefined ? [[entryTokenId(entry)!, entry.sideId]] : [])));
 }
 
 /** The sides whose turn it is: those of the side list marked, else the one an older GM names. */

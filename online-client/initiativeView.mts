@@ -13,7 +13,7 @@
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
 import { SIDE_LABELS, sidesInOrder } from '@atlas-vtt/shared/rules';
 import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
-import { listedSide } from '../src/app/online/scene/initiativeSides';
+import { entryTokenId, listedSide } from '../src/app/online/scene/initiativeSides';
 import type { PlayerInitiativeEntry, PlayerScene, PlayerSideRow, PlayerToken } from '../src/app/online/scene/sceneTypes';
 import { createCanvasSurface } from '../src/app/online/view/canvasSurface';
 
@@ -61,7 +61,11 @@ export class InitiativeView {
       panel.hidden = true;
       return;
     }
-    const key = JSON.stringify([initiative, initiative.entries.map((entry) => this.portraitKey(entry.tokenId === undefined ? undefined : scene.tokens[entry.tokenId], entry.image))]);
+    const tokenOf = (entry: PlayerInitiativeEntry): PlayerToken | undefined => {
+      const id = entryTokenId(entry);
+      return id !== undefined && Object.hasOwn(scene.tokens, id) ? scene.tokens[id] : undefined;
+    };
+    const key = JSON.stringify([initiative, initiative.entries.map((entry) => this.portraitKey(tokenOf(entry), entry.image))]);
     if (key === this.drawn && !force) return;
     this.drawn = key;
     panel.hidden = false;
@@ -69,7 +73,6 @@ export class InitiativeView {
     const list = doc.createElement('div');
     list.className = 'initiative-list';
     list.setAttribute('role', 'list');
-    const tokenOf = (entry: PlayerInitiativeEntry): PlayerToken | undefined => (entry.tokenId !== undefined && Object.hasOwn(scene.tokens, entry.tokenId) ? scene.tokens[entry.tokenId] : undefined);
     const { sides } = initiative;
     if (sides) {
       // Atlas's own list of sides, in the order they act; from an older GM, the two built-in sides, `first` first.
@@ -172,7 +175,7 @@ export class InitiativeView {
     if (entry.sitsOut === true) card.classList.add('is-sitting-out');
     // A click, Enter or Space on a combatant whose token players see brings that token into view.
     const { onFind } = this.options;
-    const { tokenId } = entry;
+    const tokenId = entryTokenId(entry);
     if (onFind && token && tokenId !== undefined) {
       card.classList.add('is-findable');
       card.tabIndex = 0;
@@ -191,7 +194,8 @@ export class InitiativeView {
       card.classList.add('is-defeated');
       card.append(this.skull(portrait !== null));
     }
-    if (entry.name) {
+    // A combatant without a token that has art is told by its art alone, as Atlas's card draws it; without art, by its name.
+    if (entry.name && !(tokenId === undefined && portrait)) {
       const name = doc.createElement('span');
       name.className = 'initiative-name';
       name.textContent = entry.name;

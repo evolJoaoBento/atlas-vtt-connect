@@ -6,7 +6,7 @@
 import type { AnyWidget, CounterWidget, InitiativeEntry, InitiativeRules, InitiativeState, TimerWidget, TokenEntity, WidgetSettings } from '@atlas-vtt/api-types';
 import { DEFAULT_INITIATIVE_RULES } from '@atlas-vtt/shared/rules';
 import { createDefaultInitiativeState, DEFAULT_INITIATIVE_CONFIG } from '../../types/initiativeDefaults';
-import { isBuiltInSide, type RuleSide } from '../scene/initiativeSides';
+import { entryTokenId, isBuiltInSide, type RuleSide } from '../scene/initiativeSides';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerInitiativeSides, PlayerSideRow, PlayerWidget } from '../scene/sceneTypes';
 
@@ -58,13 +58,15 @@ export function atlasWidgets(widgets: readonly PlayerWidget[]): AtlasWidgets {
 export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Readonly<Record<string, TokenEntity>>): AtlasInitiative {
   if (!initiative) return { initiative: createDefaultInitiativeState(), initiativeTrackerOpen: false };
   // The tab's list is drawn from tokens: a combatant without one (Atlas 0.18's party member, enemy added by name) is left out.
-  const entries = initiative.entries.flatMap((entry, order): InitiativeEntry[] => entry.tokenId === undefined ? [] : [{
+  const entries = initiative.entries.flatMap((entry, order): InitiativeEntry[] => {
+    const tokenId = entryTokenId(entry);
+    return tokenId === undefined ? [] : [{
     id: entry.id,
-    tokenId: entry.tokenId,
+    tokenId,
     name: entry.name ?? '',
     initiative: entry.initiative,
     initiativeModifier: 0,
-    imagePath: Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.imagePath ?? '' : '',
+    imagePath: Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.imagePath ?? '' : '',
     isActive: entry.isActive,
     isNPC: true,
     order,
@@ -72,7 +74,8 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
     // Fields of Atlas 0.9 the API's type predates: the tab's list groups delayed combatants and dashes a number not rolled.
     ...(entry.delayed === true && { delayed: true }),
     ...(entry.awaiting === true && { awaitingInitiative: true }),
-  }]);
+    }];
+  });
   return {
     initiative: {
       entries,

@@ -8,6 +8,7 @@
 import { isDieType, parseFormula, type DiceRollResult, type DiceSelection } from '@atlas-vtt/shared/rules';
 import { entryRolls, rollerLabel } from '../page/diceLogModel';
 import { cardRollFormula } from '../../../../packages/atlas-host/src/sheets/sheetCards';
+import { combinedSide, writtenSide } from '../../../../packages/atlas-shared/src/index';
 import { readThrownTerms } from '../tools/diceRerolls';
 import { sheetRollFormula, sheetRollLabel, type SheetRollRef, type TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import { DICE_LIMITS, PHYSICAL_MODIFIER, type DiceLogEntry, type OfferedDiceRules } from '../tools/toolMessages';
@@ -51,25 +52,28 @@ export function traySelection(selection: Readonly<Record<string, number>>): Dice
  * side, as the board throws one die more for it).
  */
 export function sheetThrow(entry: TokenSheet, ref: SheetRollRef, rules: OfferedDiceRules | null, canReroll = false): Omit<PlayerDiceRequest, 'sheet'> | null {
-  const formula = ref.kind === 'card'
+  const written = ref.kind === 'card'
     ? (entry.card ? cardRollFormula(entry.card, ref.index, ref.text) : null)
     : (entry.sheet ? sheetRollFormula(entry.sheet, ref) : null);
-  if (!formula) return null;
+  if (!written) return null;
+  // A side written into the text (`+5 adv`, Atlas 0.18) is no part of the dice: it is the roll's side, which a side asked for with Shift or Alt cancels if opposite.
+  const { formula, side: writtenOn } = writtenSide(written);
+  const side = combinedSide(writtenOn, ref.side ?? null);
   const own = thrownDice(formula, canReroll);
   if (!own) return null;
   // A reroll is thrown on the board only where nothing else changes the dice: a side adds a die to keep or drop, and the
   // collection's explosions would explode a die the rule may throw away. Any doubt sends the roll to the GM's Atlas.
   const rerolled = Object.keys(own.reroll ?? {}) as Array<keyof NonNullable<typeof own.reroll>>;
-  if (rerolled.length > 0 && (ref.side || rerolled.some((die) => explodes(rules, die)))) return null;
+  if (rerolled.length > 0 && (side || rerolled.some((die) => explodes(rules, die)))) return null;
   const base = own.count === 0 ? thrownDice(rules?.defaultRoll ?? '1d20', false) : null;
   if (own.count === 0 && !base) return null;
   const dice = base ? base.dice : own.dice;
   const count = base ? base.count : own.count;
   const modifier = own.modifier + (base?.modifier ?? 0);
-  const most = DICE_LIMITS.dicePerRoll - (ref.side ? 1 : 0);
+  const most = DICE_LIMITS.dicePerRoll - (side ? 1 : 0);
   if (count < 1 || count > most || Math.abs(modifier) > PHYSICAL_MODIFIER) return null;
   const label = ref.kind === 'card' ? entry.card?.rolls[ref.index]?.label : entry.sheet ? sheetRollLabel(entry.sheet, ref) : undefined;
-  return { dice, modifier, ...(label ? { label } : {}), ...(ref.side ? { advantage: ref.side } : {}), ...(own.reroll && rerolled.length > 0 ? { reroll: own.reroll } : {}) };
+  return { dice, modifier, ...(label ? { label } : {}), ...(side ? { advantage: side } : {}), ...(own.reroll && rerolled.length > 0 ? { reroll: own.reroll } : {}) };
 }
 
 /** Whether the collection's rules explode a die of this kind: every die, or the default roll's (any explode rule counts, as a doubt). */
