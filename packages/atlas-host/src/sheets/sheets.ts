@@ -11,6 +11,7 @@
  * from it); pure, so the join page bundles it too.
  */
 
+import { writtenSide } from '../../../atlas-shared/src/app/tools/writtenAdvantage';
 import { CARD_LIMITS, isSheetCard, type SheetCard } from './sheetCards';
 
 export const SHEET_LIMITS = {
@@ -105,7 +106,9 @@ export function advantageSide(shift: boolean, alt: boolean): AdvantageSide | nul
 }
 
 /** Whether advantage can change a roll: a bare bonus (added to the default roll) or a roll with a d20. */
-export function mayHaveAdvantage(formula: string): boolean {
+export function mayHaveAdvantage(written: string): boolean {
+  // A side written into the text (`+5 adv`) is no part of the dice: it asks for advantage itself.
+  const formula = writtenSide(written).formula;
   return /^[+-]\d+$/.test(formula) || /(^|[^\d])\d*d20(?!\d)/i.test(formula);
 }
 
@@ -256,7 +259,9 @@ export type TextPart = { text: string } | { text: string; roll: number; formula:
  * Foundry and Roll20 notation of 0.8), © Fabian Urbanek, AGPL-3.0-only, so players can roll what Atlas's own stat block
  * lets them. One dice term is `2d8`, `d20`, `d%`, `4dF`, with rerolls (`2d6r<2`), explosions (`1d6!i`, `1d6!3`, `1d6!!`,
  * `1d6xo`), keep and drop (`4d6kh3`, `2d20dl1`) and success counts (`6d10>=8`, `cs>5`), and may carry a `[label]`; terms
- * join with `+`, `-`, `*`, `/` and `×`. A single `!` ends a sentence far more often than it explodes a die.
+ * join with `+`, `-`, `*`, `/` and `×`. A single `!` ends a sentence far more often than it explodes a die. A roll may end
+ * with `adv` or `dis` after a space (`1d20+5 adv`, `ATK: +4 dis`), as Atlas 0.18 reads it (`tools/textRolls.ts`, `SIDE`,
+ * and `tools/writtenAdvantage.ts`): the word is part of the match and stays last in the formula.
  */
 const BEFORE = String.raw`(?<![\p{L}\p{N}_])`;
 const AFTER = String.raw`(?![\p{L}\p{N}_])`;
@@ -265,15 +270,17 @@ const LABEL = String.raw`(?:\[[\p{L}\p{N} '\-]{1,24}\])?`;
 /** A dice term, or a number that is not the start of a decimal, with its label. */
 const TERM = String.raw`(?:${DIE}|\d+(?!\.\d))${LABEL}${AFTER}`;
 const SIGN = String.raw`[+\-−]`;
-/** What joins terms: `+`, `-`, a minus sign, an en dash, `*`, `/`, `×`, or "+ -" ("3d6 + -1"). */
+/** A side written last (`adv`, `dis`), after a space, never inside a word. */
+const SIDE = String.raw`(?:[ \t]+(?:adv|dis)${AFTER})?`;
+/** What joins terms:`+`, `-`, a minus sign, an en dash, `*`, `/`, `×`, or "+ -" ("3d6 + -1"). */
 const OPERATOR = String.raw`[ \t]*(?:\+[ \t]*-|[+\-−–*/×])[ \t]*`;
 /**
  * Dice expressions (`2d8+3`, `2d6 - 1d4`) and bonuses (`+4`, `−1`, `+4+1`, `ATK: +4`). None starts inside a word or a
  * number; a bare sign must sit on its digits, so the dash in "Very Close - 1d12+2" is no roll.
  */
-const DICE_PATTERN = new RegExp(String.raw`${BEFORE}(?:(?:ATK|Attack)[ \t]*:[ \t]*${SIGN}${TERM}|${SIGN}${TERM}|${DIE}${LABEL}${AFTER})(?:${OPERATOR}${TERM})*`, 'giu');
+const DICE_PATTERN = new RegExp(String.raw`${BEFORE}(?:(?:ATK|Attack)[ \t]*:[ \t]*${SIGN}${TERM}|${SIGN}${TERM}|${DIE}${LABEL}${AFTER})(?:${OPERATOR}${TERM})*${SIDE}`, 'giu');
 /** A whole text that is one expression, to the end (`aUn`). */
-const WHOLE_EXPRESSION = new RegExp(String.raw`^(?:(?:ATK|Attack)[ \t]*:[ \t]*)?${SIGN}?${TERM}(?:${OPERATOR}${TERM})*$`, 'iu');
+const WHOLE_EXPRESSION = new RegExp(String.raw`^(?:(?:ATK|Attack)[ \t]*:[ \t]*)?${SIGN}?${TERM}(?:${OPERATOR}${TERM})*${SIDE}$`, 'iu');
 /** A value written as `@name` is a reference Atlas resolves, never part of a link beside it (`iUn`, `oUn`). */
 const REFERENCE_AFTER = /^[\s()+\-−–*/×]*(?<![\w.])@[A-Za-z_]/u;
 const REFERENCE_BEFORE = /(?<![\w.])@[A-Za-z_][\w.-]*[\s()+\-−–*/×]*$/u;
@@ -288,7 +295,10 @@ function normalised(text: string): string {
  * bare: Atlas adds it to the dice set's default roll, so "+5 to hit" rolls the collection's own die.
  */
 export function toRollFormula(text: string): string {
-  return normalised(text).replace(/\s+(?![^[]*\])/g, '');
+  // A side written last (`adv`, `dis`) stays last after one space, as written (Atlas 0.18's `toRollFormula`).
+  const { formula, word } = writtenSide(text.trim());
+  const roll = normalised(formula).replace(/\s+(?![^[]*\])/g, '');
+  return word === '' ? roll : `${roll} ${word}`;
 }
 
 /** Whether matched text is a roll (`BSt`): it opens with a sign, or holds a dice term of at least one die ("0d6" is none). */

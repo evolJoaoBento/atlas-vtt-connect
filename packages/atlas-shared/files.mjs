@@ -52,6 +52,7 @@ export const FILES = [
   'tools/diceExplosion.ts',
   'tools/laserPointerSettings.ts',
   'tools/pinLabels.ts',
+  'tools/writtenAdvantage.ts',
   'types/collectionSettingsTypes.ts',
   'types/diceRulesTypes.ts',
   'types/diceSetTypes.ts',

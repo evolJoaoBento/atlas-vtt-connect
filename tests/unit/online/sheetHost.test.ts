@@ -9,7 +9,7 @@ const ANA: SessionPlayer = { playerId: 'p1', name: 'Ana', status: 'admitted' };
 const BEN: SessionPlayer = { playerId: 'p2', name: 'Ben', status: 'admitted' };
 const HP = { key: 'hp', name: 'HP', field: 'hp', direction: 'drains' as const, color: '#22c55e', visibleToPlayers: false };
 
-function world(readCard?: (token: { name?: unknown }) => SheetCard | null | undefined) {
+function world(readCard?: (token: { name?: unknown }) => SheetCard | null | undefined, actionText = '+5 to hit. Hit: 1d8 + 3.') {
   const sent: Array<[string, ControlMessage]> = [];
   let handler: SessionHandler | null = null;
   const tokens: Record<string, unknown> = {
@@ -34,7 +34,7 @@ function world(readCard?: (token: { name?: unknown }) => SheetCard | null | unde
       onSlotChange: (listener: (change: never) => void) => { slotListeners.push(listener); return () => undefined; },
     } as never,
     resources: () => [HP],
-    readStatblock: (token) => ({ name: token.name, ac: 16, stats: [10, 14, 10, 10, 10, 10], actions: [{ name: 'Sword', desc: '+5 to hit. Hit: 1d8 + 3.' }] }),
+    readStatblock: (token) => ({ name: token.name, ac: 16, stats: [10, 14, 10, 10, 10, 10], actions: [{ name: 'Sword', desc: actionText }] }),
     ...(readCard ? { readCard } : {}),
     rollFor,
   });
@@ -95,6 +95,25 @@ describe('players\' own sheets', () => {
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'ogre', roll: { kind: 'check', index: 0 } });
     w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'save', index: 0 } });
     expect(w.rollFor).not.toHaveBeenCalled();
+  });
+
+  it("rolls a side written into the text (Atlas 0.18 `adv`, `dis`) as the roll's side, not in the formula, and lets a side the player asks for cancel it", () => {
+    // A fresh world per roll: a player's rolls are rate limited.
+    const rolled = (index: number, text: string, side?: 'advantage' | 'disadvantage') => {
+      const w = world(undefined, 'Stealth +5 adv. Hit: 1d8 + 3 dis.');
+      w.control.set('hero', 'p1', true);
+      w.handler().onMessage?.(ANA, { v: 1, type: 'sheet-roll', tokenId: 'hero', roll: { kind: 'text', section: 0, item: 0, index, text, ...(side ? { side } : {}) } });
+      return w;
+    };
+    expect(rolled(0, '+5 adv').rollFor).toHaveBeenCalledWith(ANA, '+5', { abilityName: 'Sword', advantage: 'advantage' });
+    expect(rolled(1, '1d8 + 3 dis').rollFor).toHaveBeenCalledWith(ANA, '1d8+3', { abilityName: 'Sword', advantage: 'disadvantage' });
+    // The same side asked for changes nothing; the opposite one cancels the written one.
+    expect(rolled(0, '+5 adv', 'advantage').rollFor).toHaveBeenCalledWith(ANA, '+5', { abilityName: 'Sword', advantage: 'advantage' });
+    expect(rolled(0, '+5 adv', 'disadvantage').rollFor).toHaveBeenCalledWith(ANA, '+5', { abilityName: 'Sword' });
+    // The GM finds the formula again without the word, for the rerolls a thrown roll may hold.
+    const w = world(undefined, 'Stealth +5 adv. Hit: 1d8 + 3 dis.');
+    w.control.set('hero', 'p1', true);
+    expect(w.host.rollFormula(ANA, 'hero', { kind: 'text', section: 0, item: 0, index: 1, text: '1d8 + 3 dis' })).toBe('1d8+3');
   });
 
   it("names a roll of the player's sheet from the GM's own copy, and nothing for a token they do not control or a roll not there", () => {

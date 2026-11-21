@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSheet, isSheetRollRef, isTokenSheets, sheetRollFormula, sheetRollLabel, textParts, toRollFormula } from '../../../packages/atlas-host/src/sheets/sheets';
+import { buildSheet, isSheetRollRef, mayHaveAdvantage, isTokenSheets, sheetRollFormula, sheetRollLabel, textParts, toRollFormula } from '../../../packages/atlas-host/src/sheets/sheets';
 
 const GOBLIN = {
   name: 'Goblin', path: 'Bestiary/Goblin.md', image: 'secret/goblin.png', size: 'Small', type: 'humanoid', subtype: 'goblinoid', alignment: 'neutral evil',
@@ -73,6 +73,20 @@ describe("a player's sheet", () => {
     expect(rolls('1d8 + @str.mod')).toEqual([]);
     expect(rolls('@agility + 2d6')).toEqual([]);
     expect(rolls('Damage 2d8 and @str')).toEqual([['2d8', '2d8']]);
+  });
+
+  it('links a side written after a roll (`adv`, `dis`) with the roll, as Atlas 0.18 does, and keeps the word last', () => {
+    const rolls = (text: string): Array<[string, string]> => textParts(text).flatMap((part) => ('roll' in part ? [[part.text, part.formula] as [string, string]] : []));
+    expect(rolls('Stealth +5 adv, Athletics +3')).toEqual([['+5 adv', '+5 adv'], ['+3', '+3']]);
+    expect(rolls('Hit: 1d20 + 5 dis.')).toEqual([['1d20 + 5 dis', '1d20+5 dis']]);
+    expect(rolls('ATK: +4 ADV')).toEqual([['ATK: +4 ADV', '+4 ADV']]);
+    expect(rolls('2d6 + 3 adv and 1d4')).toEqual([['2d6 + 3 adv', '2d6+3 adv'], ['1d4', '1d4']]);
+    // The word must stand alone after a space: not inside a word, and not without a roll before it.
+    expect(rolls('+5 advance and +4 disarm')).toEqual([['+5', '+5'], ['+4', '+4']]);
+    expect(rolls('Take adv on it')).toEqual([]);
+    expect(toRollFormula('1d20 + 5 	 adv')).toBe('1d20+5 adv');
+    expect(mayHaveAdvantage('+5 adv')).toBe(true);
+    expect(mayHaveAdvantage('2d6+3 adv')).toBe(false);
   });
 
   it('does not take for a roll what only looks like one', () => {

@@ -52,6 +52,7 @@
     "src/app/tools/diceExplosion.ts": "36ac09e376f4dced0fb24c9135a2d8a4260afb59c5496776b79c8071b1b20dbd",
     "src/app/tools/laserPointerSettings.ts": "752cc670a8ad0b56da7f97cff93c304a08f101db5a4673849cd56c6bc354b7be",
     "src/app/tools/pinLabels.ts": "152e0057d6431621c8013a7e85125bb873e1e7fa985d9093b1aaaf78a23ac52a",
+    "src/app/tools/writtenAdvantage.ts": "5e586143da8435dd6e642028a79971f84acfe30290ae76dc2cdd22d510bed73b",
     "src/app/types/collectionSettingsTypes.ts": "8ef20fcef51228ffe71dfbb971289381a805ae9819fb1013016a23f2b68f6e87",
     "src/app/types/diceRulesTypes.ts": "7875c52a27528b5acd8959c7fd9b5733a8a9c818993391f5893c8bf75af4e49f",
     "src/app/types/diceSetTypes.ts": "eee6955690031127b04bd06ef90d711d4288d68e79c765e5de1074251d84e09d",

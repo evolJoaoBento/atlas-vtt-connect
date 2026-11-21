@@ -19,8 +19,9 @@ import type { SceneSession } from '../scene/sceneContracts';
 import { admitted } from '../scene/slotAudience';
 import type { SlotChange, SlotProjection } from '../scene/slotViews';
 import { RateLimit } from '../rateLimit';
-import { SHEET_LIMITS, sheetColor, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type SheetRollRef, type TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
+import { SHEET_LIMITS, sheetColor, type AdvantageSide, sheetRollFormula, sheetRollLabel, type PlayerSheet, type SheetResource, type SheetRollRef, type TokenSheet } from '../../../../packages/atlas-host/src/sheets/sheets';
 import type { SheetRollExtras } from './DiceHost';
+import { combinedSide, writtenSide } from '../../../../packages/atlas-shared/src/index';
 import { buildPlayerSheet } from '../../../../packages/atlas-host/src/sheets/templateSheets';
 import { cardRollFormula, type SheetCard } from '../../../../packages/atlas-host/src/sheets/sheetCards';
 
@@ -47,6 +48,12 @@ export interface SheetHostOptions {
 }
 
 const isCharacter = (token: TokenEntity | undefined): token is Character => token?.kind === 'character';
+
+/** A roll's formula without the side written last (`1d20+5 adv`), and that side (Atlas 0.18's `writtenSide`). */
+function withoutWrittenSide(written: string): { formula: string; written: AdvantageSide | null } {
+  const { formula, side } = writtenSide(written);
+  return { formula, written: side };
+}
 
 function displayName(token: Character): string | null {
   const name = typeof token.name === 'string' ? token.name.trim() : '';
@@ -146,7 +153,9 @@ export class SheetHost implements SessionHandler {
     if (!this.options.control.controls(player.playerId, message.tokenId) || !this.limit.allow(player.playerId, this.now())) return;
     const found = this.sheetRoll(player, message.tokenId, message.roll);
     if (!found) return;
-    const { side } = message.roll;
+    // A side written into the text (`+5 adv`, Atlas 0.18) and the one the player asked for with Shift or Alt: opposite sides cancel.
+    // The word goes with the roll as its side, not in the formula, so an Atlas before 0.18 (which does not read it) rolls it too.
+    const side = combinedSide(found.written, message.roll.side ?? null);
     this.options.rollFor(player, found.formula, { abilityName: found.label, ...(side ? { advantage: side } : {}) });
   }
 
@@ -164,7 +173,7 @@ export class SheetHost implements SessionHandler {
    * A roll of the sheet of a token `player` controls and their scene shows, found again on the GM's own copy: its
    * formula and the ability it is named after. Null when the player has no such roll.
    */
-  private sheetRoll(player: SessionPlayer, tokenId: string, ref: SheetRollRef): { formula: string; label: string } | null {
+  private sheetRoll(player: SessionPlayer, tokenId: string, ref: SheetRollRef): { formula: string; written: AdvantageSide | null; label: string } | null {
     if (!this.options.control.controls(player.playerId, tokenId)) return null;
     const scene = this.sceneOf(player.playerId);
     const token = scene?.snapshot.objects.tokens[tokenId];
@@ -175,13 +184,13 @@ export class SheetHost implements SessionHandler {
       const roll = card ? card.rolls[ref.index] : undefined;
       const formula = card ? cardRollFormula(card, ref.index, ref.text) : null;
       if (!roll || !formula) return null;
-      return { formula, label: (roll.label || displayName(token) || 'Roll').slice(0, SHEET_LIMITS.name) };
+      return { ...withoutWrittenSide(formula), label: (roll.label || displayName(token) || 'Roll').slice(0, SHEET_LIMITS.name) };
     }
     // Read afresh: the roll is what the stat block says now.
     const sheet = buildPlayerSheet(this.read(token), displayName(token));
     const formula = sheet ? sheetRollFormula(sheet, ref) : null;
     if (!sheet || !formula) return null;
-    return { formula, label: sheetRollLabel(sheet, ref).slice(0, SHEET_LIMITS.name) };
+    return { ...withoutWrittenSide(formula), label: sheetRollLabel(sheet, ref).slice(0, SHEET_LIMITS.name) };
   }
 
   playersChanged(players: readonly SessionPlayer[]): void {
