@@ -8,7 +8,7 @@
  * held in arrays and rolls in maps, never in records keyed by id.
  */
 import { initiativeSideRules, roundTurns, type SidesFight } from '../../../../packages/atlas-shared/src/index';
-import { PLAYER_SIDES, type PlayerInitiative, type PlayerInitiativeEntry, type PlayerSide, type PlayerToken } from './sceneTypes';
+import { PLAYER_SIDES, type PlayerInitiative, type PlayerInitiativeEntry, type PlayerSide, type PlayerSideRow, type PlayerToken } from './sceneTypes';
 
 /** Atlas's limits: at most eight sides, an id up to 64 characters, a name up to 40. */
 export const SIDE_LIMITS = { sides: 8, idLength: 64, nameLength: 40 } as const;
@@ -144,13 +144,15 @@ export function tokenSideId(token: unknown, ids: readonly string[]): string {
 }
 
 /** The side a combatant is listed under on a player's scene: its named side, else its token's, else the opponents' (as the window files it). */
-export function listedSide(tokens: Readonly<Record<string, Pick<PlayerToken, 'side'>>>, entry: Pick<PlayerInitiativeEntry, 'tokenId' | 'sideId'>): string {
-  return entry.sideId ?? (Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.side : undefined) ?? 'opponents';
+export function listedSide(tokens: Readonly<Record<string, Pick<PlayerToken, 'side'>>>, entry: Pick<PlayerInitiativeEntry, 'tokenId' | 'sideId' | 'side'>): string {
+  const own = entry.tokenId !== undefined && Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.side : undefined;
+  // A combatant without a token carries its side (`side`); Atlas's `entrySide`.
+  return entry.sideId ?? own ?? entry.side ?? 'opponents';
 }
 
 /** The named side (not `players` or `opponents`) each combatant of the list is filed under, by token. */
 export function namedSidesOf(initiative: Pick<PlayerInitiative, 'entries'> | null): ReadonlyMap<string, string> {
-  return new Map((initiative?.entries ?? []).flatMap((entry): Array<[string, string]> => (entry.sideId !== undefined ? [[entry.tokenId, entry.sideId]] : [])));
+  return new Map((initiative?.entries ?? []).flatMap((entry): Array<[string, string]> => (entry.sideId !== undefined && entry.tokenId !== undefined ? [[entry.tokenId, entry.sideId]] : [])));
 }
 
 /** The sides whose turn it is: those of the side list marked, else the one an older GM names. */
@@ -172,10 +174,13 @@ export function sidesNext(initiative: Pick<PlayerInitiative, 'sides' | 'sideList
   }
   const last = rows.map((row) => row.turn === true).lastIndexOf(true);
   if (last === -1) return null;
-  const from = last + 1 < rows.length ? last + 1 : rows.some((row) => row.roll !== undefined) ? -1 : 0;
+  // The sides roll for the order where a row has a roll (an older GM) or a group (Atlas 0.18 tells no roll): equal ones act together.
+  const rollOf = (row: PlayerSideRow): number | undefined => row.group ?? row.roll;
+  const from = last + 1 < rows.length ? last + 1 : rows.some((row) => rollOf(row) !== undefined) ? -1 : 0;
   if (from === -1) return null;
   const head = rows[from]!;
-  return new Set(rows.slice(from).filter((row) => row === head || (head.roll !== undefined && row.roll === head.roll)).map((row) => row.id));
+  const key = rollOf(head);
+  return new Set(rows.slice(from).filter((row) => row === head || (key !== undefined && rollOf(row) === key)).map((row) => row.id));
 }
 
 /** What the old wire fields hold for a side: a named side counts as the opponents', as Atlas Online sends it. */

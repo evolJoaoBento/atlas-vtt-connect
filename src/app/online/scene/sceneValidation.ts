@@ -243,15 +243,18 @@ function isPlayerWidgets(value: unknown): boolean {
 }
 
 function isInitiativeEntry(value: unknown): boolean {
-  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && isText(value.tokenId, SCENE_LIMITS.idLength)
+  return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && optional((id: unknown) => isText(id, SCENE_LIMITS.idLength))(value.tokenId)
     && isNumber(value.initiative) && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp)
     && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut)
     && optional((flag) => flag === true)(value.delayed) && optional((flag) => flag === true)(value.awaiting)
-    && optional((id) => isText(id, SIDE_LIMITS.idLength) && id !== '')(value.sideId);
+    && optional((id) => isText(id, SIDE_LIMITS.idLength) && id !== '')(value.sideId)
+    // Atlas 0.18's combatants without a token: the side they are listed on and the id of their art, absent from an older GM.
+    && optional(oneOf(PLAYER_SIDES))(value.side) && optional(nullable((image: unknown) => isText(image, SCENE_LIMITS.idLength)))(value.image);
 }
 function isSideRow(value: unknown): boolean {
   return isFields(value) && isText(value.id, SIDE_LIMITS.idLength) && value.id !== '' && isText(value.name, SIDE_LIMITS.nameLength) && value.name !== ''
-    && optional(isNumber)(value.roll) && optional((flag) => flag === true)(value.turn);
+    && optional(isNumber)(value.roll) && optional((group: unknown) => typeof group === 'number' && Number.isInteger(group) && group >= 0 && group <= SIDE_LIMITS.sides)(value.group)
+    && optional((flag) => flag === true)(value.turn);
 }
 function isSideList(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SIDE_LIMITS.sides && value.every((row) => isSideRow(row))

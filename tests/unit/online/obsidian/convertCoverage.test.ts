@@ -189,7 +189,7 @@ const SCENE_CHECKS: Checks<keyof SceneSnapshot> = {
   },
   initiative: (t) => {
     expect(t.full.input.initiative).toMatchObject({ round: 2, isActive: true });
-    expect(t.full.input.initiative.entries).toMatchObject([{ tokenId: 'hero', initiative: 17, name: 'Anna', isActive: true, imagePath: tokenOf(t.full, 'hero').imagePath }]);
+    expect(t.full.input.initiative.entries).toMatchObject([{ tokenId: 'hero', initiative: 0, name: 'Anna', isActive: true, imagePath: tokenOf(t.full, 'hero').imagePath }]);
     // The bar after the name is the token's hp resource, at its share
     expect(t.full.player.initiative.health).toEqual({ hero: { value: 70, max: 100 } });
   },
@@ -221,7 +221,7 @@ const ENTRY_CHECKS: Checks<keyof typeof INITIATIVE_ENTRY_COVERAGE> = {
   id: (t) => expect(t.full.input.initiative.entries[0]?.id).toBe('e1'),
   tokenId: (t) => expect(t.full.input.initiative.entries[0]?.tokenId).toBe('hero'),
   name: (t) => expect(t.full.input.initiative.entries[0]?.name).toBe('Anna'),
-  initiative: (t) => expect(t.full.input.initiative.entries[0]?.initiative).toBe(17),
+  initiative: (t) => expect(t.full.input.initiative.entries[0]?.initiative).toBe(0),
   isActive: (t) => expect(t.full.input.initiative.entries[0]?.isActive).toBe(true),
   order: (t) => expect(t.full.input.initiative.entries[0]?.order).toBe(0),
   sitsOut: (t) => {

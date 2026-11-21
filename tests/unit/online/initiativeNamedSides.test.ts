@@ -6,7 +6,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Character, InitiativeEntry, InitiativeRules, InitiativeState, SceneSnapshot } from '@atlas-vtt/api-types';
 import { InitiativeView } from '../../../online-client/initiativeView.mts';
-import { heldOffTurn } from '../../../src/app/online/control/turnHold';
 import { atlasInitiative, atlasInitiativeRules } from '../../../src/app/online/obsidian/convertPanels';
 import { atlasToken } from '../../../src/app/online/obsidian/convertTokens';
 import { actingGroups, readRuleSides, sideRows, tokenSideId, type RuleSide } from '../../../src/app/online/scene/initiativeSides';
@@ -132,13 +131,13 @@ describe('the ported side functions, against copies of Atlas\'s own', () => {
 });
 
 describe('what the projection sends for named sides', () => {
-  it('lists every side that has a combatant, in the order they act, with rolls and the sides whose turn it is', () => {
+  it('lists every side that has a combatant, in the order they act, with the group they act in (never the roll) and the sides whose turn it is', () => {
     const sent = project(fight(ROLLED)).initiative!;
     expect(sent.sideList).toEqual([
-      { id: 'goblins', name: 'Goblins', roll: 17, turn: undefined },
-      { id: 'opponents', name: 'Opponents', roll: 17 },
-      { id: 'players', name: 'Players', roll: 9 },
-      { id: 'wolves', name: 'Wolves', roll: 4, turn: true },
+      { id: 'goblins', name: 'Goblins', group: 0, turn: undefined },
+      { id: 'opponents', name: 'Opponents', group: 0 },
+      { id: 'players', name: 'Players', group: 1 },
+      { id: 'wolves', name: 'Wolves', group: 2, turn: true },
     ].map((row) => JSON.parse(JSON.stringify(row)) as object));
   });
 
@@ -225,9 +224,6 @@ describe('whose turn it is, with named sides', () => {
     expect(turnOf(scene, new Set(['wolf'])).mine).toBe(true);
     expect(turnOf(scene, new Set(['hero'])).mine).toBe(false);
     expect(turnOf(scene, new Set(['gob'])).mine).toBe(false);
-    expect(heldOffTurn(scene, 'wolf')).toBe(false);
-    expect(heldOffTurn(scene, 'hero')).toBe(true);
-    expect(heldOffTurn(scene, 'gob')).toBe(true);
   });
 
   it('lets every side of a tie act, and not a combatant that sits out', () => {
@@ -235,13 +231,11 @@ describe('whose turn it is, with named sides', () => {
     initiative.entries[1] = { ...initiative.entries[1]!, sitsOut: true };
     const scene = sceneOf(initiative);
     expect([turnOf(scene, new Set(['gob2'])).mine, turnOf(scene, new Set(['orc'])).mine, turnOf(scene, new Set(['gob'])).mine]).toEqual([true, true, false]);
-    expect([heldOffTurn(scene, 'gob'), heldOffTurn(scene, 'gob2'), heldOffTurn(scene, 'orc'), heldOffTurn(scene, 'hero')]).toEqual([true, false, false, true]);
   });
 
   it('holds every token when no side acts, as with no active side before', () => {
     const scene = sceneOf(listed(order, entries));
     expect(turnOf(scene, new Set(['hero']))).toEqual(NO_TURN);
-    expect(heldOffTurn(scene, 'hero')).toBe(true);
   });
 
   it('knows the next group to act: the next row, with its equal rolls, and not guessing across a round where sides roll', () => {
@@ -260,28 +254,27 @@ describe('whose turn it is, with named sides', () => {
     const scene = sceneOf(older);
     expect(turnOf(scene, new Set(['hero'])).mine).toBe(true);
     expect(nextTurnOf(scene, new Set(['orc'])).mine).toBe(true);
-    expect(heldOffTurn(scene, 'orc')).toBe(true);
   });
 });
 
 describe('the list and the summary for named sides', () => {
   const initiative = listed({ goblins: { roll: 17, turn: true }, opponents: { roll: 17, turn: true }, players: { roll: 9 }, wolves: { roll: 4 } }, [['hero'], ['gob', 'goblins'], ['wolf', 'wolves'], ['orc']]);
 
-  it('draws a group per side in the order they act, with names and rolls, every side that acts marked', () => {
+  it('draws a group per side in the order they act, with names and no rolls (they stay on the GM screen), every side that acts marked', () => {
     const panel = document.createElement('div');
     document.body.replaceChildren(panel);
     new InitiativeView({ panel, images: () => null }).update(sceneOf(initiative));
     const groups = [...panel.querySelectorAll('.initiative-side')];
-    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['goblins, rolled 17', 'opponents, rolled 17', 'players, rolled 9', 'wolves, rolled 4']);
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['goblins', 'opponents', 'players', 'wolves']);
     expect(groups.map((group) => group.classList.contains('is-active'))).toEqual([true, true, false, false]);
-    expect(groups[0]!.querySelector('.initiative-side-label')?.textContent).toBe('goblins17');
-    expect(groups[0]!.querySelector('.initiative-side-roll')?.textContent).toBe('17');
+    expect(groups[0]!.querySelector('.initiative-side-label')?.textContent).toBe('goblins');
+    expect(groups[0]!.querySelector('.initiative-side-roll')).toBeNull();
     expect(groups.map((group) => group.querySelectorAll('.initiative-card').length)).toEqual([1, 1, 1, 1]);
   });
 
   it('lists the same in the text summary', () => {
     expect(initiativeLines(initiative, sceneOf(initiative).tokens).filter((row) => row.heading).map((row) => [row.text, row.current ?? false])).toEqual([
-      ['goblins, rolled 17', true], ['opponents, rolled 17', true], ['players, rolled 9', false], ['wolves, rolled 4', false],
+      ['goblins', true], ['opponents', true], ['players', false], ['wolves', false],
     ]);
   });
 });
@@ -298,6 +291,17 @@ describe('the Obsidian tab\'s conversion', () => {
     const plain = playerToken({ side: 'opponents' });
     expect(atlasToken('gob', plain, '', null, 'goblins').side).toBe('goblins');
     expect(atlasToken('orc', plain, '').side).toBe('opponents');
+  });
+
+  it("gives Atlas's list the sides' order from the groups a GM of Atlas 0.18 sends, equal groups acting together", () => {
+    const grouped: PlayerInitiative = {
+      ...initiative, sideList: ['goblins', 'opponents', 'players', 'wolves'].map((id, at) => ({ id, name: id, group: [0, 0, 1, 2][at]!, ...(at < 2 && { turn: true as const }) })),
+    };
+    const state = atlasInitiative(grouped, {}).initiative.sides as unknown as AtlasFight;
+    expect(atlasC1t(state, 2)).toEqual(['goblins', 'opponents']);
+    expect(state.rolls?.[2]?.goblins).toBe(state.rolls?.[2]?.opponents);
+    expect(state.rolls?.[2]?.goblins).toBeGreaterThan(state.rolls?.[2]?.players ?? Infinity);
+    expect(state.rolls?.[2]?.players).toBeGreaterThan(state.rolls?.[2]?.wolves ?? Infinity);
   });
 
   it('names the collection\'s sides in the rules only when one is named, and leaves a plain list as it was', () => {

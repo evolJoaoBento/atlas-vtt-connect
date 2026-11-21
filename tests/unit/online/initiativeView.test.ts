@@ -31,7 +31,8 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     show({ round: 3, active: true, entries: [entry('ana', { initiative: 18, isActive: true, hpShare: 0.5 }), entry('orc', { initiative: 12, name: null, sitsOut: true })] });
     expect(panel.hidden).toBe(false);
     const cards = [...panel.querySelectorAll('.initiative-card')];
-    expect(cards.map((card) => card.querySelector('.initiative-value')?.textContent)).toEqual(['18', '12']);
+    // Atlas 0.18: art only, no number on a card.
+    expect(cards.map((card) => card.querySelector('.initiative-value'))).toEqual([null, null]);
     expect(cards[0]!.classList.contains('is-active')).toBe(true);
     expect(cards[0]!.getAttribute('aria-current')).toBe('true');
     expect(cards[0]!.querySelector('.initiative-name')?.textContent).toBe('ana');
@@ -43,7 +44,7 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     expect(panel.querySelector('.initiative-round')?.textContent).toBe('Round 3');
   });
 
-  it('lists a delayed combatant apart under "Delayed", after the order, and dashes a number not rolled', () => {
+  it('lists a delayed combatant apart under "Delayed", after the order, and shows no number or dash', () => {
     const { panel, show } = setup();
     show({ round: 2, active: true, entries: [entry('ana', { initiative: 18, isActive: true }), entry('orc', { delayed: true, initiative: 12 }), entry('bo', { awaiting: true, initiative: 0 })] });
     const list = panel.querySelector('.initiative-list')!;
@@ -53,7 +54,8 @@ describe("the initiative column, as Atlas's player window shows it", () => {
     expect(delayed.querySelector('.initiative-side-label')?.textContent).toBe('Delayed');
     expect(delayed.querySelector('.initiative-name')?.textContent).toBe('orc');
     expect(delayed.querySelector('.is-active')).toBeNull();
-    expect([...panel.querySelectorAll('.initiative-value')].map((value) => value.textContent)).toEqual(['18', '–', '12']);
+    expect(panel.querySelector('.initiative-value')).toBeNull();
+    expect(panel.textContent).not.toContain('–');
   });
 
   it('greys a defeated combatant and marks it with a skull, and redraws when the token goes down or is healed', () => {

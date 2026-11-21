@@ -51,11 +51,11 @@ describe('the sides on the wire', () => {
 });
 
 describe('a list in turn order', () => {
-  it('sends the numbers and the turn, and no side, with a fight in turn order or none', () => {
+  it('sends the order and the turn but no number (Atlas 0.18: art only), and no side, with a fight in turn order or none', () => {
     for (const scene of [state({ isActive: true }), state()]) {
       const sent = project(scene, TURN_ORDER);
       expect(sent.initiative).not.toHaveProperty('sides');
-      expect(sent.initiative?.entries.map((e) => [e.tokenId, e.initiative])).toEqual([['orc', 21], ['hero', 17], ['boss', 12], ['scout', 9], ['ally', 3]]);
+      expect(sent.initiative?.entries.map((e) => [e.tokenId, e.initiative])).toEqual([['orc', 0], ['hero', 0], ['boss', 0], ['scout', 0], ['ally', 0]]);
       for (const shown of Object.values(sent.tokens)) expect(shown).not.toHaveProperty('side');
     }
     expect(project(state({ isActive: true }), TURN_ORDER).initiative?.entries[0]?.isActive).toBe(true);
@@ -64,26 +64,27 @@ describe('a list in turn order', () => {
   it('is what a fight started in turn order keeps, whatever the collection says since', () => {
     const sent = project(state({ isActive: true }), SIDES);
     expect(sent.initiative).not.toHaveProperty('sides');
-    expect(sent.initiative?.entries[0]).toMatchObject({ initiative: 21, isActive: true });
+    expect(sent.initiative?.entries[0]).toMatchObject({ initiative: 0, isActive: true });
   });
 });
 
 describe("the marks of Atlas 0.9's list in turn order", () => {
   const withFlags = (flags: Record<string, unknown>) => ({ ...entry('hero', 0, 1), ...flags }) as InitiativeEntry;
 
-  it('sends a delayed combatant flagged and with no turn, and a number not rolled yet as awaiting', () => {
+  it('sends a delayed combatant flagged and with no turn, and no "not rolled yet" mark (players see no numbers)', () => {
     const entries = [entry('orc', 21, 0, { isActive: true }), withFlags({ delayed: true, isActive: true }), withFlags({ id: 'e-ally', tokenId: 'ally', awaitingInitiative: true })];
     const sent = project(state({ isActive: true, entries }), TURN_ORDER).initiative?.entries;
     expect(sent?.map((e) => [e.tokenId, e.isActive, e.delayed ?? false, e.awaiting ?? false])).toEqual([
-      ['orc', true, false, false], ['hero', false, true, false], ['ally', false, false, true],
+      ['orc', true, false, false], ['hero', false, true, false], ['ally', false, false, false],
     ]);
   });
 
-  it('shows a dash only while the awaited number is still 0, and for a card not dealt in a fight by cards', () => {
+  it('sends no dash and no card, whatever is awaited or dealt', () => {
     const rolled = withFlags({ awaitingInitiative: true, initiative: 14 });
     expect(project(state({ entries: [rolled] }), TURN_ORDER).initiative?.entries[0]).not.toHaveProperty('awaiting');
+    expect(project(state({ entries: [withFlags({ awaitingInitiative: true, initiative: 0 })] }), TURN_ORDER).initiative?.entries[0]).not.toHaveProperty('awaiting');
     const cards = { isActive: true, cards: {}, entries: [withFlags({ card: 12 }), withFlags({ id: 'e-ally', tokenId: 'ally' })] } as unknown as Partial<InitiativeState>;
-    expect(project(state(cards), TURN_ORDER).initiative?.entries.map((e) => [e.initiative, e.awaiting ?? false])).toEqual([[12, false], [0, true]]);
+    expect(project(state(cards), TURN_ORDER).initiative?.entries.map((e) => [e.initiative, e.awaiting ?? false])).toEqual([[0, false], [0, false]]);
   });
 
   it('sends neither mark by sides, where the window lists no numbers and no delay', () => {
@@ -144,8 +145,8 @@ describe('a list by sides', () => {
     const entries = [entry('hero', 4217, 0), entry('orc', 3318, 1, { initiativeModifier: 7771 })];
     const text = JSON.stringify(project(state({ entries }), SIDES));
     expect(text).not.toMatch(/4217|3318|7771/);
-    // In turn order the numbers are what the window shows
-    expect(JSON.stringify(project(state({ entries }), TURN_ORDER))).toMatch(/4217/);
+    // Nor in turn order: players see art only (Atlas 0.18)
+    expect(JSON.stringify(project(state({ entries }), TURN_ORDER))).not.toMatch(/4217|3318|7771/);
   });
 
   it('is not shown when the tracker is closed or the player view hides it', () => {
@@ -169,8 +170,8 @@ describe("the join page's list", () => {
     return initiativeLines(projected.initiative, projected.tokens);
   };
 
-  it('keeps turn order as it was: the number, the turn and the bar', () => {
-    expect(rowsOf(state({ isActive: true }), TURN_ORDER).map((row) => row.text)).toEqual(['Round 2', '▶ 21 · orc', '17 · hero', '12 · boss', '9 · scout', '3 · ally']);
+  it('keeps turn order as it was, without the number: the turn and the bar', () => {
+    expect(rowsOf(state({ isActive: true }), TURN_ORDER).map((row) => row.text)).toEqual(['Round 2', '▶ orc', 'hero', 'boss', 'scout', 'ally']);
   });
 
   it('puts each side under its name, the side that acts first on top, and marks the side to act', () => {

@@ -104,10 +104,10 @@ describe('a player-safe share follows the rules of live play', () => {
     expect(JSON.stringify(payload)).not.toMatch(/"initiative":(17|23)\b/);
   });
 
-  it('lists a turn-order collection with its numbers', async () => {
+  it('lists a turn-order collection in order, with no numbers (Atlas 0.18)', async () => {
     collection = { systemConeAngle: 53.13 };
     const payload = await openedShare(false) as { scene: { initiative: { sides?: unknown; entries: Array<{ initiative: number }> } } };
     expect(payload.scene.initiative.sides).toBeUndefined();
-    expect(payload.scene.initiative.entries.map((entry) => entry.initiative)).toEqual([17, 23]);
+    expect(payload.scene.initiative.entries.map((entry) => entry.initiative)).toEqual([0, 0]);
   });
 });

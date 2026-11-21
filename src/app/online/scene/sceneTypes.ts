@@ -266,7 +266,15 @@ export interface PlayerWidget {
 
 export interface PlayerInitiativeEntry {
   id: string;
-  tokenId: string;
+  /**
+   * The combatant's token. Absent for a combatant without one (Atlas 0.18: a player at the table, an enemy added by
+   * name), which carries its `side` and `image` instead. Always present from an older GM.
+   */
+  tokenId?: string;
+  /**
+   * Always 0 since Atlas 0.18: the players' list shows art only, and initiative numbers, cards dealt and sides' rolls
+   * stay on the GM's screen. The field stays because older pages require a number; the order is the entries' order.
+   */
   initiative: number;
   name: string | null;
   /** Always null since Atlas 0.5; older players still require the field. */
@@ -279,8 +287,12 @@ export interface PlayerInitiativeEntry {
   sitsOut?: true;
   /** The combatant delayed its turn (Atlas 0.9): the window lists it apart, under "Delayed", with no turn. Never sent by sides. Absent from an older GM. */
   delayed?: true;
-  /** The combatant has no number yet (rolled for none, or dealt no card): the window shows a dash. Absent from an older GM, whose page shows the number. */
+  /** The combatant has no number yet: the window shows a dash. Never sent since Atlas 0.18, whose players' list shows no numbers; an older GM's page still reads it. */
   awaiting?: true;
+  /** Only without a `tokenId`: the side it is listed on (a player at the table on `players`, an enemy on `opponents`); a named side is `sideId`. */
+  side?: PlayerSide;
+  /** Only without a `tokenId`: its art, as the id the page loads an image by (a token's `image`); null where it has none or the image is not ready. */
+  image?: string | null;
   /**
    * The named side (not `players` or `opponents`) the list by sides files the combatant under; sent only by sides, and
    * only for a named side. Its token's `side` then reads `opponents`, as an older page knows no other. Absent from an older GM.
@@ -292,8 +304,13 @@ export interface PlayerInitiativeEntry {
 export interface PlayerSideRow {
   id: string;
   name: string;
-  /** This round's roll, where the collection rolls for the order and the side has one. */
+  /** This round's roll. Never sent since Atlas 0.18 (a side's roll stays on the GM's screen); an older GM sends it, and the page does not draw it. */
   roll?: number;
+  /**
+   * Where the collection rolls for the order: the group this side acts in, counted from 0 in the order the sides act.
+   * Sides with an equal roll share a group and act together; the number itself is not told. Absent without rolls and from an older GM (see `roll`).
+   */
+  group?: number;
   /** The side acts now; several can, where their rolls are equal. */
   turn?: true;
 }

@@ -2,10 +2,12 @@
 /**
  * The initiative list as Atlas's player window shows it (`playerInitiativeList.ts`, `player-initiative.scss`): a
  * column floating at the right edge, one card per combatant in turn order, each a square portrait of the token in its
- * ring, the initiative value, the name where nameplates show, and a thin green bar of its hit points where players see
+ * ring, the name where nameplates show, and a thin green bar of its hit points where players see
  * them; the combatant whose turn it is takes the accent, one that sits out the round is faded, and "Round N" closes the
  * list while a fight runs, the turn kept in view. By sides, the combatants stand under their side's name, the side
- * whose turn it is in the accent, with no values. Text only, never markup: everything comes from the GM. Shared with
+ * whose turn it is in the accent. As in Atlas 0.18, players see art only: no initiative number, card dealt or side's roll
+ * is sent or drawn, the order is the list's. A combatant without a token (a player at the table, an enemy added by name) is
+ * listed too, by its own art, else by its name. Text only, never markup: everything comes from the GM. Shared with
  * the Obsidian scene tab.
  */
 import { computeTokenPixelSize, computeTokenStrokeWidth, getTokenRingOuterDiameter } from '@atlas-vtt/shared/draw';
@@ -38,6 +40,8 @@ export interface InitiativeViewOptions {
 
 /** The most condition chips on a card; the rest are counted. */
 const MAX_CARD_CONDITIONS = 4;
+/** The ring a combatant without a token is drawn in: a token's default (`DEFAULT_RING`). */
+const LISTED_RING = '#ffffff';
 
 export class InitiativeView {
   /** What the column was last drawn from, so a scene patch that changes nothing of it draws nothing. */
@@ -57,7 +61,7 @@ export class InitiativeView {
       panel.hidden = true;
       return;
     }
-    const key = JSON.stringify([initiative, initiative.entries.map((entry) => this.portraitKey(scene.tokens[entry.tokenId]))]);
+    const key = JSON.stringify([initiative, initiative.entries.map((entry) => this.portraitKey(entry.tokenId === undefined ? undefined : scene.tokens[entry.tokenId], entry.image))]);
     if (key === this.drawn && !force) return;
     this.drawn = key;
     panel.hidden = false;
@@ -65,7 +69,7 @@ export class InitiativeView {
     const list = doc.createElement('div');
     list.className = 'initiative-list';
     list.setAttribute('role', 'list');
-    const tokenOf = (entry: PlayerInitiativeEntry): PlayerToken | undefined => (Object.hasOwn(scene.tokens, entry.tokenId) ? scene.tokens[entry.tokenId] : undefined);
+    const tokenOf = (entry: PlayerInitiativeEntry): PlayerToken | undefined => (entry.tokenId !== undefined && Object.hasOwn(scene.tokens, entry.tokenId) ? scene.tokens[entry.tokenId] : undefined);
     const { sides } = initiative;
     if (sides) {
       // Atlas's own list of sides, in the order they act; from an older GM, the two built-in sides, `first` first.
@@ -77,7 +81,7 @@ export class InitiativeView {
         const group = doc.createElement('div');
         group.className = 'initiative-side';
         group.setAttribute('role', 'list');
-        group.setAttribute('aria-label', row.roll !== undefined ? `${row.name}, rolled ${row.roll}` : row.name);
+        group.setAttribute('aria-label', row.name);
         if (row.turn === true) {
           group.classList.add('is-active');
           group.setAttribute('aria-current', 'true');
@@ -86,19 +90,13 @@ export class InitiativeView {
         label.className = 'initiative-side-label';
         label.setAttribute('aria-hidden', 'true');
         label.textContent = row.name;
-        if (row.roll !== undefined) {
-          const roll = doc.createElement('span');
-          roll.className = 'initiative-side-roll';
-          roll.textContent = String(row.roll);
-          label.append(roll);
-        }
-        group.append(label, ...members.map((entry) => this.card(entry, tokenOf(entry), false, false)));
+        group.append(label, ...members.map((entry) => this.card(entry, tokenOf(entry), false)));
         list.append(group);
       }
     } else {
       // In turn order, a combatant that delayed its turn is listed apart, after the order, as Atlas's list does.
       const waiting = initiative.entries.filter((entry) => entry.delayed === true);
-      list.append(...initiative.entries.filter((entry) => entry.delayed !== true).map((entry) => this.card(entry, tokenOf(entry), initiative.active, true)));
+      list.append(...initiative.entries.filter((entry) => entry.delayed !== true).map((entry) => this.card(entry, tokenOf(entry), initiative.active)));
       if (waiting.length > 0) {
         const group = doc.createElement('div');
         group.className = 'initiative-side';
@@ -108,7 +106,7 @@ export class InitiativeView {
         label.className = 'initiative-side-label';
         label.setAttribute('aria-hidden', 'true');
         label.textContent = DELAYED_LABEL;
-        group.append(label, ...waiting.map((entry) => this.card(entry, tokenOf(entry), false, true)));
+        group.append(label, ...waiting.map((entry) => this.card(entry, tokenOf(entry), false)));
         list.append(group);
       }
     }
@@ -125,9 +123,9 @@ export class InitiativeView {
     if (turn && list.scrollHeight > list.clientHeight) list.scrollTop = Math.max(0, turn.offsetTop - list.offsetTop - 4);
   }
 
-  /** What a portrait is drawn from: its image (and whether it has arrived) and its ring. */
-  private portraitKey(token: PlayerToken | undefined): string {
-    if (!token) return '';
+  /** What a portrait is drawn from: its image (and whether it has arrived) and its ring; a combatant without a token has only `image`. */
+  private portraitKey(token: PlayerToken | undefined, image?: string | null): string {
+    if (!token) return image ? `${image}|${this.options.images(image) ? 1 : 0}` : '';
     return `${token.image ?? ''}|${token.image && this.options.images(token.image) ? 1 : 0}|${token.ring ?? ''}|${token.downed === true ? 1 : 0}|${JSON.stringify(token.conditions)}|${token.instance ?? ''}`;
   }
 
@@ -162,7 +160,7 @@ export class InitiativeView {
     return mark;
   }
 
-  private card(entry: PlayerInitiativeEntry, token: PlayerToken | undefined, fightActive: boolean, showValue: boolean): HTMLElement {
+  private card(entry: PlayerInitiativeEntry, token: PlayerToken | undefined, fightActive: boolean): HTMLElement {
     const doc = this.options.panel.ownerDocument;
     const card = doc.createElement('div');
     card.className = 'initiative-card';
@@ -174,28 +172,24 @@ export class InitiativeView {
     if (entry.sitsOut === true) card.classList.add('is-sitting-out');
     // A click, Enter or Space on a combatant whose token players see brings that token into view.
     const { onFind } = this.options;
-    if (onFind && token) {
+    const { tokenId } = entry;
+    if (onFind && token && tokenId !== undefined) {
       card.classList.add('is-findable');
       card.tabIndex = 0;
-      card.addEventListener('click', () => onFind(entry.tokenId));
+      card.addEventListener('click', () => onFind(tokenId));
       card.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        onFind(entry.tokenId);
+        onFind(tokenId);
       });
     }
-    const portrait = token ? this.portrait(token, entry.name ?? '') : null;
+    // A combatant without a token has its art alone, in the white ring a token has by default; the list is drawn from its own art, not the map's.
+    const portrait = token ? this.portrait(token, entry.name ?? '') : tokenId === undefined && entry.image ? this.portrait({ image: entry.image, ring: LISTED_RING }, entry.name ?? '') : null;
     if (portrait) card.append(portrait);
     // A defeated combatant (a resource that defeats it is spent, whether players see it or not) is greyed and marked, as Atlas's list does.
     if (token?.downed === true) {
       card.classList.add('is-defeated');
       card.append(this.skull(portrait !== null));
-    }
-    if (showValue) {
-      const value = doc.createElement('span');
-      value.className = 'initiative-value';
-      value.textContent = entry.awaiting === true ? '–' : String(entry.initiative);
-      card.append(value);
     }
     if (entry.name) {
       const name = doc.createElement('span');
@@ -246,7 +240,7 @@ export class InitiativeView {
   }
 
   /** The token's art in its ring, as the map draws it; null without art to draw. */
-  private portrait(token: PlayerToken, name: string): HTMLCanvasElement | null {
+  private portrait(token: Pick<PlayerToken, 'image' | 'ring'>, name: string): HTMLCanvasElement | null {
     const art = token.image ? this.options.images(token.image) : null;
     if (!art && token.ring === null) return null;
     const canvas = this.options.panel.ownerDocument.createElement('canvas');

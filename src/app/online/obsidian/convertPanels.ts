@@ -57,7 +57,8 @@ export function atlasWidgets(widgets: readonly PlayerWidget[]): AtlasWidgets {
 /** The initiative order players may see; an entry's avatar is its token's art. */
 export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Readonly<Record<string, TokenEntity>>): AtlasInitiative {
   if (!initiative) return { initiative: createDefaultInitiativeState(), initiativeTrackerOpen: false };
-  const entries = initiative.entries.map((entry, order): InitiativeEntry => ({
+  // The tab's list is drawn from tokens: a combatant without one (Atlas 0.18's party member, enemy added by name) is left out.
+  const entries = initiative.entries.flatMap((entry, order): InitiativeEntry[] => entry.tokenId === undefined ? [] : [{
     id: entry.id,
     tokenId: entry.tokenId,
     name: entry.name ?? '',
@@ -71,7 +72,7 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
     // Fields of Atlas 0.9 the API's type predates: the tab's list groups delayed combatants and dashes a number not rolled.
     ...(entry.delayed === true && { delayed: true }),
     ...(entry.awaiting === true && { awaitingInitiative: true }),
-  }));
+  }]);
   return {
     initiative: {
       entries,
@@ -115,12 +116,14 @@ function atlasRuleSides(rows: readonly PlayerSideRow[]): RuleSide[] {
 function atlasFightSides(initiative: PlayerInitiative, sides: PlayerInitiativeSides): NonNullable<InitiativeState['sides']> {
   const rows = initiative.sideList;
   if (!rows) return { first: sides.first, active: sides.active ?? sides.first };
-  const rolled = rows.filter((row) => row.roll !== undefined);
+  // Atlas 0.18 tells no roll, only the group a side acts in: the first group gets the highest stand-in, equal groups an equal one.
+  const rollOf = (row: PlayerSideRow): number | undefined => row.group !== undefined ? rows.length - row.group : row.roll;
+  const rolled = rows.filter((row) => rollOf(row) !== undefined);
   return {
     first: sides.first,
     active: rows.find((row) => row.turn === true)?.id ?? sides.active ?? sides.first,
     // Atlas derives the order of the two built-in sides from `first`; it is stored only for named sides and rolled orders.
     ...(rolled.length > 0 || rows.some((row) => !isBuiltInSide(row.id)) ? { order: atlasRuleSides(rows) } : {}),
-    ...(rolled.length > 0 ? { roll: DEFAULT_INITIATIVE_RULES.roll, rolls: { [initiative.round]: Object.fromEntries(rolled.map((row) => [row.id, row.roll])) } } : {}),
+    ...(rolled.length > 0 ? { roll: DEFAULT_INITIATIVE_RULES.roll, rolls: { [initiative.round]: Object.fromEntries(rolled.map((row) => [row.id, rollOf(row)])) } } : {}),
   } as NonNullable<InitiativeState['sides']>;
 }

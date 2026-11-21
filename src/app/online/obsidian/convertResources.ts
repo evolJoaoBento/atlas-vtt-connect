@@ -77,7 +77,7 @@ export function atlasResourceDefinitions(tokens: Readonly<Record<string, PlayerT
 export function atlasInitiativeHealth(initiative: PlayerInitiative | null): Record<string, { value: number; max: number }> {
   const health: Record<string, { value: number; max: number }> = {};
   for (const entry of initiative?.entries ?? []) {
-    if (typeof entry.hpShare === 'number') setOwn(health, entry.tokenId, { value: Math.round(entry.hpShare * SHARE_SCALE), max: SHARE_SCALE });
+    if (entry.tokenId !== undefined && typeof entry.hpShare === 'number') setOwn(health, entry.tokenId, { value: Math.round(entry.hpShare * SHARE_SCALE), max: SHARE_SCALE });
   }
   return health;
 }

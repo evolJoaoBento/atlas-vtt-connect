@@ -128,7 +128,7 @@ export class RemoteSceneMemo {
     };
     const tokens = this.tokens.build(scene.tokens, keyOf, (id, token) => atlasToken(id, token, urlOf(id), positionOf(id), named.get(id)));
     // An entry's avatar is its token's art.
-    const avatars = (scene.initiative?.entries ?? []).map((entry) => urlOf(entry.tokenId)).join('|');
+    const avatars = (scene.initiative?.entries ?? []).map((entry) => urlOf(entry.tokenId ?? '')).join('|');
     return {
       background: { url: images.background(scene.map.asset), width: scene.map.width, height: scene.map.height },
       grid: this.grid.of([scene.grid, scene.map, scene.measurement], '', () => atlasGrid(scene)),

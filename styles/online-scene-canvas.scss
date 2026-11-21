@@ -504,7 +504,6 @@
   .initiative-list::-webkit-scrollbar { display: none; }
   .initiative-side-label { text-align: center; color: var(--text-muted); font-size: var(--font-ui-smaller); font-weight: var(--font-semibold); }
   .initiative-side.is-active .initiative-side-label { color: var(--interactive-accent); }
-  .initiative-side-roll { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--background-modifier-hover); font-weight: var(--font-semibold); }
   .initiative-card {
     display: flex; flex-direction: column; align-items: center; gap: var(--inset); padding: var(--inset);
     background: var(--background-modifier-hover); border: 1px solid var(--background-modifier-border); border-radius: var(--radius-l);
@@ -524,7 +523,6 @@
   .initiative-card.is-findable { cursor: pointer; }
   .initiative-card.is-findable:hover { border-color: var(--interactive-accent); }
   .initiative-portrait { display: block; width: 100%; aspect-ratio: 1; }
-  .initiative-value { font-weight: var(--font-semibold); }
   .initiative-name { width: 100%; overflow-wrap: anywhere; text-align: center; font-size: var(--font-ui-smaller); }
   .initiative-hp { width: 100%; height: 4px; accent-color: var(--color-green); }
   .initiative-round { text-align: center; color: var(--text-muted); font-size: var(--font-ui-smaller); }

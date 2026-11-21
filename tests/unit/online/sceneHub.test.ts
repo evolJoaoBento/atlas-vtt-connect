@@ -355,7 +355,7 @@ describe('SceneHub', () => {
       const { view, tavern } = fakeView(state);
       h.presented.present(view, tavern);
       const player = await join(h);
-      expect(player.scene?.initiative).toMatchObject({ active: false, entries: [{ initiative: 17, isActive: false }, { initiative: 23 }] });
+      expect(player.scene?.initiative).toMatchObject({ active: false, entries: [{ initiative: 0, isActive: false }, { initiative: 0 }] });
       expect(player.scene?.initiative).not.toHaveProperty('sides');
       expect(player.scene?.tokens.hero).not.toHaveProperty('side');
       h.setInitiativeRules(SIDES);
@@ -392,7 +392,7 @@ describe('SceneHub', () => {
       h.setInitiativeRules(SIDES);
       await tick();
       expect(player.scene?.initiative).not.toHaveProperty('sides');
-      expect(player.scene?.initiative?.entries.map((e) => e.initiative)).toEqual([17, 23]);
+      expect(player.scene?.initiative?.entries.map((e) => e.initiative)).toEqual([0, 0]);
     });
   });
 

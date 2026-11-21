@@ -162,8 +162,8 @@ describe('initiative projection', () => {
     expect(projected).toEqual({
       round: 3, active: true,
       entries: [
-        { id: 'e1', tokenId: 'goblin', initiative: 12, name: 'Goblin', hp: null, hpShare: 0.71, isActive: false },
-        { id: 'e2', tokenId: 'orc', initiative: 12, name: 'Orc', hp: null, hpShare: 1, isActive: true },
+        { id: 'e1', tokenId: 'goblin', initiative: 0, name: 'Goblin', hp: null, hpShare: 0.71, isActive: false },
+        { id: 'e2', tokenId: 'orc', initiative: 0, name: 'Orc', hp: null, hpShare: 1, isActive: true },
       ],
     });
     expect(JSON.stringify(projected)).not.toMatch(/stress|statblock|imagePath|Lich/);

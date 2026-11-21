@@ -118,7 +118,8 @@ export async function sha256Id(bytes: ArrayBuffer): Promise<string> {
 }
 
 /**
- * The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), each once.
+ * The fingerprints a scene shows: the map's first, then the tokens' in record order (each one's art, then its mini), then the
+ * initiative list's own art, each once.
  * `minis: false` leaves the minis' models out, for a player view that does not draw them (the web page); `video: false`, the map's video.
  */
 export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: boolean; video?: boolean } = {}): string[] {
@@ -129,6 +130,8 @@ export function sceneAssetIds(scene: PlayerScene | null, options: { minis?: bool
     if (isAssetId(token.image)) ids.add(token.image);
     if (options.minis !== false && isAssetId(token.mini?.asset)) ids.add(token.mini.asset);
   }
+  // The art of a combatant without a token (Atlas 0.18's party members and enemies added by name) is in the list, not on the map.
+  for (const entry of scene.initiative?.entries ?? []) if (isAssetId(entry.image)) ids.add(entry.image);
   // The GM's handout reaches the players of every scene in use.
   if (isAssetId(scene.handout?.asset)) ids.add(scene.handout.asset);
   // An animated map's video comes last, so its size never holds up the still, the tokens or the handout; `video: false` for a view that plays none.

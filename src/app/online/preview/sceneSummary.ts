@@ -46,14 +46,14 @@ export function initiativeLines(initiative: PlayerInitiative | null, tokens: Rea
     for (const row of rows) {
       const members = initiative.entries.filter((entry) => listedSide(tokens, entry) === row.id);
       if (members.length === 0) continue;
-      lines.push({ text: row.roll !== undefined ? `${row.name}, rolled ${row.roll}` : row.name, heading: true, ...(row.turn === true && { current: true as const }) });
+      lines.push({ text: row.name, heading: true, ...(row.turn === true && { current: true as const }) });
       for (const entry of members) lines.push({ text: entry.name ?? 'Unnamed', ...bar(entry) });
     }
     return lines;
   }
   for (const entry of initiative.entries) {
     const turn = entry.isActive ? '▶ ' : '';
-    lines.push({ text: `${turn}${entry.initiative} · ${entry.name ?? 'Unnamed'}`, ...bar(entry) });
+    lines.push({ text: `${turn}${entry.name ?? 'Unnamed'}`, ...bar(entry) });
   }
   return lines;
 }

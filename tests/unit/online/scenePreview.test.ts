@@ -79,7 +79,7 @@ describe('scene summary', () => {
         { id: 'e2', tokenId: 't2', initiative: 12, name: null, hp: null, isActive: false },
       ],
     });
-    expect(lines).toEqual([{ text: 'Round 2' }, { text: '▶ 18 · Anna', share: 0.5 }, { text: '12 · Unnamed' }]);
+    expect(lines).toEqual([{ text: 'Round 2' }, { text: '▶ Anna', share: 0.5 }, { text: 'Unnamed' }]);
     // The window draws a bar and no number: no row prints the share
     expect(JSON.stringify(lines.map((line) => line.text))).not.toMatch(/HP|%|0\.5/);
     expect(initiativeLines({ round: 0, active: false, entries: [] })).toEqual([]);

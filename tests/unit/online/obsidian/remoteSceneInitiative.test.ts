@@ -43,11 +43,11 @@ async function shown(initiative: Partial<InitiativeState>, rules: InitiativeRule
 }
 
 describe("the remote view's initiative list", () => {
-  it('in turn order: the numbers, the turn and the round, without hidden combatants', async () => {
+  it('in turn order: the order, the turn and the round, with no numbers (Atlas 0.18), without hidden combatants', async () => {
     const t = await shown({ entries: ENTRIES.map((e, i) => (i === 1 ? { ...e, isActive: true } : e)), isActive: true }, TURN_ORDER);
     expect(t.handle.player?.initiative.rules).toEqual({ mode: 'turn-order', roll: '1d20', firstSide: 'players' });
     expect(t.handle.scene?.initiative).toMatchObject({ round: 3, isActive: true, currentIndex: 1 });
-    expect(t.handle.scene?.initiative.entries.map((e) => [e.tokenId, e.initiative])).toEqual([['orc', 21], ['hero', 17], ['boss', 12]]);
+    expect(t.handle.scene?.initiative.entries.map((e) => [e.tokenId, e.initiative])).toEqual([['orc', 0], ['hero', 0], ['boss', 0]]);
   });
 
   it('by sides in a fight: the fight keeps its sides, with no numbers and no active combatant', async () => {

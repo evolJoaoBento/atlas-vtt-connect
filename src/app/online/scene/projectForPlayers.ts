@@ -134,7 +134,7 @@ export function projectForPlayers(state: ProjectionInput, context: ProjectionCon
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars; nor is
   // one kept beside the map (Atlas 0.9's `offMap`), which is no part of the map.
   const seen = projectRecord(onMapTokens(objects?.tokens), (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, id, context, cellSize)));
-  const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS);
+  const initiative = projectInitiative(state, listedTokenIds(seen, objects?.tokens, closed), context.rules, context.resources ?? NO_RESOURCES, initiativeRules, context.resourceShows ?? COLLECTION_SHOWS, context.assets);
   const tokens = withTokenLooks(withCombatantSides(seen, initiative, objects?.tokens), state);
   const fog = projectFog(objects?.fog, memo);
   return {

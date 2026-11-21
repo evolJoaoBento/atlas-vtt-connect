@@ -25,12 +25,13 @@ export function turnOf(scene: PlayerScene | null, controlled: ReadonlySet<string
     if (acting.size === 0) return NO_TURN;
     // By sides: every token of an acting side the player controls acts (sides with equal rolls act together); the first named one names it.
     const mine = initiative.entries
-      .filter((entry) => controlled.has(entry.tokenId) && acting.has(listedSide(scene.tokens, entry)) && entry.sitsOut !== true);
-    const named = mine.map((entry) => scene.tokens[entry.tokenId]?.name ?? entry.name).find((name) => !!name) ?? null;
+      .filter((entry) => entry.tokenId !== undefined && controlled.has(entry.tokenId) && acting.has(listedSide(scene.tokens, entry)) && entry.sitsOut !== true);
+    const named = mine.map((entry) => scene.tokens[entry.tokenId ?? '']?.name ?? entry.name).find((name) => !!name) ?? null;
     return { tokenId: null, mine: mine.length > 0, name: named };
   }
   const entry = initiative.entries.find((candidate) => candidate.isActive);
-  if (!entry || !scene.tokens[entry.tokenId]) return NO_TURN;
+  // A combatant without a token (a player at the table, an enemy added by name) has the turn, but no token of theirs does.
+  if (!entry || entry.tokenId === undefined || !scene.tokens[entry.tokenId]) return NO_TURN;
   const mine = controlled.has(entry.tokenId);
   return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
 }
@@ -47,8 +48,8 @@ export function nextTurnOf(scene: PlayerScene | null, controlled: ReadonlySet<st
     const next = sidesNext(initiative);
     if (!next) return NO_TURN;
     const mine = initiative.entries
-      .filter((entry) => controlled.has(entry.tokenId) && next.has(listedSide(scene.tokens, entry)) && entry.sitsOut !== true);
-    const named = mine.map((entry) => scene.tokens[entry.tokenId]?.name ?? entry.name).find((name) => !!name) ?? null;
+      .filter((entry) => entry.tokenId !== undefined && controlled.has(entry.tokenId) && next.has(listedSide(scene.tokens, entry)) && entry.sitsOut !== true);
+    const named = mine.map((entry) => scene.tokens[entry.tokenId ?? '']?.name ?? entry.name).find((name) => !!name) ?? null;
     return { tokenId: null, mine: mine.length > 0, name: named };
   }
   const acting = initiative.entries.findIndex((candidate) => candidate.isActive);
@@ -56,7 +57,10 @@ export function nextTurnOf(scene: PlayerScene | null, controlled: ReadonlySet<st
   const count = initiative.entries.length;
   for (let step = 1; step < count; step++) {
     const entry = initiative.entries[(acting + step) % count]!;
-    if (entry.sitsOut === true || !scene.tokens[entry.tokenId]) continue;
+    if (entry.sitsOut === true) continue;
+    // The next to act has no token of theirs: it is not this player's turn that comes.
+    if (entry.tokenId === undefined) return NO_TURN;
+    if (!scene.tokens[entry.tokenId]) continue;
     const mine = controlled.has(entry.tokenId);
     return { tokenId: entry.tokenId, mine, name: mine ? scene.tokens[entry.tokenId]?.name ?? entry.name : null };
   }
