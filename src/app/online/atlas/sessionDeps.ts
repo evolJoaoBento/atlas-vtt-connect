@@ -81,7 +81,7 @@ export function sessionDeps(atlas: SessionAtlas, { dice, lasers, lighting, token
       onChange: (cb) => atlas.on('settings-changed', (key) => { if (key === 'playerView') cb(); }),
     },
     ...(diceLooks ? { diceLook: diceLooks } : {}),
-    ...(tokens ? { tokenControl: tokenControlPart(tokens, () => movesOnTurn(atlas.settings)) } : {}),
+    ...(tokens ? { tokenControl: tokenControlPart(tokens, () => movesOnTurn(atlas.settings), (p) => atlas.rules.forMap(p).resources) } : {}),
     ...(tokens ? { sheets: sheetHostPart(atlas, statblocks ?? null) } : {}),
     // Players' physical rolls are judged by the rules the board offer tells them.
     ...(dice ? { dice: diceHostPart(dice, diceRules, () => gmRollsShared(atlas.settings)), diceRules } : {}),

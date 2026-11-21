@@ -4,7 +4,7 @@
  * (`TokenMoveHandler`, through Atlas's `tokens.move`, on the sender's scene) and dropping tokens deleted from the
  * scene the GM's view shows. Started after the scene hub and the camera sender, so its messages follow theirs.
  */
-import type { TokensApi } from '@atlas-vtt/api-types';
+import type { ResourceDefinition, TokensApi } from '@atlas-vtt/api-types';
 import type { SessionPlayer } from '../GmSession';
 import type { SceneSession } from '../scene/sceneSources';
 import type { SlotProjection } from '../scene/slotViews';
@@ -20,6 +20,8 @@ export interface TokenControlHostOptions {
   tokens: Pick<TokensApi, 'move'>;
   /** Whether players move only on their turn (`TokenMoveHandler`); without it they move at any time. */
   movesOnTurn?: () => boolean;
+  /** The resources of a map's collection (`TokenMoveHandler`): who is defeated holds no turn by sides. */
+  resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   /** Whether a cutscene runs (`TokenMoveHandler`). */
   cutscene?: { running(): boolean };
 }

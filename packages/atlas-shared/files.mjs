@@ -26,6 +26,7 @@ export const FILES = [
   'initiative/party.ts',
   'initiative/sideOrder.ts',
   'initiative/sides.ts',
+  'initiative/turnHolders.ts',
   'levels/levelObjects.ts',
   'levels/sceneLevels.ts',
   'lighting/lightingConstants.ts',

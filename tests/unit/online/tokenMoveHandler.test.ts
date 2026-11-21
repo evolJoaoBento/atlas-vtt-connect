@@ -294,8 +294,8 @@ describe.each(HUB_PATHS)('players move only on their turn, $atlas', ({ tabs }) =
     imagePath: '', isActive, isDefeated: false, isNPC: false, order,
   });
   /** A fight between the hero and the ally, shown to players; both tokens belong to the player. */
-  async function fight(movesOnTurn: () => boolean) {
-    const w = controlWorld({ movesOnTurn });
+  async function fight(movesOnTurn: () => boolean, rules: { showInitiative?: boolean } = {}) {
+    const w = controlWorld({ movesOnTurn, scene: { rules } });
     w.present();
     const a = await w.join('A');
     w.control.set('hero', a.playerId, true);
@@ -333,7 +333,7 @@ describe.each(HUB_PATHS)('players move only on their turn, $atlas', ({ tabs }) =
     w.finish();
   });
 
-  it('holds nothing without the setting, with no fight running, or with the tracker closed', async () => {
+  it('holds nothing without the setting or with no fight running', async () => {
     const off = await fight(() => false);
     off.start('ally');
     await off.w.tick();
@@ -346,12 +346,27 @@ describe.each(HUB_PATHS)('players move only on their turn, $atlas', ({ tabs }) =
     idle.a.move('hero', 300, 150);
     expect(idle.a.refusals()).toEqual([]);
     idle.w.finish();
+  });
+
+  // Atlas 0.18 (commit ca0a5038, online/gm/turnShare.ts): the hold lasts the whole fight, whatever players are shown of it.
+  it('keeps holding with the tracker closed, and with the list hidden from players', async () => {
     const closed = await fight(() => true);
     closed.start('ally');
     closed.w.store.setState({ initiativeTrackerOpen: false });
     await closed.w.tick();
     closed.a.move('hero', 300, 150);
-    expect(closed.a.refusals()).toEqual([]);
+    expect(closed.a.refusals()).toEqual(['hero']);
+    expect(closed.w.token('hero')).toMatchObject({ x: 140, y: 140 });
+    closed.a.move('ally', 400, 150);
+    expect(closed.a.refusals()).toEqual(['hero']);
     closed.w.finish();
+    const hidden = await fight(() => true, { showInitiative: false });
+    hidden.start('ally');
+    await hidden.w.tick();
+    hidden.a.move('hero', 300, 150);
+    expect(hidden.a.refusals()).toEqual(['hero']);
+    hidden.a.move('ally', 400, 150);
+    expect(hidden.a.refusals()).toEqual(['hero']);
+    hidden.w.finish();
   });
 });

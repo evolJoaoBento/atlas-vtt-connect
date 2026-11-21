@@ -9,7 +9,7 @@
  * map just now (Atlas holds one map at a time, and nothing is ever written to a map it does not hold); more than `MOVES_PER_SECOND` from one player in a second are ignored. A `GmSession` handler;
  * `GmSession` delivers only admitted players' messages.
  */
-import type { TokensApi } from '@atlas-vtt/api-types';
+import type { ResourceDefinition, TokensApi } from '@atlas-vtt/api-types';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import { sceneWorldBounds, type PreviewRect } from '../preview/previewLayout';
 import type { ControlMessage, MoveRefusedReason } from '../protocol';
@@ -18,7 +18,7 @@ import type { SceneSession } from '../scene/sceneSources';
 import type { ScenePoint } from '../scene/sceneTypes';
 import type { SlotProjection } from '../scene/slotViews';
 import type { TokenControl } from './TokenControl';
-import { heldOffTurn } from './turnHold';
+import { movesOutOfTurn } from './turnHold';
 
 export const MOVES_PER_SECOND = 10;
 
@@ -33,6 +33,8 @@ export interface TokenMoveHandlerOptions {
   tokens: Pick<TokensApi, 'move'>;
   /** Whether the GM lets players move only on their turn (Atlas's "Players move only on their turn"); asked at each move. Without it they may move at any time. */
   movesOnTurn?: () => boolean;
+  /** The resources of the collection holding a map, by which a combatant is defeated (a defeated one holds no turn by sides); without them nobody is. */
+  resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   /** While a cutscene runs, players' tokens do not move; without it they move as ever. */
   cutscene?: { running(): boolean };
 }
@@ -81,8 +83,6 @@ export class TokenMoveHandler implements SessionHandler {
     const slot = projection.slotOf(playerId);
     const scene = slot?.lastSent;
     if (!slot || !scene || scene.sceneId !== move.sceneId) return false;
-    // During a fight the token must have the turn, where the GM asks for that: judged on what the player was sent.
-    if (this.options.movesOnTurn?.() === true && heldOffTurn(scene, move.tokenId)) return false;
     // Checked before the clamp: a clamp would turn an infinite coordinate into a point on the map's edge.
     if (!Number.isFinite(move.x) || !Number.isFinite(move.y)) return false;
     const { x, y } = clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene));
@@ -91,6 +91,9 @@ export class TokenMoveHandler implements SessionHandler {
     // The player's own token on the scene they have, and Atlas shows another map or is still loading this one.
     if (!snapshot) return Object.hasOwn(scene.tokens, move.tokenId) ? 'not-held' : false;
     if (!Object.hasOwn(scene.tokens, move.tokenId) || !Object.hasOwn(snapshot.objects.tokens, move.tokenId)) return false;
+    // During a fight the token must have the turn, where the GM asks for that: judged on the GM's own store for the whole
+    // fight (Atlas 0.18's `movesOutOfTurn`), whatever the players are shown of it, the list hidden or the tracker closed.
+    if (this.options.movesOnTurn?.() === true && movesOutOfTurn(snapshot, this.options.resources?.(slot.mapPath) ?? [], move.tokenId)) return false;
     // Atlas refuses a hidden token itself (no `allowHidden`), also one hidden since the hub's last tick.
     return tokens.move(slot.tab.viewId, [{ tokenId: move.tokenId, x, y }], { snap: true, clampToMap: true }).ok;
   }

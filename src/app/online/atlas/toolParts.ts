@@ -1,5 +1,5 @@
 /** Players' tokens, dice and lasers as hosted parts, over Atlas's `tokens`, `dice` and `lasers` (each exists only on an Atlas that has the capability). */
-import type { AtlasExtension, Character, DiceApi, LasersApi, SettingsApi, TokensApi, ViewId } from '@atlas-vtt/api-types';
+import type { AtlasExtension, Character, DiceApi, LasersApi, ResourceDefinition, SettingsApi, TokensApi, ViewId } from '@atlas-vtt/api-types';
 import type { OptionalParts } from '../hostedSession';
 import { TokenControlHost } from '../control/TokenControlHost';
 import { DiceHost, foldedRequest, SHEET_AWARE_DICE } from '../tools/DiceHost';
@@ -13,8 +13,8 @@ import type { StockMeasures } from '../../../connect/stockMeasures';
 import type { SheetCard } from '../../../../packages/atlas-host/src/sheets/sheetCards';
 
 /** The tokens the GM assigns players, moved through Atlas's `tokens.move`; without `tokens` there is no host and no control list is sent. */
-export function tokenControlPart(tokens: TokensApi, movesOnTurn?: () => boolean): NonNullable<OptionalParts['tokenControl']> {
-  return ({ session, projection, cutscene }) => new TokenControlHost({ session, projection, tokens, ...(movesOnTurn ? { movesOnTurn } : {}), ...(cutscene ? { cutscene } : {}) });
+export function tokenControlPart(tokens: TokensApi, movesOnTurn?: () => boolean, resources?: (mapPath: string | null) => readonly ResourceDefinition[]): NonNullable<OptionalParts['tokenControl']> {
+  return ({ session, projection, cutscene }) => new TokenControlHost({ session, projection, tokens, ...(movesOnTurn ? { movesOnTurn } : {}), ...(resources ? { resources } : {}), ...(cutscene ? { cutscene } : {}) });
 }
 
 /**
