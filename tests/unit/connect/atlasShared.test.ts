@@ -36,6 +36,14 @@ describe('atlas-shared: Atlas 0.15.0 placement, heights and levels', () => {
     expect(Math.hypot(large.x - 80, large.y - 80)).toBeLessThanOrEqual(Math.hypot(35, 35));
   });
 
+  it('snaps a Tiny token (0.75) to the quarter of the cell nearest the pointer and a Small one (0.875) to the cell centre, as Atlas 0.18 does', () => {
+    const toCell = (point: { x: number; y: number }) => ({ x: Math.floor(point.x / 70) * 70 + 35, y: Math.floor(point.y / 70) * 70 + 35 });
+    // The pointer in the cell's top-left quarter and in its bottom-right one: the preview follows the pointer.
+    expect(snapTokenCenter({ x: 20, y: 20 }, 0.75, 'square', 70, toCell)).toEqual({ x: 17.5, y: 17.5 });
+    expect(snapTokenCenter({ x: 60, y: 60 }, 0.75, 'square', 70, toCell)).toEqual({ x: 52.5, y: 52.5 });
+    expect(snapTokenCenter({ x: 60, y: 60 }, 0.875, 'square', 70, toCell)).toEqual({ x: 35, y: 35 });
+  });
+
   it('reads a height in game units, and counts it in cells only where a cell spans a distance', () => {
     expect(tokenHeight({ elevation: 10 })).toBe(10);
     expect(tokenHeight({ elevation: 'x' })).toBe(0);

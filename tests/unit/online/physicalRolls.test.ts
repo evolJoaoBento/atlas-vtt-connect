@@ -24,6 +24,11 @@ describe('critOf and totalOf', () => {
     expect(critOf({ defaultRoll: '1d20', crit: 'none' }, [rolled('d20', 20, 20)])).toBeUndefined();
   });
 
+  it('calls a pool that mixes in other dice no crit (Atlas 0.18 `aloneWith`), but keeps a roll with only its advantage die', () => {
+    expect(critOf(D20, [rolled('d20', 20, 20), rolled('d4', 3, 4)])).toBeUndefined();
+    expect(critOf(D20, [rolled('d20', 20, 20), rolled('d20', 4, 20, { dropped: true })])).toBe('success');
+  });
+
   it("reads the default dice as Atlas does: the first of each group the rules roll, so Tabletop's board and the GM's log agree", () => {
     expect(critOf(D20, [rolled('d20', 5, 20), rolled('d20', 20, 20)])).toBeUndefined();
     expect(critOf({ defaultRoll: '2d10', crit: 'doubles' }, [rolled('d10', 7, 10)])).toBeUndefined();

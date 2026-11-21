@@ -1,6 +1,6 @@
 // The stock Atlas VTT files copied verbatim into packages/atlas-shared/src/app, relative to Atlas's src/app.
 // To add one: list it here, run `npm run sync:shared -- --atlas <checkout>`, and export what is needed from src/index.ts.
-export const ATLAS_TAG = '0.16.0';
+export const ATLAS_TAG = '0.18.0';
 export const FILES = [
   // Atlas 0.16's reader of drawings and texts: what is drawn, what is hidden from players, what is passed over.
   'annotations/annotationFit.ts',
@@ -23,6 +23,7 @@ export const FILES = [
   'grid/squareLattice.ts',
   'initiative/defeated.ts',
   'initiative/initiativeDice.ts',
+  'initiative/party.ts',
   'initiative/sideOrder.ts',
   'initiative/sides.ts',
   'levels/levelObjects.ts',

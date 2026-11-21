@@ -145,6 +145,7 @@ export * from './app/resources/resourceTypes';
 export { fightSides, listedBySides, listedSides, sideOf, type ListedSide } from './app/initiative/sides';
 export { activeSides, enterSideRound, fightSideIds, rollSides, roundTurns } from './app/initiative/sideOrder';
 export { combatantDefeated, defeatedCombatants } from './app/initiative/defeated';
+export { collectionParty, entrySide, entryToken } from './app/initiative/party';
 export * as initiativeSideRules from './app/gameSystems/initiativeSideRules';
 export * as diceRules from './app/gameSystems/diceRules';
 
