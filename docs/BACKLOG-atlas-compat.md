@@ -83,6 +83,18 @@ Atlas 0.12.0 ("TrueScale and the player window bar") and Atlas Online's changes 
 - [x] **Shim header.** Says 0.7 to 0.12 now; `lightingIsStandard` passes 0.12.0.
 - Not Connect's: TrueScale, the saved frames of the players' TV (`playerFrames` in the map file), the 4K player view and full screen. They concern the local player window, which Connect's players do not use.
 
+## Atlas 0.19 (2026-11-22): what is new for hosted players
+
+Read from the source diff of the tags 0.18.0 and 0.19.0, not run against a live 0.19. `packages/atlas-shared` is resynced to 0.19.0.
+
+- [x] **Sides in the order the GM dragged them into (0.19 `sideOrder`).** Done: the players' side list before a fight by sides starts follows it (`inSideOrder`); a running fight keeps its own order. A page of before 0.19 still lists the sides as the rules do (its `first` is the rules').
+- [x] **Nothing Connect's stock shim reads changed.** The map view store keeps its shape (`exploredForgotten` is added and optional), the settings service only gains `hiddenSoundOffers`, the dice tool's roll is the same (a side only asked for still rolls as is), and the lighting controller only gains a per-floor memory forget (`ForgottenFloors`; a forgotten floor's mask is simply none, which Connect already reads).
+- [ ] **Players' range marks (0.19 Ranges).** Atlas Online players now see the GM's range check and rings of Ranges (`Measurements.ranges`, `RemoteRanges`), by the rule measurements follow (the tokens they stand on are seen), and keep or drop their own measurements (`PlayerMeasureKeep`, `PlayerMeasureDrop`). Connect shows none of this.
+- [ ] **Dice sets with no advantage (0.19).** A collection without a system now rolls a plain d20 and Cairn-like sets offer no advantage; Atlas hides the choice, Connect's dice tray still offers it on a lone d20 (Atlas rolls the roll as it is).
+- [ ] **A card gliding to its new place when the GM reorders the list, and the foot shade of the list (0.19 `turnKept`, `bottom-shade`).** Looks of Atlas's own player window; Connect's list has neither.
+- [ ] **Floors forgotten together (0.19 Forget explored areas, `exploredForgotten`).** Atlas Online players drop what they remember of every floor; Connect has no player-side memory, so nothing to drop.
+- Not Connect's: the Sound remote (a phone page that plays the GM's sounds), Sound downloads and the music pack offers, the collection's sound sorting, `Ranges` hotkeys and the Patreon link.
+
 ## P2: Atlas Online compatibility (small, in the order to do them)
 
 Features Atlas Online has that players of Connect would notice first. Each is smaller than a whole Online feature.

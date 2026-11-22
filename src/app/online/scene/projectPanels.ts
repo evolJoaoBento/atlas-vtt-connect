@@ -134,6 +134,7 @@ function sideRowsOf(state: InitiativeState, rules: PlayerViewRules, initiativeRu
     fight: stored,
     rulesSides: readRuleSides((initiativeRules as { sides?: unknown }).sides),
     firstSide: oneOf(PLAYER_SIDES, initiativeRules.firstSide, 'players'),
+    sideOrder: (initiative as { sideOrder?: unknown }).sideOrder,
   });
 }
 

@@ -79,6 +79,11 @@ function readOrder(value: unknown): RuleSide[] | null {
   return order.length > 0 ? order : null;
 }
 
+/** The ids of a stored `sideOrder`, texts only; none where it is no list. */
+function readSideOrder(value: unknown): string[] | undefined {
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : undefined;
+}
+
 /** This round's rolls (`rolls[round]`), finite ones only; undefined where none are in. */
 function readRolls(fight: Record<string, unknown>, round: number): Map<string, number> | undefined {
   if (!isRecord(fight.rolls)) return undefined;
@@ -110,15 +115,18 @@ export interface SideRowsInput {
   /** The collection's sides, when it names any besides the two built-in ones. */
   rulesSides: readonly RuleSide[] | undefined;
   firstSide: PlayerSide;
+  /** Atlas 0.19: the order the GM dragged the sides into before a fight (`InitiativeState.sideOrder`), as stored; anything but a list is none. */
+  sideOrder?: unknown;
 }
 
 /**
  * The list the player window shows (`Y2e`): the collection's sides before a fight; in one, the fight's sides in the order
  * they act this round, each with its roll, those whose turn it is marked. At most eight.
  */
-export function sideRows({ active, round, fight, rulesSides, firstSide }: SideRowsInput): SideRow[] {
+export function sideRows({ active, round, fight, rulesSides, firstSide, sideOrder }: SideRowsInput): SideRow[] {
   if (!active || !isRecord(fight)) {
-    return (rulesSides ?? defaultSides(firstSide)).slice(0, SIDE_LIMITS.sides).map((side) => ({ id: side.id, name: sideName(side), roll: null, turn: false }));
+    // Atlas's own `inSideOrder` (`listedSides`): those the GM's order names first, the rest after them as the rules have them.
+    return initiativeSideRules.inSideOrder(rulesSides ?? defaultSides(firstSide), readSideOrder(sideOrder)).slice(0, SIDE_LIMITS.sides).map((side) => ({ id: side.id, name: sideName(side), roll: null, turn: false }));
   }
   const first = isBuiltInSide(fight.first) ? fight.first : firstSide;
   const order = readOrder(fight.order) ?? defaultSides(first);

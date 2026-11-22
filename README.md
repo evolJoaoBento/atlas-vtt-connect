@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.15.0 to 0.18.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.9.0 (the same fusion release).
+**Compatible with Atlas VTT 0.15.0 to 0.19.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.9.0 (the same fusion release).
 
 **Atlas VTT 0.16's drawings and texts:** a drawing or text you hide from your players in Atlas is never sent to them (the scene, a cutscene, a split party, a shared map). Filled shapes (solid or soft, with their holes), lines of no width and stamps by any pin symbol, turned, reach players as Atlas draws them; dashed lines, arrowheads and a text's outline look not yet.
 
@@ -80,7 +80,7 @@ Choices are kept with your vault, so you can set them while preparing. A token a
 
 ### Whose turn
 
-Right-click tokens → **Add to Initiative**, roll, and **Start combat** in Atlas's tracker. With the initiative list shown to players, they get the order at the right of their map, "Your turn is next" on the turn before theirs, and "Your turn" with a white ring when it comes. As in Atlas Online (0.18), players see art only: the list never shows initiative numbers, dealt cards or sides' rolls, which stay on your screen. Combatants you hide from players in the tracker are not sent, and the players you add in the collection's Party tab and enemies you add by name are listed (on the players' and the opponents' side). With "Players move only on their turn" on, the hold lasts the whole fight, even with the tracker closed or the list hidden from players.
+Right-click tokens → **Add to Initiative**, roll, and **Start combat** in Atlas's tracker. With the initiative list shown to players, they get the order at the right of their map, "Your turn is next" on the turn before theirs, and "Your turn" with a white ring when it comes. As in Atlas Online (0.18), players see art only: the list never shows initiative numbers, dealt cards or sides' rolls, which stay on your screen. Combatants you hide from players in the tracker are not sent, and the players you add in the collection's Party tab and enemies you add by name are listed (on the players' and the opponents' side). In a fight by sides not yet started, the sides are listed in the order you dragged them into in Atlas 0.19. With "Players move only on their turn" on, the hold lasts the whole fight, even with the tracker closed or the list hidden from players.
 
 ![Initiative, "Your turn is next" and "Your turn"](https://raw.githubusercontent.com/evolJoaoBento/atlas-vtt-connect/main/docs/media/15-initiative.gif)
 
