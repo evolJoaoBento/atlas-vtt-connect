@@ -138,6 +138,7 @@ export {
 } from './app/resources/resourceValues';
 export { isSocket, slottedResources, type SlottedResource } from './app/resources/resourceSlots';
 export { shapeOf, visibleResources } from './app/resources/visibleResources';
+export { PLAYER_AUDIENCES, playerAudience, shownToPlayersOn, withPlayerAudience, type PlayerAudience, type SideHolder } from './app/resources/playerAudience';
 export { remainingShare, RESOURCE_COLORS, resourceColor } from './app/resources/resourceColors';
 export * from './app/resources/resourceTypes';
 

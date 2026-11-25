@@ -15,6 +15,7 @@ import { isDefeated, isSpent, resourceColor, shapeOf } from '../../../../package
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from '@atlas-vtt/api-types';
 import { finiteOr } from './coerce';
 import { collectionShow, type ResourceShow } from './resourceVisibility';
+import type { SideHolder } from '../../../../packages/atlas-shared/src/index';
 import { SCENE_RANGES } from './sceneLimits';
 import type { PlayerResource, PlayerWheel } from './sceneTypes';
 import { visibleResources } from './visibleResources';
@@ -66,7 +67,7 @@ function colorOf(show: ResourceShow, definition: ResourceDefinition, value: Reso
 }
 
 /** The bars the player window draws on `token`, top to bottom. */
-export function projectBars(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): PlayerResource[] {
+export function projectBars(token: ResourceHolder & SideHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = (definition) => collectionShow(definition, token)): PlayerResource[] {
   let darkened = false;
   const bars: PlayerResource[] = [];
   for (const { definition, value, slot, show } of shownResources(token, definitions, showOf)) {
@@ -91,7 +92,7 @@ export function projectBars(token: ResourceHolder, definitions: readonly Resourc
  * The wheels the player window draws beside `token`, in socket order: the resources players see in sockets 2 to 5,
  * each with its numbers, which the window shows in the wheel's middle (`ResourceWheelView`), its wheels at rest.
  */
-export function projectWheels(token: ResourceHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = collectionShow): PlayerWheel[] {
+export function projectWheels(token: ResourceHolder & SideHolder, definitions: readonly ResourceDefinition[], showOf: ShowOf = (definition) => collectionShow(definition, token)): PlayerWheel[] {
   const wheels: PlayerWheel[] = [];
   for (const { definition, value, slot, show } of shownResources(token, definitions, showOf)) {
     if (shapeOf(slot) !== 'wheel') continue;

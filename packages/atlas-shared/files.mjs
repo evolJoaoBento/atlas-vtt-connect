@@ -1,6 +1,6 @@
 // The stock Atlas VTT files copied verbatim into packages/atlas-shared/src/app, relative to Atlas's src/app.
 // To add one: list it here, run `npm run sync:shared -- --atlas <checkout>`, and export what is needed from src/index.ts.
-export const ATLAS_TAG = '0.19.0';
+export const ATLAS_TAG = '0.20.0';
 export const FILES = [
   // Atlas 0.16's reader of drawings and texts: what is drawn, what is hidden from players, what is passed over.
   'annotations/annotationFit.ts',
@@ -11,6 +11,10 @@ export const FILES = [
   'gameSystems/diceRules.ts',
   'gameSystems/diceSets.ts',
   'dice3d/diceLook.ts',
+  // Atlas 0.20: the dice look's colour presets (diceLook.ts reads them).
+  'appearance/colourPresets.ts',
+  'resources/playerAudienceFields.ts',
+  'resources/playerAudience.ts',
   'gameSystems/initiativeSideRules.ts',
   'grid/cellNumbering.ts',
   'grid/gridDistance.ts',
@@ -71,6 +75,9 @@ export const FILES = [
  * would have no type. The shape given here is the least the copied code needs, never more than Atlas's own.
  */
 export const STUB_TYPES = {
+  // Atlas: the token on the map. A stand-in open to every field, with the side and vision Atlas 0.20's playerAudience
+  // picks optional as on Atlas's own (a Pick of `any` would make them required).
+  'types.ts': { TokenEntity: "Partial<Record<'side' | 'vision' | 'resources', any>> & Record<string, any>" },
   // Atlas: `(object: object) => boolean`; its file's run-time closure is 31 files of map stretching.
   'grid/mapStretchObjects.ts': { MovesWithMap: '(object: any) => boolean' },
   // Atlas: one die of a roll; its file is the formula parser. The stand-in has the fields the dice files read and write.
@@ -92,6 +99,8 @@ export const BOUNDARIES = {
     "// Generated boundary stand-in (scripts/sync-atlas-shared.mjs). Atlas's i18n is not copied: its texts are not rules.",
     '// `t` gives the key back, so a label made here is never shown; show Atlas\'s own, or one of the plugin\'s.',
     'export const t = (key: string, ..._rest: unknown[]): string => key;',
+    '/** Atlas: the union of its text keys; any key here. */',
+    'export type MessageKey = string;',
     '',
   ].join('\n'),
 };
