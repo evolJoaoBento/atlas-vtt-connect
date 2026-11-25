@@ -47,7 +47,7 @@ export function fakePresented() {
 }
 
 export function setupStockAtlas() {
-  const { app, plugins } = fakeWorkspaceApp();
+  const { app, plugins, fire } = fakeWorkspaceApp();
   const a = fakeView('view-a', [{ id: 't1', filePath: 'maps/one.atlasmap', displayName: 'One' }, { id: 't2', filePath: 'maps/two.atlasmap', displayName: 'Two' }]);
   const leaves = [{ view: a.view }];
   const workspace = app.workspace as unknown as Record<string, unknown>;
@@ -65,6 +65,6 @@ export function setupStockAtlas() {
   };
   const atlas = { presentedScene: presented, settingsService, manifest: { version: '0.15.0' } };
   plugins['atlas-vtt'] = atlas as never;
-  return { app, plugins, atlas, a, presented, leaves };
+  return { app, plugins, atlas, a, presented, leaves, fire };
 }
 

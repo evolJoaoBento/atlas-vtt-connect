@@ -68,7 +68,12 @@ export class AtlasLink {
 
   start(): void {
     const { workspace } = this.plugin.app;
-    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => { this.stockAtlas = null; this.attach(api); }));
+    // Atlas 0.20 fires api-ready with its own small API (no extension): only an extension API replaces the stand-in.
+    this.plugin.registerEvent(workspace.on('atlas-vtt:api-ready', (api) => {
+      if (!isAtlasApi(api)) return;
+      this.stockAtlas = null;
+      this.attach(api);
+    }));
     this.plugin.registerEvent(workspace.on('atlas-vtt:api-unload', () => this.detach()));
     this.plugin.register(() => this.detach());
     this.attach(this.plugin.app.plugins?.plugins['atlas-vtt']?.api);
