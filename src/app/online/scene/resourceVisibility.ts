@@ -1,7 +1,8 @@
 /**
  * What the GM lets players see of each resource on a token, beyond the collection's own switch: per placed token, and
  * per statblock (every token of that creature). A placed token's choice comes first, then its statblock's, then the
- * collection's default: the resource shown with its numbers where the collection shows it to players, else hidden.
+ * collection's default: the resource shown with its numbers on the tokens the collection shows it to players on (Atlas
+ * 0.20: every token, the party's, the opponents' or none, by the token's side), else hidden.
  *
  * - `both`: the bar or wheel with its numbers, as Atlas's player window shows a resource it shows.
  * - `bar`: the bar or wheel without numbers; the numbers never leave the GM's machine.
@@ -11,6 +12,7 @@
  * Kept by the GM in a file of Connect's storage folder of Atlas, never sent: players only receive what it lets through.
  */
 import type { ResourceDefinition } from '@atlas-vtt/api-types';
+import { shownToPlayersOn, type SideHolder } from '../../../../packages/atlas-shared/src/index';
 
 export const RESOURCE_SHOWS = ['both', 'bar', 'numbers', 'hidden'] as const;
 export type ResourceShow = typeof RESOURCE_SHOWS[number];
@@ -27,8 +29,8 @@ export interface ResourceVisibilityData {
 
 export const NO_RESOURCE_VISIBILITY: ResourceVisibilityData = Object.freeze({ tokens: Object.freeze({}), statblocks: Object.freeze({}) });
 
-/** A token as far as its choices go: its statblock, when it has one. */
-export interface TokenShowsKey {
+/** A token as far as its choices go: its statblock, when it has one, and its side (whose tokens a resource shows on). */
+export interface TokenShowsKey extends SideHolder {
   statblockPath?: string | null | undefined;
   statblockName?: string | null | undefined;
 }
@@ -36,9 +38,12 @@ export interface TokenShowsKey {
 /** How each resource of a token on one map is shown: the token's id and record give its resolver. */
 export type TokenResourceShows = (tokenId: string, token: TokenShowsKey) => (definition: ResourceDefinition) => ResourceShow;
 
-/** The collection's own choice: Atlas's player window shows a resource the collection shows to players, with its numbers. */
-export function collectionShow(definition: ResourceDefinition): ResourceShow {
-  return definition.visibleToPlayers ? 'both' : 'hidden';
+/**
+ * The collection's own choice: Atlas's player window shows a resource, with its numbers, on the tokens the collection
+ * shows it to players on (`shownToPlayersOn`: every token, or only the party's or the opponents' by the token's side).
+ */
+export function collectionShow(definition: ResourceDefinition, token: SideHolder = {}): ResourceShow {
+  return shownToPlayersOn(definition, token) ? 'both' : 'hidden';
 }
 
 /**
@@ -70,13 +75,13 @@ export function resourceShowsFor(data: ResourceVisibilityData, mapPath: string |
       const key = definition.key;
       if (Object.hasOwn(own, key)) return own[key]!;
       if (Object.hasOwn(shared, key)) return shared[key]!;
-      return collectionShow(definition);
+      return collectionShow(definition, token);
     };
   };
 }
 
 /** Every token on every map shows what its collection shows: no choice made. */
-export const COLLECTION_SHOWS: TokenResourceShows = () => collectionShow;
+export const COLLECTION_SHOWS: TokenResourceShows = (_id, token) => (definition) => collectionShow(definition, token);
 
 const isShow = (value: unknown): value is ResourceShow => (RESOURCE_SHOWS as readonly unknown[]).includes(value);
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);

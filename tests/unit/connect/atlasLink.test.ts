@@ -265,6 +265,25 @@ describe('AtlasLink', () => {
       }
     });
 
+    it("keeps following a stock Atlas 0.20 that announces its own API (api-ready without Connect's extension)", () => {
+      vi.useFakeTimers();
+      try {
+        const { link, stops, plugins, atlas, fire } = stockLink('0.20.0');
+        vi.advanceTimersByTime(STOCK_GRACE_MS);
+        expect(link.connected).not.toBeNull();
+        // Atlas 0.20 publishes plugin.api (appearance, tokens) and fires api-ready with it: not an extension API.
+        fire('atlas-vtt:api-ready', { apiVersion: { major: 0, minor: 1 }, atlasVersion: '0.20.0' });
+        expect(link.connected).not.toBeNull();
+        // Atlas reloads in place: the stand-in lets go of the old stores and stands in for the new Atlas.
+        plugins['atlas-vtt'] = { ...atlas } as never;
+        vi.advanceTimersByTime(STOCK_WATCH_MS);
+        expect(stops).toEqual(['stop']);
+        expect(link.connected).not.toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('refuses an Atlas with an extension API whose manifest says it is older than 0.15', () => {
       const { app, plugins } = fakeWorkspaceApp();
       const notices: string[] = [];

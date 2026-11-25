@@ -138,6 +138,7 @@ export {
 } from './app/resources/resourceValues';
 export { isSocket, slottedResources, type SlottedResource } from './app/resources/resourceSlots';
 export { shapeOf, visibleResources } from './app/resources/visibleResources';
+export { PLAYER_AUDIENCES, playerAudience, shownToPlayersOn, withPlayerAudience, type PlayerAudience, type SideHolder } from './app/resources/playerAudience';
 export { remainingShare, RESOURCE_COLORS, resourceColor } from './app/resources/resourceColors';
 export * from './app/resources/resourceTypes';
 
@@ -156,7 +157,7 @@ export { combinedSide, writtenSide, type WrittenSide } from './app/tools/written
 export { explodingFaces, MAX_EXPLOSIONS } from './app/tools/diceExplosion';
 export { DICE_SET_COLOURS, isDieColour, rollingRules } from './app/gameSystems/diceSets';
 // The dice look (Atlas's global `diceColour` / `diceFont`, read with `getDiceLook`): its values and how they are checked.
-export { DEFAULT_DICE_LOOK, isDiceColour, isDiceFont, parseHex, readableInk, type DiceColour, type DiceFont, type DiceLook } from './app/dice3d/diceLook';
+export { DEFAULT_DICE_LOOK, isDiceColour, isDiceFont, parseHex, presetDiceHex, readableInk, type DiceColour, type DiceFont, type DiceLook } from './app/dice3d/diceLook';
 export type { RollingDice } from './app/types/diceSetTypes';
 export type * from './app/types/initiativeRulesTypes';
 export type * from './app/types/initiativeTypes';

@@ -69,6 +69,8 @@ function readResource(value: unknown): ResourceDefinition | null {
     visibleToPlayers: value.visibleToPlayers === true,
   };
   if (value.defeatedWhenSpent === true) resource.defeatedWhenSpent = true;
+  // Atlas 0.20: players see it only on one side's tokens (kept beside `visibleToPlayers: false`).
+  if (value.visibleOnSide === 'players' || value.visibleOnSide === 'opponents') resource.visibleOnSide = value.visibleOnSide;
   if (typeof value.slot === 'number' && Number.isInteger(value.slot) && value.slot >= 0 && value.slot < MAX_RESOURCES) resource.slot = value.slot;
   return Object.freeze(resource) as unknown as ResourceDefinition;
 }

@@ -2,4 +2,4 @@
 export type DrawingStroke = any;
 export type NotePin = any;
 export type TextElement = any;
-export type TokenEntity = any;
+export type TokenEntity = Partial<Record<'side' | 'vision' | 'resources', any>> & Record<string, any>;

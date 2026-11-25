@@ -6,7 +6,8 @@
  */
 import { visibleResources } from '../scene/visibleResources';
 import type { AtlasExtension, Character, ResourceDefinition } from '@atlas-vtt/api-types';
-import { collectionShow, statblockKey, statblockLabel, RESOURCE_SHOWS, type ResourceShow, type ResourceVisibilityStore } from '../scene/resourceVisibility';
+import { playerAudience } from '../../../../packages/atlas-shared/src/index';
+import { statblockKey, statblockLabel, RESOURCE_SHOWS, type ResourceShow, type ResourceVisibilityStore } from '../scene/resourceVisibility';
 import type { EditTokenChoice, EditTokenSectionProvider, EditTokenSectionSpec } from './editTokenSection';
 
 export const RESOURCE_SHOW_LABELS: Readonly<Record<ResourceShow, string>> = {
@@ -21,7 +22,9 @@ export const THIS_TOKEN_LABEL = 'This token';
 /** The heading over a statblock's choices. */
 export const everyTokenLabel = (statblock: string): string => `Every ${statblock}`;
 /** The choice that leaves it to the collection, saying what that shows. */
-export const collectionDefaultLabel = (definition: ResourceDefinition): string => `Map default (${collectionShow(definition) === 'hidden' ? 'hidden' : 'shown'})`;
+export const collectionDefaultLabel = (definition: ResourceDefinition): string => `Map default (${AUDIENCE_LABELS[playerAudience(definition)]})`;
+/** What the collection's own choice (Atlas 0.20's player audience) reads as for the GM. */
+const AUDIENCE_LABELS = { everyone: 'shown', party: 'party only', opponents: 'enemies only', hidden: 'hidden' } as const;
 /** A token's choice that leaves it to its statblock. */
 export const sameAsStatblockLabel = (statblock: string): string => `Same as every ${statblock}`;
 

@@ -1,6 +1,6 @@
 # Connect for Atlas VTT
 
-**Compatible with Atlas VTT 0.15.0 to 0.19.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.9.0 (the same fusion release).
+**Compatible with Atlas VTT 0.15.0 to 0.20.0.** Needs Atlas VTT 0.15 or later. With Tabletop for Atlas VTT, it needs Tabletop 1.9.0 (the same fusion release).
 
 **Atlas VTT 0.16's drawings and texts:** a drawing or text you hide from your players in Atlas is never sent to them (the scene, a cutscene, a split party, a shared map). Filled shapes (solid or soft, with their holes), lines of no width and stamps by any pin symbol, turned, reach players as Atlas draws them; dashed lines, arrowheads and a text's outline look not yet.
 

@@ -23,6 +23,29 @@ const KI = define('ki', { slot: 2 });
 const holder = (resources: Record<string, { current: number; max: number }>): Pick<Character, 'resources'> => ({ resources });
 const showAll = (show: ResourceShow) => () => show;
 
+describe("Atlas 0.20's player audience (visibleOnSide)", () => {
+  const partyHp = define('hp', { visibleToPlayers: false, visibleOnSide: 'players' } as Partial<ResourceDefinition>);
+  const enemyHp = define('hp', { visibleToPlayers: false, visibleOnSide: 'opponents' } as Partial<ResourceDefinition>);
+  const hero = { side: 'players' };
+  const goblin = { side: 'opponents' };
+  const shows = resourceShowsFor(NO_RESOURCE_VISIBILITY, 'maps/cave.md');
+
+  it("shows a party-only resource on the party's tokens and an enemies-only one on the opponents', by the token's side", () => {
+    expect(shows('h', hero)(partyHp)).toBe('both');
+    expect(shows('g', goblin)(partyHp)).toBe('hidden');
+    expect(shows('h', hero)(enemyHp)).toBe('hidden');
+    expect(shows('g', goblin)(enemyHp)).toBe('both');
+    // A token with vision and no side is the party's, as Atlas's sideOf has it.
+    expect(shows('v', { vision: { enabled: true } })(partyHp)).toBe('both');
+  });
+
+  it("puts a side's bar on the wire only for that side's tokens", () => {
+    const hp = holder({ hp: { current: 5, max: 10 } });
+    expect(projectBars({ ...hp, ...hero }, [partyHp])).toHaveLength(1);
+    expect(projectBars({ ...hp, ...goblin }, [partyHp])).toHaveLength(0);
+  });
+});
+
 describe('resourceShowsFor', () => {
   const data: ResourceVisibilityData = {
     tokens: { 'maps/cave.md': { g1: { hp: 'numbers' } } },
