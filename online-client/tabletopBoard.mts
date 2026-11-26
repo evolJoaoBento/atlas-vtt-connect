@@ -4,4 +4,4 @@ import '../vendor/tabletop/tabletop-player-board.css';
 // The Roll dice tray of a cutscene is built of Atlas's classes, which the page has no styles for.
 import './atlas-dice-tray.css';
 
-export { webPlayerBoard } from '../vendor/tabletop/tabletop-player-board.js';
+export { boardDiedLeanest, webPlayerBoard } from '../vendor/tabletop/tabletop-player-board.js';
