@@ -19,13 +19,20 @@ export type { AssetProgress };
 
 export interface DecodedImage {
   /** A playing `<video>` for an animated map's video. */
-  image: ImageBitmap | HTMLImageElement | HTMLVideoElement;
+  image: ImageBitmap | HTMLImageElement | HTMLVideoElement | HTMLCanvasElement;
   width: number;
   height: number;
   release(): void;
+  /** Not decoded (a file only the 3D board reads, by its URL): `image` is a stand-in, never drawn. */
+  urlOnly?: boolean;
 }
 
-export type ImageDecoder = (bytes: ArrayBuffer, mime: AssetMime) => Promise<DecodedImage | null>;
+/**
+ * Image bytes made into something a view draws. `use.boardOnly`: only Tabletop's 3D board reads this file (a material's
+ * map, a stacked scene's floor, a painted background's picture), by its URL; a decoder may then skip decoding it
+ * (`urlOnly`), which a page short of memory must: a set of 4K material maps decoded is hundreds of megabytes.
+ */
+export type ImageDecoder = (bytes: ArrayBuffer, mime: AssetMime, use?: { boardOnly: boolean }) => Promise<DecodedImage | null>;
 
 export interface AssetLoaderOptions {
   cache: Pick<AssetCache, 'get' | 'put'>;
@@ -102,6 +109,8 @@ export class AssetLoader implements PlayerAssetHandler {
   private cutscene: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }> = [];
   /** Files wanted only by a cutscene's revealed scenes. */
   private transient = new Set<string>();
+  /** Files only Tabletop's 3D board reads (by URL): never drawn in 2D. */
+  private boardOnly = new Set<string>();
 
   /** The revealed scenes of the running cutscene and their board files, wanted beside the player's own; empty once it ends. */
   setCutscene(scenes: ReadonlyArray<{ scene: PlayerScene; extras: BoardExtras | null }>): void {
@@ -126,6 +135,16 @@ export class AssetLoader implements PlayerAssetHandler {
     const ids = [...new Set([...own, ...revealed])];
     // What only a cutscene shows lives in memory for the run: it is never written to the device's image store.
     this.transient = new Set(revealed.filter((id) => !own.has(id)));
+    // Files no view draws in 2D: only the board reads them, by URL.
+    const flat = new Set([...sceneAssetIds(this.scene, shown), ...this.cutscene.flatMap((each) => sceneAssetIds(each.scene, { ...shown, minis: true }))]);
+    this.boardOnly = new Set(ids.filter((id) => !flat.has(id)));
+    // One the board alone had (not decoded) and a 2D view now draws too is read again, decoded this time.
+    for (const [id, wanted] of [...this.wanted]) {
+      if (wanted.image?.urlOnly !== true || this.boardOnly.has(id)) continue;
+      this.wanted.delete(id);
+      this.tally.forget(id);
+      wanted.image.release();
+    }
     for (const [id, wanted] of this.wanted) wanted.transient = this.transient.has(id);
     const keep = new Set(ids);
     const cancelled: string[] = [];
@@ -207,7 +226,7 @@ export class AssetLoader implements PlayerAssetHandler {
       this.changed();
       return 'shown';
     }
-    const decoded = await this.options.decode(bytes, mime).catch(() => null);
+    const decoded = await this.options.decode(bytes, mime, { boardOnly: this.boardOnly.has(id) }).catch(() => null);
     if (!this.isCurrent(id, wanted)) {
       decoded?.release();
       return 'gone';

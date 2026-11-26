@@ -6,6 +6,8 @@
  */
 import { isVideoMime, type AssetMime } from '../src/app/online/assets/assetIds';
 import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
+import { imageDimensions } from '../src/app/imageProcessing/imageDimensions';
+import { shrunkSize } from '../src/app/online/assets/imageShrink';
 
 async function viaImageElement(blob: Blob): Promise<DecodedImage | null> {
   const url = URL.createObjectURL(blob);
@@ -57,12 +59,21 @@ async function viaVideoElement(blob: Blob): Promise<DecodedImage | null> {
   return { image: video, width: video.videoWidth, height: video.videoHeight, release };
 }
 
-export async function decodeImage(bytes: ArrayBuffer, mime: AssetMime): Promise<DecodedImage | null> {
+/**
+ * `maxSide`: the longest side a picture is decoded at (a phone's or tablet's page, short of memory: an 8192-pixel map
+ * decoded whole holds a quarter of a gigabyte); it is decoded straight to that size where the browser can. The views
+ * draw a picture at the size the scene gives it, so a smaller one only looks softer up close.
+ */
+export async function decodeImage(bytes: ArrayBuffer, mime: AssetMime, maxSide = Infinity): Promise<DecodedImage | null> {
   const blob = new Blob([bytes], { type: mime });
   if (isVideoMime(mime)) return viaVideoElement(blob);
   if (mime === 'image/svg+xml' || typeof createImageBitmap !== 'function') return viaImageElement(blob);
   try {
-    const bitmap = await createImageBitmap(blob);
+    const size = Number.isFinite(maxSide) ? await imageDimensions(blob).catch(() => null) : null;
+    const fit = size && Math.max(size.width, size.height) > maxSide ? shrunkSize(size.width, size.height, maxSide) : null;
+    const bitmap = fit
+      ? await createImageBitmap(blob, { resizeWidth: fit.width, resizeHeight: fit.height, resizeQuality: 'high' })
+      : await createImageBitmap(blob);
     return { image: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
   } catch {
     return null;

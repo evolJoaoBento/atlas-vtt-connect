@@ -35,7 +35,7 @@ import { SceneSwitch } from './sceneSwitch.mts';
 import { CutsceneKeeper } from '../src/app/online/scene/cutsceneKeeper';
 import { BoardSceneView } from '../src/app/online/obsidian/BoardSceneView';
 import type { DecodedImage } from '../src/app/online/assets/AssetLoader';
-import type { AssetMime } from '../src/app/online/assets/assetIds';
+import { isVideoMime, type AssetMime } from '../src/app/online/assets/assetIds';
 import { Menu } from './menu.mts';
 import { PageToolbar } from './toolbar.mts';
 
@@ -238,9 +238,29 @@ const toolbar = new PageToolbar({
 // The board's own buttons (2D/3D, Eyes, AR) at the toolbar's end.
 toolbar.addGroup(element('board-buttons'));
 let assetsFrame: number | null = null;
-/** The page's images, each with a URL of its bytes too (Tabletop's board loads textures by URL). */
-async function decodeWithUrl(bytes: ArrayBuffer, mime: AssetMime): Promise<DecodedImage | null> {
-  const decoded = await decodeImage(bytes, mime);
+/** A phone's or tablet's page decodes no picture larger than this (`decodeImage`). */
+const PHONE_PICTURE_SIDE = 4096;
+const shortOfMemory = ((): boolean => {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches || Math.min(window.screen.width, window.screen.height) < 700;
+  } catch {
+    return false;
+  }
+})();
+/** Stands in for a picture only the 3D board reads (by URL): never drawn. */
+let standIn: HTMLCanvasElement | null = null;
+/**
+ * The page's images, each with a URL of its bytes too (Tabletop's board loads textures by URL). A file only the board
+ * reads (a material's map, a stacked scene's floor) is not decoded at all: the board decodes it itself, at the size it
+ * draws it, and the page would otherwise hold every map whole (an old iPad's tab is killed by them).
+ */
+async function decodeWithUrl(bytes: ArrayBuffer, mime: AssetMime, use?: { boardOnly: boolean }): Promise<DecodedImage | null> {
+  if (use?.boardOnly && !isVideoMime(mime)) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    standIn ??= Object.assign(document.createElement('canvas'), { width: 1, height: 1 });
+    return { image: standIn, width: 1, height: 1, urlOnly: true, url, release: () => URL.revokeObjectURL(url) } as DecodedImage;
+  }
+  const decoded = await decodeImage(bytes, mime, shortOfMemory ? PHONE_PICTURE_SIDE : Infinity);
   if (!decoded) return null;
   const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
   return { ...decoded, url, release: () => { decoded.release?.(); URL.revokeObjectURL(url); } } as DecodedImage;
