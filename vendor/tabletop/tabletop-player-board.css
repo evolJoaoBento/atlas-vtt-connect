@@ -1508,318 +1508,64 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-condition-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;color:#fff;font-weight:var(--font-bold);line-height:1;background:linear-gradient(to bottom,color-mix(in srgb,var(--atlas-condition-color),#fff 18%),var(--atlas-condition-color) 55%,color-mix(in srgb,var(--atlas-condition-color),#000 20%));box-shadow:0 0 0 1px #111114,inset 0 1px #ffffff59,0 1px 2px #0000004d}
 .atlas-condition-badge--light{color:#16161a}
 
-/* Atlas's initiative tracker (0.8.0, `initiative-tracker.scss` and `token-portrait.scss`), copied rule for rule under
-   Tabletop's root, its classes renamed `tabletop-initiative-*`: Atlas 0.9 restyled its own tracker with global rules
-   on the `atlas-initiative-*` names, which would otherwise reach this one. Atlas fixes it to its window's right edge; here it stands at the board's, centred, clear of the
-   toolbar. Atlas's ring is an image tinted with the token's colour; here a ring of that colour, as wide. */
+/* The initiative tracker: Atlas 0.20's GM tracker (`atlas-initiative-*`, styled by Atlas's own styles.css, as its cards, side
+   headings, shades and round are) drawn as a row across the board's top (`src/board/initiativePanel.ts`). Atlas fixes its
+   column to its window's right edge; this only places the row: centred under the scene tabs, clear of the widgets at the top right
+   and of the toolbar at the foot, scrolling sideways when it holds more than fit. Atlas's bars float above and below its column;
+   a row's stand below it, Roll and Start or End combat at its start and the turn's arrows at its end. */
 .atlas-tabletop-initiative[hidden] { display: none; }
 
-.atlas-tabletop-atlas .tabletop-initiative-tracker {
+.atlas-tabletop-atlas .tabletop-initiative-tracker.atlas-initiative-tracker {
   position: absolute;
-  top: 50%;
-  right: 12px;
-  transform: translateY(-50%);
-  width: 96px;
-  max-height: calc(100% - 2 * 88px);
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px;
+  top: 52px;
+  right: 0;
+  left: 0;
+  width: fit-content;
+  max-width: calc(100% - 2 * 168px);
+  max-height: none;
+  margin-inline: auto;
+  transform: none;
   z-index: 25;
-  font-family: var(--font-interface);
-  pointer-events: auto;
-  box-sizing: border-box;
-  background: var(--background-primary);
-  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 18%, transparent);
-  box-shadow: var(--shadow-l);
-  --atlas-panel-inner-radius: calc(var(--radius-xl) - 1.5px);
-  border-radius: var(--radius-xl);
-  corner-shape: var(--corner-shape, round);
-  overflow: hidden;
 }
 
-.atlas-tabletop-atlas .tabletop-initiative-tracker__controls,
-.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
+/* Atlas's top row card (`player-initiative.scss`): as wide as its column, less the column's border and padding. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-card--tile { width: calc(96px - 2 * 1.5px - 2 * 4px); flex: none; }
+/* The compact view's lines, side by side. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker.atlas-initiative-tracker--compact .atlas-initiative-card { width: 184px; flex: none; }
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-panel__list { flex: 1 1 auto; align-items: stretch; }
+
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__float--top,
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__float--bottom {
+  top: calc(100% + 1.5px + 8px);
+  bottom: auto;
 }
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__round {
-  flex: 1;
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  text-align: center;
-  min-width: 0;
-}
-
-/* The first and last rows sit 8px inside the border: their outer buttons' outer corners run with the panel's. */
-.atlas-tabletop-atlas .tabletop-initiative-tracker__controls > .tabletop-initiative-tracker__btn:first-child { corner-shape: var(--corner-shape, round); border-top-left-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
-.atlas-tabletop-atlas .tabletop-initiative-tracker__controls > .tabletop-initiative-tracker__btn:last-child { corner-shape: var(--corner-shape, round); border-top-right-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
-.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls > .tabletop-initiative-tracker__btn:first-child { corner-shape: var(--corner-shape, round); border-bottom-left-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
-.atlas-tabletop-atlas .tabletop-initiative-tracker__turn-controls > .tabletop-initiative-tracker__btn:last-child { corner-shape: var(--corner-shape, round); border-bottom-right-radius: max(0px, calc(var(--atlas-panel-inner-radius, var(--radius-l)) - 8px)); }
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__btn {
-  flex: 1;
-  height: 36px;
-  padding: 0;
-  border-radius: 8px;
-  transition: all 0.15s ease;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__btn:disabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__btn--end { color: var(--color-red); }
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__btn--pressed {
-  transform: scale(0.9);
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__btn svg {
-  width: 16px;
-  height: 16px;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  scroll-behavior: smooth;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .atlas-tabletop-atlas .tabletop-initiative-tracker__content { scroll-behavior: auto; }
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-tracker__content::-webkit-scrollbar { display: none; }
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__float--top { left: 0; transform: translate(0, var(--atlas-float-nudge)); }
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__float--bottom { left: auto; right: 0; transform: translate(0, var(--atlas-float-nudge)); }
+/* The bars float below a row: they rise from under it. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__float { --atlas-float-nudge: -4px; }
+/* The pointer counts as near the row over it and the room below it, where its bars are: not above, where the scene tabs are. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-tracker__reach { inset: 0 -8px -52px; }
 
 .atlas-tabletop-atlas .tabletop-initiative-tracker__empty {
+  align-self: center;
   margin: 0;
+  padding: 0 8px;
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-muted);
-  text-align: center;
+  white-space: nowrap;
 }
 
-.atlas-tabletop-atlas .tabletop-initiative-side {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* The compact lines are as high as one line of text: the round at the row's end reads along it, not up its height. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker.atlas-initiative-tracker--compact .atlas-initiative-panel__round { writing-mode: horizontal-tb; transform: none; align-items: center; padding: 0 12px 0 16px; }
 
-.atlas-tabletop-atlas .tabletop-initiative-side__label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--text-muted);
-  text-align: center;
-}
+/* Where a dragged card would land: before or after the card it is over. */
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-card.tabletop-initiative-card--drop-before { box-shadow: -3px 0 0 0 var(--interactive-accent); }
+.atlas-tabletop-atlas .tabletop-initiative-tracker .atlas-initiative-card.tabletop-initiative-card--drop-after { box-shadow: 3px 0 0 0 var(--interactive-accent); }
 
-.atlas-tabletop-atlas .tabletop-initiative-side--active .tabletop-initiative-side__label { color: var(--interactive-accent); }
+/* The Connect banner stands below the row while it is open. */
+.atlas-tabletop-initiative:not([hidden]) ~ .atlas-tabletop-banner { top: 164px; }
 
-.atlas-tabletop-atlas .tabletop-initiative-side--active .tabletop-initiative-card:not(.tabletop-initiative-card--sitting-out) {
-  border-color: var(--interactive-accent);
-  box-shadow: inset 0 0 0 1px var(--interactive-accent);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  width: 100%;
-  background: var(--background-modifier-hover);
-  border: 1.5px solid color-mix(in oklch, var(--mono-100, var(--text-normal)) 6%, transparent);
-  border-radius: 8px;
-  cursor: grab;
-  transition: all 0.2s ease;
-  position: relative;
-  box-sizing: border-box;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card:hover {
-  background: var(--background-modifier-active-hover);
-  border-color: color-mix(in oklch, var(--mono-100, var(--text-normal)) 12%, transparent);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card:active {
-  cursor: grabbing;
-  transform: scale(0.96);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card--active {
-  border-color: var(--interactive-accent);
-  box-shadow:
-    inset 0 0 0 1px var(--interactive-accent),
-    inset 0 0 12px color-mix(in oklch, var(--interactive-accent) 25%, transparent);
-  animation: atlas-tabletop-initiative-pulse 2s ease-in-out infinite;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card--defeated {
-  opacity: 0.45;
-  filter: grayscale(70%);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card--sitting-out { opacity: 0.45; }
-
-.atlas-tabletop-atlas .tabletop-initiative-card--hidden .tabletop-initiative-card__portrait { opacity: 0.5; }
-
-.atlas-tabletop-atlas .tabletop-initiative-card--drop-above::before,
-.atlas-tabletop-atlas .tabletop-initiative-card--drop-below::after {
-  content: '';
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  height: 2px;
-  background: var(--interactive-accent);
-  border-radius: 1px;
-  box-shadow: 0 0 8px var(--interactive-accent);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card--drop-above::before { top: -3px; }
-.atlas-tabletop-atlas .tabletop-initiative-card--drop-below::after { bottom: -3px; }
-
-@keyframes atlas-tabletop-initiative-pulse {
-  50% {
-    box-shadow:
-      inset 0 0 0 1px var(--interactive-accent),
-      inset 0 0 16px color-mix(in oklch, var(--interactive-accent) 45%, transparent);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .atlas-tabletop-atlas .tabletop-initiative-card--active { animation: none; }
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__drag-handle { display: none; }
-
-.atlas-tabletop-atlas .tabletop-initiative-card__avatar-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__instance-badge,
-.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge {
-  position: absolute;
-  bottom: -2px;
-  left: -4px;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  background: #000;
-  border: 1.5px solid #555;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  box-sizing: border-box;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge {
-  top: -2px;
-  right: -4px;
-  bottom: auto;
-  left: auto;
-  padding: 0;
-  pointer-events: auto;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__hidden-badge svg {
-  width: 12px;
-  height: 12px;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__portrait { width: 48px; }
-
-.atlas-tabletop-atlas .tabletop-initiative-card__avatar {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--background-secondary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__avatar svg {
-  width: 18px;
-  height: 18px;
-  color: var(--text-muted);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__defeated-overlay {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: var(--text-muted);
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__defeated-overlay svg {
-  width: 24px;
-  height: 24px;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__initiative {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-normal);
-  line-height: 1;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__resources {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__hp-bar {
-  width: 100%;
-  height: 4px;
-  background: color-mix(in oklch, var(--mono-100, var(--text-normal)) 10%, transparent);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.atlas-tabletop-atlas .tabletop-initiative-card__hp-fill {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--atlas-resource-color, var(--color-green));
-  transition: width 0.3s ease;
-}
 
 .atlas-tabletop-atlas .atlas-token-portrait {
   position: relative;
@@ -1950,125 +1696,6 @@ body.atlas-tabletop-player-window .view-header {
 }
 
 /* Atlas 0.18's compact tracker (its Compact view setting; `initiative-tracker-compact.scss`, restated under the board's class names):
-   a line per combatant, the number on a plate, the name beside it, the marks last, over the token's art faded in from the right end. */
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact { width: 216px; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact,
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-tracker__content { gap: 4px; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-side { gap: 4px; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  height: 34px;
-  flex-shrink: 0;
-  gap: 4px;
-  padding: 4px;
-  border-width: 1px;
-  isolation: isolate;
-}
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card:active { transform: none; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card > :not(.tabletop-initiative-card__backdrop) { z-index: 1; }
-.atlas-tabletop-atlas .tabletop-initiative-card__backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: 9px;
-  pointer-events: none;
-}
-.atlas-tabletop-atlas .tabletop-initiative-card__backdrop img {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 75%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 30%;
-  opacity: 0.75;
-  filter: brightness(0.85);
-  mask-image: linear-gradient(to right, transparent 8%, rgb(0 0 0 / 0.45) 50%, #000 90%);
-  transition: opacity 120ms ease-out, filter 120ms ease-out;
-}
-.atlas-tabletop-atlas .tabletop-initiative-card__backdrop--framed img { transform: scale(1.4); transform-origin: 50% 45%; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card:hover .tabletop-initiative-card__backdrop img { opacity: 0.95; filter: none; transition-duration: 0s; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--hidden .tabletop-initiative-card__backdrop { opacity: 0.5; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--hidden .tabletop-initiative-card__name { opacity: 0.6; }
-/* The turn's ring and glow lie over the art, which would cover them on the card itself. */
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--active,
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-side--active .tabletop-initiative-card:not(.tabletop-initiative-card--sitting-out) { box-shadow: none; }
-.atlas-tabletop-atlas .tabletop-initiative-card__backdrop::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--active .tabletop-initiative-card__backdrop::after,
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-side--active .tabletop-initiative-card:not(.tabletop-initiative-card--sitting-out) .tabletop-initiative-card__backdrop::after {
-  box-shadow:
-    inset 0 0 0 1px var(--interactive-accent),
-    inset 0 0 12px color-mix(in oklch, var(--interactive-accent) 25%, transparent);
-}
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--active .tabletop-initiative-card__backdrop::after { animation: atlas-tabletop-initiative-pulse 2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) {
-  .atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card--active .tabletop-initiative-card__backdrop::after { animation: none; }
-}
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__initiative {
-  grid-area: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 4px;
-  border-radius: 5px;
-  border: 1px solid var(--background-modifier-border);
-  background: color-mix(in srgb, var(--background-primary) 70%, transparent);
-}
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__name {
-  grid-area: 1 / 2;
-  display: block;
-  min-width: 0;
-  padding-inline: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: var(--text-normal);
-  text-align: start;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.9), 0 0 6px rgb(0 0 0 / 0.7);
-}
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__marks {
-  grid-area: 1 / 3;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--text-muted);
-}
-.atlas-tabletop-atlas .tabletop-initiative-card__marks:empty { display: none; }
-.atlas-tabletop-atlas .tabletop-initiative-card__marks svg { width: 14px; height: 14px; }
-.atlas-tabletop-atlas .tabletop-initiative-card__marks .tabletop-initiative-card__defeated-mark { display: flex; }
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__instance-badge,
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__hidden-badge { position: static; }
-/* The resource bars that defeat lie along the line's foot. */
-.atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card__resources {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: 1px;
-  width: auto;
-  z-index: 1;
-  pointer-events: none;
-}
-/* A compact line is a dark surface in a light theme too, its art fading into dark under light words. */
-.theme-light .atlas-tabletop-atlas .tabletop-initiative-tracker--compact .tabletop-initiative-card {
-  --background-primary: #1c1c1f;
-  --background-secondary: #2a2a2e;
-  --background-modifier-hover: #26262a;
-  --background-modifier-active-hover: #303035;
-  --background-modifier-border: rgb(255 255 255 / 0.14);
-  --text-normal: #ece6da;
-  --text-muted: rgb(236 230 218 / 0.72);
-  --mono-100: #fff;
-  color-scheme: dark;
-}
 
 .atlas-tabletop-palette__check { margin: 0; }
 
