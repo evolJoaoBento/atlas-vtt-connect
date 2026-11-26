@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { deviceRotation, flatSheet, placeFor, screenTurn, SensorFusion, sheetHeading } from '../../../online-client/ar/fusion.mts';
+import { deviceRotation, flatSheet, placeFor, ScreenTurn, SensorFusion, sheetHeading } from '../../../online-client/ar/fusion.mts';
 import { SHEET_MARKERS, MARKER_MM } from '../../../online-client/ar/markerSheet.mts';
 import { intrinsicsFor, project, type Point } from '../../../online-client/ar/sheetPose.mts';
 
@@ -122,12 +122,13 @@ describe('the fused pose', () => {
   });
 });
 
-describe('screenTurn: which way the screen is turned', () => {
-  it("believes the browser where its angle fits the window, else the lean (an iPad's Safari calls its landscape 0)", () => {
-    expect(screenTurn(90, false, 0, -80, null)).toBe(90);
-    expect(screenTurn(0, false, 5, -85, null)).toBe(90);
-    expect(screenTurn(0, false, 5, 85, null)).toBe(270);
-    expect(screenTurn(null, true, -85, 0, null)).toBe(180);
-    expect(screenTurn(0, false, 3, 2, 270)).toBe(270);
+describe('ScreenTurn: which way the screen is turned', () => {
+  it("believes the browser where its angle fits the window, else the lean, found once and kept (an iPad's Safari calls its landscape 0)", () => {
+    expect(new ScreenTurn().read(90, false, 0, -80)).toBe(90);
+    const turn = new ScreenTurn();
+    expect(turn.read(0, false, 5, -85)).toBe(90);
+    expect(turn.read(0, false, 30, 70)).toBe(90);
+    expect(new ScreenTurn().read(0, false, 5, 85)).toBe(270);
+    expect(new ScreenTurn().read(null, true, -85, 0)).toBe(180);
   });
 });
