@@ -24,7 +24,7 @@ import type { AugmentedView, RoomPlace } from '../../src/app/online/obsidian/pla
 import { readArSettings, saveArSettings, SQUARES_MM, type ArSettings, type Tracking } from './arPrefs.mts';
 import { keepFov, keptFov } from './calibrate.mts';
 import { CalibrationWizard } from './calibrationWizard.mts';
-import { CAMERA_LAG_MS, deviceRotation, SensorFusion } from './fusion.mts';
+import { CAMERA_LAG_MS, deviceRotation, screenTurn, SensorFusion } from './fusion.mts';
 import { MarkerLayout } from './markerLayout.mts';
 import { CARD_MM, CARD_PAGES, CARDS_PER_PAGE, groupOutline, MAT_MM, MAT_PAGES, markerCardsSvg, markerMatSvg, markerSheetSvg, MARKER_MM } from './markerSheet.mts';
 import { coverCrop, coverFrustum, intrinsicsFor, type Intrinsics } from './sheetPose.mts';
@@ -284,9 +284,11 @@ export class ArMode {
   /** The gyroscope's readings, into the fusion. */
   private listenToMotion(): void {
     const win = this.doc.defaultView ?? window;
+    let screen: number | null = null;
     const read = (event: DeviceOrientationEvent): void => {
       if (event.alpha === null || event.beta === null || event.gamma === null) return;
-      const screen = win.screen?.orientation?.angle ?? (win as unknown as { orientation?: number }).orientation ?? 0;
+      const reported = win.screen?.orientation?.angle ?? (win as unknown as { orientation?: number }).orientation ?? null;
+      screen = screenTurn(reported, win.innerHeight >= win.innerWidth, event.beta, event.gamma, screen);
       this.fusion.orient(deviceRotation(event.alpha, event.beta, event.gamma, screen), performance.now());
     };
     win.addEventListener('deviceorientation', read);

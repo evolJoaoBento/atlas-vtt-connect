@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { deviceRotation, flatSheet, placeFor, SensorFusion, sheetHeading } from '../../../online-client/ar/fusion.mts';
+import { deviceRotation, flatSheet, placeFor, screenTurn, SensorFusion, sheetHeading } from '../../../online-client/ar/fusion.mts';
 import { SHEET_MARKERS, MARKER_MM } from '../../../online-client/ar/markerSheet.mts';
 import { intrinsicsFor, project, type Point } from '../../../online-client/ar/sheetPose.mts';
 
@@ -119,5 +119,15 @@ describe('the fused pose', () => {
     // A turn whose sheet stands upright in the world.
     const upright = mul(transpose(deviceRotation(0, 0, 0, 0)), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
     expect(fusion.found(upright, corners, corners, camera, 0)).toBe(false);
+  });
+});
+
+describe('screenTurn: which way the screen is turned', () => {
+  it("believes the browser where its angle fits the window, else the lean (an iPad's Safari calls its landscape 0)", () => {
+    expect(screenTurn(90, false, 0, -80, null)).toBe(90);
+    expect(screenTurn(0, false, 5, -85, null)).toBe(90);
+    expect(screenTurn(0, false, 5, 85, null)).toBe(270);
+    expect(screenTurn(null, true, -85, 0, null)).toBe(180);
+    expect(screenTurn(0, false, 3, 2, 270)).toBe(270);
   });
 });

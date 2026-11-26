@@ -44,6 +44,23 @@ export function deviceRotation(alpha: number, beta: number, gamma: number, scree
   return mul(three, VISION);
 }
 
+/** How far a phone must lean from lying flat (degrees) for its gravity to tell which way the screen is turned. */
+const UPRIGHT_ENOUGH = 25;
+
+/**
+ * How far the screen is turned from the phone's portrait (degrees; 90 with the phone's top to the left), for
+ * `deviceRotation`, as Tabletop's eye view finds it (its `screenTurn`): the browser's angle where it agrees with the
+ * window's shape (an iPad's Safari calls its landscape 0, which turned the view a quarter), else the phone's lean
+ * (`beta`, `gamma`); lying flat, `last` stays.
+ */
+export function screenTurn(reported: number | null, portraitWindow: boolean, beta: number, gamma: number, last: number | null): number {
+  const angle = reported === null ? null : ((reported % 360) + 360) % 360;
+  if (angle !== null && (angle === 0 || angle === 180) === portraitWindow) return angle;
+  if (last !== null && (last === 0 || last === 180) === portraitWindow && Math.abs(beta) < UPRIGHT_ENOUGH && Math.abs(gamma) < UPRIGHT_ENOUGH) return last;
+  if (portraitWindow) return beta < 0 ? 180 : 0;
+  return gamma < 0 ? 90 : 270;
+}
+
 /** The sheet lying flat with heading `heading`: the turn taking its directions (x right, y down the page, z into the table) to the world's. */
 export function flatSheet(heading: number): Matrix {
   const c = Math.cos(heading);
