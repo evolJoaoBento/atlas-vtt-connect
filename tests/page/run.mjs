@@ -23,6 +23,7 @@ copyFileSync('tests/page/boardPage.html', join(out, 'index.html'));
 // The AR worker, where the page's chunk asks for it (vite names it so in the real build).
 copyFileSync(join(out, 'trackerWorker.js'), join(out, 'trackerWorker.mts'));
 copyFileSync('online-client/style.css', join(out, 'style.css'));
+copyFileSync('online-client/atlas-initiative.css', join(out, 'atlas-initiative.css'));
 
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mts': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png' };
 const server = createServer((request, response) => {
@@ -288,6 +289,21 @@ async function run(engine, label, device) {
     return { side: board.quality.textureSide, noLayers: board.quality.noLayers, ratio: board.quality.maxPixelRatio, layers: board.layerViews?.size ?? 0, mark: JSON.parse(localStorage.getItem(key) ?? 'null') };
   }, KEY);
   check(tag('after a death with the board up, the board comes back leaner: small textures, lower resolution, no layers'), lean.side === 2048 && lean.noLayers === true && lean.ratio < 1 && lean.layers === 0 && lean.mark?.running === true && lean.mark?.crashes === 2, JSON.stringify(lean));
+  // The fight's order is a row across the top, centred, the turn in Atlas's accent ring; it stays inside the window.
+  await page.evaluate(() => {
+    const { view, scene } = window.pageTest;
+    const entry = (tokenId, isActive) => ({ id: tokenId, tokenId, initiative: 0, name: tokenId, hp: null, hpShare: 0.5, isActive });
+    view.setScene({ ...scene, initiative: { round: 2, active: true, entries: [entry('mine', false), entry('theirs', true)] } });
+  });
+  await wait(300);
+  const row = await page.evaluate(() => {
+    const panel = document.getElementById('initiative-panel');
+    const box = panel.getBoundingClientRect();
+    const cards = [...panel.querySelectorAll('.atlas-initiative-card')].map((card) => card.getBoundingClientRect());
+    return { hidden: panel.hidden, left: box.left, right: box.right, top: box.top, width: box.width, height: box.height, vw: innerWidth, vh: innerHeight, cards: cards.length, sameRow: cards.every((c) => Math.abs(c.top - cards[0].top) < 1), active: panel.querySelectorAll('.atlas-initiative-card--active').length };
+  });
+  check(tag('the initiative list is a row at the top centre of the window'), !row.hidden && row.cards === 2 && row.sameRow && row.active === 1 && Math.abs((row.left + row.right) / 2 - row.vw / 2) < 3 && row.top < row.vh * 0.2 && row.width > row.height && row.left >= 0 && row.right <= row.vw, JSON.stringify(row));
+  await shoot('initiative-row');
   await page.click('#dimension-button');
   await wait(300);
   await page.evaluate((key) => localStorage.removeItem(key), KEY);

@@ -121,7 +121,7 @@ describe('MapView', () => {
       initiative: { round: 1, active: true, entries: [{ id: 'e1', tokenId: 't1', initiative: 12, name: 'Ana', hp: null, isActive: true }] },
     }));
     expect(t.buttons.hidden).toBe(true);
-    panel.querySelector<HTMLElement>('.initiative-card')!.click();
+    panel.querySelector<HTMLElement>('.atlas-initiative-card')!.click();
     expect(t.buttons.hidden).toBe(false);
     t.follow.click();
     expect(t.buttons.hidden).toBe(true);

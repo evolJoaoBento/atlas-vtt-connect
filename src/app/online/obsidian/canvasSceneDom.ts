@@ -107,7 +107,7 @@ export function buildSceneDom(parent: HTMLElement): SceneDom {
   // The token card under the mouse (`HoverCardView`), placed in the window's coordinates.
   const hoverCard = root.createDiv({ cls: 'hover-card' });
   hoverCard.hidden = true;
-  // The fight's order, as Atlas's player window floats it at the right edge (`InitiativeView`).
+  // The fight's order, as Atlas's player window shows it, a row across the top (`InitiativeView`).
   const initiative = root.createDiv({ cls: 'initiative-panel', attr: { role: 'region', 'aria-label': 'Initiative order' } });
   initiative.hidden = true;
   // Atlas's Ctrl/Cmd+hover stat block preview of the player's tokens (`StatblockPreviewView`), in the window's coordinates.

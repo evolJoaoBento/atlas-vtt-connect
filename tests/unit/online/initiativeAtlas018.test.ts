@@ -177,16 +177,16 @@ describe('the initiative column draws art and names only', () => {
     });
     expect(panel.querySelector('.initiative-side-roll')).toBeNull();
     expect(panel.textContent).not.toMatch(/14|9/);
-    expect(panel.querySelector('.initiative-side')?.getAttribute('aria-label')).toBe('Players');
+    expect(panel.querySelector('.atlas-initiative-side')?.getAttribute('aria-label')).toBe('Players');
   });
 
   it('lists a combatant without a token by its name and turn, offers no find, and by sides stands it under its own side', () => {
     const found: string[] = [];
     const { panel, show } = setup(() => null, (id) => found.push(id));
     show({ round: 1, active: true, entries: [entryOf('ana'), tokenless({ isActive: true })] });
-    const cards = [...panel.querySelectorAll('.initiative-card')] as HTMLElement[];
-    expect(cards.map((card) => card.querySelector('.initiative-name')?.textContent)).toEqual(['ana', 'Imp']);
-    expect(cards[1]!.classList.contains('is-active')).toBe(true);
+    const cards = [...panel.querySelectorAll('.atlas-initiative-card')] as HTMLElement[];
+    expect(cards.map((card) => card.querySelector('.atlas-initiative-card__name')?.textContent)).toEqual(['ana', 'Imp']);
+    expect(cards[1]!.classList.contains('atlas-initiative-card--active')).toBe(true);
     expect(cards[1]!.classList.contains('is-findable')).toBe(false);
     cards[1]!.click();
     expect(found).toEqual([]);
@@ -194,9 +194,9 @@ describe('the initiative column draws art and names only', () => {
       round: 1, active: true, entries: [entryOf('ana'), tokenless()], sides: { first: 'players', active: 'opponents' },
       sideList: [{ id: 'players', name: 'Players' }, { id: 'opponents', name: 'Opponents', turn: true }],
     });
-    const groups = [...panel.querySelectorAll('.initiative-side')];
-    expect(groups.map((group) => [group.querySelector('.initiative-side-label')?.textContent, group.querySelectorAll('.initiative-card').length])).toEqual([['Players', 1], ['Opponents', 1]]);
-    expect(groups[1]!.classList.contains('is-active')).toBe(true);
+    const groups = [...panel.querySelectorAll('.atlas-initiative-side')];
+    expect(groups.map((group) => [group.querySelector('.atlas-initiative-side__label')?.textContent, group.querySelectorAll('.atlas-initiative-card').length])).toEqual([['Players', 1], ['Opponents', 1]]);
+    expect(groups[1]!.classList.contains('atlas-initiative-side--active')).toBe(true);
   });
 
   it('asks for the art of a combatant without a token by the id it was sent', () => {

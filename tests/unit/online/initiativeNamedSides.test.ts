@@ -264,12 +264,12 @@ describe('the list and the summary for named sides', () => {
     const panel = document.createElement('div');
     document.body.replaceChildren(panel);
     new InitiativeView({ panel, images: () => null }).update(sceneOf(initiative));
-    const groups = [...panel.querySelectorAll('.initiative-side')];
+    const groups = [...panel.querySelectorAll('.atlas-initiative-side')];
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual(['goblins', 'opponents', 'players', 'wolves']);
-    expect(groups.map((group) => group.classList.contains('is-active'))).toEqual([true, true, false, false]);
-    expect(groups[0]!.querySelector('.initiative-side-label')?.textContent).toBe('goblins');
+    expect(groups.map((group) => group.classList.contains('atlas-initiative-side--active'))).toEqual([true, true, false, false]);
+    expect(groups[0]!.querySelector('.atlas-initiative-side__label')?.textContent).toBe('goblins');
     expect(groups[0]!.querySelector('.initiative-side-roll')).toBeNull();
-    expect(groups.map((group) => group.querySelectorAll('.initiative-card').length)).toEqual([1, 1, 1, 1]);
+    expect(groups.map((group) => group.querySelectorAll('.atlas-initiative-card').length)).toEqual([1, 1, 1, 1]);
   });
 
   it('lists the same in the text summary', () => {
