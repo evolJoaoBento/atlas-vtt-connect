@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { measureKind, measureToSpell, MEASURE_LIMITS, readExtra, type MeasureRecord } from '../../../packages/atlas-host/src/spellMeasure';
 import type { Spell, SpellAbout } from '../../../src/app/online/tools/spells';
-import { ANA, BEN, CARA, MAP, measureWorld } from './measureWorld';
+import { ANA, BEN, CARA, measureWorld } from './measureWorld';
 
 const sphere: Spell = { shape: 'sphere', from: 'point', at: { x: 400, y: 300, h: 10 }, yaw: 0.5, pitch: 0, roll: 0, size: 140, length: 0, angle: 0.93, effect: 'fire' };
 const lasting: SpellAbout = { line: '2nd-level', properties: [['Duration', 'Concentration, up to 1 minute']], text: 'It lasts.' };
@@ -32,14 +32,13 @@ describe("players' spells are kept in Atlas's measures", () => {
     expect([kept.by, readExtra(kept)?.owner]).toEqual(['Ben', 'p2']);
   });
 
-  it('an instantaneous spell is flashed to the scene and the board, and kept nowhere', () => {
+  it('an instantaneous spell is kept like any other, until its caster or the GM takes it off', () => {
     const w = measureWorld();
     w.send(ANA, cast({ name: 'Fireball', about: instant, rules: { push: 10 } }));
-    expect(w.list()).toEqual([]);
-    expect(w.transactions()).toBe(0);
-    const flash = w.lastOf('p2', 'spell-flash')!;
-    expect(flash.cast).toMatchObject({ owner: 'p1', name: 'Fireball', rules: { push: 10 }, spell: { shape: 'sphere' } });
-    expect(w.flashes).toEqual([[MAP, flash.cast]]);
+    expect(w.list()).toHaveLength(1);
+    expect(readExtra(record(w.list()[0]))).toMatchObject({ kind: 'spell', owner: 'p1', name: 'Fireball', rules: { push: 10 } });
+    expect(w.lastOf('p2', 'spell-flash')).toBeUndefined();
+    expect(w.flashes).toEqual([]);
   });
 
   it('an instantaneous spell that summons is kept: its going is what offers to take its summons off', () => {
@@ -79,14 +78,10 @@ describe("players' spells are kept in Atlas's measures", () => {
     ]);
   });
 
-  it('an instantaneous spell taken off again by its board is no write: nothing is refused, though Atlas holds another map', () => {
+  it('an older board taking a flash of its own off is no write: nothing is refused, though Atlas holds another map', () => {
     const away = measureWorld();
     away.hold('maps/other.atlasmap');
-    away.send(ANA, cast({ name: 'Fireball', about: instant }));
-    const flash = away.lastOf('p2', 'spell-flash')!;
-    away.tick();
-    // The player's board takes its own instantaneous spell off a moment after the cast.
-    away.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', remove: (flash.cast as { id: string }).id });
+    away.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', remove: 'f1' });
     expect(away.sent.filter(([, m]) => m.type === 'map-refused')).toEqual([]);
   });
 

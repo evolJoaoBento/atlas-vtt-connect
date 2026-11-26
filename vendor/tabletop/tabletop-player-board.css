@@ -356,6 +356,12 @@
 /* Cinematic mode: the toolbar stays above the bars and the fade (the cinema layer is 200); the palette sits above both. */
 .tabletop-cinematic-mode .atlas-tabletop-toolbar-row { z-index: 205; }
 .tabletop-cinematic-mode .atlas-tabletop-atlas-ui { position: relative; z-index: 220; }
+/* Tabletop's switches and choices in the command palette (modes, fog, GM view, lighting presets) keep their icon, in
+   the accent while on, where Atlas would draw a checkbox. */
+.atlas-tabletop-command-icon { display: flex; align-items: center; justify-content: center; }
+.atlas-tabletop-command-icon svg { width: 16px; height: 16px; }
+.atlas-command-item-icon .atlas-tabletop-command-icon.is-on,
+.atlas-command-item.atlas-focused .atlas-command-item-icon .atlas-tabletop-command-icon.is-on { color: var(--interactive-accent); }
 /* The GM switches scenes while making cutscenes: the scene tabs stay above the bars, in Cinematic mode and the editor. */
 .tabletop-cinematic-mode .atlas-tabletop-scene-tabs,
 .tabletop-authoring .atlas-tabletop-scene-tabs { z-index: 210; }

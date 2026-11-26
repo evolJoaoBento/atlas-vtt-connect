@@ -73,13 +73,14 @@ describe('spells the GM asks of a token', () => {
     expect(spellsOf(w).some(({ spell }) => spell.caster === 'wizard')).toBe(true);
   });
 
-  it("an ask whose words say it is instantaneous is flashed when cast, and the ask is answered", () => {
+  it("an ask whose words say it is instantaneous is kept when cast, as any other, and the ask is answered", () => {
     const w = world();
     const about = { line: 'Level 3 Evocation', properties: [['Duration', 'Instantaneous']] as Array<[string, string]>, text: 'A bright streak.' };
     w.host.requestSpell('s1', 'wizard', { ...fireball, about });
     w.send(ANA, { v: 1, type: 'map-spell', sceneId: 's1', add: aimed, request: 'a1' });
-    expect(w.list()).toEqual([]);
-    expect(w.lastOf('p3', 'spell-flash')?.cast).toMatchObject({ owner: 'p1', name: 'Fireball', spell: { shape: 'sphere', caster: 'wizard' } });
+    expect(w.list()).toHaveLength(1);
+    expect(w.lastOf('p3', 'spell-flash')).toBeUndefined();
+    expect(spellsOf(w)[0]).toMatchObject({ spell: { shape: 'sphere', caster: 'wizard' }, extra: { owner: 'p1', name: 'Fireball' } });
     expect(w.notify).toHaveBeenCalledWith('Ana cast Fireball.');
     expect(w.host.requestOf('s1', 'wizard')).toBeNull();
   });

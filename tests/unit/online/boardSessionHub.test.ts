@@ -59,7 +59,7 @@ describe('BoardSessionHub', () => {
     expect(w.hub).not.toHaveProperty('castSpell');
   });
 
-  it("the GM's instantaneous spell is flashed to the scene's players, and a player's reaches the board as a mark", () => {
+  it("the GM's flashed spell goes to the scene's players; a player's instantaneous one is kept, so it reaches the board as no mark", () => {
     const w = world();
     const spell = { shape: 'sphere' as const, from: 'point' as const, at: { x: 0, y: 0, h: 0 }, yaw: 0, pitch: 0, roll: 0, size: 70, length: 0, angle: 0.9 };
     expect(w.hub.flashSpell('maps/a.atlasmap', spell, { push: 10 }, { name: 'Thunderwave' })).toBe(true);
@@ -72,7 +72,7 @@ describe('BoardSessionHub', () => {
     w.hub.onMark((mark) => marks.push(mark));
     const instant = { line: 'x', properties: [['Duration', 'Instantaneous']] as Array<[string, string]>, text: 'Boom.' };
     w.playerSends('anna', { v: 1, type: 'map-spell', sceneId: 's1', add: spell, name: 'Fireball', about: instant });
-    expect(marks).toEqual([{ kind: 'spell', mapPath: 'maps/a.atlasmap', cast: expect.objectContaining({ owner: 'anna', name: 'Fireball' }) }]);
+    expect(marks).toEqual([]);
   });
 
   it('pings and lasers players send reach the GM\'s board as marks of their map', () => {

@@ -8,7 +8,7 @@
  *   leaves, or in a sweep when a session starts (one left in the map by a crash).
  * - A kept spell stays in the map until its caster or the GM removes it: at most `perPlayer` of a player's and
  *   `perScene` in all on a map, and no more than Atlas keeps on a level.
- * - An instantaneous spell (its words say so) is kept nowhere: it is flashed to the scene's players and the GM's board.
+ * - An instantaneous spell (Fireball) is kept as any other: every cast stays until it is taken off.
  * - Atlas holds one map at a time: a request for a map it does not hold is refused, and the player is told.
  * - The GM's asks of tokens (`requestSpell`) wait here until a player casts or turns them down; they go to the
  *   token's players in `spell-asks`.
@@ -25,7 +25,7 @@ import type { SlotChange, SlotProjection, SlotView } from '../scene/slotViews';
 import { GM_LASER_ID, laserColor } from './laserColors';
 import type { PlayerColors } from './playerColors';
 import {
-  askedSpell, cleanAsk, cleanRules, cleanSpell, cutCastWords, isInstantaneous, isSpellRules, splitAsks, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS,
+  askedSpell, cleanAsk, cleanRules, cleanSpell, cutCastWords, isSpellRules, splitAsks, SPELL_ASKS_PER_PLAYER, SPELL_LIMITS,
   type MapSpell, type Spell, type SpellAbout, type SpellAsk, type SpellRequest, type SpellRules,
 } from './spells';
 import { TEMPLATE_LIMITS } from './templates';
@@ -241,12 +241,7 @@ export class MeasureHost implements SessionHandler {
       this.asking?.notify?.(`${player.name} cast ${what}.`);
       this.broadcastAsks(slot.sceneId);
     };
-    // A summoning spell is kept though instantaneous (Find Familiar): its going is what offers to take its summons off.
-    if (isInstantaneous(words?.about) && !rules?.summon) {
-      this.flash(slot.sceneId, { id: `f${this.nextFlash++}`, owner: player.playerId, color, spell, ...(rules ? { rules: cleanRules(rules) } : {}), ...cutCastWords(words) }, true);
-      done();
-      return;
-    }
+    // Every cast is kept, an instantaneous one (Fireball) too: it stays until its caster or the GM takes it off.
     const record = spellToMeasure(spell, { owner: player.playerId, by: player.name.slice(0, MEASURE_LIMITS.by), color, ...(rules ? { rules: cleanRules(rules) } : {}), ...cutCastWords(words) });
     const kept = this.write(player, slot, 'spell', (store) => {
       const spells = store.list().filter((measure) => measureKind(measure) === 'spell');
