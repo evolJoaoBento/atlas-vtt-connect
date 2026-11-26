@@ -73,6 +73,14 @@ const fitButton = element<HTMLButtonElement>('fit-map');
 let session: PlayerSession | null = null;
 /** A cutscene runs: the tools are locked. */
 let cutsceneLocked = false;
+/** Whether the 3D board died here last time even drawn its leanest (from the board's chunk, once it is loaded). */
+let boardDied: (() => boolean) | null = null;
+const boardNotice = element<HTMLElement>('board-notice');
+/** Says, for a while, why the map opened in 2D: the board closed this page last time. */
+function showBoardHeld(): void {
+  boardNotice.hidden = false;
+  window.setTimeout(() => { boardNotice.hidden = true; }, 10000);
+}
 /** Whether the GM takes dice thrown on the board, and its rules: the board's Roll dice (the one tool a cutscene leaves) throws and sends them. */
 let boardDice: BoardDiceOffer | null = null;
 // The lookup runs at draw time, in a later animation frame, so `loader` below is already set;
@@ -140,7 +148,12 @@ const map: SceneSwitch | null = surface
       note: { panel: element('note-panel'), title: element('note-title'), body: element('note-body'), closeButton: element('note-close') },
       doc: document,
     }),
-    loadBoard: () => import('./tabletopBoard.mts').then((chunk) => chunk.webPlayerBoard()),
+    loadBoard: () => import('./tabletopBoard.mts').then((chunk) => {
+      boardDied = chunk.boardDiedLeanest;
+      return chunk.webPlayerBoard();
+    }),
+    boardGaveOut: () => boardDied?.() ?? false,
+    onBoardHeld: () => showBoardHeld(),
     canvas, boardEl,
     dimensionButton: element('dimension-button'),
     eyeButton: element('eye-button'),

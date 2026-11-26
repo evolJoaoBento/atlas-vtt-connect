@@ -58,6 +58,13 @@ export interface SceneSwitchOptions {
   };
   /** Loads the board's chunk. */
   loadBoard(): Promise<PlayerBoardFactory>;
+  /**
+   * Whether the board died in this browser even drawn its leanest (a phone out of memory): the page then opens on the
+   * 2D map, and the board waits for the player's 3D tap. Asked once the board's code is here.
+   */
+  boardGaveOut?(): boolean;
+  /** The page opened on the 2D map because the board died on this device last time (`boardGaveOut`). */
+  onBoardHeld?(): void;
   canvas: HTMLElement;
   boardEl: HTMLElement;
   dimensionButton: HTMLButtonElement;
@@ -87,6 +94,8 @@ export class SceneSwitch implements SceneViewport {
   private loading = false;
   private offered = false;
   private wantsBoard = true;
+  /** The player tapped 2D/3D: their choice stands over the page's own. */
+  private chose = false;
   /** The GM holds a request of ours for this offer. */
   private asked = false;
   private disposed = false;
@@ -134,6 +143,7 @@ export class SceneSwitch implements SceneViewport {
       this.stops.push(() => target.removeEventListener(type, handler));
     };
     listen(options.dimensionButton, 'click', () => {
+      this.chose = true;
       this.wantsBoard = !this.wantsBoard;
       this.choose();
     });
@@ -179,6 +189,11 @@ export class SceneSwitch implements SceneViewport {
     this.loading = true;
     this.options.loadBoard().then((factory) => {
       this.factory = factory;
+      // The board died here last time even at its leanest: start on the 2D map rather than die again.
+      if (!this.chose && this.wantsBoard && this.options.boardGaveOut?.()) {
+        this.wantsBoard = false;
+        this.options.onBoardHeld?.();
+      }
     }, (error: unknown) => {
       this.options.onError?.('The 3D board could not load; the map stays 2D.', error);
     }).finally(() => {
