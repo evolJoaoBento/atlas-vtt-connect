@@ -3192,3 +3192,8 @@ body.atlas-tabletop-player-window .view-header {
 .atlas-tabletop-widgets { position: absolute; top: 0; left: 0; right: 0; height: 0; z-index: 8; pointer-events: none; }
 .atlas-tabletop-widgets .atlas-widget-bar { position: absolute; top: var(--size-4-2, 8px); right: var(--size-4-2, 8px); max-width: calc(100% - 16px); }
 .atlas-tabletop-widgets[hidden] { display: none; }
+
+/* A setting that belongs to the one above it in Tabletop's settings page (Walls reach the level above, under Default wall height): set in. */
+.atlas-tabletop-sub-setting {
+  padding-left: 24px;
+}
