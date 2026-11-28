@@ -24,6 +24,7 @@ import { atlasMapSize, playerVisibilityApi } from '../../packages/atlas-host/src
 import { onlineSessionStore } from '../app/online/onlineSessionStore';
 import { stockDiceApi } from './stockDice/stockDice';
 import { stockMapRules, stockMovement } from './stockRules';
+import { StockPresets } from './stockPresets';
 import { stockMeasuresApi } from './stockMeasures';
 import { fileMemory, PartyLinks, type LibraryToken } from './stockParty/partyLinks';
 import { partyScenes, SavedSceneTokens } from './stockParty/savedScene';
@@ -789,6 +790,9 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
         app.vault.on('rename', (file, old) => { saved.changed(old); saved.changed(file.path); }),
       ] : [];
       disposers.add(() => { for (const ref of vaultRefs) app.vault.offref(ref); });
+      // The game system presets a collection's initiative rules may come from (Atlas 0.21 reads them for players too).
+      const presets = new StockPresets(app);
+      disposers.add(() => presets.dispose());
       disposers.add(presented.onChange(sceneChanged));
       const party = new PartyLinks({
         session: { state: () => onlineSessionStore.getState(), subscribe: (listener) => onlineSessionStore.subscribe(listener) },
@@ -839,7 +843,7 @@ export function stockAtlasApi(app: App, atlasPlugin: StockPlugin): AtlasApi {
           forMap: (mapPath: string | null): MapRules => {
             try {
               const views = mapViews(app).map((view) => ({ mapPath: () => view.atlasStore.getState().mapPath, serviceManager: view.serviceManager }));
-              return stockMapRules(views, mapPath, defaultRules());
+              return stockMapRules(views, mapPath, defaultRules(), (id) => presets.initiativeOf(id));
             } catch (error) {
               console.warn('[Atlas VTT Connect] Could not read the rules of a stock Atlas map; using the defaults:', error);
               return defaultRules();

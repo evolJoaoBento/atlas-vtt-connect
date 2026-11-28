@@ -14,7 +14,7 @@ import { currentTurn, defeatedCombatants, inFight, turnEntries } from '../../../
 type TurnState = Pick<SceneSnapshot, 'initiative'> & { objects?: Partial<Pick<SceneSnapshot['objects'], 'tokens'>> };
 
 /** The shared rules' view of the store's fight (the API's type predates Atlas 0.18's tokenless entries). */
-type FightState = Parameters<typeof currentTurn>[0] & { entries: Parameters<typeof turnEntries>[1]['entries'] };
+type FightState = NonNullable<Parameters<typeof currentTurn>[0]> & { entries: NonNullable<Parameters<typeof inFight>[0]>['entries'] };
 
 /**
  * Whether a player may not move `tokenId` now (given the GM's choice that players move only on their turn): a fight

@@ -1,7 +1,7 @@
 /**
  * Atlas's kept measures (`objects.measures`) on a stock Atlas, as Connect writes them: a player's spell or template is
- * kept in Atlas's own store, the only place it lives, through the store's own actions (`addMeasure`, `updateMeasure`,
- * `deleteMeasure`). Each write runs inside one transaction of Atlas's history, so it is one undo step there. Atlas
+ * kept in Atlas's own store, the only place it lives, through the store's own actions (`addMeasure`; a change and a
+ * removal by Atlas 0.21's `patchObject` and `removeObjects`, else 0.15's `updateMeasure` and `deleteMeasure`). Each write runs inside one transaction of Atlas's history, so it is one undo step there. Atlas
  * holds one map at a time: a map its view does not hold (or is still reading) is not written at all (`not-held`).
  */
 import type { MeasureRecord } from '../../packages/atlas-host/src/spellMeasure';
@@ -38,13 +38,16 @@ type Rec = Record<string, unknown>;
 const isRec = (value: unknown): value is Rec => typeof value === 'object' && value !== null && !Array.isArray(value);
 const SHAPES = new Set(['ruler', 'circle', 'cone', 'square', 'line']);
 
-/** The store's state where it holds `mapPath` loaded and has Atlas 0.15's measure actions; null otherwise. */
+/** Whether the store can take a measure off: Atlas 0.21's `removeObjects`, or 0.15's `deleteMeasure`. */
+const removes = (state: Rec): boolean => typeof state.removeObjects === 'function' || typeof state.deleteMeasure === 'function';
+
+/** The store's state where it holds `mapPath` loaded and has Atlas's measure actions; null otherwise. */
 function heldState(view: MeasureStoreView | null, mapPath: string): Rec | null {
   if (!view) return null;
   let state: unknown;
   try { state = view.atlasStore.getState(); } catch { return null; }
   if (!isRec(state) || state.mapPath !== mapPath || state.mapLoaded === false || state.isMapLoading === true) return null;
-  return typeof state.addMeasure === 'function' && typeof state.deleteMeasure === 'function' ? state : null;
+  return typeof state.addMeasure === 'function' && removes(state) ? state : null;
 }
 
 function listOf(state: Rec): KeptRecord[] {
@@ -84,8 +87,16 @@ export function stockMeasuresApi(deps: {
           const id = (now().addMeasure as (data: MeasureRecord) => unknown)(placed);
           return typeof id === 'string' ? id : null;
         },
-        update: (id, changes) => { (now().updateMeasure as ((id: string, changes: object) => void) | undefined)?.(id, changes); },
-        remove: (id) => { (now().deleteMeasure as (id: string) => void)(id); },
+        update: (id, changes) => {
+          const state = now();
+          if (typeof state.patchObject === 'function') (state.patchObject as (kind: string, id: string, changes: object) => void)('measures', id, changes);
+          else (state.updateMeasure as ((id: string, changes: object) => void) | undefined)?.(id, changes);
+        },
+        remove: (id) => {
+          const state = now();
+          if (typeof state.removeObjects === 'function') (state.removeObjects as (ids: string[]) => void)([id]);
+          else (state.deleteMeasure as (id: string) => void)(id);
+        },
       };
       const history = view.atlasStore.temporal?.getState();
       const transaction = isRec(history) && typeof history.transaction === 'function' ? history.transaction as <T>(run: () => T) => T : null;

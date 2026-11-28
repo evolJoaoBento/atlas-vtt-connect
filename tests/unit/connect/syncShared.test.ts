@@ -19,7 +19,7 @@ const firstStub = (dir: string): string => {
 describe('check-shared', () => {
   it('passes on the committed tree', () => {
     const run = check();
-    expect(run.stdout + run.stderr).toContain('packages/atlas-shared matches Atlas 0.20.0');
+    expect(run.stdout + run.stderr).toContain('packages/atlas-shared matches Atlas 0.21.3');
     expect(run.status).toBe(0);
   });
 

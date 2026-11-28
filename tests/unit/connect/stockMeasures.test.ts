@@ -26,6 +26,23 @@ function fakeView(mapPath: string, over: Record<string, unknown> = {}) {
 }
 
 describe("measures on a stock Atlas's store", () => {
+  it("Atlas 0.21: a change and a removal go through the store's patchObject and removeObjects", () => {
+    const { view, measures, log, state } = fakeView('maps/a.atlasmap', { updateMeasure: undefined, deleteMeasure: undefined });
+    Object.assign(state, {
+      patchObject: (kind: string, id: string, changes: Record<string, unknown>) => { Object.assign(measures[id]!, changes); log.push(`patch:${kind}:${id}`); },
+      removeObjects: (ids: string[]) => { for (const id of ids) delete measures[id]; log.push(`remove:${ids.join(',')}`); },
+    });
+    const api = stockMeasuresApi({ view: () => view });
+    api.write('v1', 'maps/a.atlasmap', (store) => {
+      const id = store.add({ shape: 'circle', points: [{ x: 0, y: 0 }, { x: 70, y: 0 }] })!;
+      store.update(id, { colour: 'red' });
+      store.remove(id);
+      return id;
+    });
+    expect(log).toEqual(['begin', 'add:m1:tx', 'patch:measures:m1', 'remove:m1', 'end']);
+    expect(measures).toEqual({});
+  });
+
   it("keeps a player's measure on the level the players are shown, not the one the GM happens to browse", () => {
     const { view, measures } = fakeView('maps/a.atlasmap');
     const shown: { level: string | null | undefined } = { level: 'upper' };
