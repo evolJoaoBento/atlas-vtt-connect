@@ -3205,3 +3205,95 @@ body.atlas-tabletop-player-window .view-header {
   min-width: 0;
   min-height: 0;
 }
+
+/* The Sound files window (sound/SoundFilesWindow.tsx): Atlas's asset manager frame, sidebar and settings rows; these are only its own parts. */
+.atlas-tabletop-sound-files .atlas-asset-manager-header .atlas-am-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atlas-tabletop-sound-files .atlas-am-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.atlas-tabletop-sound-files-title {
+  font-size: var(--font-ui-medium);
+  font-weight: var(--font-semibold);
+  padding-left: 4px;
+}
+.atlas-tabletop-sound-files-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9999px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+.atlas-tabletop-sound-files-search svg { width: 14px; height: 14px; flex-shrink: 0; }
+.atlas-tabletop-sound-files-search input,
+.atlas-tabletop-sound-files-search input:focus,
+.atlas-tabletop-sound-files-search input:hover {
+  width: 200px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+.atlas-tabletop-sound-files-list {
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+}
+.atlas-tabletop-sound-file + .atlas-tabletop-sound-file { border-top: 1px solid var(--background-modifier-border); }
+.atlas-tabletop-sound-file .atlas-setting-row-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.atlas-tabletop-sound-file .atlas-setting-row-control .btn svg { width: 14px; height: 14px; }
+.atlas-tabletop-sound-file .atlas-setting-row-control .btn--sm { gap: 4px; }
+.atlas-tabletop-sound-file-level { width: 120px; }
+.atlas-tabletop-sound-file-percent {
+  width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+.atlas-tabletop-sound-file-mark {
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background-color: color-mix(in oklch, var(--interactive-accent) 14%, transparent);
+  color: var(--text-accent);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+.atlas-tabletop-sound-file-mark.is-failed {
+  background-color: color-mix(in oklch, var(--text-error) 14%, transparent);
+  color: var(--text-error);
+}
+.atlas-tabletop-sound-files-muted,
+.atlas-tabletop-sound-files-empty {
+  padding: 12px 0;
+  color: var(--text-muted);
+}
+.atlas-tabletop-sound-files-folder-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.atlas-tabletop-sound-files-folder-box .atlas-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.atlas-tabletop-sound-files-folder-box .atlas-section-title svg { width: 12px; height: 12px; }
+.atlas-tabletop-sound-files-folder { width: 100%; }
