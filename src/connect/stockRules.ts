@@ -214,8 +214,11 @@ function storedSettings(views: readonly RulesView[], mapPath: string): { collect
   return null;
 }
 
-/** `rules.forMap` for a stock Atlas: `defaults` with what the map's collection says over them. */
-export function stockMapRules(views: readonly RulesView[], mapPath: string | null, defaults: MapRules): MapRules {
+/**
+ * `rules.forMap` for a stock Atlas: `defaults` with what the map's collection says over them. A collection that stores no
+ * initiative rules of its own follows the game system preset it was set from (`presetInitiative`, by preset id), as Atlas does.
+ */
+export function stockMapRules(views: readonly RulesView[], mapPath: string | null, defaults: MapRules, presetInitiative?: (presetId: unknown) => unknown): MapRules {
   if (!mapPath) return defaults;
   const stored = storedSettings(views, mapPath);
   const showing = views.find((view) => view.mapPath() === mapPath);
@@ -224,7 +227,7 @@ export function stockMapRules(views: readonly RulesView[], mapPath: string | nul
     ?? (stored ? readList(stored.settings.resources, readResource, MAX_RESOURCES) ?? Object.freeze([HP_RESOURCE]) : null);
   const conditions = (sync ? readList(call(sync, 'conditions'), readCondition, MAX_CONDITIONS) : null)
     ?? (stored ? readList(stored.settings.conditions, readCondition, MAX_CONDITIONS) : null);
-  const initiative = stored ? readInitiative(stored.settings.initiative) : null;
+  const initiative = stored ? readInitiative(stored.settings.initiative) ?? readInitiative(presetInitiative?.(stored.settings.systemPresetId)) : null;
   // A dice set the tool cannot give a default roll for (mixed dice) takes the collection's stored one before the defaults.
   const storedDice = stored ? readDice(stored.settings.dice, defaults.dice) : null;
   const dice = (showing ? readDice(toolDice(showing), storedDice ?? defaults.dice) : null) ?? storedDice;
